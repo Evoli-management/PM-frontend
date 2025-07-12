@@ -4,6 +4,7 @@ import './index.css'
 import Home from './pages/Home.jsx'
 import Pricing from "./pages/Pricing.jsx";
 import Testimonials from "./pages/Testimonials.jsx";
+import Login from "./pages/Login.jsx";
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
 const router = createBrowserRouter([
@@ -24,5 +25,6 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')).render(
   <StrictMode>
       <RouterProvider router={router} />
+      <Login/>
   </StrictMode>,
 )
