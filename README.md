@@ -1,12 +1,47 @@
-# React + Vite
+# PM-Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+---
 
-Currently, two official plugins are available:
+## Requirements:
+- Node | Bun
+- Text Editor | IDE
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Tech Stack
 
-## Expanding the ESLint configuration
+- **React (with Vite)** - UI library
+- **JavaScript** - Programming Language
+- **CSS | TailwindCSS** - for styling
+- **React Router** - for routing
+- **Lucide React** - for icons
+- **Prettier** - for formating
+- **Zod** - Schema Validation
+- **Axios** - for promise-based HTTP
 
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Setup Info:
+
+1. Clone Repo
+`git clone https://github.com/Evoli-management/PM-frontend.git -b <branch_name>`
+
+2. Navigate to the repo
+`cd <PM-frontend>`
+
+3. Install dependencies
+`npm install`
+
+4. Start dev server
+`npm run dev`
+
+## Testing:
+
+`npm run test`
+
+## To check production
+
+1. Build the app
+`npm run build`
+
+2. Preview the build
+`npm run preview`
+
+## License
+- None
