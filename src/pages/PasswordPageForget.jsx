@@ -1,8 +1,42 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
 
 const ForgotPasswordPage = () => {
+    const [email, setEmail] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
+
+    const handleEmailChange = (e) => {
+        setEmail(e.target.value);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        // Basic email validation
+        if (!email) {
+            alert("Please enter your email address");
+            return;
+        }
+
+        if (!email.includes("@") || !email.includes(".")) {
+            alert("Please enter a valid email address");
+            return;
+        }
+
+        setIsLoading(true);
+
+        // Simulate API call for sending reset email
+        setTimeout(() => {
+            setIsLoading(false);
+            // Redirect to reset password page
+            navigate("/reset-password", { 
+                state: { email: email } // Pass email to reset password page
+            });
+        }, 1000);
+    };
     return (
         <div className="min-h-screen flex items-center justify-center bg-white px-4">
             <div className="w-full max-w-[1450px] bg-white rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.5)] flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
@@ -31,26 +65,32 @@ const ForgotPasswordPage = () => {
                             Enter your email to receive reset password instructions
                         </p>
 
-                        <div className="relative mb-4 sm:mb-6 shadow w-full max-w-[613px] h-[50px] sm:h-[57px]">
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                className="w-full h-full pl-10 sm:pl-12 pr-4 text-black placeholder-black border border-gray-300 rounded-[12px] text-sm sm:text-base"
-                                style={{ backgroundColor: "#AEC1FF" }}
-                            />
-                            <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                <FontAwesomeIcon icon={faEnvelope} className="text-lg sm:text-xl" />
-                            </span>
-                        </div>
+                        <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
+                            <div className="relative mb-4 sm:mb-6 shadow w-full max-w-[613px] h-[50px] sm:h-[57px]">
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={handleEmailChange}
+                                    placeholder="Email"
+                                    className="w-full h-full pl-10 sm:pl-12 pr-4 text-black placeholder-black border border-gray-300 rounded-[12px] text-sm sm:text-base"
+                                    style={{ backgroundColor: "#AEC1FF" }}
+                                    required
+                                />
+                                <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
+                                    <FontAwesomeIcon icon={faEnvelope} className="text-lg sm:text-xl" />
+                                </span>
+                            </div>
 
-                        {/* Submit button */}
-                        <button
-                            type="submit"
-                            className="text-black font-semibold w-full max-w-[613px] h-[50px] sm:h-[57px] rounded-[12px] shadow text-sm sm:text-base"
-                            style={{ backgroundColor: "#1BFF23" }}
-                        >
-                            SUBMIT
-                        </button>
+                            {/* Submit button */}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="text-black font-semibold w-full max-w-[613px] h-[50px] sm:h-[57px] rounded-[12px] shadow text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ backgroundColor: "#1BFF23" }}
+                            >
+                                {isLoading ? "SENDING..." : "SUBMIT"}
+                            </button>
+                        </form>
                     </div>
                 </div>
 
