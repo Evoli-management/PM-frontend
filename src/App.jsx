@@ -15,7 +15,7 @@ export default function App() {
                     <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<LoginPage />} />
-                        <Route path="/password-forget" element={<PasswordPageForget />} />
+                        <Route path="/PasswordPageForget" element={<PasswordPageForget />} />
                         <Route path="/reset-password" element={<ResetPasswordpage />} />
                     </Routes>
                 </main>
