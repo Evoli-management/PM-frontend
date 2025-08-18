@@ -1,0 +1,143 @@
+/* Cross-browser compatibility and mobile responsiveness */
+
+/* Reset and normalize for consistent rendering across browsers */
+* {
+  box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+}
+
+/* Ensure consistent font rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Fix for Safari and iOS */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+button {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+/* Prevent zoom on input focus in iOS */
+@media screen and (max-width: 768px) {
+  input[type="email"],
+  input[type="password"],
+  input[type="text"] {
+    font-size: 16px !important;
+  }
+}
+
+/* Fix for flexbox in older browsers */
+.flex {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+/* Ensure images are responsive */
+img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Fix for button styling across browsers */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus {
+  outline: 2px solid #00e200;
+  outline-offset: 2px;
+}
+
+/* Fix for input field styling */
+input {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input:focus {
+  outline: 2px solid #00e200;
+  outline-offset: -2px;
+}
+
+/* Ensure proper viewport handling */
+@viewport {
+  width: device-width;
+  initial-scale: 1;
+}
+
+/* Fix for IE and Edge */
+@supports (-ms-ime-align: auto) {
+  .flex {
+    display: -ms-flexbox;
+  }
+}
+
+/* Mobile-first responsive breakpoints */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hidden-desktop {
+    display: none !important;
+  }
+}
+
+/* Fix for touch devices */
+@media (hover: none) and (pointer: coarse) {
+  button:hover {
+    background-color: inherit;
+  }
+}
+
+/* High DPI display support */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Dark mode support preparation */
+@media (prefers-color-scheme: dark) {
+  /* Add dark mode styles if needed */
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
