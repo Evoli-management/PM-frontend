@@ -7,6 +7,7 @@ import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
 
 export default function App() {
     return (
@@ -21,6 +22,7 @@ export default function App() {
                         <Route path="/reset-password" element={<ResetPasswordpage />} />
                         <Route path="/registration" element={<Registration />} />
                         <Route path="/profile-settings" element={<ProfileSetting />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
                     </Routes>
                 </main>
                 <Footer />

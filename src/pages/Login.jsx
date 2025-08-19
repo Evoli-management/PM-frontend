@@ -1,7 +1,8 @@
+
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faLock, faEye, faEyeSlash, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 
 const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
@@ -10,196 +11,180 @@ const LoginPage = () => {
         password: "",
         rememberMe: false,
     });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const navigate = useNavigate();
+
     const handleForgotPassword = () => {
         navigate("/PasswordPageForget");
     };
+
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData((prev) => ({
             ...prev,
             [name]: type === "checkbox" ? checked : value,
         }));
+        setError("");
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-
-        // Basic validation
+        setError("");
         if (!formData.email || !formData.password) {
-            alert("Please fill in all fields");
+            setError("Please fill in all fields.");
             return;
         }
-
-        // Here you would typically make an API call to authenticate
-        // For now, we'll just simulate a successful login
-        console.log("Login submitted:", formData);
-
-        // Simulate API call delay
+        setLoading(true);
         setTimeout(() => {
-            // Redirect to homepage after successful login
+            setLoading(false);
+            if (formData.email !== "demo@pm.com" || formData.password !== "demo123") {
+                setError("Invalid email or password.");
+                return;
+            }
             navigate("/");
-        }, 500);
+        }, 1200);
     };
 
     const handleSocialLogin = (provider) => {
-        // Handle social login (Google/Microsoft)
-        console.log(`${provider} login initiated`);
-        // Simulate social login success
+        setLoading(true);
+        setError("");
         setTimeout(() => {
-            navigate("/");
-        }, 500);
+            setLoading(false);
+            if (provider === "Google" || provider === "Microsoft") {
+                navigate("/");
+            } else {
+                setError("Social login failed. Try again.");
+            }
+        }, 1200);
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-white p-4">
-            {/* Main Box */}
-            <div className="w-full max-w-[1450px] bg-white rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.5)] flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-                {/* Left Section. */}
-                <div className="w-full lg:w-1/2 flex flex-col items-center">
-                    {/* Logo */}
+        <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
+            <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8">
+                {/* Login Box */}
+                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
                     <img
                         src="/PM-frontend/logo.png"
                         alt="Practical Manager Logo"
-                        className="mb-4 w-[200px] h-[133px] sm:w-[250px] sm:h-[167px] lg:w-[314.63px] lg:h-[210px] object-contain"
+                        loading="lazy"
+                        className="mb-4 w-32 h-20 object-contain"
                     />
-
-                    <h2 className="text-[20px] sm:text-[24px] lg:text-[28px] font-bold text-black mb-2">LOGIN</h2>
-                    <p className="text-black font-semibold mb-4 text-sm sm:text-base text-center px-4">
-                        Login and Take Control of Your Workflow.
-                    </p>
-
-                    {/* Form */}
-                    <form className="space-y-4 flex flex-col items-center w-full" onSubmit={handleSubmit}>
-                        {/* Email Input */}
-                        <div className="relative w-full max-w-[721px] h-[55px] sm:h-[65px]">
+                    <h2 className="text-2xl font-bold text-black mb-2 text-center">LOGIN</h2>
+                    <p className="text-black font-semibold mb-4 text-base text-center">Login and Take Control of Your Workflow.</p>
+                    <form className="space-y-4 w-full" onSubmit={handleSubmit} aria-label="Login form">
+                        <div className="relative w-full">
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
                                 placeholder="Enter your Email"
-                                className="w-full h-full pl-10 sm:pl-12 pr-2 border border-gray-300 rounded-lg sm:rounded-none text-black text-sm sm:text-base"
-                                style={{ backgroundColor: "#AEC1FF" }}
+                                className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base bg-blue-100"
                                 required
+                                aria-label="Email"
                             />
-                            <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                <FontAwesomeIcon icon={faEnvelope} className="text-lg sm:text-2xl" />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
                             </span>
                         </div>
-
-                        {/* Password Input */}
-                        <div className="relative w-full max-w-[721px] h-[55px] sm:h-[65px]">
+                        <div className="relative w-full">
                             <input
                                 type={showPassword ? "text" : "password"}
                                 name="password"
                                 value={formData.password}
                                 onChange={handleInputChange}
                                 placeholder="Enter Password"
-                                className="w-full h-full pl-10 sm:pl-12 pr-10 border border-gray-300 rounded-lg sm:rounded-none text-black text-sm sm:text-base"
-                                style={{ backgroundColor: "#AEC1FF" }}
+                                className="w-full p-3 pl-10 pr-10 rounded-lg border border-gray-300 text-base bg-blue-100"
                                 required
+                                aria-label="Password"
                             />
-                            <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                <FontAwesomeIcon icon={faLock} className="text-lg sm:text-2xl" />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                <FontAwesomeIcon icon={faLock} className="text-lg" />
                             </span>
                             <span
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 cursor-pointer text-black"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-black"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                tabIndex={0}
+                                role="button"
                             >
                                 <FontAwesomeIcon
                                     icon={showPassword ? faEye : faEyeSlash}
-                                    className="text-lg sm:text-2xl"
+                                    className="text-lg"
                                 />
                             </span>
+                            <span className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400" title="Password must be at least 6 characters">
+                                <FontAwesomeIcon icon={faInfoCircle} />
+                            </span>
                         </div>
-
-                        {/* Remember Me & Forgot Password */}
-                        <div className="flex flex-col sm:flex-row items-center justify-between w-full max-w-[721px] gap-2 sm:gap-0">
-                            <label className="flex items-center text-xs sm:text-sm text-black">
+                        <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-2">
+                            <label className="flex items-center text-sm text-black">
                                 <input
                                     type="checkbox"
                                     name="rememberMe"
                                     checked={formData.rememberMe}
                                     onChange={handleInputChange}
                                     className="mr-2"
-                                />{" "}
+                                    aria-label="Remember me"
+                                />
                                 Remember me!
                             </label>
-                            <button
-                                type="button"
-                                onClick={handleForgotPassword}
-                                className="text-xs sm:text-sm text-black underline font-semibold bg-transparent border-none cursor-pointer"
-                                style={{ padding: 0 }}
+                            <Link
+                                to="/PasswordPageForget"
+                                className="text-sm text-blue-700 underline font-semibold bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                aria-label="Forgot password"
                             >
                                 Forget password?
-                            </button>
+                            </Link>
                         </div>
-
-                        {/* Login Button */}
+                        {error && <div className="w-full text-red-600 text-sm font-semibold text-center" role="alert">{error}</div>}
                         <button
                             type="submit"
-                            className="text-white font-semibold rounded-[16px] w-full max-w-[724px] h-[50px] sm:h-[57px] text-sm sm:text-base"
-                            style={{ backgroundColor: "#00e200" }}
+                            className={`w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            disabled={loading}
+                            aria-busy={loading}
                         >
-                            Login
+                            {loading ? "Logging in..." : "Login"}
                         </button>
-
-                        {/* Divider */}
-                        <div className="w-full max-w-[724px] flex items-center justify-center gap-4 my-6 text-xs sm:text-sm text-black font-semibold">
+                        <div className="w-full flex items-center justify-center gap-4 my-6 text-sm text-black font-semibold">
                             <span className="flex-1 h-[1px] bg-black"></span>
                             <span>or continue</span>
                             <span className="flex-1 h-[1px] bg-black"></span>
                         </div>
-
-                        {/* Continue Box */}
-                        <div
-                            className="border border-gray-300 px-4 py-6 rounded-[24px] flex items-center justify-center w-full max-w-[727px] min-h-[90px]"
-                            style={{ backgroundColor: "#DEE3DD" }}
-                        >
-                            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8 lg:gap-16 w-full">
-                                {/* Google */}
-                                <button
-                                    type="button"
-                                    onClick={() => handleSocialLogin("Google")}
-                                    className="flex items-center justify-center border border-gray-300 rounded-[24px] w-full sm:w-[200px] lg:w-[257px] h-[50px] sm:h-[57px]"
-                                    style={{ backgroundColor: "#FFFFFF" }}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <img
-                                            src="/PM-frontend/google.svg"
-                                            alt="Google"
-                                            className="w-4 h-4 sm:w-5 sm:h-5"
-                                        />
-                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">
-                                            Login with Google
-                                        </span>
-                                    </div>
-                                </button>
-
-                                {/* Microsoft */}
-                                <button
-                                    type="button"
-                                    onClick={() => handleSocialLogin("Microsoft")}
-                                    className="flex items-center justify-center border border-gray-300 rounded-[24px] w-full sm:w-[200px] lg:w-[257px] h-[50px] sm:h-[57px]"
-                                    style={{ backgroundColor: "#FFFFFF" }}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <img
-                                            src="/PM-frontend/microsoft.svg"
-                                            alt="Microsoft"
-                                            className="w-4 h-4 sm:w-5 sm:h-5"
-                                        />
-                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">
-                                            Login with Microsoft
-                                        </span>
-                                    </div>
-                                </button>
-                            </div>
+                        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full">
+                            <button
+                                type="button"
+                                onClick={() => handleSocialLogin("Google")}
+                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-white transition hover:bg-gray-50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={loading}
+                                aria-label="Login with Google"
+                            >
+                                <img
+                                    src="/PM-frontend/google.svg"
+                                    alt="Google"
+                                    loading="lazy"
+                                    className="w-5 h-5 mr-2"
+                                />
+                                <span className="text-gray-700 font-medium">Login with Google</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSocialLogin("Microsoft")}
+                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-white transition hover:bg-gray-50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={loading}
+                                aria-label="Login with Microsoft"
+                            >
+                                <img
+                                    src="/PM-frontend/microsoft.svg"
+                                    alt="Microsoft"
+                                    loading="lazy"
+                                    className="w-5 h-5 mr-2"
+                                />
+                                <span className="text-gray-700 font-medium">Login with Microsoft</span>
+                            </button>
                         </div>
-
-                        {/* Register Link */}
-                        <p className="text-xs sm:text-sm text-center mt-4 text-black font-semibold">
+                        <p className="text-sm text-center mt-4 text-black font-semibold">
                             Not registered yet?{" "}
                             <Link to="/registration" className="text-blue-600 hover:text-blue-800 underline">
                                 Please register here
@@ -207,16 +192,16 @@ const LoginPage = () => {
                         </p>
                     </form>
                 </div>
-
-                {/* Right Vector Section */}
-                <div className="hidden lg:flex lg:w-1/2 items-center justify-center">
+                {/* Illustration Section */}
+                <div className="hidden md:flex flex-1 items-center justify-center">
                     <div className="text-center">
                         <img
                             src="/PM-frontend/image.png"
                             alt="2FA Illustration"
-                            className="w-[300px] h-[350px] lg:w-[400px] lg:h-[470px] xl:w-[515px] xl:h-[600px] object-contain"
+                            loading="lazy"
+                            className="w-64 h-64 object-contain mx-auto"
                         />
-                        <p className="mt-4 text-black text-xs sm:text-sm font-semibold mx-auto max-w-[439px] px-4">
+                        <p className="mt-4 text-black text-sm font-semibold mx-auto max-w-xs px-4">
                             This account is protected with <br />
                             Two factor authentication 2FA
                         </p>

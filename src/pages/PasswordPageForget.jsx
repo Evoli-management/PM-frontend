@@ -38,81 +38,50 @@ const ForgotPasswordPage = () => {
         }, 1000);
     };
     return (
-        <div className="min-h-screen flex items-center justify-center bg-white px-4">
-            <div className="w-full max-w-[1450px] bg-white rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.5)] flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-                {/* Left Section */}
-                <div className="flex flex-col items-center w-full lg:w-1/2">
-                    {/* Logo */}
+        <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
+            <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8">
+                {/* Forgot Password Box */}
+                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
                     <img
                         src="/PM-frontend/logo.png"
                         alt="Practical Manager Logo"
-                        className="mb-4 w-[200px] h-[133px] sm:w-[250px] sm:h-[167px] lg:w-[314.63px] lg:h-[210px] object-contain"
+                        className="mb-4 w-32 h-20 object-contain"
                     />
-
-                    {/* White Box with Solid Border (Pencil-Style) */}
-                    <div
-                        className="flex flex-col items-center py-6 sm:py-8 px-4 sm:px-6 mb-6 w-full max-w-[720px]"
-                        style={{
-                            backgroundColor: "#ffffff",
-                            border: "2px solid #333",
-                            borderRadius: "12px",
-                            boxShadow: "2px 2px 0px rgba(0,0,0,0.3)",
-                        }}
-                    >
-                        <h2 className="text-[18px] sm:text-[20px] lg:text-[24px] font-bold text-black text-center mb-2">FORGOT PASSWORD?</h2>
-
-                        <p className="text-black font-medium text-sm sm:text-base text-center mb-4 sm:mb-6 px-2 sm:px-4">
-                            Enter your email to receive reset password instructions
-                        </p>
-
-                        <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
-                            <div className="relative mb-4 sm:mb-6 shadow w-full max-w-[613px] h-[50px] sm:h-[57px]">
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={handleEmailChange}
-                                    placeholder="Email"
-                                    className="w-full h-full pl-10 sm:pl-12 pr-4 text-black placeholder-black border border-gray-300 rounded-[12px] text-sm sm:text-base"
-                                    style={{ backgroundColor: "#AEC1FF" }}
-                                    required
-                                />
-                                <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                    <FontAwesomeIcon icon={faEnvelope} className="text-lg sm:text-xl" />
-                                </span>
-                            </div>
-
-                            {/* Submit button */}
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="text-black font-semibold w-full max-w-[613px] h-[50px] sm:h-[57px] rounded-[12px] shadow text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                                style={{ backgroundColor: "#1BFF23" }}
-                            >
-                                {isLoading ? "SENDING..." : "SUBMIT"}
-                            </button>
-                        </form>
-                    </div>
+                    <h2 className="text-2xl font-bold text-black mb-2 text-center">FORGOT PASSWORD?</h2>
+                    <p className="text-black font-medium mb-4 text-base text-center">Enter your email to receive reset password instructions</p>
+                    <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
+                        <div className="relative w-full mb-4">
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={handleEmailChange}
+                                placeholder="Email"
+                                className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base bg-blue-100"
+                                required
+                            />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
+                            </span>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? "SENDING..." : "SUBMIT"}
+                        </button>
+                    </form>
                 </div>
-
-                {/* Right Section */}
-                <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center">
-                    {/* Header Text Horizontally with more spacing and lower position */}
-                    <div className="flex flex-wrap justify-center gap-4 lg:gap-8 xl:gap-12 mb-6 lg:mb-8 mt-6 lg:mt-10">
-                        <p className="text-black text-xs lg:text-sm xl:text-base font-semibold text-center">BENEFIT AND FEATURES</p>
-                        <p className="text-black text-xs lg:text-sm xl:text-base font-semibold text-center">PRICING</p>
-                        <p className="text-black text-xs lg:text-sm xl:text-base font-semibold text-center">CONTACT AND HELP</p>
-                    </div>
-
-                    {/* Smaller Vector.*/}
+                {/* Illustration Section */}
+                <div className="hidden md:flex flex-1 items-center justify-center">
                     <div className="text-center">
                         <img
                             src="/PM-frontend/forget.png"
                             alt="Forgot Password Illustration"
-                            className="w-[250px] h-[295px] lg:w-[300px] lg:h-[355px] xl:w-[400px] xl:h-[470px] object-contain"
+                            className="w-64 h-64 object-contain mx-auto"
                         />
-                        <p className="mt-4 text-black text-xs sm:text-sm font-semibold mx-auto max-w-[439px] px-4">
-                            Your tasks won’t even notice you left.
-                            <br />
+                        <p className="mt-4 text-black text-sm font-semibold mx-auto max-w-xs px-4">
+                            Your tasks won’t even notice you left.<br />
                             Secure password, powered by Practical Manager.
                         </p>
                     </div>
