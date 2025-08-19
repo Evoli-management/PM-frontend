@@ -41,12 +41,12 @@ const Home = () => {
             </nav>
 
             {/* Hero Section */}
-            <section className="px-4 py-10 text-center bg-white shadow">
-                <h1 className="text-2xl sm:text-4xl font-bold mb-4 text-blue-700">Your team's success, powered by Practical Manager</h1>
-                <p className="text-base sm:text-xl mb-6 text-gray-700">A unique platform to transform the way you work. Built for teams of all sizes, focused on productivity, engagement, and leadership.</p>
-                <Link to="/registration" className="inline-block bg-blue-700 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-blue-800 transition mb-4">Get Started Free</Link>
-                <div className="mt-6 flex justify-center">
-                    <img src="/public/icon.png" alt="Practical Manager" className="w-24 h-24 rounded-full shadow-lg" />
+            <section className="flex flex-col items-center justify-center px-2 py-10 bg-white">
+                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
+                    <img src="/public/icon.png" alt="Practical Manager" className="mb-4 w-24 h-24 rounded-full shadow-lg object-contain" />
+                    <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-blue-700 text-center">Your team's success, powered by Practical Manager</h1>
+                    <p className="text-base sm:text-lg mb-6 text-gray-700 text-center">A unique platform to transform the way you work. Built for teams of all sizes, focused on productivity, engagement, and leadership.</p>
+                    <Link to="/registration" className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 mb-2 text-center">Get Started Free</Link>
                 </div>
             </section>
 
@@ -113,25 +113,29 @@ const Home = () => {
             </section>
 
             {/* Contact Form Section */}
-            <section id="contact" className="bg-blue-50 py-10 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-6">Contact us for DEMO</h2>
-                <form className="mx-auto bg-white rounded-2xl shadow-lg p-6 max-w-md w-full">
-                    <input type="text" placeholder="First Name" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
-                    <input type="text" placeholder="Last Name*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                    <input type="text" placeholder="Phone" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
-                    <input type="email" placeholder="Email*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                    <input type="text" placeholder="Company*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                    <input type="number" placeholder="No. of Employees" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
-                    <div className="text-left mb-4">
-                        <label className="text-sm">
-                            <input type="checkbox" required className="mr-2" /> I agree with <a href="#" className="text-blue-700 underline">terms and conditions</a> and <a href="#" className="text-blue-700 underline">privacy policy</a>.
-                        </label>
-                    </div>
-                    <input type="text" placeholder="Enter the Captcha" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                    <div className="mb-4 text-blue-700 font-bold">m5yg32 <button type="button" className="ml-2 text-blue-700 underline">Reload</button></div>
-                    <button type="submit" className="bg-blue-700 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-blue-800 transition mr-2">Submit</button>
-                    <button type="reset" className="bg-yellow-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-yellow-700 transition">Reset</button>
-                </form>
+            <section id="contact" className="bg-blue-50 py-10 flex flex-col items-center justify-center">
+                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-6 text-center">Contact us for DEMO</h2>
+                    <form className="w-full flex flex-col items-center">
+                        <input type="text" placeholder="First Name" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
+                        <input type="text" placeholder="Last Name*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                        <input type="text" placeholder="Phone" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
+                        <input type="email" placeholder="Email*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                        <input type="text" placeholder="Company*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                        <input type="number" placeholder="No. of Employees" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
+                        <div className="w-full text-left mb-4">
+                            <label className="text-sm">
+                                <input type="checkbox" required className="mr-2" /> I agree with <a href="#" className="text-blue-700 underline">terms and conditions</a> and <a href="#" className="text-blue-700 underline">privacy policy</a>.
+                            </label>
+                        </div>
+                        <input type="text" placeholder="Enter the Captcha" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                        <div className="mb-4 text-blue-700 font-bold">m5yg32 <button type="button" className="ml-2 text-blue-700 underline">Reload</button></div>
+                        <div className="flex w-full gap-2">
+                            <button type="submit" className="w-1/2 rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800">Submit</button>
+                            <button type="reset" className="w-1/2 rounded-lg bg-yellow-600 text-white font-bold py-3 text-lg transition hover:bg-yellow-700">Reset</button>
+                        </div>
+                    </form>
+                </div>
             </section>
 
             {/* Footer Section */}

@@ -199,9 +199,9 @@ const LoginPage = () => {
                             src="/PM-frontend/image.png"
                             alt="2FA Illustration"
                             loading="lazy"
-                            className="w-64 h-64 object-contain mx-auto"
+                            className="w-[300px] h-[350px] lg:w-[400px] lg:h-[470px] xl:w-[515px] xl:h-[600px] object-contain mx-auto"
                         />
-                        <p className="mt-4 text-black text-sm font-semibold mx-auto max-w-xs px-4">
+                        <p className="mt-4 text-black text-sm font-semibold mx-auto max-w-[439px] px-4">
                             This account is protected with <br />
                             Two factor authentication 2FA
                         </p>

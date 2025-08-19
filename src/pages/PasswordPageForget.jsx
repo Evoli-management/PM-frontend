@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
 
@@ -47,7 +47,7 @@ const ForgotPasswordPage = () => {
                         alt="Practical Manager Logo"
                         className="mb-4 w-32 h-20 object-contain"
                     />
-                    <h2 className="text-2xl font-bold text-black mb-2 text-center">FORGOT PASSWORD?</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-2 text-center">FORGOT PASSWORD?</h2>
                     <p className="text-black font-medium mb-4 text-base text-center">Enter your email to receive reset password instructions</p>
                     <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
                         <div className="relative w-full mb-4">
@@ -71,6 +71,15 @@ const ForgotPasswordPage = () => {
                             {isLoading ? "SENDING..." : "SUBMIT"}
                         </button>
                     </form>
+                    <div className="w-full flex flex-col items-center mt-6">
+                        <span className="text-gray-500 text-sm mb-2">Remembered your password?</span>
+                        <Link
+                            to="/login"
+                            className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
+                        >
+                            Back to Login
+                        </Link>
+                    </div>
                 </div>
                 {/* Illustration Section */}
                 <div className="hidden md:flex flex-1 items-center justify-center">
