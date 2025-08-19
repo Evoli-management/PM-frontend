@@ -6,6 +6,7 @@ import Home from "./pages/Home.jsx";
 import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
+import ProfileSetting from "./pages/SetProfile.jsx";
 
 export default function App() {
     return (
@@ -19,6 +20,7 @@ export default function App() {
                         <Route path="/PasswordPageForget" element={<PasswordPageForget />} />
                         <Route path="/reset-password" element={<ResetPasswordpage />} />
                         <Route path="/registration" element={<Registration />} />
+                        <Route path="/profile-settings" element={<ProfileSetting />} />
                     </Routes>
                 </main>
                 <Footer />
