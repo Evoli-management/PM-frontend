@@ -49,9 +49,8 @@ const testimonials = [
     { quote: "The feedback and recognition tools make management easy and effective.", author: "HR Manager, InnovateX" },
 ];
 
-const partners = [
-    "Amazon", "KPMG", "Netflix", "HP", "Facebook"
-];
+// Remove placeholder brands; use empty array or your real partners if available
+const partners = [];
 
 const Home = () => {
     return (
@@ -65,7 +64,10 @@ const Home = () => {
                     <a href="#testimonials" style={navLink}>Testimonials</a>
                     <a href="#contact" style={navLink}>Contact</a>
                 </div>
-                <Link to="/login" style={{ background: '#217c8c', color: '#fff', borderRadius: 20, padding: '0.5rem 1.5rem', fontWeight: 600, textDecoration: 'none' }}>Login</Link>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <Link to="/login" style={{ background: '#217c8c', color: '#fff', borderRadius: 20, padding: '0.5rem 1.5rem', fontWeight: 600, textDecoration: 'none' }}>Login</Link>
+                    <Link to="/registration" style={{ background: '#c87d2a', color: '#fff', borderRadius: 20, padding: '0.5rem 1.5rem', fontWeight: 600, textDecoration: 'none' }}>Register</Link>
+                </div>
             </nav>
 
             {/* Hero Section */}
@@ -76,7 +78,7 @@ const Home = () => {
                 <p style={{ fontSize: '1.25rem', marginBottom: '2rem', color: '#234' }}>
                     A unique platform to transform the way you work. Built for teams of all sizes, focused on productivity, engagement, and leadership.
                 </p>
-                <Link to="/register" style={{ ...ctaBtn, display: 'inline-block', textAlign: 'center', textDecoration: 'none', fontSize: '1.1rem', fontWeight: 700 }}>Get Started Free</Link>
+                <Link to="/registration" style={{ ...ctaBtn, display: 'inline-block', textAlign: 'center', textDecoration: 'none', fontSize: '1.1rem', fontWeight: 700 }}>Get Started Free</Link>
                 <div style={{ marginTop: '2rem' }}>
                     <img src="/public/icon.png" alt="Practical Manager" style={{ width: 120, borderRadius: '50%', boxShadow: '0 2px 12px #217c8c22' }} />
                 </div>
@@ -107,18 +109,16 @@ const Home = () => {
             <section style={{ background: '#ffe600', padding: '3rem 0', textAlign: 'center' }}>
                 <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#234', marginBottom: '1rem' }}>All-in-one suite for your business</h2>
                 <p style={{ fontSize: '1.15rem', color: '#234', marginBottom: '1.5rem' }}>Break down silos, increase efficiency, and empower your team with Practical Manager.</p>
-                <Link to="/register" style={{ ...ctaBtn, background: '#e53935', display: 'inline-block', textAlign: 'center', textDecoration: 'none' }}>Try Now</Link>
+                <Link to="/registration" style={{ ...ctaBtn, background: '#e53935', display: 'inline-block', textAlign: 'center', textDecoration: 'none' }}>Try Now</Link>
             </section>
 
-            {/* Trust Signals Section */}
-            <section style={{ background: '#f8f9fa', padding: '2rem 0', textAlign: 'center' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#217c8c', marginBottom: '1rem' }}>Brands that trust us</h3>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    {partners.map((p, i) => (
-                        <span key={i} style={{ fontWeight: 600, color: '#234', fontSize: '1.2rem', background: '#fff', borderRadius: 12, padding: '0.75rem 2rem', boxShadow: '0 2px 8px #217c8c22' }}>{p}</span>
-                    ))}
-                </div>
-            </section>
+                    {/* Trust Signals Section - removed brands, upgraded for clean UI */}
+                    <section style={{ background: '#f8f9fa', padding: '2rem 0', textAlign: 'center', borderTop: '1px solid #e0e0e0' }}>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#217c8c', marginBottom: '1rem' }}>Trusted by teams who value results</h3>
+                        <div style={{ color: '#888', fontSize: '1.05rem', marginBottom: '1rem' }}>
+                            Practical Manager is used by organizations focused on growth, engagement, and leadership.
+                        </div>
+                    </section>
 
             {/* Testimonials Section */}
             <section id="testimonials" style={{ background: '#fff', padding: '2rem 0', textAlign: 'center' }}>
@@ -170,19 +170,19 @@ const Home = () => {
                 </form>
             </section>
 
-            {/* Footer Section */}
-            <footer style={{ background: '#fff', padding: '2rem 0', textAlign: 'center', color: '#234', fontSize: '1rem', marginTop: '2rem', boxShadow: '0 -2px 8px #217c8c11' }}>
-                <div style={{ marginBottom: '1rem' }}>
-                    <a href="#" style={{ margin: '0 1rem', color: '#217c8c', textDecoration: 'none' }}>User guidelines</a>
-                    <a href="#" style={{ margin: '0 1rem', color: '#217c8c', textDecoration: 'none' }}>FAQ</a>
-                    <a href="#" style={{ margin: '0 1rem', color: '#217c8c', textDecoration: 'none' }}>Contact us</a>
-                    <a href="#" style={{ margin: '0 1rem', color: '#217c8c', textDecoration: 'none' }}>About us</a>
-                </div>
-                <div style={{ marginBottom: '0.5rem' }}>
-                    <a href="#" style={{ color: '#217c8c', marginRight: 8 }}>Privacy policy</a> | <a href="#" style={{ color: '#217c8c', marginLeft: 8 }}>Terms of service</a>
-                </div>
-                <div style={{ color: '#888', fontSize: '0.95rem' }}>Copyright © 2025 Evoli management d.o.o.</div>
-            </footer>
+                    {/* Footer Section - upgraded for best UI/UX */}
+                    <footer style={{ background: '#fff', padding: '2.5rem 0 1.5rem', textAlign: 'center', color: '#234', fontSize: '1rem', marginTop: '2rem', boxShadow: '0 -2px 8px #217c8c11', borderTop: '1px solid #e0e0e0' }}>
+                        <div style={{ marginBottom: '1.2rem', display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>User guidelines</a>
+                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>FAQ</a>
+                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>Contact us</a>
+                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>About us</a>
+                        </div>
+                        <div style={{ marginBottom: '0.7rem', color: '#888' }}>
+                            <a href="#" style={{ color: '#217c8c', marginRight: 8 }}>Privacy policy</a> | <a href="#" style={{ color: '#217c8c', marginLeft: 8 }}>Terms of service</a>
+                        </div>
+                        <div style={{ color: '#888', fontSize: '0.95rem' }}>Copyright © 2025 Evoli management d.o.o.</div>
+                    </footer>
         </main>
     );
 };
