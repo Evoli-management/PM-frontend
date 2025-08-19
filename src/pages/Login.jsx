@@ -11,7 +11,9 @@ const LoginPage = () => {
         rememberMe: false,
     });
     const navigate = useNavigate();
-
+    const handleForgotPassword = () => {
+        navigate("/PasswordPageForget");
+    };
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData((prev) => ({
@@ -52,67 +54,66 @@ const LoginPage = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-white p-4">
             {/* Main Box */}
-            <div className="w-full max-w-[1450px] bg-white rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.5)] flex flex-col md:flex-row items-center justify-between px-8 py-10">
+            <div className="w-full max-w-[1450px] bg-white rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.5)] flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
                 {/* Left Section. */}
-                <div className="w-full md:w-1/2 flex flex-col items-center">
+                <div className="w-full lg:w-1/2 flex flex-col items-center">
                     {/* Logo */}
                     <img
                         src="/PM-frontend/logo.png"
                         alt="Practical Manager Logo"
-                        className="mb-4"
-                        style={{ width: "314.63px", height: "210px" }}
+                        className="mb-4 w-[200px] h-[133px] sm:w-[250px] sm:h-[167px] lg:w-[314.63px] lg:h-[210px] object-contain"
                     />
 
-                    <h2 className="text-[28px] font-bold text-black mb-2">LOGIN</h2>
-                    <p className="text-black font-semibold mb-4 text-base text-center">
+                    <h2 className="text-[20px] sm:text-[24px] lg:text-[28px] font-bold text-black mb-2">LOGIN</h2>
+                    <p className="text-black font-semibold mb-4 text-sm sm:text-base text-center px-4">
                         Login and Take Control of Your Workflow.
                     </p>
 
                     {/* Form */}
-                    <form className="space-y-4 flex flex-col items-center" onSubmit={handleSubmit}>
+                    <form className="space-y-4 flex flex-col items-center w-full" onSubmit={handleSubmit}>
                         {/* Email Input */}
-                        <div className="relative" style={{ width: "721px", height: "65px" }}>
+                        <div className="relative w-full max-w-[721px] h-[55px] sm:h-[65px]">
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
                                 placeholder="Enter your Email"
-                                className="w-full h-full pl-12 pr-2 border border-gray-300 rounded-none text-black"
+                                className="w-full h-full pl-10 sm:pl-12 pr-2 border border-gray-300 rounded-lg sm:rounded-none text-black text-sm sm:text-base"
                                 style={{ backgroundColor: "#AEC1FF" }}
                                 required
                             />
-                            <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                <FontAwesomeIcon icon={faEnvelope} className="text-2xl" />
+                            <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
+                                <FontAwesomeIcon icon={faEnvelope} className="text-lg sm:text-2xl" />
                             </span>
                         </div>
 
                         {/* Password Input */}
-                        <div className="relative" style={{ width: "721px", height: "65px" }}>
+                        <div className="relative w-full max-w-[721px] h-[55px] sm:h-[65px]">
                             <input
                                 type={showPassword ? "text" : "password"}
                                 name="password"
                                 value={formData.password}
                                 onChange={handleInputChange}
                                 placeholder="Enter Password"
-                                className="w-full h-full pl-12 pr-10 border border-gray-300 rounded-none text-black"
+                                className="w-full h-full pl-10 sm:pl-12 pr-10 border border-gray-300 rounded-lg sm:rounded-none text-black text-sm sm:text-base"
                                 style={{ backgroundColor: "#AEC1FF" }}
                                 required
                             />
-                            <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                <FontAwesomeIcon icon={faLock} className="text-2xl" />
+                            <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-black">
+                                <FontAwesomeIcon icon={faLock} className="text-lg sm:text-2xl" />
                             </span>
                             <span
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 transform -translate-y-1/2 cursor-pointer text-black"
+                                className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 cursor-pointer text-black"
                             >
-                                <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-2xl" />
+                                <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-lg sm:text-2xl" />
                             </span>
                         </div>
 
                         {/* Remember Me & Forgot Password */}
-                        <div className="flex items-center justify-between w-[721px]">
-                            <label className="flex items-center text-sm text-black">
+                        <div className="flex flex-col sm:flex-row items-center justify-between w-full max-w-[721px] gap-2 sm:gap-0">
+                            <label className="flex items-center text-xs sm:text-sm text-black">
                                 <input
                                     type="checkbox"
                                     name="rememberMe"
@@ -122,22 +123,27 @@ const LoginPage = () => {
                                 />{" "}
                                 Remember me!
                             </label>
-                            <a href="#" className="text-sm text-black underline font-semibold">
+                            <button
+                                type="button"
+                                onClick={handleForgotPassword}
+                                className="text-xs sm:text-sm text-black underline font-semibold bg-transparent border-none cursor-pointer"
+                                style={{ padding: 0 }}
+                            >
                                 Forget password?
-                            </a>
+                            </button>
                         </div>
 
                         {/* Login Button */}
                         <button
                             type="submit"
-                            className="text-white font-semibold rounded-[16px]"
-                            style={{ backgroundColor: "#00e200", width: "724px", height: "57px" }}
+                            className="text-white font-semibold rounded-[16px] w-full max-w-[724px] h-[50px] sm:h-[57px] text-sm sm:text-base"
+                            style={{ backgroundColor: "#00e200" }}
                         >
                             Login
                         </button>
 
                         {/* Divider */}
-                        <div className="w-[724px] flex items-center justify-center gap-4 my-6 text-sm text-black font-semibold">
+                        <div className="w-full max-w-[724px] flex items-center justify-center gap-4 my-6 text-xs sm:text-sm text-black font-semibold">
                             <span className="flex-1 h-[1px] bg-black"></span>
                             <span>or continue</span>
                             <span className="flex-1 h-[1px] bg-black"></span>
@@ -145,20 +151,20 @@ const LoginPage = () => {
 
                         {/* Continue Box */}
                         <div
-                            className="border border-gray-300 px-4 py-6 rounded-[24px] flex items-center justify-center"
-                            style={{ backgroundColor: "#DEE3DD", width: "727px", height: "90px" }}
+                            className="border border-gray-300 px-4 py-6 rounded-[24px] flex items-center justify-center w-full max-w-[727px] min-h-[90px]"
+                            style={{ backgroundColor: "#DEE3DD" }}
                         >
-                            <div className="flex justify-between gap-40">
+                            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8 lg:gap-16 w-full">
                                 {/* Google */}
                                 <button
                                     type="button"
                                     onClick={() => handleSocialLogin("Google")}
-                                    className="flex items-center justify-center border border-gray-300 rounded-[24px]"
-                                    style={{ backgroundColor: "#FFFFFF", width: "257px", height: "57px" }}
+                                    className="flex items-center justify-center border border-gray-300 rounded-[24px] w-full sm:w-[200px] lg:w-[257px] h-[50px] sm:h-[57px]"
+                                    style={{ backgroundColor: "#FFFFFF" }}
                                 >
                                     <div className="flex items-center gap-2">
-                                        <img src="/PM-frontend/google.svg" alt="Google" className="w-5 h-5" />
-                                        <span className="text-gray-700 text-sm font-medium">Login with Google</span>
+                                        <img src="/PM-frontend/google.svg" alt="Google" className="w-4 h-4 sm:w-5 sm:h-5" />
+                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">Login with Google</span>
                                     </div>
                                 </button>
 
@@ -166,19 +172,19 @@ const LoginPage = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleSocialLogin("Microsoft")}
-                                    className="flex items-center justify-center border border-gray-300 rounded-[24px]"
-                                    style={{ backgroundColor: "#FFFFFF", width: "257px", height: "57px" }}
+                                    className="flex items-center justify-center border border-gray-300 rounded-[24px] w-full sm:w-[200px] lg:w-[257px] h-[50px] sm:h-[57px]"
+                                    style={{ backgroundColor: "#FFFFFF" }}
                                 >
                                     <div className="flex items-center gap-2">
-                                        <img src="/PM-frontend/microsoft.svg" alt="Microsoft" className="w-5 h-5" />
-                                        <span className="text-gray-700 text-sm font-medium">Login with Microsoft</span>
+                                        <img src="/PM-frontend/microsoft.svg" alt="Microsoft" className="w-4 h-4 sm:w-5 sm:h-5" />
+                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">Login with Microsoft</span>
                                     </div>
                                 </button>
                             </div>
                         </div>
 
                         {/* Register Link */}
-                        <p className="text-sm text-center mt-4 text-black font-semibold">
+                        <p className="text-xs sm:text-sm text-center mt-4 text-black font-semibold">
                             Not registered yet?{" "}
                             <a href="#" className="text-blue-600 underline">
                                 Please register here
@@ -188,17 +194,14 @@ const LoginPage = () => {
                 </div>
 
                 {/* Right Vector Section */}
-                <div className="hidden md:flex md:w-1/2 items-center justify-center">
+                <div className="hidden lg:flex lg:w-1/2 items-center justify-center">
                     <div className="text-center">
                         <img
                             src="/PM-frontend/image.png"
                             alt="2FA Illustration"
-                            style={{ width: "515px", height: "600px" }}
+                            className="w-[300px] h-[350px] lg:w-[400px] lg:h-[470px] xl:w-[515px] xl:h-[600px] object-contain"
                         />
-                        <p
-                            className="mt-4 text-black text-sm font-semibold mx-auto"
-                            style={{ width: "439px", height: "57px" }}
-                        >
+                        <p className="mt-4 text-black text-xs sm:text-sm font-semibold mx-auto max-w-[439px] px-4">
                             This account is protected with <br />
                             Two factor authentication 2FA
                         </p>
