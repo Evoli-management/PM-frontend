@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 
@@ -107,7 +107,10 @@ const LoginPage = () => {
                                 onClick={() => setShowPassword(!showPassword)}
                                 className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 cursor-pointer text-black"
                             >
-                                <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-lg sm:text-2xl" />
+                                <FontAwesomeIcon
+                                    icon={showPassword ? faEye : faEyeSlash}
+                                    className="text-lg sm:text-2xl"
+                                />
                             </span>
                         </div>
 
@@ -163,8 +166,14 @@ const LoginPage = () => {
                                     style={{ backgroundColor: "#FFFFFF" }}
                                 >
                                     <div className="flex items-center gap-2">
-                                        <img src="/PM-frontend/google.svg" alt="Google" className="w-4 h-4 sm:w-5 sm:h-5" />
-                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">Login with Google</span>
+                                        <img
+                                            src="/PM-frontend/google.svg"
+                                            alt="Google"
+                                            className="w-4 h-4 sm:w-5 sm:h-5"
+                                        />
+                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">
+                                            Login with Google
+                                        </span>
                                     </div>
                                 </button>
 
@@ -176,8 +185,14 @@ const LoginPage = () => {
                                     style={{ backgroundColor: "#FFFFFF" }}
                                 >
                                     <div className="flex items-center gap-2">
-                                        <img src="/PM-frontend/microsoft.svg" alt="Microsoft" className="w-4 h-4 sm:w-5 sm:h-5" />
-                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">Login with Microsoft</span>
+                                        <img
+                                            src="/PM-frontend/microsoft.svg"
+                                            alt="Microsoft"
+                                            className="w-4 h-4 sm:w-5 sm:h-5"
+                                        />
+                                        <span className="text-gray-700 text-xs sm:text-sm font-medium">
+                                            Login with Microsoft
+                                        </span>
                                     </div>
                                 </button>
                             </div>
@@ -186,9 +201,9 @@ const LoginPage = () => {
                         {/* Register Link */}
                         <p className="text-xs sm:text-sm text-center mt-4 text-black font-semibold">
                             Not registered yet?{" "}
-                            <a href="#" className="text-blue-600 underline">
+                            <Link to="/registration" className="text-blue-600 hover:text-blue-800 underline">
                                 Please register here
-                            </a>
+                            </Link>
                         </p>
                     </form>
                 </div>
