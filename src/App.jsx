@@ -8,6 +8,8 @@ import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Tasks from "./pages/Tasks.jsx";
+import Calendar from "./pages/Calendar.jsx";
 
 export default function App() {
     return (
@@ -22,7 +24,10 @@ export default function App() {
                         <Route path="/reset-password" element={<ResetPasswordpage />} />
                         <Route path="/registration" element={<Registration />} />
                         <Route path="/profile-settings" element={<ProfileSetting />} />
+                        <Route path="/profile" element={<ProfileSetting />} />
                         <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/calendar" element={<Calendar />} />
+                        <Route path="/tasks" element={<Tasks />} />
                     </Routes>
                 </main>
                 <Footer />

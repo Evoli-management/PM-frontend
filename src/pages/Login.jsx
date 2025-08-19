@@ -30,20 +30,11 @@ const LoginPage = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        setError("");
-        if (!formData.email || !formData.password) {
-            setError("Please fill in all fields.");
-            return;
-        }
         setLoading(true);
         setTimeout(() => {
             setLoading(false);
-            if (formData.email !== "demo@pm.com" || formData.password !== "demo123") {
-                setError("Invalid email or password.");
-                return;
-            }
-            navigate("/");
-        }, 1200);
+            navigate("/dashboard");
+        }, 500);
     };
 
     const handleSocialLogin = (provider) => {
