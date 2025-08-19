@@ -2,35 +2,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-const navLink = {
-    color: '#234',
-    textDecoration: 'none',
-    fontWeight: 500,
-    transition: 'color 0.2s',
-};
-
-const ctaBtn = {
-    background: '#217c8c',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 24,
-    padding: '0.75rem 2rem',
-    fontSize: '1rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px #217c8c22',
-    marginBottom: '0.5rem',
-};
-
-const inputStyle = {
-    width: '100%',
-    padding: '0.75rem',
-    marginBottom: '1rem',
-    borderRadius: 8,
-    border: '1px solid #ccc',
-    fontSize: '1rem',
-};
-
 const modules = [
     { icon: "🎯", title: "Goals & Alignment", desc: "Set and track goals, align your team, and drive results." },
     { icon: "⏱️", title: "Time Management", desc: "Manage tasks, deadlines, and priorities for maximum productivity." },
@@ -49,140 +20,133 @@ const testimonials = [
     { quote: "The feedback and recognition tools make management easy and effective.", author: "HR Manager, InnovateX" },
 ];
 
-// Remove placeholder brands; use empty array or your real partners if available
 const partners = [];
 
 const Home = () => {
     return (
-        <main style={{ fontFamily: 'Inter, Arial, sans-serif', background: '#f8f9fa', color: '#234', minHeight: '100vh' }}>
+        <main className="font-sans bg-gray-50 text-gray-900 min-h-screen">
             {/* Navigation Bar */}
-            <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', background: '#fff', boxShadow: '0 2px 8px #217c8c11', position: 'sticky', top: 0, zIndex: 10 }}>
-                <div style={{ fontWeight: 700, fontSize: '1.5rem', color: '#217c8c' }}>Practical Manager</div>
-                <div style={{ display: 'flex', gap: '2rem', fontSize: '1rem' }}>
-                    <a href="#modules" style={navLink}>Modules</a>
-                    <a href="#values" style={navLink}>Values</a>
-                    <a href="#testimonials" style={navLink}>Testimonials</a>
-                    <a href="#contact" style={navLink}>Contact</a>
+            <nav className="flex flex-col sm:flex-row justify-between items-center px-4 py-4 bg-white shadow sticky top-0 z-10">
+                <div className="font-bold text-xl text-blue-700 mb-2 sm:mb-0">Practical Manager</div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-8 text-base mb-2 sm:mb-0">
+                    <a href="#modules" className="text-blue-900 hover:text-blue-700 font-medium">Modules</a>
+                    <a href="#values" className="text-blue-900 hover:text-blue-700 font-medium">Values</a>
+                    <a href="#testimonials" className="text-blue-900 hover:text-blue-700 font-medium">Testimonials</a>
+                    <a href="#contact" className="text-blue-900 hover:text-blue-700 font-medium">Contact</a>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <Link to="/login" style={{ background: '#217c8c', color: '#fff', borderRadius: 20, padding: '0.5rem 1.5rem', fontWeight: 600, textDecoration: 'none' }}>Login</Link>
-                    <Link to="/registration" style={{ background: '#c87d2a', color: '#fff', borderRadius: 20, padding: '0.5rem 1.5rem', fontWeight: 600, textDecoration: 'none' }}>Register</Link>
+                <div className="flex gap-2">
+                    <Link to="/login" className="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold hover:bg-blue-800 transition">Login</Link>
+                    <Link to="/registration" className="bg-yellow-600 text-white rounded-lg px-4 py-2 font-semibold hover:bg-yellow-700 transition">Register</Link>
                 </div>
             </nav>
 
             {/* Hero Section */}
-            <section style={{ padding: '4rem 0 2rem', background: '#fff', textAlign: 'center', boxShadow: '0 2px 8px #217c8c11' }}>
-                <h1 style={{ fontSize: '2.7rem', fontWeight: 700, marginBottom: '1rem', color: '#217c8c' }}>
-                    Your team's success, powered by Practical Manager
-                </h1>
-                <p style={{ fontSize: '1.25rem', marginBottom: '2rem', color: '#234' }}>
-                    A unique platform to transform the way you work. Built for teams of all sizes, focused on productivity, engagement, and leadership.
-                </p>
-                <Link to="/registration" style={{ ...ctaBtn, display: 'inline-block', textAlign: 'center', textDecoration: 'none', fontSize: '1.1rem', fontWeight: 700 }}>Get Started Free</Link>
-                <div style={{ marginTop: '2rem' }}>
-                    <img src="/public/icon.png" alt="Practical Manager" style={{ width: 120, borderRadius: '50%', boxShadow: '0 2px 12px #217c8c22' }} />
+            <section className="px-4 py-10 text-center bg-white shadow">
+                <h1 className="text-2xl sm:text-4xl font-bold mb-4 text-blue-700">Your team's success, powered by Practical Manager</h1>
+                <p className="text-base sm:text-xl mb-6 text-gray-700">A unique platform to transform the way you work. Built for teams of all sizes, focused on productivity, engagement, and leadership.</p>
+                <Link to="/registration" className="inline-block bg-blue-700 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-blue-800 transition mb-4">Get Started Free</Link>
+                <div className="mt-6 flex justify-center">
+                    <img src="/public/icon.png" alt="Practical Manager" className="w-24 h-24 rounded-full shadow-lg" />
                 </div>
             </section>
 
             {/* Featured Modules Section */}
-            <section id="modules" style={{ background: '#f8f9fa', padding: '3rem 0' }}>
-                <h2 style={{ textAlign: 'center', fontSize: '2rem', fontWeight: 700, color: '#217c8c', marginBottom: '2rem' }}>Featured Modules</h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '2rem' }}>
+            <section id="modules" className="bg-gray-50 py-10">
+                <h2 className="text-center text-2xl sm:text-3xl font-bold text-blue-700 mb-8">Featured Modules</h2>
+                <div className="flex flex-wrap justify-center gap-6">
                     {modules.map((m, i) => (
-                        <div key={i} style={{ background: '#fff', borderRadius: 24, boxShadow: '0 2px 12px #217c8c22', padding: '2rem', maxWidth: 260, flex: '1 1 200px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{m.icon}</div>
-                            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.5rem', color: '#217c8c' }}>{m.title}</h3>
-                            <p style={{ fontSize: '1rem', color: '#234' }}>{m.desc}</p>
+                        <div key={i} className="bg-white rounded-2xl shadow-lg p-6 max-w-xs w-full text-center transition hover:scale-105">
+                            <div className="text-4xl mb-3">{m.icon}</div>
+                            <h3 className="text-lg font-bold text-blue-700 mb-2">{m.title}</h3>
+                            <p className="text-base text-gray-700">{m.desc}</p>
                         </div>
                     ))}
                 </div>
             </section>
 
             {/* Story/Brand Section */}
-            <section style={{ background: '#fff', padding: '3rem 0', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#c87d2a', marginBottom: '1rem' }}>It takes time to build something that lasts</h2>
-                <p style={{ fontSize: '1.15rem', color: '#234', marginBottom: '1.5rem' }}>We believe in long-term commitment, continuous improvement, and putting our users first.</p>
-                <Link to="/about" style={{ ...ctaBtn, background: '#c87d2a', display: 'inline-block', textAlign: 'center', textDecoration: 'none' }}>Read Our Story</Link>
+            <section className="bg-white py-10 text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold text-yellow-600 mb-4">It takes time to build something that lasts</h2>
+                <p className="text-base sm:text-lg text-gray-700 mb-6">We believe in long-term commitment, continuous improvement, and putting our users first.</p>
+                <Link to="/about" className="inline-block bg-yellow-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-yellow-700 transition">Read Our Story</Link>
             </section>
 
             {/* Platform Highlight Section */}
-            <section style={{ background: '#ffe600', padding: '3rem 0', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#234', marginBottom: '1rem' }}>All-in-one suite for your business</h2>
-                <p style={{ fontSize: '1.15rem', color: '#234', marginBottom: '1.5rem' }}>Break down silos, increase efficiency, and empower your team with Practical Manager.</p>
-                <Link to="/registration" style={{ ...ctaBtn, background: '#e53935', display: 'inline-block', textAlign: 'center', textDecoration: 'none' }}>Try Now</Link>
+            <section className="bg-yellow-200 py-10 text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-4">All-in-one suite for your business</h2>
+                <p className="text-base sm:text-lg text-gray-700 mb-6">Break down silos, increase efficiency, and empower your team with Practical Manager.</p>
+                <Link to="/registration" className="inline-block bg-red-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-red-700 transition">Try Now</Link>
             </section>
 
-                    {/* Trust Signals Section - removed brands, upgraded for clean UI */}
-                    <section style={{ background: '#f8f9fa', padding: '2rem 0', textAlign: 'center', borderTop: '1px solid #e0e0e0' }}>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#217c8c', marginBottom: '1rem' }}>Trusted by teams who value results</h3>
-                        <div style={{ color: '#888', fontSize: '1.05rem', marginBottom: '1rem' }}>
-                            Practical Manager is used by organizations focused on growth, engagement, and leadership.
-                        </div>
-                    </section>
+            {/* Trust Signals Section */}
+            <section className="bg-gray-50 py-8 text-center border-t border-gray-200">
+                <h3 className="text-lg font-bold text-blue-700 mb-2">Trusted by teams who value results</h3>
+                <div className="text-gray-500 text-base mb-2">Practical Manager is used by organizations focused on growth, engagement, and leadership.</div>
+            </section>
 
             {/* Testimonials Section */}
-            <section id="testimonials" style={{ background: '#fff', padding: '2rem 0', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#217c8c', marginBottom: '1rem' }}>What our users say</h2>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+            <section id="testimonials" className="bg-white py-10 text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-8">What our users say</h2>
+                <div className="flex flex-wrap justify-center gap-6">
                     {testimonials.map((t, i) => (
-                        <blockquote key={i} style={{ background: '#eaf6f6', borderRadius: 16, padding: '1.5rem', maxWidth: 320, fontStyle: 'italic', color: '#234', boxShadow: '0 2px 8px #217c8c22', margin: 0 }}>
+                        <blockquote key={i} className="bg-blue-50 rounded-xl p-6 max-w-xs w-full font-serif italic text-gray-700 shadow mb-4">
                             “{t.quote}”
-                            <div style={{ fontWeight: 600, color: '#217c8c', marginTop: '0.5rem', fontSize: '0.95rem' }}>{t.author}</div>
+                            <div className="font-bold text-blue-700 mt-2 text-base">{t.author}</div>
                         </blockquote>
                     ))}
                 </div>
             </section>
 
             {/* Values Section */}
-            <section id="values" style={{ background: '#fff', padding: '3rem 0', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#c87d2a', marginBottom: '2rem' }}>Our Core Values</h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '2rem' }}>
+            <section id="values" className="bg-white py-10 text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold text-yellow-600 mb-8">Our Core Values</h2>
+                <div className="flex flex-wrap justify-center gap-6">
                     {values.map((v, i) => (
-                        <div key={i} style={{ background: '#f8f9fa', borderRadius: 24, boxShadow: '0 2px 12px #c87d2a22', padding: '2rem', maxWidth: 260, flex: '1 1 200px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{v.icon}</div>
-                            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.5rem', color: '#c87d2a' }}>{v.title}</h3>
-                            <p style={{ fontSize: '1rem', color: '#234' }}>{v.desc}</p>
+                        <div key={i} className="bg-gray-50 rounded-2xl shadow-lg p-6 max-w-xs w-full text-center transition hover:scale-105">
+                            <div className="text-4xl mb-3">{v.icon}</div>
+                            <h3 className="text-lg font-bold text-yellow-600 mb-2">{v.title}</h3>
+                            <p className="text-base text-gray-700">{v.desc}</p>
                         </div>
                     ))}
                 </div>
-                <Link to="/about" style={{ ...ctaBtn, background: '#c87d2a', display: 'inline-block', textAlign: 'center', textDecoration: 'none', marginTop: '2rem' }}>Read Our Story</Link>
+                <Link to="/about" className="inline-block bg-yellow-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-yellow-700 transition mt-6">Read Our Story</Link>
             </section>
 
             {/* Contact Form Section */}
-            <section id="contact" style={{ background: '#eaf6f6', padding: '2rem 0', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#217c8c', marginBottom: '1rem' }}>Contact us for DEMO</h2>
-                <form style={{ display: 'inline-block', background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px #217c8c22', padding: '2rem', maxWidth: 400, width: '100%' }}>
-                    <input type="text" placeholder="First Name" style={inputStyle} />
-                    <input type="text" placeholder="Last Name*" style={inputStyle} required />
-                    <input type="text" placeholder="Phone" style={inputStyle} />
-                    <input type="email" placeholder="Email*" style={inputStyle} required />
-                    <input type="text" placeholder="Company*" style={inputStyle} required />
-                    <input type="number" placeholder="No. of Employees" style={inputStyle} />
-                    <div style={{ textAlign: 'left', margin: '1rem 0' }}>
-                        <label style={{ fontSize: '0.95rem' }}>
-                            <input type="checkbox" required /> I agree with <a href="#" style={{ color: '#217c8c' }}>terms and conditions</a> and <a href="#" style={{ color: '#217c8c' }}>privacy policy</a>.
+            <section id="contact" className="bg-blue-50 py-10 text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-6">Contact us for DEMO</h2>
+                <form className="mx-auto bg-white rounded-2xl shadow-lg p-6 max-w-md w-full">
+                    <input type="text" placeholder="First Name" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
+                    <input type="text" placeholder="Last Name*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                    <input type="text" placeholder="Phone" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
+                    <input type="email" placeholder="Email*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                    <input type="text" placeholder="Company*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                    <input type="number" placeholder="No. of Employees" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
+                    <div className="text-left mb-4">
+                        <label className="text-sm">
+                            <input type="checkbox" required className="mr-2" /> I agree with <a href="#" className="text-blue-700 underline">terms and conditions</a> and <a href="#" className="text-blue-700 underline">privacy policy</a>.
                         </label>
                     </div>
-                    <input type="text" placeholder="Enter the Captcha" style={inputStyle} required />
-                    <div style={{ marginBottom: '1rem', color: '#217c8c', fontWeight: 600 }}>m5yg32 <button type="button" style={{ marginLeft: 8, background: 'none', border: 'none', color: '#217c8c', cursor: 'pointer' }}>Reload</button></div>
-                    <button type="submit" style={{ background: '#217c8c', color: '#fff', border: 'none', borderRadius: 24, padding: '0.75rem 2rem', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', marginRight: 8 }}>Submit</button>
-                    <button type="reset" style={{ background: '#c87d2a', color: '#fff', border: 'none', borderRadius: 24, padding: '0.75rem 2rem', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>Reset</button>
+                    <input type="text" placeholder="Enter the Captcha" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
+                    <div className="mb-4 text-blue-700 font-bold">m5yg32 <button type="button" className="ml-2 text-blue-700 underline">Reload</button></div>
+                    <button type="submit" className="bg-blue-700 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-blue-800 transition mr-2">Submit</button>
+                    <button type="reset" className="bg-yellow-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-yellow-700 transition">Reset</button>
                 </form>
             </section>
 
-                    {/* Footer Section - upgraded for best UI/UX */}
-                    <footer style={{ background: '#fff', padding: '2.5rem 0 1.5rem', textAlign: 'center', color: '#234', fontSize: '1rem', marginTop: '2rem', boxShadow: '0 -2px 8px #217c8c11', borderTop: '1px solid #e0e0e0' }}>
-                        <div style={{ marginBottom: '1.2rem', display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap' }}>
-                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>User guidelines</a>
-                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>FAQ</a>
-                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>Contact us</a>
-                            <a href="#" style={{ color: '#217c8c', textDecoration: 'none', fontWeight: 500 }}>About us</a>
-                        </div>
-                        <div style={{ marginBottom: '0.7rem', color: '#888' }}>
-                            <a href="#" style={{ color: '#217c8c', marginRight: 8 }}>Privacy policy</a> | <a href="#" style={{ color: '#217c8c', marginLeft: 8 }}>Terms of service</a>
-                        </div>
-                        <div style={{ color: '#888', fontSize: '0.95rem' }}>Copyright © 2025 Evoli management d.o.o.</div>
-                    </footer>
+            {/* Footer Section */}
+            <footer className="bg-white py-8 text-center text-gray-700 mt-8 shadow border-t border-gray-200">
+                <div className="mb-4 flex flex-wrap justify-center gap-6">
+                    <a href="#" className="text-blue-700 font-medium hover:underline">User guidelines</a>
+                    <a href="#" className="text-blue-700 font-medium hover:underline">FAQ</a>
+                    <a href="#" className="text-blue-700 font-medium hover:underline">Contact us</a>
+                    <a href="#" className="text-blue-700 font-medium hover:underline">About us</a>
+                </div>
+                <div className="mb-2 text-gray-500">
+                    <a href="#" className="text-blue-700 mr-2 hover:underline">Privacy policy</a> | <a href="#" className="text-blue-700 ml-2 hover:underline">Terms of service</a>
+                </div>
+                <div className="text-gray-400 text-sm">Copyright © 2025 Evoli management d.o.o.</div>
+            </footer>
         </main>
     );
 };
