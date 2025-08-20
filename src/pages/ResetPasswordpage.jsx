@@ -55,10 +55,21 @@ const ResetPasswordPage = () => {
 
         setIsLoading(true);
 
-        // Simulate API call for password reset
+        // Front-end simulation: Accept password reset for any valid input
+        // In real implementation, this would call backend API with reset token
+        // TODO: POST /api/auth/reset-password { token: resetToken, newPassword: passwords.newPassword }
+        
         setTimeout(() => {
             setIsLoading(false);
-            alert("Password reset successful! You can now login with your new password.");
+            alert("Password reset successful! You can now login with your new password. (Front-end simulation)");
+            
+            // Clear the form
+            setPasswords({
+                newPassword: "",
+                confirmPassword: ""
+            });
+            
+            // Navigate back to login
             navigate("/login");
         }, 1500);
     };

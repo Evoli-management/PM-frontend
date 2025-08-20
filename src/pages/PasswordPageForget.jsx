@@ -28,12 +28,16 @@ const ForgotPasswordPage = () => {
 
         setIsLoading(true);
 
-        // Simulate API call for sending reset email
+        // Front-end simulation: Accept any valid email format
+        // In real implementation, this would call backend API
+        // TODO: POST /api/auth/forgot-password { email: email }
+        
         setTimeout(() => {
             setIsLoading(false);
-            // Redirect to reset password page
+            alert(`Password reset instructions have been sent to ${email} (Front-end simulation)`);
+            // Redirect to reset password page with email parameter
             navigate("/reset-password", { 
-                state: { email: email } // Pass email to reset password page
+                state: { email: email, fromForgot: true }
             });
         }, 1000);
     };
