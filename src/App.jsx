@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/shared/Navbar.jsx";
 import Footer from "./components/shared/Footer.jsx";
 import LoginPage from "./pages/Login.jsx";
@@ -15,7 +15,7 @@ import KeyAreas from "./pages/KeyAreas.jsx";
 
 export default function App() {
     return (
-        <Router basename="/PM-frontend">
+        <Router>
             <div className="flex flex-col min-h-screen">
                 <Navbar />
                 <main className="flex-grow">
