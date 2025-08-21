@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
+import KeyAreas from "./pages/KeyAreas.jsx";
 
 export default function App() {
     return (
@@ -30,6 +31,7 @@ export default function App() {
                         <Route path="/calendar" element={<Calendar />} />
                         <Route path="/tasks" element={<Tasks />} />
                         <Route path="/goals" element={<Goals />} />
+                        <Route path="/key-areas" element={<KeyAreas />} />
                     </Routes>
                 </main>
                 <Footer />
