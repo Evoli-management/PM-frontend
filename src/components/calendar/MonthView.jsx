@@ -54,8 +54,9 @@ export default function MonthView({ events, categories, onEventClick }) {
   return (
     <div className="p-4 bg-white rounded shadow">
       <h2 className="text-xl font-bold mb-2">Month View</h2>
-      <div className="overflow-x-auto" ref={gridRef} style={{ position: 'relative' }}>
-  <table className="border border-sky-100 rounded" style={{ minWidth: '3200px', tableLayout: 'fixed' }}>
+      <div className="relative w-full">
+        <div className="overflow-x-auto" style={{ maxWidth: '100vw', margin: '0 auto' }} ref={gridRef}>
+          <table className="border border-sky-100 rounded" style={{ minWidth: '3200px', tableLayout: 'fixed', width: '3200px' }}>
           <thead>
             <tr className="bg-sky-50">
               <th className="sticky left-0 bg-sky-50 text-left px-2 py-2 text-xs font-semibold text-gray-400 w-32 z-10">&nbsp;</th>
@@ -89,9 +90,10 @@ export default function MonthView({ events, categories, onEventClick }) {
               );
             })}
           </tbody>
-        </table>
-        {/* Red line for current time */}
-        <div style={{ position: 'absolute', left: 0, right: 0, top: 'var(--red-line-top)', height: '2px', background: 'red', zIndex: 10 }}></div>
+          </table>
+          {/* Red line for current time */}
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 'var(--red-line-top)', height: '2px', background: 'red', zIndex: 10 }}></div>
+        </div>
       </div>
     </div>
   );
