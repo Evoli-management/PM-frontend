@@ -34,32 +34,81 @@ const quickActions = [
     { label: "Invite Team", icon: <FaUsers />, to: "/teams" },
 ];
 
-export default function Sidebar({ user, collapsed: collapsedProp, onCollapseToggle }) {
+export default function Sidebar({
+    user,
+    collapsed: collapsedProp,
+    onCollapseToggle,
+    mobileOpen = false,
+    onMobileClose,
+}) {
     const location = useLocation();
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [internalCollapsed, setInternalCollapsed] = useState(false);
     const [search, setSearch] = useState("");
+    const [keyAreasOpen, setKeyAreasOpen] = useState(false); // State for Key Areas dropdown
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
+
+    const handleKeyAreasClick = () => {
+        setKeyAreasOpen((prev) => !prev);
+    };
+
+    // mobile overlay classes: off-canvas when closed, fixed overlay when open on small screens
+    const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full";
 
     return (
         <aside
-            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-72"} min-h-screen shadow-lg border-r border-blue-300 flex flex-col justify-between px-2 transition-all duration-300 rounded-t-3xl rounded-b-3xl rounded-l-3xl rounded-r-3xl`}
+            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border-r border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-t-3xl rounded-b-3xl rounded-l-3xl rounded-r-3xl ${mobileTranslate} fixed top-0 left-0 z-40 md:static md:translate-x-0`}
             aria-label="Sidebar"
         >
             <div>
                 <div className="mb-6 flex items-center gap-2 px-2">
                     <img src="/PM-frontend/logo.png" alt="Logo" className="w-8 h-8" />
                     {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
-                    <button
-                        className="ml-auto text-blue-700 hover:text-blue-900 focus:outline-none"
-                        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                        onClick={() => {
-                            if (typeof onCollapseToggle === "function") onCollapseToggle();
-                            else setInternalCollapsed((c) => !c);
-                        }}
-                    >
-                        <FaChevronDown className={`transform ${collapsed ? "rotate-90" : "rotate-0"}`} />
-                    </button>
+
+                    {/* mobile close button */}
+                    <div className="ml-auto flex items-center gap-2">
+                        {mobileOpen && (
+                            <button
+                                className="md:hidden text-blue-700 hover:text-blue-900 focus:outline-none"
+                                aria-label="Close sidebar"
+                                onClick={() => (typeof onMobileClose === "function" ? onMobileClose() : null)}
+                            >
+                                <span className="sr-only">Close</span>
+                                <svg
+                                    className="w-5 h-5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+
+                        <button
+                            className="text-blue-700 hover:text-blue-900 focus:outline-none"
+                            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                            onClick={() => {
+                                if (typeof onCollapseToggle === "function") onCollapseToggle();
+                                else setInternalCollapsed((c) => !c);
+                            }}
+                        >
+                            <svg
+                                className={`w-4 h-4 transform ${collapsed ? "rotate-90" : "rotate-0"}`}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 {!collapsed && (
                     <div className="mb-4 px-2">

@@ -1,5 +1,5 @@
 // src/pages/KeyAreas.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Sidebar from "../components/shared/Sidebar";
 import {
     FaPlus,
@@ -196,7 +196,7 @@ function KanbanView({ tasks, onSelect }) {
                             items.map((t) => (
                                 <div
                                     key={t.id}
-                                    className="bg-white border border-slate-200 rounded-sm p-2 mb-2 shadow-sm cursor-pointer hover:shadow"
+                                    className="bg-white border border-slate-200 rounded-lg p-2 mb-2 shadow-sm cursor-pointer hover:shadow"
                                     onClick={() => onSelect(t)}
                                 >
                                     <div className="text-sm font-semibold text-slate-900">{t.title}</div>
@@ -298,7 +298,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                     <div className="flex items-center justify-between p-4 border-b border-slate-100">
                         <h3 className="text-lg font-bold text-slate-900">Edit Task</h3>
                         <div className="flex items-center gap-2">
-                            <button className="p-2 rounded hover:bg-slate-100 text-slate-700" onClick={onClose}>
+                            <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
                                 <FaTimes />
                             </button>
                         </div>
@@ -415,7 +415,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                                                 ),
                                                             }))
                                                         }
-                                                        className="text-xs text-slate-500 ml-2"
+                                                        className="text-xs rounded-lg text-slate-500 ml-2"
                                                     >
                                                         Remove
                                                     </button>
@@ -524,7 +524,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                         </div>
 
                         <div className="mt-4 flex items-center gap-2">
-                            <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 btn-compact">
+                            <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
                                 <FaSave /> Save
                             </button>
                             <button
@@ -532,14 +532,14 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                 onClick={() => {
                                     if (confirm("Delete this task?")) onDelete(task);
                                 }}
-                                className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 btn-compact"
+                                className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
                             >
                                 <FaTrash /> Delete
                             </button>
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="ml-auto text-sm text-slate-700 hover:underline"
+                                className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
                             >
                                 Close
                             </button>
@@ -570,6 +570,7 @@ export default function KeyAreas() {
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [showTaskComposer, setShowTaskComposer] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -758,712 +759,773 @@ export default function KeyAreas() {
     };
 
     return (
-        <div className="flex keyareas">
-            {/* Desktop sidebar always visible (parent controls collapsed state to adjust layout) */}
-            <aside className="hidden md:block">
-                <Sidebar collapsed={sidebarCollapsed} onCollapseToggle={() => setSidebarCollapsed((c) => !c)} />
-            </aside>
+        <div className="min-h-screen bg-slate-50">
+            {/* Mobile header */}
+            <header className="md:hidden bg-white border-b border-slate-200 p-2 flex items-center">
+                <button
+                    aria-label="Open sidebar"
+                    className="p-2 rounded-lg text-blue-700"
+                    onClick={() => setMobileSidebarOpen(true)}
+                >
+                    <FaBars />
+                </button>
+                <div className="ml-2 font-semibold text-lg">Key Areas</div>
+            </header>
 
-            {/* Mobile sidebar as overlay */}
-            {showMobileSidebar && (
-                <div className="fixed inset-0 z-50 md:hidden">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileSidebar(false)} />
-                    <div className="absolute left-0 top-0 h-full w-72 bg-white border-r border-slate-200 p-4 overflow-auto">
-                        <Sidebar />
-                    </div>
-                </div>
-            )}
-
-            <main
-                className={`flex-1 p-4 md:p-6 transition-transform duration-300 z-0 ${showMobileSidebar ? "transform translate-x-72 pointer-events-none" : ""}`}
-            >
-                {/* Header / Search / New KA */}
-                <div className="flex items-center justify-between gap-3 mb-4">
-                    {!selectedKA ? (
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
-                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                <FaSearch className="text-slate-700 mr-2" />
-                                <input
-                                    placeholder="Search key areas..."
-                                    className="bg-transparent outline-none text-sm w-56"
-                                    value={filter}
-                                    onChange={(e) => setFilter(e.target.value)}
-                                />
-                            </div>
-                            <button
-                                className={`flex items-center gap-2 rounded-lg font-semibold shadow btn-compact ${
-                                    canAdd
-                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                        : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                }`}
-                                onClick={() => canAdd && (setShowForm(true), setEditing(null))}
-                                disabled={!canAdd}
-                            >
-                                <FaPlus /> New Key Area
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 w-full">
-                            {/* mobile sidebar toggle */}
-                            <button
-                                className="md:hidden p-2 rounded bg-white border border-slate-200 mr-2"
-                                onClick={() => setShowMobileSidebar(true)}
-                                aria-label="Open menu"
-                            >
-                                <FaBars />
-                            </button>
-                            <button
-                                className="text-slate-700 hover:text-slate-900 flex items-center gap-2"
-                                onClick={() => {
-                                    setSelectedKA(null);
-                                    setAllTasks([]);
-                                }}
-                            >
-                                <FaArrowLeft /> Back
-                            </button>
-
-                            <div className="ml-2 flex items-center gap-2 w-full">
-                                <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                    <FaSearch className="text-slate-700 mr-2" />
-                                    <input
-                                        placeholder={`Search tasks in "${selectedKA.title}"…`}
-                                        className="bg-transparent outline-none text-sm w-40 sm:w-56"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                </div>
-
-                                <select
-                                    className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                                    value={quadrant}
-                                    onChange={(e) => setQuadrant(e.target.value)}
-                                    title="Focus quadrant"
-                                >
-                                    <option value="all">All Quadrants</option>
-                                    <option value="1">Q1 • Important & Urgent</option>
-                                    <option value="2">Q2 • Important, Not Urgent</option>
-                                    <option value="3">Q3 • Not Important, Urgent</option>
-                                    <option value="4">Q4 • Not Important, Not Urgent</option>
-                                </select>
-
-                                <div className="ml-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
-                                    {["list", "kanban", "calendar"].map((v) => (
-                                        <button
-                                            key={v}
-                                            onClick={() => setView(v)}
-                                            className={`px-2 py-1 rounded-sm text-sm font-semibold btn-compact ${
-                                                view === v
-                                                    ? "bg-blue-600 text-white"
-                                                    : "text-slate-800 hover:bg-slate-100"
-                                            }`}
-                                            title={`Switch to ${v} view`}
-                                        >
-                                            {v[0].toUpperCase() + v.slice(1)}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* LIST: Key Areas */}
-                {!selectedKA && (
-                    <div>
-                        {loading ? (
-                            <div className="text-slate-700">Loading…</div>
-                        ) : (
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredKAs.map((ka) => (
-                                    <div
-                                        key={ka.id}
-                                        className="bg-white rounded-2xl shadow border border-slate-200 p-4 flex flex-col"
+            <div className="flex w-full overflow-hidden">
+                {" "}
+                {/* ensure wrapper hides overflow */}
+                <Sidebar
+                    user={{ name: "User" }}
+                    collapsed={sidebarCollapsed}
+                    onCollapseToggle={() => setSidebarCollapsed((c) => !c)}
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
+                />
+                {mobileSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+                <main
+                    className={`flex-1 min-w-0 w-full transition-all ${mobileSidebarOpen ? "ml-64" : "ml-0"} md:ml-[5mm]`}
+                >
+                    {" "}
+                    {/* min-w-0 prevents overflow of flex children */}
+                    <div className="max-w-full overflow-x-hidden">
+                        {" "}
+                        {/* content constrained to available width */}
+                        {/* Header / Search / New KA */}
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            {!selectedKA ? (
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
+                                    <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                        <FaSearch className="text-slate-700 mr-2" />
+                                        <input
+                                            placeholder="Search key areas..."
+                                            className="bg-transparent outline-none text-sm w-56"
+                                            value={filter}
+                                            onChange={(e) => setFilter(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
+                                            canAdd
+                                                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                                : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                        }`}
+                                        onClick={() => canAdd && (setShowForm(true), setEditing(null))}
+                                        disabled={!canAdd}
                                     >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-lg font-bold text-slate-900">{ka.title}</h3>
-                                                    {ka.is_default && (
-                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                                            <FaLock /> Locked
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                                                    {ka.description || "—"}
-                                                </p>
-                                                <p className="text-xs text-slate-700 mt-2">Position: {ka.position}</p>
-                                            </div>
+                                        <FaPlus /> New Key Area
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 w-full">
+                                    {/* mobile sidebar toggle */}
+                                    <button
+                                        className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
+                                        onClick={() => setShowMobileSidebar(true)}
+                                        aria-label="Open menu"
+                                    >
+                                        <FaBars />
+                                    </button>
+                                    <button
+                                        className="text-slate-700 hover:text-slate-900 flex items-center gap-2"
+                                        onClick={() => {
+                                            setSelectedKA(null);
+                                            setAllTasks([]);
+                                        }}
+                                    >
+                                        <FaArrowLeft /> Back
+                                    </button>
+
+                                    <div className="ml-2 flex items-center gap-2 w-full">
+                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                            <FaSearch className="text-slate-700 mr-2" />
+                                            <input
+                                                placeholder={`Search tasks in "${selectedKA.title}"…`}
+                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                            />
                                         </div>
 
-                                        <div className="mt-4 flex items-center gap-2">
-                                            <button
-                                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 btn-compact"
-                                                onClick={() => openKA(ka)}
-                                            >
-                                                <FaListUl /> Open Lists
-                                            </button>
-                                            <button
-                                                className="rounded-lg bg-white border font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 btn-compact"
-                                                onClick={() => {
-                                                    setEditing(ka);
-                                                    setShowForm(true);
-                                                }}
-                                            >
-                                                <FaEdit /> Edit
-                                            </button>
-                                            <button
-                                                disabled={ka.is_default}
-                                                className={`rounded-lg font-semibold flex items-center gap-2 btn-compact ${
-                                                    ka.is_default
-                                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                                        : "bg-white border text-red-600 hover:bg-red-50"
-                                                }`}
-                                                onClick={() => onDeleteKA(ka)}
-                                            >
-                                                <FaTrash /> Delete
-                                            </button>
+                                        <select
+                                            className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                                            value={quadrant}
+                                            onChange={(e) => setQuadrant(e.target.value)}
+                                            title="Focus quadrant"
+                                        >
+                                            <option value="all">All Quadrants</option>
+                                            <option value="1">Q1 • Important & Urgent</option>
+                                            <option value="2">Q2 • Important, Not Urgent</option>
+                                            <option value="3">Q3 • Not Important, Urgent</option>
+                                            <option value="4">Q4 • Not Important, Not Urgent</option>
+                                        </select>
+
+                                        <div className="ml-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+                                            {["list", "kanban", "calendar"].map((v) => (
+                                                <button
+                                                    key={v}
+                                                    onClick={() => setView(v)}
+                                                    className={`px-2 py-1 rounded-lg text-sm font-semibold border border-slate-200 ${
+                                                        view === v
+                                                            ? "bg-blue-600 text-white"
+                                                            : "text-slate-800 hover:bg-slate-100"
+                                                    }`}
+                                                    title={`Switch to ${v} view`}
+                                                >
+                                                    {v[0].toUpperCase() + v.slice(1)}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                            )}
+                        </div>
+                        {/* LIST: Key Areas */}
+                        {!selectedKA && (
+                            <div>
+                                {loading ? (
+                                    <div className="text-slate-700">Loading…</div>
+                                ) : (
+                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {filteredKAs.map((ka) => (
+                                            <div
+                                                key={ka.id}
+                                                className="bg-white rounded-2xl shadow border border-slate-200 p-4 flex flex-col"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="text-lg font-bold text-slate-900">
+                                                                {ka.title}
+                                                            </h3>
+                                                            {ka.is_default && (
+                                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                                    <FaLock /> Locked
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                                                            {ka.description || "—"}
+                                                        </p>
+                                                        <p className="text-xs text-slate-700 mt-2">
+                                                            Position: {ka.position}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 flex items-center gap-2">
+                                                    <button
+                                                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                        onClick={() => openKA(ka)}
+                                                    >
+                                                        <FaListUl /> Open Lists
+                                                    </button>
+                                                    <button
+                                                        className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                        onClick={() => {
+                                                            setEditing(ka);
+                                                            setShowForm(true);
+                                                        }}
+                                                    >
+                                                        <FaEdit /> Edit
+                                                    </button>
+                                                    <button
+                                                        disabled={ka.is_default}
+                                                        className={`rounded-lg font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200 ${
+                                                            ka.is_default
+                                                                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                                                : "bg-white border text-red-600 hover:bg-red-50"
+                                                        }`}
+                                                        onClick={() => onDeleteKA(ka)}
+                                                    >
+                                                        <FaTrash /> Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="mt-4 text-sm text-slate-600 flex items-start gap-2">
+                                    <FaExclamationCircle className="mt-0.5" />
+                                    <span>
+                                        Max 10 Key Areas per user. The last slot is <strong>Ideas</strong> and cannot be
+                                        deleted.
+                                    </span>
+                                </div>
                             </div>
                         )}
-
-                        <div className="mt-4 text-sm text-slate-600 flex items-start gap-2">
-                            <FaExclamationCircle className="mt-0.5" />
-                            <span>
-                                Max 10 Key Areas per user. The last slot is <strong>Ideas</strong> and cannot be
-                                deleted.
-                            </span>
-                        </div>
-                    </div>
-                )}
-
-                {/* DETAIL: Tabs */}
-                {selectedKA && (
-                    <div className="mt-4 space-y-4">
-                        {/* Tabs */}
-                        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur rounded-xl border border-slate-200">
-                            <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                <div className="flex items-center gap-1 overflow-x-auto">
-                                    {Array.from({ length: Math.max(4, Math.max(...tabNumbers, 4)) }).map((_, i) => {
-                                        const n = i + 1;
-                                        const active = taskTab === n;
-                                        return (
-                                            <button
-                                                key={n}
-                                                onClick={() => setTaskTab(n)}
-                                                className={`px-2 py-1 rounded-sm text-sm font-semibold border transition btn-compact ${
-                                                    active
-                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
-                                                }`}
-                                            >
-                                                List {n}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Composer — show toggle button; composer renders only when requested */}
-                        {!showTaskComposer ? (
-                            <div className="mb-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowTaskComposer(true)}
-                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 btn-compact"
-                                >
-                                    <FaPlus /> Add Task
-                                </button>
-                            </div>
-                        ) : (
-                            <form onSubmit={onCreateTask}>
-                                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                                    <div className="grid md:grid-cols-2 gap-6">
-                                        {/* Left column: Title + Extra info */}
-                                        <div className="flex flex-col gap-4">
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900 block">
-                                                    Task Title *
-                                                </label>
-                                                <input
-                                                    name="title"
-                                                    required
-                                                    value={taskForm.title}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, title: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    placeholder="e.g., Draft Q3 campaign brief"
-                                                />
-                                            </div>
-
-                                            <div className="grid gap-4">
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Tags (comma separated)
-                                                    </label>
-                                                    <input
-                                                        name="tags"
-                                                        value={taskForm.tags}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, tags: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        placeholder="e.g., q3,campaign,urgent"
-                                                    />
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Deadline
-                                                    </label>
-                                                    <input
-                                                        name="deadline"
-                                                        type="datetime-local"
-                                                        value={taskForm.deadline}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, deadline: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    />
-                                                    <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Planned End
-                                                    </label>
-                                                    <input
-                                                        name="end_date"
-                                                        type="datetime-local"
-                                                        value={taskForm.end_date}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, end_date: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    />
-                                                    <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Recurrence
-                                                    </label>
-                                                    <input
-                                                        name="recurrence"
-                                                        value={taskForm.recurrence}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, recurrence: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        placeholder='e.g., {"freq":"weekly","interval":1}'
-                                                    />
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Attachments
-                                                    </label>
-                                                    <div className="mt-1">
-                                                        <input
-                                                            ref={(el) => (window.__slideFileInput = el)}
-                                                            name="attachments_files"
-                                                            type="file"
-                                                            multiple
-                                                            onChange={(e) => {
-                                                                const incoming = Array.from(e.target.files || []);
-                                                                setTaskForm((s) => {
-                                                                    const existing = s.attachmentsFiles || [];
-                                                                    const combined = [...existing, ...incoming];
-                                                                    const uniq = Array.from(
-                                                                        new Map(
-                                                                            combined.map((f) => [f.name, f]),
-                                                                        ).values(),
-                                                                    );
-                                                                    return { ...s, attachmentsFiles: uniq };
-                                                                });
-                                                            }}
-                                                            className="hidden"
-                                                        />
+                        {/* DETAIL: Tabs */}
+                        {selectedKA && (
+                            <div className="mt-4 space-y-4">
+                                {/* Tabs */}
+                                <div className="sticky top-0 z-10 bg-white/80 backdrop-blur rounded-xl border border-slate-200">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 p-3">
+                                        <div className="flex items-center gap-1 overflow-x-auto">
+                                            {Array.from({ length: Math.max(4, Math.max(...tabNumbers, 4)) }).map(
+                                                (_, i) => {
+                                                    const n = i + 1;
+                                                    const active = taskTab === n;
+                                                    return (
                                                         <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                window.__slideFileInput &&
-                                                                window.__slideFileInput.click()
-                                                            }
-                                                            className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                            key={n}
+                                                            onClick={() => setTaskTab(n)}
+                                                            className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                active
+                                                                    ? "bg-blue-600 text-white border-blue-600 shadow"
+                                                                    : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                                                            }`}
                                                         >
-                                                            Choose files
+                                                            List {n}
                                                         </button>
-                                                    </div>
-                                                    {taskForm.attachmentsFiles &&
-                                                    taskForm.attachmentsFiles.length > 0 ? (
-                                                        <ul className="mt-2 space-y-1 text-sm">
-                                                            {taskForm.attachmentsFiles.map((f, i) => (
-                                                                <li
-                                                                    key={i}
-                                                                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
-                                                                >
-                                                                    <span className="truncate">{f.name}</span>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            setTaskForm((s) => ({
-                                                                                ...s,
-                                                                                attachmentsFiles:
-                                                                                    s.attachmentsFiles.filter(
-                                                                                        (_, idx) => idx !== i,
-                                                                                    ),
-                                                                            }))
-                                                                        }
-                                                                        className="text-xs text-slate-500 ml-2"
-                                                                    >
-                                                                        Remove
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    ) : null}
-                                                    {/* storage picker removed */}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right column: Meta + reordered fields per request */}
-                                        <div className="flex flex-col gap-4">
-                                            <div>
-                                                <div className="grid md:grid-cols-2 gap-4">
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            List (Tab)
-                                                        </label>
-                                                        <input
-                                                            name="list_index"
-                                                            type="number"
-                                                            min={1}
-                                                            value={taskForm.list_index}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({
-                                                                    ...s,
-                                                                    list_index: Number(e.target.value || 1),
-                                                                }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        />
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Importance
-                                                        </label>
-                                                        <select
-                                                            name="importance"
-                                                            value={taskForm.importance}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({
-                                                                    ...s,
-                                                                    importance: e.target.value,
-                                                                }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="low">Low</option>
-                                                            <option value="med">Medium</option>
-                                                            <option value="high">High</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900">Category</label>
-                                                <select
-                                                    name="category"
-                                                    value={taskForm.category}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, category: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                >
-                                                    <option>Key Areas</option>
-                                                    <option>Don’t Forget</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900">
-                                                    Linked Goal (optional)
-                                                </label>
-                                                <select
-                                                    name="goal_id"
-                                                    value={taskForm.goal_id}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, goal_id: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                >
-                                                    <option value="">— None (Activity Trap) —</option>
-                                                    {goals.map((g) => (
-                                                        <option key={g.id} value={g.id}>
-                                                            {g.title}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900">Assignee</label>
-                                                <input
-                                                    name="assignee"
-                                                    value={taskForm.assignee}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, assignee: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    placeholder="Name or ID"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <div className="grid md:grid-cols-2 gap-4">
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Status
-                                                        </label>
-                                                        <select
-                                                            name="status"
-                                                            value={taskForm.status}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, status: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="open">Open</option>
-                                                            <option value="in_progress">In Progress</option>
-                                                            <option value="done">Done</option>
-                                                            <option value="cancelled">Cancelled</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Priority
-                                                        </label>
-                                                        <select
-                                                            name="priority"
-                                                            value={taskForm.priority}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, priority: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="low">Low</option>
-                                                            <option value="med">Medium</option>
-                                                            <option value="high">High</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900 block">
-                                                    Description
-                                                </label>
-                                                <textarea
-                                                    name="description"
-                                                    rows={3}
-                                                    value={taskForm.description}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, description: e.target.value }))
-                                                    }
-                                                    className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
-                                                    placeholder="Details…"
-                                                />
-                                            </div>
+                                                    );
+                                                },
+                                            )}
                                         </div>
                                     </div>
+                                </div>
 
-                                    {/* Actions (span both columns) */}
-                                    <div className="mt-4 flex items-center gap-3 justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 btn-compact">
-                                                <FaSave /> Add Task
-                                            </button>
-                                            <span className="text-xs text-slate-700 flex items-center gap-1">
-                                                <FaExclamationCircle /> Tasks must belong to the current Key Area.
-                                            </span>
+                                {/* Composer — show toggle button; composer renders only when requested */}
+                                {!showTaskComposer ? (
+                                    <div className="mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTaskComposer(true)}
+                                            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                        >
+                                            <FaPlus /> Add Task
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <form onSubmit={onCreateTask}>
+                                        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                                            <div className="grid md:grid-cols-2 gap-6">
+                                                {/* Left column: Title + Extra info */}
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900 block">
+                                                            Task Title *
+                                                        </label>
+                                                        <input
+                                                            name="title"
+                                                            required
+                                                            value={taskForm.title}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, title: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            placeholder="e.g., Draft Q3 campaign brief"
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid gap-4">
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Tags (comma separated)
+                                                            </label>
+                                                            <input
+                                                                name="tags"
+                                                                value={taskForm.tags}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({ ...s, tags: e.target.value }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                placeholder="e.g., q3,campaign,urgent"
+                                                            />
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Deadline
+                                                            </label>
+                                                            <input
+                                                                name="deadline"
+                                                                type="datetime-local"
+                                                                value={taskForm.deadline}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        deadline: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            />
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                mm/dd/yyyy, --:--
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Planned End
+                                                            </label>
+                                                            <input
+                                                                name="end_date"
+                                                                type="datetime-local"
+                                                                value={taskForm.end_date}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        end_date: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            />
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                mm/dd/yyyy, --:--
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Recurrence
+                                                            </label>
+                                                            <input
+                                                                name="recurrence"
+                                                                value={taskForm.recurrence}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        recurrence: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                placeholder='e.g., {"freq":"weekly","interval":1}'
+                                                            />
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Attachments
+                                                            </label>
+                                                            <div className="mt-1">
+                                                                <input
+                                                                    ref={(el) => (window.__slideFileInput = el)}
+                                                                    name="attachments_files"
+                                                                    type="file"
+                                                                    multiple
+                                                                    onChange={(e) => {
+                                                                        const incoming = Array.from(
+                                                                            e.target.files || [],
+                                                                        );
+                                                                        setTaskForm((s) => {
+                                                                            const existing = s.attachmentsFiles || [];
+                                                                            const combined = [...existing, ...incoming];
+                                                                            const uniq = Array.from(
+                                                                                new Map(
+                                                                                    combined.map((f) => [f.name, f]),
+                                                                                ).values(),
+                                                                            );
+                                                                            return { ...s, attachmentsFiles: uniq };
+                                                                        });
+                                                                    }}
+                                                                    className="hidden"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        window.__slideFileInput &&
+                                                                        window.__slideFileInput.click()
+                                                                    }
+                                                                    className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                                >
+                                                                    Choose files
+                                                                </button>
+                                                            </div>
+                                                            {taskForm.attachmentsFiles &&
+                                                            taskForm.attachmentsFiles.length > 0 ? (
+                                                                <ul className="mt-2 space-y-1 text-sm">
+                                                                    {taskForm.attachmentsFiles.map((f, i) => (
+                                                                        <li
+                                                                            key={i}
+                                                                            className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
+                                                                        >
+                                                                            <span className="truncate">{f.name}</span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    setTaskForm((s) => ({
+                                                                                        ...s,
+                                                                                        attachmentsFiles:
+                                                                                            s.attachmentsFiles.filter(
+                                                                                                (_, idx) => idx !== i,
+                                                                                            ),
+                                                                                    }))
+                                                                                }
+                                                                                className="text-xs rounded-lg text-slate-500 ml-2"
+                                                                            >
+                                                                                Remove
+                                                                            </button>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            ) : null}
+                                                            {/* storage picker removed */}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Right column: Meta + reordered fields per request */}
+                                                <div className="flex flex-col gap-4">
+                                                    <div>
+                                                        <div className="grid md:grid-cols-2 gap-4">
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    List (Tab)
+                                                                </label>
+                                                                <input
+                                                                    name="list_index"
+                                                                    type="number"
+                                                                    min={1}
+                                                                    value={taskForm.list_index}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            list_index: Number(e.target.value || 1),
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                />
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Importance
+                                                                </label>
+                                                                <select
+                                                                    name="importance"
+                                                                    value={taskForm.importance}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            importance: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                >
+                                                                    <option value="low">Low</option>
+                                                                    <option value="med">Medium</option>
+                                                                    <option value="high">High</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900">
+                                                            Category
+                                                        </label>
+                                                        <select
+                                                            name="category"
+                                                            value={taskForm.category}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, category: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                        >
+                                                            <option>Key Areas</option>
+                                                            <option>Don’t Forget</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900">
+                                                            Linked Goal (optional)
+                                                        </label>
+                                                        <select
+                                                            name="goal_id"
+                                                            value={taskForm.goal_id}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, goal_id: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                        >
+                                                            <option value="">— None (Activity Trap) —</option>
+                                                            {goals.map((g) => (
+                                                                <option key={g.id} value={g.id}>
+                                                                    {g.title}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900">
+                                                            Assignee
+                                                        </label>
+                                                        <input
+                                                            name="assignee"
+                                                            value={taskForm.assignee}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, assignee: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            placeholder="Name or ID"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="grid md:grid-cols-2 gap-4">
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Status
+                                                                </label>
+                                                                <select
+                                                                    name="status"
+                                                                    value={taskForm.status}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            status: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                >
+                                                                    <option value="open">Open</option>
+                                                                    <option value="in_progress">In Progress</option>
+                                                                    <option value="done">Done</option>
+                                                                    <option value="cancelled">Cancelled</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Priority
+                                                                </label>
+                                                                <select
+                                                                    name="priority"
+                                                                    value={taskForm.priority}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            priority: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                >
+                                                                    <option value="low">Low</option>
+                                                                    <option value="med">Medium</option>
+                                                                    <option value="high">High</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900 block">
+                                                            Description
+                                                        </label>
+                                                        <textarea
+                                                            name="description"
+                                                            rows={3}
+                                                            value={taskForm.description}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({
+                                                                    ...s,
+                                                                    description: e.target.value,
+                                                                }))
+                                                            }
+                                                            className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
+                                                            placeholder="Details…"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions (span both columns) */}
+                                            <div className="mt-4 flex items-center gap-3 justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
+                                                        <FaSave /> Add Task
+                                                    </button>
+                                                    <span className="text-xs text-slate-700 flex items-center gap-1">
+                                                        <FaExclamationCircle /> Tasks must belong to the current Key
+                                                        Area.
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowTaskComposer(false)}
+                                                        className="rounded-lg text-sm text-slate-600 hover:underline"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {/* Tasks (List / Kanban / Calendar) */}
+                                {view === "list" && (
+                                    <div className="space-y-3">
+                                        {visibleTasks.length === 0 ? (
+                                            <EmptyState
+                                                title={`No tasks in List ${taskTab}`}
+                                                hint="Create your first task above."
+                                            />
+                                        ) : (
+                                            visibleTasks.map((t) => (
+                                                <div
+                                                    key={t.id}
+                                                    className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow transition"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="mt-1">
+                                                                <FaTags className="text-slate-700" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-semibold text-slate-900">
+                                                                    {t.title}
+                                                                </div>
+                                                                {t.description && (
+                                                                    <div className="text-sm text-slate-600">
+                                                                        {t.description}
+                                                                    </div>
+                                                                )}
+                                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                                    <Chip>Tab {t.list_index || 1}</Chip>
+                                                                    <Chip>Status: {t.status}</Chip>
+                                                                    <Chip>Priority: {t.priority}</Chip>
+                                                                    <Chip>Importance: {t.importance}</Chip>
+                                                                    <Chip>Category: {t.category}</Chip>
+                                                                    <Chip>Assignee: {t.assignee || "—"}</Chip>
+                                                                    {t.goal_id ? (
+                                                                        <Chip>Goal #{t.goal_id}</Chip>
+                                                                    ) : (
+                                                                        <Chip>Activity Trap</Chip>
+                                                                    )}
+                                                                    {t.eisenhower_quadrant && (
+                                                                        <Chip>Q{t.eisenhower_quadrant}</Chip>
+                                                                    )}
+                                                                    {t.tags && <Chip>Tags: {t.tags}</Chip>}
+                                                                    {t.attachments && (
+                                                                        <Chip>
+                                                                            Attachments:{" "}
+                                                                            {
+                                                                                t.attachments.split(",").filter(Boolean)
+                                                                                    .length
+                                                                            }
+                                                                        </Chip>
+                                                                    )}
+                                                                    {t.deadline && (
+                                                                        <Chip>
+                                                                            Deadline:{" "}
+                                                                            {new Date(t.deadline).toLocaleString()}
+                                                                        </Chip>
+                                                                    )}
+                                                                    {t.end_date && (
+                                                                        <Chip>
+                                                                            Planned End:{" "}
+                                                                            {new Date(t.end_date).toLocaleString()}
+                                                                        </Chip>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            className="rounded-lg text-slate-700 hover:text-slate-900 flex items-center gap-1 whitespace-nowrap"
+                                                            onClick={() => setSelectedTask(t)}
+                                                        >
+                                                            Open <FaChevronRight />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+
+                                {view === "kanban" && <KanbanView tasks={visibleTasks} onSelect={setSelectedTask} />}
+                                {view === "calendar" && (
+                                    <CalendarView tasks={visibleTasks} onSelect={setSelectedTask} />
+                                )}
+                            </div>
+                        )}
+                        {/* Create/Edit KA Modal */}
+                        {showForm && (
+                            <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
+                                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h2 className="text-lg font-bold text-slate-900">
+                                            {editing ? "Edit Key Area" : "New Key Area"}
+                                        </h2>
+                                        <button
+                                            className="p-2 rounded-lg hover:bg-slate-50"
+                                            onClick={() => {
+                                                setShowForm(false);
+                                                setEditing(null);
+                                            }}
+                                        >
+                                            <FaTimes />
+                                        </button>
+                                    </div>
+                                    <form onSubmit={onSaveKA} className="grid gap-3">
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-900">Title *</label>
+                                            <input
+                                                name="title"
+                                                required
+                                                defaultValue={editing?.title || ""}
+                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
+                                                placeholder="e.g., Finance"
+                                            />
                                         </div>
                                         <div>
+                                            <label className="text-sm font-semibold text-slate-900">Description</label>
+                                            <textarea
+                                                name="description"
+                                                rows={3}
+                                                defaultValue={editing?.description || ""}
+                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
+                                                placeholder="What belongs to this area?"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
+                                                <FaSave /> Save
+                                            </button>
                                             <button
                                                 type="button"
-                                                onClick={() => setShowTaskComposer(false)}
-                                                className="text-sm text-slate-600 hover:underline"
+                                                onClick={() => {
+                                                    setShowForm(false);
+                                                    setEditing(null);
+                                                }}
+                                                className="px-3 py-2 rounded-lg bg-white border text-slate-700 hover:bg-slate-50 font-semibold"
                                             >
                                                 Cancel
                                             </button>
                                         </div>
-                                    </div>
-                                </div>
-                            </form>
-                        )}
-
-                        {/* Tasks (List / Kanban / Calendar) */}
-                        {view === "list" && (
-                            <div className="space-y-3">
-                                {visibleTasks.length === 0 ? (
-                                    <EmptyState
-                                        title={`No tasks in List ${taskTab}`}
-                                        hint="Create your first task above."
-                                    />
-                                ) : (
-                                    visibleTasks.map((t) => (
-                                        <div
-                                            key={t.id}
-                                            className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow transition"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="mt-1">
-                                                        <FaTags className="text-slate-700" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-semibold text-slate-900">{t.title}</div>
-                                                        {t.description && (
-                                                            <div className="text-sm text-slate-600">
-                                                                {t.description}
-                                                            </div>
-                                                        )}
-                                                        <div className="mt-2 flex flex-wrap gap-2">
-                                                            <Chip>Tab {t.list_index || 1}</Chip>
-                                                            <Chip>Status: {t.status}</Chip>
-                                                            <Chip>Priority: {t.priority}</Chip>
-                                                            <Chip>Importance: {t.importance}</Chip>
-                                                            <Chip>Category: {t.category}</Chip>
-                                                            <Chip>Assignee: {t.assignee || "—"}</Chip>
-                                                            {t.goal_id ? (
-                                                                <Chip>Goal #{t.goal_id}</Chip>
-                                                            ) : (
-                                                                <Chip>Activity Trap</Chip>
-                                                            )}
-                                                            {t.eisenhower_quadrant && (
-                                                                <Chip>Q{t.eisenhower_quadrant}</Chip>
-                                                            )}
-                                                            {t.tags && <Chip>Tags: {t.tags}</Chip>}
-                                                            {t.attachments && (
-                                                                <Chip>
-                                                                    Attachments:{" "}
-                                                                    {t.attachments.split(",").filter(Boolean).length}
-                                                                </Chip>
-                                                            )}
-                                                            {t.deadline && (
-                                                                <Chip>
-                                                                    Deadline: {new Date(t.deadline).toLocaleString()}
-                                                                </Chip>
-                                                            )}
-                                                            {t.end_date && (
-                                                                <Chip>
-                                                                    Planned End: {new Date(t.end_date).toLocaleString()}
-                                                                </Chip>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    className="text-slate-700 hover:text-slate-900 flex items-center gap-1 whitespace-nowrap"
-                                                    onClick={() => setSelectedTask(t)}
-                                                >
-                                                    Open <FaChevronRight />
-                                                </button>
-                                            </div>
+                                        <div className="text-xs text-slate-700 flex items-start gap-2">
+                                            <FaExclamationCircle className="mt-0.5" />
+                                            <span>
+                                                “Ideas” is locked and always at position 10. Enforce max 10 on server
+                                                too.
+                                            </span>
                                         </div>
-                                    ))
-                                )}
+                                    </form>
+                                </div>
                             </div>
                         )}
-
-                        {view === "kanban" && <KanbanView tasks={visibleTasks} onSelect={setSelectedTask} />}
-                        {view === "calendar" && <CalendarView tasks={visibleTasks} onSelect={setSelectedTask} />}
+                        {/* SlideOver */}
+                        <TaskSlideOver
+                            task={selectedTask}
+                            goals={goals}
+                            onClose={() => setSelectedTask(null)}
+                            onSave={handleSaveTask}
+                            onDelete={handleDeleteTask}
+                        />
                     </div>
-                )}
-
-                {/* Create/Edit KA Modal */}
-                {showForm && (
-                    <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
-                        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-lg font-bold text-slate-900">
-                                    {editing ? "Edit Key Area" : "New Key Area"}
-                                </h2>
-                                <button
-                                    className="p-2 rounded-lg hover:bg-slate-50"
-                                    onClick={() => {
-                                        setShowForm(false);
-                                        setEditing(null);
-                                    }}
-                                >
-                                    <FaTimes />
-                                </button>
-                            </div>
-                            <form onSubmit={onSaveKA} className="grid gap-3">
-                                <div>
-                                    <label className="text-sm font-semibold text-slate-900">Title *</label>
-                                    <input
-                                        name="title"
-                                        required
-                                        defaultValue={editing?.title || ""}
-                                        className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
-                                        placeholder="e.g., Finance"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-semibold text-slate-900">Description</label>
-                                    <textarea
-                                        name="description"
-                                        rows={3}
-                                        defaultValue={editing?.description || ""}
-                                        className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
-                                        placeholder="What belongs to this area?"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
-                                        <FaSave /> Save
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowForm(false);
-                                            setEditing(null);
-                                        }}
-                                        className="px-3 py-2 rounded-lg bg-white border text-slate-700 hover:bg-slate-50 font-semibold"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                                <div className="text-xs text-slate-700 flex items-start gap-2">
-                                    <FaExclamationCircle className="mt-0.5" />
-                                    <span>
-                                        “Ideas” is locked and always at position 10. Enforce max 10 on server too.
-                                    </span>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* SlideOver */}
-                <TaskSlideOver
-                    task={selectedTask}
-                    goals={goals}
-                    onClose={() => setSelectedTask(null)}
-                    onSave={handleSaveTask}
-                    onDelete={handleDeleteTask}
-                />
-            </main>
+                </main>
+            </div>
         </div>
     );
 }
