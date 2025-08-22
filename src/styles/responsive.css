@@ -17,12 +17,11 @@ body {
 /* Fix for Safari and iOS */
 input[type="email"],
 input[type="password"],
-input[type="text"],
-button {
+input[type="text"] {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    border-radius: 0;
+    /* don't force border-radius on buttons globally; let Tailwind control it */
 }
 
 /* Prevent zoom on input focus in iOS */
@@ -147,18 +146,18 @@ input:focus {
 /* KeyAreas page scoped Tailwind component utilities */
 @layer components {
     .keyareas .btn-compact {
-        /* compact primary/secondary buttons: tighter padding, small radius, thin border */
-        @apply px-2 py-1 rounded-sm text-sm border border-slate-200;
+        /* compact primary/secondary buttons: tighter padding and border; do not force radius here */
+        @apply px-2 py-1 text-sm border border-slate-200;
     }
 
     .keyareas .tab-btn {
         /* compact tab buttons */
-        @apply px-2 py-1 rounded-sm text-sm font-semibold border border-transparent hover:border-slate-200;
+        @apply px-2 py-1 text-sm font-semibold border border-transparent hover:border-slate-200;
     }
 
     .keyareas .view-toggle-btn {
         /* compact view toggle buttons */
-        @apply px-2 py-1 rounded-sm text-sm font-semibold border border-transparent hover:border-slate-200;
+        @apply px-2 py-1 text-sm font-semibold border border-transparent hover:border-slate-200;
     }
 
     .keyareas .kanban-card {
