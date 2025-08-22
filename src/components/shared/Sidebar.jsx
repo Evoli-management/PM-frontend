@@ -6,6 +6,7 @@ import {
     FaBullseye,
     FaKey,
     FaHeart,
+    FaLightbulb,
     FaUsers,
     FaChevronDown,
     FaCog,
@@ -21,7 +22,19 @@ const navItems = [
     // Tasks & Activities removed per request
     { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
     { label: "Goals & Tracking", icon: <FaBullseye />, to: "/goals", section: "Main", badge: 2 },
-    { label: "Key Areas", icon: <FaKey />, to: "/key-areas", section: "Main" },
+    {
+        label: "Key Areas",
+        icon: <FaKey />,
+        to: "/key-areas",
+        section: "Main",
+        children: [
+            {
+                label: "Ideas",
+                icon: <FaLightbulb />,
+                to: { pathname: "/key-areas", search: "?select=ideas" },
+            },
+        ],
+    },
     { label: "Time Tracking", icon: <FaClock />, to: "/time-tracking", section: "Main" },
     { label: "Team", icon: <FaUsers />, to: "/teams", section: "Main" },
     { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
@@ -130,7 +143,10 @@ export default function Sidebar({
                         .map((item) =>
                             item.children ? (
                                 <div key={item.label} className="mb-2">
-                                    <div
+                                    <Link
+                                        to={{ pathname: item.to, search: "?view=all" }}
+                                        onClick={handleKeyAreasClick}
+                                        aria-expanded={keyAreasOpen}
                                         className={`relative flex items-center gap-3 px-3 py-2 rounded-lg transition group focus:outline-none focus:ring-2 focus:ring-blue-400 ${location.pathname.startsWith(item.to) ? "bg-blue-100 text-blue-700 font-bold" : "text-blue-900 hover:bg-blue-50"} ${collapsed ? "justify-center px-0" : ""}`}
                                     >
                                         <span className="text-xl" title={item.label}>
@@ -143,15 +159,20 @@ export default function Sidebar({
                                             </span>
                                         )}
                                         {collapsed && <span className="sr-only">{item.label}</span>}
-                                    </div>
-                                    {/* Render children as nested links */}
-                                    {!collapsed && (
-                                        <div className="ml-8">
+                                    </Link>
+                                    {/* Render children as nested links when expanded */}
+                                    {!collapsed && keyAreasOpen && (
+                                        <div className="ml-10 mt-2 space-y-1">
                                             {item.children.map((child) => (
                                                 <Link
                                                     key={child.label}
                                                     to={child.to}
-                                                    className={`flex items-center gap-2 px-2 py-1 rounded-lg mb-1 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${location.pathname === child.to ? "bg-blue-200 text-blue-700 font-bold" : "text-blue-900 hover:bg-blue-50"}`}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                                                        location.pathname ===
+                                                        (child.to && child.to.pathname ? child.to.pathname : child.to)
+                                                            ? "bg-blue-200 text-blue-700 font-bold"
+                                                            : "text-blue-900 hover:bg-blue-50"
+                                                    }`}
                                                     tabIndex={0}
                                                     aria-label={child.label}
                                                 >
@@ -167,7 +188,11 @@ export default function Sidebar({
                             ) : (
                                 <Link
                                     key={item.label}
-                                    to={item.to}
+                                    to={
+                                        item.label === "Key Areas"
+                                            ? { pathname: item.to, search: "?view=all" }
+                                            : item.to
+                                    }
                                     className={`relative flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition group focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                                         location.pathname === item.to
                                             ? "bg-blue-200 text-blue-700 font-bold"
@@ -189,6 +214,17 @@ export default function Sidebar({
                                 </Link>
                             ),
                         )}
+                    {/* Add Ideas quick link under Key Areas using a Link with query param so KeyAreas can react */}
+                    <div className="mt-4 mb-6 px-3">
+                        <Link
+                            to={{ pathname: "/key-areas", search: "?select=ideas" }}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition ${collapsed ? "justify-center px-0" : "text-blue-900 hover:bg-blue-50"}`}
+                            aria-label="Ideas"
+                        >
+                            <span className="text-xl">{collapsed ? <FaLightbulb /> : <FaLightbulb />}</span>
+                            {!collapsed && <span>Ideas</span>}
+                        </Link>
+                    </div>
                 </nav>
                 {!collapsed && (
                     <div className="mt-6 px-2">

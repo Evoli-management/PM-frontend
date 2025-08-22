@@ -1,5 +1,6 @@
 // src/pages/KeyAreas.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import {
     FaPlus,
@@ -259,7 +260,7 @@ function CalendarView({ tasks, onSelect }) {
 }
 
 /* --------------------------- Slide Over (Edit) --------------------------- */
-function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
+function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = false }) {
     const [form, setForm] = useState(null);
 
     useEffect(() => {
@@ -279,6 +280,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
 
     const submit = (e) => {
         e.preventDefault();
+        if (readOnly) return;
         const attachmentsNames = (form.attachmentsFiles || []).map((f) => f.name || f).filter(Boolean);
         const payload = {
             ...form,
@@ -314,6 +316,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                         value={form.title || ""}
                                         onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
                                         className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                        disabled={readOnly}
                                     />
                                 </div>
 
@@ -324,6 +327,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                         onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
                                         className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                         placeholder="e.g., q3,campaign"
+                                        disabled={readOnly}
                                     />
                                 </div>
 
@@ -337,6 +341,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                             }
                                             onChange={(e) => setForm((s) => ({ ...s, deadline: e.target.value }))}
                                             className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            disabled={readOnly}
                                         />
                                         <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
                                     </div>
@@ -350,6 +355,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                             }
                                             onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
                                             className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            disabled={readOnly}
                                         />
                                         <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
                                     </div>
@@ -386,15 +392,17 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                             }}
                                             className="hidden"
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                window.__composerFileInput && window.__composerFileInput.click()
-                                            }
-                                            className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                        >
-                                            Choose files
-                                        </button>
+                                        {!readOnly && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    window.__composerFileInput && window.__composerFileInput.click()
+                                                }
+                                                className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                            >
+                                                Choose files
+                                            </button>
+                                        )}
                                     </div>
                                     {/* show selected files */}
                                     {form.attachmentsFiles && form.attachmentsFiles.length > 0 ? (
@@ -405,20 +413,22 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                                     className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
                                                 >
                                                     <span className="truncate">{f.name}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setForm((s) => ({
-                                                                ...s,
-                                                                attachmentsFiles: s.attachmentsFiles.filter(
-                                                                    (_, idx) => idx !== i,
-                                                                ),
-                                                            }))
-                                                        }
-                                                        className="text-xs rounded-lg text-slate-500 ml-2"
-                                                    >
-                                                        Remove
-                                                    </button>
+                                                    {!readOnly && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setForm((s) => ({
+                                                                    ...s,
+                                                                    attachmentsFiles: s.attachmentsFiles.filter(
+                                                                        (_, idx) => idx !== i,
+                                                                    ),
+                                                                }))
+                                                            }
+                                                            className="text-xs rounded-lg text-slate-500 ml-2"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>
@@ -524,18 +534,22 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                         </div>
 
                         <div className="mt-4 flex items-center gap-2">
-                            <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
-                                <FaSave /> Save
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (confirm("Delete this task?")) onDelete(task);
-                                }}
-                                className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
-                            >
-                                <FaTrash /> Delete
-                            </button>
+                            {!readOnly && (
+                                <>
+                                    <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
+                                        <FaSave /> Save
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (confirm("Delete this task?")) onDelete(task);
+                                        }}
+                                        className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
+                                    >
+                                        <FaTrash /> Delete
+                                    </button>
+                                </>
+                            )}
                             <button
                                 type="button"
                                 onClick={onClose}
@@ -553,6 +567,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
 
 /* --------------------------------- Screen -------------------------------- */
 export default function KeyAreas() {
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [keyAreas, setKeyAreas] = useState([]);
     const [filter, setFilter] = useState("");
@@ -599,17 +614,85 @@ export default function KeyAreas() {
         })();
     }, []);
 
+    // React to sidebar clicks and query params: show all key areas or select Ideas
+    useEffect(() => {
+        const showAll = () => {
+            setSelectedKA(null);
+            setAllTasks([]);
+            setFilter("");
+        };
+
+        const selectIdeas = async () => {
+            if (loading) return;
+            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.position === 10);
+            // do NOT open the Ideas area; instead show it in the main list and make it read-only
+            if (found) {
+                setSelectedKA(null);
+                setAllTasks([]);
+                setFilter(found.title || "Ideas");
+            } else {
+                const synth = {
+                    id: "ideas-synth",
+                    title: "Ideas",
+                    description: "Locked ideas slot",
+                    position: 10,
+                    is_default: true,
+                };
+                setKeyAreas((prev) => {
+                    if (prev.some((k) => (k.id && k.id === synth.id) || (k.title || "").toLowerCase() === "ideas"))
+                        return prev;
+                    return [...prev, synth].sort((a, b) => (a.position || 0) - (b.position || 0));
+                });
+                setSelectedKA(null);
+                setAllTasks([]);
+                setFilter("Ideas");
+            }
+        };
+
+        window.addEventListener("sidebar-keyareas-click", showAll);
+        window.addEventListener("sidebar-ideas-click", selectIdeas);
+
+        // also respect query params when navigated via Link
+        const params = new URLSearchParams(location.search);
+        if (params.get("view") === "all") showAll();
+        if (params.get("select") === "ideas") selectIdeas();
+
+        return () => {
+            window.removeEventListener("sidebar-keyareas-click", showAll);
+            window.removeEventListener("sidebar-ideas-click", selectIdeas);
+        };
+    }, [keyAreas, loading, location.search]);
+
     // storage picker removed
 
     const canAdd = useMemo(() => keyAreas.length < 10, [keyAreas.length]);
 
     const filteredKAs = useMemo(() => {
         const q = filter.trim().toLowerCase();
-        if (!q) return keyAreas;
-        return keyAreas.filter(
-            (k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q),
-        );
+        const params = new URLSearchParams(location.search);
+        const explicitSelect = params.get("select");
+
+        // If the URL explicitly requests Ideas, show only Ideas
+        if (explicitSelect === "ideas") {
+            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.position === 10);
+        }
+
+        // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
+        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && k.position !== 10);
+        if (!q) return base;
+        return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
+
+    const paramsForRender = new URLSearchParams(location.search);
+    const showOnlyIdeas = paramsForRender.get("select") === "ideas";
+    const ideaForShow = keyAreas.find((k) => (k.title || "").toLowerCase() === "ideas") ||
+        keyAreas.find((k) => k.position === 10) || {
+            id: "ideas-synth",
+            title: "Ideas",
+            description: "Locked ideas slot",
+            position: 10,
+            is_default: true,
+        };
 
     const onSaveKA = async (e) => {
         e.preventDefault();
@@ -681,6 +764,8 @@ export default function KeyAreas() {
     const onCreateTask = async (e) => {
         e.preventDefault();
         if (!selectedKA) return;
+        // prevent creating tasks in Ideas/locked key area
+        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") return;
         const f = new FormData(e.currentTarget);
         const title = f.get("title").toString().trim();
         if (!title) return;
@@ -789,7 +874,7 @@ export default function KeyAreas() {
                     />
                 )}
                 <main
-                    className={`flex-1 min-w-0 w-full transition-all ${mobileSidebarOpen ? "ml-64" : "ml-0"} md:ml-[5mm]`}
+                    className={`flex-1 min-w-0 w-full transition-all ${mobileSidebarOpen ? "ml-64" : "ml-0"} md:ml-[3mm]`}
                 >
                     {" "}
                     {/* min-w-0 prevents overflow of flex children */}
@@ -801,26 +886,30 @@ export default function KeyAreas() {
                             {!selectedKA ? (
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
-                                    <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                        <FaSearch className="text-slate-700 mr-2" />
-                                        <input
-                                            placeholder="Search key areas..."
-                                            className="bg-transparent outline-none text-sm w-56"
-                                            value={filter}
-                                            onChange={(e) => setFilter(e.target.value)}
-                                        />
-                                    </div>
-                                    <button
-                                        className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
-                                            canAdd
-                                                ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                                : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                        }`}
-                                        onClick={() => canAdd && (setShowForm(true), setEditing(null))}
-                                        disabled={!canAdd}
-                                    >
-                                        <FaPlus /> New Key Area
-                                    </button>
+                                    {!showOnlyIdeas && (
+                                        <>
+                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                                <FaSearch className="text-slate-700 mr-2" />
+                                                <input
+                                                    placeholder="Search key areas..."
+                                                    className="bg-transparent outline-none text-sm w-56"
+                                                    value={filter}
+                                                    onChange={(e) => setFilter(e.target.value)}
+                                                />
+                                            </div>
+                                            <button
+                                                className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
+                                                    canAdd
+                                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                                        : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                                }`}
+                                                onClick={() => canAdd && (setShowForm(true), setEditing(null))}
+                                                disabled={!canAdd}
+                                            >
+                                                <FaPlus /> New Key Area
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-2 w-full">
@@ -891,6 +980,43 @@ export default function KeyAreas() {
                             <div>
                                 {loading ? (
                                     <div className="text-slate-700">Loading…</div>
+                                ) : showOnlyIdeas ? (
+                                    // render Ideas as a single centered full-width card
+                                    <div className="flex justify-center">
+                                        <div
+                                            key={ideaForShow.id}
+                                            className="w-full max-w-3xl bg-white rounded-2xl shadow border border-slate-200 p-6 flex flex-col"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-xl font-bold text-slate-900">
+                                                            {ideaForShow.title}
+                                                        </h3>
+                                                        {ideaForShow.is_default && (
+                                                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                                <FaLock /> Locked
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-slate-600 mt-2">
+                                                        {ideaForShow.description || "—"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-6 flex items-center gap-2">
+                                                <button
+                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                    onClick={() => openKA(ideaForShow)}
+                                                >
+                                                    <FaListUl /> Open Lists
+                                                </button>
+                                                <p className="text-sm text-slate-700 ml-2">
+                                                    This Key Area is read-only (cannot edit or delete).
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {filteredKAs.map((ka) => (
@@ -994,13 +1120,19 @@ export default function KeyAreas() {
                                 {/* Composer — show toggle button; composer renders only when requested */}
                                 {!showTaskComposer ? (
                                     <div className="mb-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowTaskComposer(true)}
-                                            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                        >
-                                            <FaPlus /> Add Task
-                                        </button>
+                                        {!selectedKA.is_default ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowTaskComposer(true)}
+                                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                            >
+                                                <FaPlus /> Add Task
+                                            </button>
+                                        ) : (
+                                            <div className="text-sm text-slate-600">
+                                                Adding tasks is disabled for this Key Area.
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <form onSubmit={onCreateTask}>
@@ -1522,6 +1654,7 @@ export default function KeyAreas() {
                             onClose={() => setSelectedTask(null)}
                             onSave={handleSaveTask}
                             onDelete={handleDeleteTask}
+                            readOnly={selectedKA?.is_default || (selectedKA?.title || "").toLowerCase() === "ideas"}
                         />
                     </div>
                 </main>
