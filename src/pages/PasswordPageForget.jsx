@@ -1,83 +1,96 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
 
 const ForgotPasswordPage = () => {
+    const [email, setEmail] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
+
+    const handleEmailChange = (e) => {
+        setEmail(e.target.value);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        // Basic email validation
+        if (!email) {
+            alert("Please enter your email address");
+            return;
+        }
+
+        if (!email.includes("@") || !email.includes(".")) {
+            alert("Please enter a valid email address");
+            return;
+        }
+
+        setIsLoading(true);
+
+        // Simulate API call for sending reset email
+        setTimeout(() => {
+            setIsLoading(false);
+            // Redirect to reset password page
+            navigate("/reset-password", { 
+                state: { email: email } // Pass email to reset password page
+            });
+        }, 1000);
+    };
     return (
-        <div className="min-h-screen flex items-center justify-center bg-white px-4">
-            <div className="w-full max-w-[1450px] bg-white rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.5)] flex flex-col md:flex-row items-center justify-between px-8 py-10">
-                {/* Left Section */}
-                <div className="flex flex-col items-center w-full md:w-1/2">
-                    {/* Logo */}
+        <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
+            <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8">
+                {/* Forgot Password Box */}
+                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
                     <img
                         src="/PM-frontend/logo.png"
                         alt="Practical Manager Logo"
-                        className="mb-4"
-                        style={{ width: "314.63px", height: "210px" }}
+                        className="mb-4 w-32 h-20 object-contain"
                     />
-
-                    {/* White Box with Solid Border (Pencil-Style) */}
-                    <div
-                        className="flex flex-col items-center py-8 px-6 mb-6"
-                        style={{
-                            backgroundColor: "#ffffff",
-                            border: "2px solid #333",
-                            borderRadius: "12px",
-                            width: "720px",
-                            boxShadow: "2px 2px 0px rgba(0,0,0,0.3)",
-                        }}
-                    >
-                        <h2 className="text-[24px] font-bold text-black text-center mb-2">FORGOT PASSWORD?</h2>
-
-                        <p className="text-black font-medium text-base text-center mb-6 px-4">
-                            Enter your email to receive reset password instructions
-                        </p>
-
-                        <div className="relative mb-6 shadow" style={{ width: "613px", height: "57px" }}>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-2 text-center">FORGOT PASSWORD?</h2>
+                    <p className="text-black font-medium mb-4 text-base text-center">Enter your email to receive reset password instructions</p>
+                    <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
+                        <div className="relative w-full mb-4">
                             <input
                                 type="email"
+                                value={email}
+                                onChange={handleEmailChange}
                                 placeholder="Email"
-                                className="w-full h-full pl-12 pr-4 text-black placeholder-black border border-gray-300 rounded-[12px] text-sm"
-                                style={{ backgroundColor: "#AEC1FF" }}
+                                className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base bg-blue-100"
+                                required
                             />
-                            <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-black">
-                                <FontAwesomeIcon icon={faEnvelope} className="text-xl" />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
                             </span>
                         </div>
-
-                        {/* Submit button */}
                         <button
                             type="submit"
-                            className="text-black font-semibold w-[613px] h-[57px] rounded-[12px] shadow"
-                            style={{ backgroundColor: "#1BFF23" }}
+                            disabled={isLoading}
+                            className="w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            SUBMIT
+                            {isLoading ? "SENDING..." : "SUBMIT"}
                         </button>
+                    </form>
+                    <div className="w-full flex flex-col items-center mt-6">
+                        <span className="text-gray-500 text-sm mb-2">Remembered your password?</span>
+                        <Link
+                            to="/login"
+                            className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
+                        >
+                            Back to Login
+                        </Link>
                     </div>
                 </div>
-
-                {/* Right Section */}
-                <div className="hidden md:flex md:w-1/2 flex-col items-center justify-center">
-                    {/* Header Text Horizontally with more spacing and lower position */}
-                    <div className="flex space-x-12 mb-8 mt-10">
-                        <p className="text-black text-base font-semibold">BENEFIT AND FEATURES</p>
-                        <p className="text-black text-base font-semibold">PRICING</p>
-                        <p className="text-black text-base font-semibold">CONTACT AND HELP</p>
-                    </div>
-
-                    {/* Smaller Vector.*/}
+                {/* Illustration Section */}
+                <div className="hidden md:flex flex-1 items-center justify-center">
                     <div className="text-center">
                         <img
                             src="/PM-frontend/forget.png"
                             alt="Forgot Password Illustration"
-                            style={{ width: "400px", height: "470px" }}
+                            className="w-64 h-64 object-contain mx-auto"
                         />
-                        <p
-                            className="mt-4 text-black text-sm font-semibold mx-auto"
-                            style={{ width: "439px", height: "57px" }}
-                        >
-                            Your tasks won’t even notice you left.
-                            <br />
+                        <p className="mt-4 text-black text-sm font-semibold mx-auto max-w-xs px-4">
+                            Your tasks won’t even notice you left.<br />
                             Secure password, powered by Practical Manager.
                         </p>
                     </div>
