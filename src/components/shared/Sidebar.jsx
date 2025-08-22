@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import {
     FaHome,
     FaCalendarAlt,
-    FaBell,
     FaBullseye,
     FaKey,
     FaHeart,
@@ -13,14 +12,13 @@ import {
     FaSignOutAlt,
     FaPlus,
     FaSearch,
-    FaTasks,
     FaClock,
     FaChartBar,
 } from "react-icons/fa";
 
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
-    { label: "Tasks & Activities", icon: <FaTasks />, to: "/tasks", section: "Main", badge: 3 },
+    // Tasks & Activities removed per request
     { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
     { label: "Goals & Tracking", icon: <FaBullseye />, to: "/goals", section: "Main", badge: 2 },
     { label: "Key Areas", icon: <FaKey />, to: "/key-areas", section: "Main" },
@@ -32,16 +30,16 @@ const navItems = [
 
 const quickActions = [
     { label: "New Task", icon: <FaPlus />, to: "/tasks" },
-    { label: "Activity Trap", icon: <FaBell />, to: "/tasks?view=activity-trap" },
     { label: "Set Goal", icon: <FaBullseye />, to: "/goals" },
     { label: "Invite Team", icon: <FaUsers />, to: "/teams" },
 ];
 
-export default function Sidebar({ user }) {
+export default function Sidebar({ user, collapsed: collapsedProp, onCollapseToggle }) {
     const location = useLocation();
     const [userMenuOpen, setUserMenuOpen] = useState(false);
-    const [collapsed, setCollapsed] = useState(false);
+    const [internalCollapsed, setInternalCollapsed] = useState(false);
     const [search, setSearch] = useState("");
+    const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
     return (
         <aside
@@ -55,7 +53,10 @@ export default function Sidebar({ user }) {
                     <button
                         className="ml-auto text-blue-700 hover:text-blue-900 focus:outline-none"
                         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                        onClick={() => setCollapsed((c) => !c)}
+                        onClick={() => {
+                            if (typeof onCollapseToggle === "function") onCollapseToggle();
+                            else setInternalCollapsed((c) => !c);
+                        }}
                     >
                         <FaChevronDown className={`transform ${collapsed ? "rotate-90" : "rotate-0"}`} />
                     </button>
