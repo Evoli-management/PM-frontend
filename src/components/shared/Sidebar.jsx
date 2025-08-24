@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
     FaHome,
     FaCalendarAlt,
     FaBullseye,
     FaKey,
+    FaLock,
     FaHeart,
     FaLightbulb,
     FaUsers,
@@ -55,15 +56,39 @@ export default function Sidebar({
     onMobileClose,
 }) {
     const location = useLocation();
+    const [keyAreasList, setKeyAreasList] = useState([]);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [internalCollapsed, setInternalCollapsed] = useState(false);
     const [search, setSearch] = useState("");
     const [keyAreasOpen, setKeyAreasOpen] = useState(false); // State for Key Areas dropdown
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
-    const handleKeyAreasClick = () => {
+    const navigate = useNavigate();
+
+    const handleKeyAreasClick = (e, item) => {
+        e.preventDefault();
+        // navigate to Key Areas main view and toggle submenu
+        try {
+            navigate({ pathname: item.to, search: "?view=all" });
+        } catch (err) {
+            // fallback
+            window.location.href = `${item.to}?view=all`;
+        }
         setKeyAreasOpen((prev) => !prev);
+        try {
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-click"));
+        } catch (e) {}
     };
+
+    // listen for key areas data emitted by the KeyAreas page
+    React.useEffect(() => {
+        const handler = (e) => {
+            const ka = e?.detail?.keyAreas || [];
+            setKeyAreasList(Array.isArray(ka) ? ka : []);
+        };
+        window.addEventListener("sidebar-keyareas-data", handler);
+        return () => window.removeEventListener("sidebar-keyareas-data", handler);
+    }, []);
 
     // mobile overlay classes: off-canvas when closed, fixed overlay when open on small screens
     const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full";
@@ -140,13 +165,101 @@ export default function Sidebar({
                 <nav aria-label="Sidebar navigation">
                     {navItems
                         .filter((item) => item.label.toLowerCase().includes(search.toLowerCase()))
-                        .map((item) =>
-                            item.children ? (
+                        .map((item) => {
+                            const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
+
+                            // Key Areas: render as a toggle with submenu (All Key Areas, Ideas, Bright Idea)
+                            if (isKeyAreas) {
+                                return (
+                                    <div key={item.label} className="mb-2">
+                                        <button
+                                            onClick={(e) => handleKeyAreasClick(e, item)}
+                                            aria-expanded={keyAreasOpen}
+                                            className={`relative flex items-center gap-3 w-full px-3 py-2 rounded-lg transition group focus:outline-none focus:ring-2 focus:ring-blue-400 ${location.pathname.startsWith("/key-areas") ? "bg-blue-100 text-blue-700 font-bold" : "text-blue-900 hover:bg-blue-50"} ${collapsed ? "justify-center px-0" : ""}`}
+                                        >
+                                            <span className="text-xl" title={item.label}>
+                                                {item.icon}
+                                            </span>
+                                            {!collapsed && <span>{item.label}</span>}
+                                            {item.badge && (
+                                                <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
+                                                    {item.badge}
+                                                </span>
+                                            )}
+                                            {collapsed && <span className="sr-only">{item.label}</span>}
+                                            <FaChevronDown
+                                                className={`ml-auto ${keyAreasOpen ? "rotate-180" : "rotate-0"}`}
+                                            />
+                                        </button>
+
+                                        {!collapsed && keyAreasOpen && (
+                                            <div className="ml-10 mt-2 space-y-1">
+                                                {/* dynamically render key areas received from KeyAreas page */}
+                                                {keyAreasList && keyAreasList.length > 0
+                                                    ? keyAreasList.map((ka) => (
+                                                          <Link
+                                                              key={ka.id}
+                                                              to={{ pathname: "/key-areas", search: `?ka=${ka.id}` }}
+                                                              onClick={(e) => {
+                                                                  // still dispatch an event for older handlers
+                                                                  try {
+                                                                      window.dispatchEvent(
+                                                                          new CustomEvent("sidebar-open-ka", {
+                                                                              detail: { id: ka.id },
+                                                                          }),
+                                                                      );
+                                                                  } catch (err) {}
+                                                                  setKeyAreasOpen(false);
+                                                              }}
+                                                              className="flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition text-blue-900 hover:bg-blue-50 text-left w-full"
+                                                          >
+                                                              <span className="text-sm flex items-center gap-2">
+                                                                  {ka.title}
+                                                                  {(ka.is_default || ka.position === 10) && (
+                                                                      <span className="text-xs text-slate-500 ml-2 inline-flex items-center">
+                                                                          <FaLock />
+                                                                      </span>
+                                                                  )}
+                                                              </span>
+                                                          </Link>
+                                                      ))
+                                                    : item.children &&
+                                                      item.children.map((child) => (
+                                                          <Link
+                                                              key={child.label}
+                                                              to={child.to}
+                                                              className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                                                                  location.pathname ===
+                                                                      (child.to && child.to.pathname
+                                                                          ? child.to.pathname
+                                                                          : child.to) &&
+                                                                  new URLSearchParams(location.search).get("select") ===
+                                                                      "ideas"
+                                                                      ? "bg-blue-200 text-blue-700 font-bold"
+                                                                      : "text-blue-900 hover:bg-blue-50"
+                                                              }`}
+                                                              tabIndex={0}
+                                                              aria-label={child.label}
+                                                          >
+                                                              <span className="text-lg" title={child.label}>
+                                                                  {child.icon}
+                                                              </span>
+                                                              <span>{child.label}</span>
+                                                          </Link>
+                                                      ))}
+
+                                                {/* Bright Idea link removed per request */}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+
+                            // All other nav items: render as simple links
+                            return (
                                 <div key={item.label} className="mb-2">
                                     <Link
-                                        to={{ pathname: item.to, search: "?view=all" }}
-                                        onClick={handleKeyAreasClick}
-                                        aria-expanded={keyAreasOpen}
+                                        to={item.to}
                                         className={`relative flex items-center gap-3 px-3 py-2 rounded-lg transition group focus:outline-none focus:ring-2 focus:ring-blue-400 ${location.pathname.startsWith(item.to) ? "bg-blue-100 text-blue-700 font-bold" : "text-blue-900 hover:bg-blue-50"} ${collapsed ? "justify-center px-0" : ""}`}
                                     >
                                         <span className="text-xl" title={item.label}>
@@ -158,73 +271,11 @@ export default function Sidebar({
                                                 {item.badge}
                                             </span>
                                         )}
-                                        {collapsed && <span className="sr-only">{item.label}</span>}
                                     </Link>
-                                    {/* Render children as nested links when expanded */}
-                                    {!collapsed && keyAreasOpen && (
-                                        <div className="ml-10 mt-2 space-y-1">
-                                            {item.children.map((child) => (
-                                                <Link
-                                                    key={child.label}
-                                                    to={child.to}
-                                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                                                        location.pathname ===
-                                                        (child.to && child.to.pathname ? child.to.pathname : child.to)
-                                                            ? "bg-blue-200 text-blue-700 font-bold"
-                                                            : "text-blue-900 hover:bg-blue-50"
-                                                    }`}
-                                                    tabIndex={0}
-                                                    aria-label={child.label}
-                                                >
-                                                    <span className="text-lg" title={child.label}>
-                                                        {child.icon}
-                                                    </span>
-                                                    <span>{child.label}</span>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
-                            ) : (
-                                <Link
-                                    key={item.label}
-                                    to={
-                                        item.label === "Key Areas"
-                                            ? { pathname: item.to, search: "?view=all" }
-                                            : item.to
-                                    }
-                                    className={`relative flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition group focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                                        location.pathname === item.to
-                                            ? "bg-blue-200 text-blue-700 font-bold"
-                                            : "text-blue-900 hover:bg-blue-50"
-                                    } ${collapsed ? "justify-center px-0" : ""}`}
-                                    tabIndex={0}
-                                    aria-label={item.label}
-                                >
-                                    <span className="text-xl" title={item.label}>
-                                        {item.icon}
-                                    </span>
-                                    {!collapsed && <span>{item.label}</span>}
-                                    {item.badge && (
-                                        <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
-                                            {item.badge}
-                                        </span>
-                                    )}
-                                    {collapsed && <span className="sr-only">{item.label}</span>}
-                                </Link>
-                            ),
-                        )}
-                    {/* Add Ideas quick link under Key Areas using a Link with query param so KeyAreas can react */}
-                    <div className="mt-4 mb-6 px-3">
-                        <Link
-                            to={{ pathname: "/key-areas", search: "?select=ideas" }}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition ${collapsed ? "justify-center px-0" : "text-blue-900 hover:bg-blue-50"}`}
-                            aria-label="Ideas"
-                        >
-                            <span className="text-xl">{collapsed ? <FaLightbulb /> : <FaLightbulb />}</span>
-                            {!collapsed && <span>Ideas</span>}
-                        </Link>
-                    </div>
+                            );
+                        })}
+                    {/* Ideas quick link removed per request */}
                 </nav>
                 {!collapsed && (
                     <div className="mt-6 px-2">
