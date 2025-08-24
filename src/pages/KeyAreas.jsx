@@ -1,5 +1,6 @@
 // src/pages/KeyAreas.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import {
     FaPlus,
@@ -23,6 +24,49 @@ const Chip = ({ children }) => (
         {children}
     </span>
 );
+
+/* Small UI helpers used in the new KA layout */
+function Card({ title, titleIcon, children }) {
+    return (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">
+                    {title} {titleIcon && <span className="ml-1">{titleIcon}</span>}
+                </div>
+            </div>
+            <div className="mt-3">{children}</div>
+        </div>
+    );
+}
+
+function Tab({ active, onClick, children }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-2 py-1 rounded-lg text-sm ${active ? "bg-blue-600 text-white" : "bg-slate-100"}`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function DotLeader({ label, placeholder }) {
+    return (
+        <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-700">{label}</div>
+            <div className="text-sm text-slate-500">{placeholder}</div>
+        </div>
+    );
+}
+
+function GhostInput({ prefix, placeholder, value, onChange }) {
+    return (
+        <div className="flex items-center gap-2">
+            <div className="text-sm text-slate-600">{prefix}</div>
+            <input value={value} onChange={onChange} placeholder={placeholder} className="flex-1 p-2 border rounded" />
+        </div>
+    );
+}
 
 // StoragePicker removed per user request
 
@@ -69,12 +113,14 @@ function RecurrenceInput({ value, onChange }) {
     );
 }
 
-const EmptyState = ({ title = "No items yet", hint }) => (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-        <div className="text-slate-900 font-semibold">{title}</div>
-        {hint && <div className="text-sm text-slate-600 mt-1">{hint}</div>}
-    </div>
-);
+function EmptyState({ title = "No items yet", hint }) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+            <div className="text-slate-900 font-semibold">{title}</div>
+            {hint && <div className="text-sm text-slate-600 mt-1">{hint}</div>}
+        </div>
+    );
+}
 
 /* ------------------------------- Mocked API ------------------------------ */
 const api = {
@@ -86,76 +132,61 @@ const api = {
     createKeyArea: async (payload) => ({ ...payload, id: Math.random() }),
     updateKeyArea: async (id, payload) => ({ id, ...payload }),
     deleteKeyArea: async (id) => id,
-
     listGoals: async () => [
         { id: "g1", title: "Grow Sales Q1", parent_goal_id: null },
         { id: "g2", title: "Improve Customer Support", parent_goal_id: null },
-        { id: "g3", title: "Revamp Website", parent_goal_id: "g1" },
     ],
-
-    listTasks: async (keyAreaId) => [
-        {
-            id: 101,
-            key_area_id: keyAreaId,
-            title: "Welcome task",
-            description: "Kickoff activity",
-            status: "open",
-            priority: "med",
-            importance: "med",
-            category: "Key Areas",
-            list_index: 1,
-            goal_id: null,
-            deadline: null,
-            end_date: null,
-            eisenhower_quadrant: 2,
-            tags: "onboarding,setup",
-            recurrence: "",
-            attachments: "",
-            assignee: "user1",
-        },
-        {
-            id: 102,
-            key_area_id: keyAreaId,
-            title: "Plan Q3 campaign",
-            description: "Draft brief & assets",
-            status: "in_progress",
-            priority: "high",
-            importance: "high",
-            category: "Key Areas",
-            list_index: 1,
-            goal_id: "g1",
-            deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-            end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 6).toISOString(),
-            eisenhower_quadrant: 2,
-            tags: "q3,campaign",
-            recurrence: "",
-            attachments: "https://example.com/brief.pdf",
-            assignee: "maria",
-        },
-        {
-            id: 103,
-            key_area_id: keyAreaId,
-            title: "Close June tickets",
-            description: "Backlog triage",
-            status: "done",
-            priority: "low",
-            importance: "low",
-            category: "Don’t Forget",
-            list_index: 2,
-            goal_id: "g2",
-            deadline: null,
-            end_date: null,
-            eisenhower_quadrant: 4,
-            tags: "support,cleanup",
-            recurrence: '{"freq":"weekly","interval":1}',
-            attachments: "",
-            assignee: "",
-        },
-    ],
+    listTasks: async (keyAreaId) => {
+        const id = String(keyAreaId);
+        if (id === "1") {
+            return [
+                {
+                    id: 101,
+                    key_area_id: 1,
+                    title: "Welcome task",
+                    description: "Kickoff activity",
+                    status: "open",
+                    priority: "med",
+                    importance: "med",
+                    category: "Key Areas",
+                    list_index: 1,
+                    goal_id: null,
+                    deadline: null,
+                    end_date: null,
+                    eisenhower_quadrant: 2,
+                    tags: "onboarding",
+                    attachments: "",
+                    assignee: "user1",
+                },
+            ];
+        }
+        if (id === "2") {
+            return [
+                {
+                    id: 201,
+                    key_area_id: 2,
+                    title: "Triage backlog",
+                    description: "Sort incoming tickets",
+                    status: "open",
+                    priority: "med",
+                    importance: "med",
+                    category: "Key Areas",
+                    list_index: 1,
+                    goal_id: null,
+                    deadline: null,
+                    end_date: null,
+                    eisenhower_quadrant: 3,
+                    tags: "support",
+                    attachments: "",
+                    assignee: "support1",
+                },
+            ];
+        }
+        return [];
+    },
     createTask: async (payload) => ({ ...payload, id: Math.floor(Math.random() * 100000) }),
     updateTask: async (id, payload) => ({ id, ...payload }),
     deleteTask: async (id) => id,
-    // storage picker removed
 };
 
 /* -------------------------- Quadrant Calculation ------------------------- */
@@ -196,7 +227,7 @@ function KanbanView({ tasks, onSelect }) {
                             items.map((t) => (
                                 <div
                                     key={t.id}
-                                    className="bg-white border border-slate-200 rounded-sm p-2 mb-2 shadow-sm cursor-pointer hover:shadow"
+                                    className="bg-white border border-slate-200 rounded-lg p-2 mb-2 shadow-sm cursor-pointer hover:shadow"
                                     onClick={() => onSelect(t)}
                                 >
                                     <div className="text-sm font-semibold text-slate-900">{t.title}</div>
@@ -259,7 +290,7 @@ function CalendarView({ tasks, onSelect }) {
 }
 
 /* --------------------------- Slide Over (Edit) --------------------------- */
-function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
+function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = false }) {
     const [form, setForm] = useState(null);
 
     useEffect(() => {
@@ -279,6 +310,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
 
     const submit = (e) => {
         e.preventDefault();
+        if (readOnly) return;
         const attachmentsNames = (form.attachmentsFiles || []).map((f) => f.name || f).filter(Boolean);
         const payload = {
             ...form,
@@ -298,7 +330,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                     <div className="flex items-center justify-between p-4 border-b border-slate-100">
                         <h3 className="text-lg font-bold text-slate-900">Edit Task</h3>
                         <div className="flex items-center gap-2">
-                            <button className="p-2 rounded hover:bg-slate-100 text-slate-700" onClick={onClose}>
+                            <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
                                 <FaTimes />
                             </button>
                         </div>
@@ -314,6 +346,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                         value={form.title || ""}
                                         onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
                                         className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                        disabled={readOnly}
                                     />
                                 </div>
 
@@ -324,6 +357,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                         onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
                                         className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                         placeholder="e.g., q3,campaign"
+                                        disabled={readOnly}
                                     />
                                 </div>
 
@@ -337,6 +371,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                             }
                                             onChange={(e) => setForm((s) => ({ ...s, deadline: e.target.value }))}
                                             className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            disabled={readOnly}
                                         />
                                         <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
                                     </div>
@@ -350,6 +385,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                             }
                                             onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
                                             className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            disabled={readOnly}
                                         />
                                         <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
                                     </div>
@@ -386,15 +422,17 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                             }}
                                             className="hidden"
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                window.__composerFileInput && window.__composerFileInput.click()
-                                            }
-                                            className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                        >
-                                            Choose files
-                                        </button>
+                                        {!readOnly && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    window.__composerFileInput && window.__composerFileInput.click()
+                                                }
+                                                className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                            >
+                                                Choose files
+                                            </button>
+                                        )}
                                     </div>
                                     {/* show selected files */}
                                     {form.attachmentsFiles && form.attachmentsFiles.length > 0 ? (
@@ -405,20 +443,22 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                                                     className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
                                                 >
                                                     <span className="truncate">{f.name}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setForm((s) => ({
-                                                                ...s,
-                                                                attachmentsFiles: s.attachmentsFiles.filter(
-                                                                    (_, idx) => idx !== i,
-                                                                ),
-                                                            }))
-                                                        }
-                                                        className="text-xs text-slate-500 ml-2"
-                                                    >
-                                                        Remove
-                                                    </button>
+                                                    {!readOnly && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setForm((s) => ({
+                                                                    ...s,
+                                                                    attachmentsFiles: s.attachmentsFiles.filter(
+                                                                        (_, idx) => idx !== i,
+                                                                    ),
+                                                                }))
+                                                            }
+                                                            className="text-xs rounded-lg text-slate-500 ml-2"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>
@@ -524,22 +564,26 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
                         </div>
 
                         <div className="mt-4 flex items-center gap-2">
-                            <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 btn-compact">
-                                <FaSave /> Save
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (confirm("Delete this task?")) onDelete(task);
-                                }}
-                                className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 btn-compact"
-                            >
-                                <FaTrash /> Delete
-                            </button>
+                            {!readOnly && (
+                                <>
+                                    <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
+                                        <FaSave /> Save
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (confirm("Delete this task?")) onDelete(task);
+                                        }}
+                                        className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
+                                    >
+                                        <FaTrash /> Delete
+                                    </button>
+                                </>
+                            )}
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="ml-auto text-sm text-slate-700 hover:underline"
+                                className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
                             >
                                 Close
                             </button>
@@ -553,6 +597,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete }) {
 
 /* --------------------------------- Screen -------------------------------- */
 export default function KeyAreas() {
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [keyAreas, setKeyAreas] = useState([]);
     const [filter, setFilter] = useState("");
@@ -570,6 +615,8 @@ export default function KeyAreas() {
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [showTaskComposer, setShowTaskComposer] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [listNames, setListNames] = useState({}); // per-key-area custom names for lists/tabs
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -589,14 +636,137 @@ export default function KeyAreas() {
         assignee: "",
     });
 
+    // Activities associated to tasks: { [taskIdOrNew]: [{ id, text, createdAt }] }
+    const [activitiesByTask, setActivitiesByTask] = useState({});
+    const [activityTaskId, setActivityTaskId] = useState("new");
+    const [activityName, setActivityName] = useState("");
+
+    // load persisted activities
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:kaActivities");
+            if (raw) setActivitiesByTask(JSON.parse(raw));
+        } catch (e) {}
+    }, []);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("pm:kaActivities", JSON.stringify(activitiesByTask));
+        } catch (e) {}
+    }, [activitiesByTask]);
+
+    // When the composer opens, ensure the visible tab matches the composer list_index
+    useEffect(() => {
+        if (showTaskComposer) {
+            const idx = Number(taskForm?.list_index || 1);
+            if (taskTab !== idx) setTaskTab(idx);
+        }
+    }, [showTaskComposer]);
+
+    // If the user switches tabs while the composer is open, keep the composer list_index in sync
+    useEffect(() => {
+        if (showTaskComposer) {
+            setTaskForm((s) => ({ ...s, list_index: taskTab }));
+        }
+    }, [taskTab]);
+
     useEffect(() => {
         (async () => {
             const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-            setKeyAreas(kas.sort((a, b) => a.position - b.position));
+            const sorted = kas.sort((a, b) => a.position - b.position);
+            setKeyAreas(sorted);
+            // emit key areas so sidebar can populate its dropdown
+            try {
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+            } catch (e) {
+                // ignore if window not available or dispatch fails
+            }
             setGoals(gs);
             setLoading(false);
         })();
     }, []);
+
+    // load persisted list names from localStorage
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:listNames");
+            if (raw) setListNames(JSON.parse(raw));
+        } catch (e) {
+            // ignore parse errors
+        }
+    }, []);
+
+    // persist list names whenever they change
+    useEffect(() => {
+        try {
+            localStorage.setItem("pm:listNames", JSON.stringify(listNames));
+        } catch (e) {
+            // ignore
+        }
+    }, [listNames]);
+
+    // reset activities selector when switching key areas
+    useEffect(() => {
+        setActivityTaskId("new");
+    }, [selectedKA]);
+
+    // when a task is opened, default the activities selector to that task (if it belongs to the current KA)
+    useEffect(() => {
+        if (selectedTask && selectedKA && String(selectedTask.key_area_id) === String(selectedKA.id)) {
+            setActivityTaskId(String(selectedTask.id));
+        } else if (!selectedTask) {
+            setActivityTaskId("new");
+        }
+    }, [selectedTask, selectedKA]);
+
+    // React to sidebar clicks and query params: show all key areas or select Ideas
+    useEffect(() => {
+        const showAll = () => {
+            setSelectedKA(null);
+            setAllTasks([]);
+            setFilter("");
+        };
+
+        const selectIdeas = async () => {
+            if (loading) return;
+            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.position === 10);
+            // do NOT open the Ideas area; instead show it in the main list and make it read-only
+            if (found) {
+                setSelectedKA(null);
+                setAllTasks([]);
+                setFilter(found.title || "Ideas");
+            } else {
+                const synth = {
+                    id: "ideas-synth",
+                    title: "Ideas",
+                    description: "Locked ideas slot",
+                    position: 10,
+                    is_default: true,
+                };
+                setKeyAreas((prev) => {
+                    if (prev.some((k) => (k.id && k.id === synth.id) || (k.title || "").toLowerCase() === "ideas"))
+                        return prev;
+                    return [...prev, synth].sort((a, b) => (a.position || 0) - (b.position || 0));
+                });
+                setSelectedKA(null);
+                setAllTasks([]);
+                setFilter("Ideas");
+            }
+        };
+
+        window.addEventListener("sidebar-keyareas-click", showAll);
+        window.addEventListener("sidebar-ideas-click", selectIdeas);
+
+        // also respect query params when navigated via Link
+        const params = new URLSearchParams(location.search);
+        if (params.get("view") === "all") showAll();
+        if (params.get("select") === "ideas") selectIdeas();
+
+        return () => {
+            window.removeEventListener("sidebar-keyareas-click", showAll);
+            window.removeEventListener("sidebar-ideas-click", selectIdeas);
+        };
+    }, [keyAreas, loading, location.search]);
 
     // storage picker removed
 
@@ -604,11 +774,30 @@ export default function KeyAreas() {
 
     const filteredKAs = useMemo(() => {
         const q = filter.trim().toLowerCase();
-        if (!q) return keyAreas;
-        return keyAreas.filter(
-            (k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q),
-        );
+        const params = new URLSearchParams(location.search);
+        const explicitSelect = params.get("select");
+
+        // If the URL explicitly requests Ideas, show only Ideas
+        if (explicitSelect === "ideas") {
+            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.position === 10);
+        }
+
+        // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
+        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && k.position !== 10);
+        if (!q) return base;
+        return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
+
+    const paramsForRender = new URLSearchParams(location.search);
+    const showOnlyIdeas = paramsForRender.get("select") === "ideas";
+    const ideaForShow = keyAreas.find((k) => (k.title || "").toLowerCase() === "ideas") ||
+        keyAreas.find((k) => k.position === 10) || {
+            id: "ideas-synth",
+            title: "Ideas",
+            description: "Locked ideas slot",
+            position: 10,
+            is_default: true,
+        };
 
     const onSaveKA = async (e) => {
         e.preventDefault();
@@ -622,6 +811,11 @@ export default function KeyAreas() {
         if (editing) {
             const updated = await api.updateKeyArea(editing.id, { ...editing, ...payload });
             setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
+            // emit updated list
+            try {
+                const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: updatedList } }));
+            } catch (e) {}
         } else {
             const used = new Set(keyAreas.map((k) => k.position));
             let pos = 1;
@@ -632,6 +826,14 @@ export default function KeyAreas() {
                     (a, b) => a.position - b.position,
                 ),
             );
+            // emit updated list after create
+            try {
+                const after = [
+                    ...(keyAreas || []).filter((k) => k.position !== pos),
+                    { ...created, position: pos },
+                ].sort((a, b) => a.position - b.position);
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: after } }));
+            } catch (e) {}
         }
         setShowForm(false);
         setEditing(null);
@@ -641,12 +843,38 @@ export default function KeyAreas() {
         if (ka.is_default) return;
         if (!confirm(`Delete "${ka.title}"? Tasks will need reassignment.`)) return;
         await api.deleteKeyArea(ka.id);
-        setKeyAreas((prev) => prev.filter((k) => k.id !== ka.id));
+        const next = (keyAreas || []).filter((k) => k.id !== ka.id);
+        setKeyAreas(next);
+        try {
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
+        } catch (e) {}
         if (selectedKA?.id === ka.id) {
             setSelectedKA(null);
             setAllTasks([]);
         }
     };
+
+    // respond to sidebar open requests (if sidebar dispatches an event)
+    useEffect(() => {
+        const handler = (e) => {
+            const id = e?.detail?.id;
+            if (!id) return;
+            const found = (keyAreas || []).find((k) => String(k.id) === String(id));
+            if (found) openKA(found);
+        };
+        window.addEventListener("sidebar-open-ka", handler);
+        return () => window.removeEventListener("sidebar-open-ka", handler);
+    }, [keyAreas]);
+
+    // respond to ?ka=<id> query param
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const kaParam = params.get("ka");
+        if (kaParam && keyAreas.length) {
+            const found = keyAreas.find((k) => String(k.id) === String(kaParam));
+            if (found) openKA(found);
+        }
+    }, [location.search, keyAreas]);
 
     const openKA = async (ka) => {
         setSelectedKA(ka);
@@ -665,6 +893,38 @@ export default function KeyAreas() {
         return Array.from(s).sort((a, b) => a - b);
     }, [allTasks]);
 
+    // Determine how many lists to show in the left card for the selected KA.
+    const leftListCount = useMemo(() => {
+        const kaId = selectedKA?.id;
+        const maxFromTabs = tabNumbers && tabNumbers.length ? Math.max(...tabNumbers) : 4;
+        const nameKeys = kaId
+            ? Object.keys(listNames[kaId] || {})
+                  .map((k) => Number(k))
+                  .filter(Boolean)
+            : [];
+        const maxFromNames = nameKeys.length ? Math.max(...nameKeys) : 0;
+        return Math.max(4, maxFromTabs, maxFromNames);
+    }, [selectedKA, listNames, tabNumbers]);
+
+    // Helpers to manage per-key-area list names
+    const getListName = (kaId, n) => {
+        if (!kaId) return `List ${n}`;
+        const names = listNames[kaId] || {};
+        return names[n] || `List ${n}`;
+    };
+
+    const renameList = (n) => {
+        if (!selectedKA) return;
+        const current = getListName(selectedKA.id, n);
+        const val = prompt("Rename list", current);
+        if (val === null) return; // cancelled
+        setListNames((prev) => {
+            const copy = { ...(prev || {}) };
+            copy[selectedKA.id] = { ...(copy[selectedKA.id] || {}), [n]: val };
+            return copy;
+        });
+    };
+
     const visibleTasks = useMemo(() => {
         let arr = allTasks.filter((t) => (t.list_index || 1) === taskTab);
         if (searchTerm.trim()) {
@@ -680,6 +940,8 @@ export default function KeyAreas() {
     const onCreateTask = async (e) => {
         e.preventDefault();
         if (!selectedKA) return;
+        // prevent creating tasks in Ideas/locked key area
+        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") return;
         const f = new FormData(e.currentTarget);
         const title = f.get("title").toString().trim();
         if (!title) return;
@@ -693,7 +955,8 @@ export default function KeyAreas() {
         // gather attachments from device uploads and composer state (including storage picks)
         const deviceFiles = f.getAll("attachments_files") || [];
         const deviceNames = deviceFiles.map((file) => file.name);
-        const stateNames = form && form.attachmentsFiles ? form.attachmentsFiles.map((f) => f.name || f) : [];
+        const stateNames =
+            taskForm && taskForm.attachmentsFiles ? taskForm.attachmentsFiles.map((ff) => ff.name || ff) : [];
         const allNames = Array.from(new Set([...(stateNames || []), ...deviceNames]));
         const attachments = allNames.join(",");
         const assignee = f.get("assignee").toString();
@@ -758,712 +1021,1091 @@ export default function KeyAreas() {
     };
 
     return (
-        <div className="flex keyareas">
-            {/* Desktop sidebar always visible (parent controls collapsed state to adjust layout) */}
-            <aside className="hidden md:block">
-                <Sidebar collapsed={sidebarCollapsed} onCollapseToggle={() => setSidebarCollapsed((c) => !c)} />
-            </aside>
-
-            {/* Mobile sidebar as overlay */}
-            {showMobileSidebar && (
-                <div className="fixed inset-0 z-50 md:hidden">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileSidebar(false)} />
-                    <div className="absolute left-0 top-0 h-full w-72 bg-white border-r border-slate-200 p-4 overflow-auto">
-                        <Sidebar />
-                    </div>
-                </div>
-            )}
-
-            <main
-                className={`flex-1 p-4 md:p-6 transition-transform duration-300 z-0 ${showMobileSidebar ? "transform translate-x-72 pointer-events-none" : ""}`}
-            >
-                {/* Header / Search / New KA */}
-                <div className="flex items-center justify-between gap-3 mb-4">
-                    {!selectedKA ? (
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
-                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                <FaSearch className="text-slate-700 mr-2" />
-                                <input
-                                    placeholder="Search key areas..."
-                                    className="bg-transparent outline-none text-sm w-56"
-                                    value={filter}
-                                    onChange={(e) => setFilter(e.target.value)}
-                                />
-                            </div>
-                            <button
-                                className={`flex items-center gap-2 rounded-lg font-semibold shadow btn-compact ${
-                                    canAdd
-                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                        : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                }`}
-                                onClick={() => canAdd && (setShowForm(true), setEditing(null))}
-                                disabled={!canAdd}
-                            >
-                                <FaPlus /> New Key Area
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 w-full">
-                            {/* mobile sidebar toggle */}
-                            <button
-                                className="md:hidden p-2 rounded bg-white border border-slate-200 mr-2"
-                                onClick={() => setShowMobileSidebar(true)}
-                                aria-label="Open menu"
-                            >
-                                <FaBars />
-                            </button>
-                            <button
-                                className="text-slate-700 hover:text-slate-900 flex items-center gap-2"
-                                onClick={() => {
-                                    setSelectedKA(null);
-                                    setAllTasks([]);
-                                }}
-                            >
-                                <FaArrowLeft /> Back
-                            </button>
-
-                            <div className="ml-2 flex items-center gap-2 w-full">
-                                <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                    <FaSearch className="text-slate-700 mr-2" />
-                                    <input
-                                        placeholder={`Search tasks in "${selectedKA.title}"…`}
-                                        className="bg-transparent outline-none text-sm w-40 sm:w-56"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                </div>
-
-                                <select
-                                    className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                                    value={quadrant}
-                                    onChange={(e) => setQuadrant(e.target.value)}
-                                    title="Focus quadrant"
-                                >
-                                    <option value="all">All Quadrants</option>
-                                    <option value="1">Q1 • Important & Urgent</option>
-                                    <option value="2">Q2 • Important, Not Urgent</option>
-                                    <option value="3">Q3 • Not Important, Urgent</option>
-                                    <option value="4">Q4 • Not Important, Not Urgent</option>
-                                </select>
-
-                                <div className="ml-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
-                                    {["list", "kanban", "calendar"].map((v) => (
-                                        <button
-                                            key={v}
-                                            onClick={() => setView(v)}
-                                            className={`px-2 py-1 rounded-sm text-sm font-semibold btn-compact ${
-                                                view === v
-                                                    ? "bg-blue-600 text-white"
-                                                    : "text-slate-800 hover:bg-slate-100"
-                                            }`}
-                                            title={`Switch to ${v} view`}
-                                        >
-                                            {v[0].toUpperCase() + v.slice(1)}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* LIST: Key Areas */}
-                {!selectedKA && (
-                    <div>
-                        {loading ? (
-                            <div className="text-slate-700">Loading…</div>
-                        ) : (
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredKAs.map((ka) => (
-                                    <div
-                                        key={ka.id}
-                                        className="bg-white rounded-2xl shadow border border-slate-200 p-4 flex flex-col"
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-lg font-bold text-slate-900">{ka.title}</h3>
-                                                    {ka.is_default && (
-                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                                            <FaLock /> Locked
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                                                    {ka.description || "—"}
-                                                </p>
-                                                <p className="text-xs text-slate-700 mt-2">Position: {ka.position}</p>
+        <div className="min-h-screen bg-slate-50">
+            <div className="flex w-full overflow-hidden">
+                {" "}
+                {/* ensure wrapper hides overflow */}
+                <Sidebar
+                    user={{ name: "User" }}
+                    collapsed={sidebarCollapsed}
+                    onCollapseToggle={() => setSidebarCollapsed((c) => !c)}
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
+                />
+                {mobileSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+                <main
+                    className={`flex-1 min-w-0 w-full transition-all ${mobileSidebarOpen ? "ml-64" : "ml-0"} md:ml-[3mm]`}
+                >
+                    {" "}
+                    {/* min-w-0 prevents overflow of flex children */}
+                    <div className="max-w-full overflow-x-hidden">
+                        {" "}
+                        {/* content constrained to available width */}
+                        {/* Header / Search / New KA */}
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            {!selectedKA ? (
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
+                                    {!showOnlyIdeas && (
+                                        <>
+                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                                <FaSearch className="text-slate-700 mr-2" />
+                                                <input
+                                                    placeholder="Search key areas..."
+                                                    className="bg-transparent outline-none text-sm w-56"
+                                                    value={filter}
+                                                    onChange={(e) => setFilter(e.target.value)}
+                                                />
                                             </div>
+                                            <button
+                                                className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
+                                                    canAdd
+                                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                                        : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                                }`}
+                                                onClick={() => canAdd && (setShowForm(true), setEditing(null))}
+                                                disabled={!canAdd}
+                                            >
+                                                <FaPlus /> New Key Area
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 w-full">
+                                    {/* mobile sidebar toggle */}
+                                    <button
+                                        className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
+                                        onClick={() => setShowMobileSidebar(true)}
+                                        aria-label="Open menu"
+                                    >
+                                        <FaBars />
+                                    </button>
+                                    <button
+                                        className="text-slate-700 hover:text-slate-900 flex items-center gap-2"
+                                        onClick={() => {
+                                            setSelectedKA(null);
+                                            setAllTasks([]);
+                                        }}
+                                    >
+                                        <FaArrowLeft /> Back
+                                    </button>
+
+                                    {/* Title intentionally omitted here; shown below in the dedicated title block */}
+
+                                    <div className="ml-auto flex items-center gap-2">
+                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                            <FaSearch className="text-slate-700 mr-2" />
+                                            <input
+                                                placeholder={`Search tasks in "${selectedKA.title}"…`}
+                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                            />
                                         </div>
 
-                                        <div className="mt-4 flex items-center gap-2">
-                                            <button
-                                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 btn-compact"
-                                                onClick={() => openKA(ka)}
-                                            >
-                                                <FaListUl /> Open Lists
-                                            </button>
-                                            <button
-                                                className="rounded-lg bg-white border font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 btn-compact"
-                                                onClick={() => {
-                                                    setEditing(ka);
-                                                    setShowForm(true);
-                                                }}
-                                            >
-                                                <FaEdit /> Edit
-                                            </button>
-                                            <button
-                                                disabled={ka.is_default}
-                                                className={`rounded-lg font-semibold flex items-center gap-2 btn-compact ${
-                                                    ka.is_default
-                                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                                        : "bg-white border text-red-600 hover:bg-red-50"
-                                                }`}
-                                                onClick={() => onDeleteKA(ka)}
-                                            >
-                                                <FaTrash /> Delete
-                                            </button>
+                                        <select
+                                            className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                                            value={quadrant}
+                                            onChange={(e) => setQuadrant(e.target.value)}
+                                            title="Focus quadrant"
+                                        >
+                                            <option value="all">All Quadrants</option>
+                                            <option value="1">Q1 • Important & Urgent</option>
+                                            <option value="2">Q2 • Important, Not Urgent</option>
+                                            <option value="3">Q3 • Not Important, Urgent</option>
+                                            <option value="4">Q4 • Not Important, Not Urgent</option>
+                                        </select>
+
+                                        <div className="ml-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+                                            {["list", "kanban", "calendar"].map((v) => (
+                                                <button
+                                                    key={v}
+                                                    onClick={() => setView(v)}
+                                                    className={`px-2 py-1 rounded-lg text-sm font-semibold border border-slate-200 ${
+                                                        view === v
+                                                            ? "bg-blue-600 text-white"
+                                                            : "text-slate-800 hover:bg-slate-100"
+                                                    }`}
+                                                    title={`Switch to ${v} view`}
+                                                >
+                                                    {v[0].toUpperCase() + v.slice(1)}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                            )}
+                        </div>
+                        {/* Selected Key Area title/description (shown when a KA is open) */}
+                        {selectedKA && (
+                            <div className="mb-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-xl font-bold text-slate-900">{selectedKA.title}</h2>
+                                            {selectedKA.is_default && (
+                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                    <FaLock /> Locked
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* description removed per request */}
+                                    </div>
+                                    {/* Controls removed: search, quadrant filter, and view buttons */}
+                                </div>
                             </div>
                         )}
-
-                        <div className="mt-4 text-sm text-slate-600 flex items-start gap-2">
-                            <FaExclamationCircle className="mt-0.5" />
-                            <span>
-                                Max 10 Key Areas per user. The last slot is <strong>Ideas</strong> and cannot be
-                                deleted.
-                            </span>
-                        </div>
-                    </div>
-                )}
-
-                {/* DETAIL: Tabs */}
-                {selectedKA && (
-                    <div className="mt-4 space-y-4">
-                        {/* Tabs */}
-                        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur rounded-xl border border-slate-200">
-                            <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                <div className="flex items-center gap-1 overflow-x-auto">
-                                    {Array.from({ length: Math.max(4, Math.max(...tabNumbers, 4)) }).map((_, i) => {
-                                        const n = i + 1;
-                                        const active = taskTab === n;
-                                        return (
-                                            <button
-                                                key={n}
-                                                onClick={() => setTaskTab(n)}
-                                                className={`px-2 py-1 rounded-sm text-sm font-semibold border transition btn-compact ${
-                                                    active
-                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
-                                                }`}
-                                            >
-                                                List {n}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Composer — show toggle button; composer renders only when requested */}
-                        {!showTaskComposer ? (
+                        {selectedKA && (
                             <div className="mb-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowTaskComposer(true)}
-                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 btn-compact"
-                                >
-                                    <FaPlus /> Add Task
-                                </button>
-                            </div>
-                        ) : (
-                            <form onSubmit={onCreateTask}>
-                                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                                    <div className="grid md:grid-cols-2 gap-6">
-                                        {/* Left column: Title + Extra info */}
-                                        <div className="flex flex-col gap-4">
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900 block">
-                                                    Task Title *
-                                                </label>
-                                                <input
-                                                    name="title"
-                                                    required
-                                                    value={taskForm.title}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, title: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    placeholder="e.g., Draft Q3 campaign brief"
-                                                />
-                                            </div>
-
-                                            <div className="grid gap-4">
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Tags (comma separated)
-                                                    </label>
-                                                    <input
-                                                        name="tags"
-                                                        value={taskForm.tags}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, tags: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        placeholder="e.g., q3,campaign,urgent"
-                                                    />
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Deadline
-                                                    </label>
-                                                    <input
-                                                        name="deadline"
-                                                        type="datetime-local"
-                                                        value={taskForm.deadline}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, deadline: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    />
-                                                    <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Planned End
-                                                    </label>
-                                                    <input
-                                                        name="end_date"
-                                                        type="datetime-local"
-                                                        value={taskForm.end_date}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, end_date: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    />
-                                                    <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Recurrence
-                                                    </label>
-                                                    <input
-                                                        name="recurrence"
-                                                        value={taskForm.recurrence}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, recurrence: e.target.value }))
-                                                        }
-                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        placeholder='e.g., {"freq":"weekly","interval":1}'
-                                                    />
-                                                </div>
-
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                    <label className="text-sm font-semibold text-slate-900">
-                                                        Attachments
-                                                    </label>
-                                                    <div className="mt-1">
-                                                        <input
-                                                            ref={(el) => (window.__slideFileInput = el)}
-                                                            name="attachments_files"
-                                                            type="file"
-                                                            multiple
-                                                            onChange={(e) => {
-                                                                const incoming = Array.from(e.target.files || []);
-                                                                setTaskForm((s) => {
-                                                                    const existing = s.attachmentsFiles || [];
-                                                                    const combined = [...existing, ...incoming];
-                                                                    const uniq = Array.from(
-                                                                        new Map(
-                                                                            combined.map((f) => [f.name, f]),
-                                                                        ).values(),
-                                                                    );
-                                                                    return { ...s, attachmentsFiles: uniq };
-                                                                });
-                                                            }}
-                                                            className="hidden"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                window.__slideFileInput &&
-                                                                window.__slideFileInput.click()
-                                                            }
-                                                            className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                                        >
-                                                            Choose files
-                                                        </button>
-                                                    </div>
-                                                    {taskForm.attachmentsFiles &&
-                                                    taskForm.attachmentsFiles.length > 0 ? (
-                                                        <ul className="mt-2 space-y-1 text-sm">
-                                                            {taskForm.attachmentsFiles.map((f, i) => (
-                                                                <li
-                                                                    key={i}
-                                                                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
-                                                                >
-                                                                    <span className="truncate">{f.name}</span>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            setTaskForm((s) => ({
-                                                                                ...s,
-                                                                                attachmentsFiles:
-                                                                                    s.attachmentsFiles.filter(
-                                                                                        (_, idx) => idx !== i,
-                                                                                    ),
-                                                                            }))
-                                                                        }
-                                                                        className="text-xs text-slate-500 ml-2"
-                                                                    >
-                                                                        Remove
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    ) : null}
-                                                    {/* storage picker removed */}
-                                                </div>
-                                            </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {/* Your tasks column with list buttons + Add Task inside */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="text-sm font-semibold">Task Lists</div>
                                         </div>
 
-                                        {/* Right column: Meta + reordered fields per request */}
-                                        <div className="flex flex-col gap-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 p-3">
+                                            <div className="flex items-center gap-1 overflow-x-auto">
+                                                {Array.from({ length: leftListCount }).map((_, i) => {
+                                                    const n = i + 1;
+                                                    return (
+                                                        <div key={n} className="flex items-center gap-1">
+                                                            <button
+                                                                onClick={() => setTaskTab(n)}
+                                                                className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                    taskTab === n
+                                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
+                                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                                                                }`}
+                                                            >
+                                                                {getListName(selectedKA?.id, n)}
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => renameList(n)}
+                                                                title={`Rename ${getListName(selectedKA?.id, n)}`}
+                                                                className="text-xs p-1 rounded hover:bg-slate-100"
+                                                            >
+                                                                <svg
+                                                                    stroke="currentColor"
+                                                                    fill="currentColor"
+                                                                    strokeWidth="0"
+                                                                    viewBox="0 0 576 512"
+                                                                    height="1em"
+                                                                    width="1em"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                >
+                                                                    <path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path>
+                                                                </svg>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (!selectedKA) return;
+                                                                    const kaId = selectedKA.id;
+                                                                    // do not allow deleting a list that has tasks
+                                                                    const hasTasks = (allTasks || []).some(
+                                                                        (t) =>
+                                                                            (t.list_index || 1) === n &&
+                                                                            String(t.key_area_id) === String(kaId),
+                                                                    );
+                                                                    if (hasTasks) {
+                                                                        alert(
+                                                                            "Cannot delete list while it contains tasks. Move or remove tasks first.",
+                                                                        );
+                                                                        return;
+                                                                    }
+                                                                    const names = listNames[kaId] || {};
+                                                                    if (!names || !names[n]) {
+                                                                        // nothing custom to delete
+                                                                        if (
+                                                                            !confirm(
+                                                                                `Remove list ${n}? This will reset any custom name.`,
+                                                                            )
+                                                                        )
+                                                                            return;
+                                                                    }
+                                                                    setListNames((prev) => {
+                                                                        const copy = { ...(prev || {}) };
+                                                                        if (!copy[kaId]) return copy;
+                                                                        const { [n]: _rem, ...rest } = copy[kaId];
+                                                                        copy[kaId] = { ...rest };
+                                                                        return copy;
+                                                                    });
+                                                                    // if current tab was deleted, go back to 1
+                                                                    if (taskTab === n) setTaskTab(1);
+                                                                }}
+                                                                title={`Delete list ${n}`}
+                                                                className="text-xs p-1 rounded hover:bg-red-50 text-red-600"
+                                                            >
+                                                                <svg
+                                                                    stroke="currentColor"
+                                                                    fill="currentColor"
+                                                                    strokeWidth="0"
+                                                                    viewBox="0 0 448 512"
+                                                                    height="1em"
+                                                                    width="1em"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                >
+                                                                    <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96h384c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 295.8 0 283.2 0H164.8c-12.6 0-24.2 6.8-29.6 17.7zM53.2 467c6 26.3 29.8 45 56.8 45h175.9c27 0 50.8-18.7 56.8-45L360 128H88L53.2 467z"></path>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {leftListCount < 10 && (
+                                                    <div className="flex items-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!selectedKA) return;
+                                                                const kaId = selectedKA.id;
+                                                                const currentCount = leftListCount;
+                                                                const next = currentCount + 1;
+                                                                setListNames((prev) => {
+                                                                    const copy = { ...(prev || {}) };
+                                                                    copy[kaId] = { ...(copy[kaId] || {}) };
+                                                                    copy[kaId][next] = `List ${next}`;
+                                                                    return copy;
+                                                                });
+                                                                setTaskTab(next);
+                                                            }}
+                                                            title="Add list"
+                                                            className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
+                                                        >
+                                                            <svg
+                                                                stroke="currentColor"
+                                                                fill="currentColor"
+                                                                strokeWidth="0"
+                                                                viewBox="0 0 448 512"
+                                                                height="1em"
+                                                                width="1em"
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                            >
+                                                                <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                             <div>
-                                                <div className="grid md:grid-cols-2 gap-4">
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            List (Tab)
-                                                        </label>
-                                                        <input
-                                                            name="list_index"
-                                                            type="number"
-                                                            min={1}
-                                                            value={taskForm.list_index}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({
-                                                                    ...s,
-                                                                    list_index: Number(e.target.value || 1),
-                                                                }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        />
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Importance
-                                                        </label>
-                                                        <select
-                                                            name="importance"
-                                                            value={taskForm.importance}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({
-                                                                    ...s,
-                                                                    importance: e.target.value,
-                                                                }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="low">Low</option>
-                                                            <option value="med">Medium</option>
-                                                            <option value="high">High</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900">Category</label>
-                                                <select
-                                                    name="category"
-                                                    value={taskForm.category}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, category: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaskForm((s) => ({ ...s, list_index: taskTab }));
+                                                        setShowTaskComposer(true);
+                                                    }}
+                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
                                                 >
-                                                    <option>Key Areas</option>
-                                                    <option>Don’t Forget</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900">
-                                                    Linked Goal (optional)
-                                                </label>
-                                                <select
-                                                    name="goal_id"
-                                                    value={taskForm.goal_id}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, goal_id: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                >
-                                                    <option value="">— None (Activity Trap) —</option>
-                                                    {goals.map((g) => (
-                                                        <option key={g.id} value={g.id}>
-                                                            {g.title}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900">Assignee</label>
-                                                <input
-                                                    name="assignee"
-                                                    value={taskForm.assignee}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, assignee: e.target.value }))
-                                                    }
-                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                    placeholder="Name or ID"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <div className="grid md:grid-cols-2 gap-4">
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Status
-                                                        </label>
-                                                        <select
-                                                            name="status"
-                                                            value={taskForm.status}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, status: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="open">Open</option>
-                                                            <option value="in_progress">In Progress</option>
-                                                            <option value="done">Done</option>
-                                                            <option value="cancelled">Cancelled</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Priority
-                                                        </label>
-                                                        <select
-                                                            name="priority"
-                                                            value={taskForm.priority}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, priority: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="low">Low</option>
-                                                            <option value="med">Medium</option>
-                                                            <option value="high">High</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                <label className="text-sm font-semibold text-slate-900 block">
-                                                    Description
-                                                </label>
-                                                <textarea
-                                                    name="description"
-                                                    rows={3}
-                                                    value={taskForm.description}
-                                                    onChange={(e) =>
-                                                        setTaskForm((s) => ({ ...s, description: e.target.value }))
-                                                    }
-                                                    className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
-                                                    placeholder="Details…"
-                                                />
+                                                    <svg
+                                                        stroke="currentColor"
+                                                        fill="currentColor"
+                                                        strokeWidth="0"
+                                                        viewBox="0 0 448 512"
+                                                        height="1em"
+                                                        width="1em"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                    </svg>
+                                                    Add Task
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Actions (span both columns) */}
-                                    <div className="mt-4 flex items-center gap-3 justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 btn-compact">
-                                                <FaSave /> Add Task
-                                            </button>
-                                            <span className="text-xs text-slate-700 flex items-center gap-1">
-                                                <FaExclamationCircle /> Tasks must belong to the current Key Area.
-                                            </span>
+                                    {/* Your activities column */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm font-semibold">Your activities</div>
+                                            <div className="text-xs text-slate-500">
+                                                Attach to a task or keep as new
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    value={activityTaskId}
+                                                    onChange={(e) => setActivityTaskId(e.target.value)}
+                                                    className="p-2 border rounded bg-white text-sm"
+                                                    aria-label="Select task for activity"
+                                                    disabled={!selectedKA}
+                                                >
+                                                    <option value="new">Select task</option>
+                                                    {allTasks
+                                                        .filter(
+                                                            (t) =>
+                                                                !selectedKA ||
+                                                                String(t.key_area_id) === String(selectedKA.id),
+                                                        )
+                                                        .map((t) => (
+                                                            <option key={t.id} value={t.id}>
+                                                                {t.title}
+                                                            </option>
+                                                        ))}
+                                                </select>
+
+                                                <input
+                                                    value={activityName}
+                                                    onChange={(e) => setActivityName(e.target.value)}
+                                                    placeholder="Activity name..."
+                                                    className="flex-1 p-2 border rounded text-sm"
+                                                />
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const key = String(activityTaskId || "new");
+                                                        if (!activityName.trim()) return;
+                                                        const item = {
+                                                            id: Date.now(),
+                                                            text: activityName.trim(),
+                                                            createdAt: new Date().toISOString(),
+                                                        };
+                                                        setActivitiesByTask((prev) => {
+                                                            const c = { ...(prev || {}) };
+                                                            c[key] = [...(c[key] || []), item];
+                                                            return c;
+                                                        });
+                                                        setActivityName("");
+                                                    }}
+                                                    className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                                                >
+                                                    Add
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        // clear activities for current selection
+                                                        const key = String(activityTaskId || "new");
+                                                        setActivitiesByTask((prev) => {
+                                                            const c = { ...(prev || {}) };
+                                                            delete c[key];
+                                                            return c;
+                                                        });
+                                                    }}
+                                                    title="Clear activities for current selection"
+                                                    className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+
+                                            <div>
+                                                {(activitiesByTask[String(activityTaskId)] || []).length === 0 ? (
+                                                    <div className="text-sm text-slate-500 mt-2">
+                                                        No activities yet.
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-2 space-y-2">
+                                                        {(activitiesByTask[String(activityTaskId)] || [])
+                                                            .slice()
+                                                            .reverse()
+                                                            .map((a) => (
+                                                                <div
+                                                                    key={a.id}
+                                                                    className="flex items-start justify-between p-2 border rounded bg-white"
+                                                                >
+                                                                    <div className="flex-1">
+                                                                        <div className="text-sm text-slate-800">
+                                                                            {a.text}
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 mt-1">
+                                                                            {new Date(a.createdAt).toLocaleString()}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="ml-3 flex items-start">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const key = String(
+                                                                                    activityTaskId || "new",
+                                                                                );
+                                                                                setActivitiesByTask((prev) => {
+                                                                                    const c = { ...(prev || {}) };
+                                                                                    c[key] = (c[key] || []).filter(
+                                                                                        (it) => it.id !== a.id,
+                                                                                    );
+                                                                                    return c;
+                                                                                });
+                                                                            }}
+                                                                            className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Summary column */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="text-sm font-semibold">Summary 📊</div>
+                                        <div className="mt-3 text-sm">Total Tasks: {allTasks.length}</div>
+                                        <div className="mt-1 text-sm">
+                                            Completed: {allTasks.filter((t) => t.status === "done").length}
+                                        </div>
+                                        <div className="mt-1 text-sm">
+                                            Pending: {allTasks.filter((t) => t.status !== "done").length}
+                                        </div>
+
+                                        <div className="mt-3 text-sm">
+                                            Total Activities:{" "}
+                                            {Object.values(activitiesByTask).reduce((s, a) => s + (a?.length || 0), 0)}
+                                        </div>
+                                        <div className="mt-1 text-sm">
+                                            Active: {Object.values(activitiesByTask).flat().length}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {/* LIST: Key Areas */}
+                        {!selectedKA && (
+                            <div>
+                                {loading ? (
+                                    <div className="text-slate-700">Loading…</div>
+                                ) : showOnlyIdeas ? (
+                                    // render Ideas as a single centered full-width card
+                                    <div className="flex justify-center">
+                                        <div
+                                            key={ideaForShow.id}
+                                            className="w-full max-w-3xl bg-white rounded-2xl shadow border border-slate-200 p-6 flex flex-col"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-xl font-bold text-slate-900">
+                                                            {ideaForShow.title}
+                                                        </h3>
+                                                        {ideaForShow.is_default && (
+                                                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                                <FaLock /> Locked
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-slate-600 mt-2">
+                                                        {ideaForShow.description || "—"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-6 flex items-center gap-2">
+                                                <button
+                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                    onClick={() => openKA(ideaForShow)}
+                                                >
+                                                    <FaListUl /> Open Lists
+                                                </button>
+                                                <p className="text-sm text-slate-700 ml-2">
+                                                    This Key Area is read-only (cannot edit or delete).
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {filteredKAs.map((ka) => (
+                                            <div
+                                                key={ka.id}
+                                                className="bg-white rounded-2xl shadow border border-slate-200 p-4 flex flex-col"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="text-lg font-bold text-slate-900">
+                                                                {ka.title}
+                                                            </h3>
+                                                            {ka.is_default && (
+                                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                                    <FaLock /> Locked
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                                                            {ka.description || "—"}
+                                                        </p>
+                                                        <p className="text-xs text-slate-700 mt-2">
+                                                            Position: {ka.position}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 flex items-center gap-2">
+                                                    <button
+                                                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                        onClick={() => openKA(ka)}
+                                                    >
+                                                        <FaListUl /> Open Lists
+                                                    </button>
+                                                    <button
+                                                        className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                        onClick={() => {
+                                                            setEditing(ka);
+                                                            setShowForm(true);
+                                                        }}
+                                                    >
+                                                        <FaEdit /> Edit
+                                                    </button>
+                                                    <button
+                                                        disabled={ka.is_default}
+                                                        className={`rounded-lg font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200 ${
+                                                            ka.is_default
+                                                                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                                                : "bg-white border text-red-600 hover:bg-red-50"
+                                                        }`}
+                                                        onClick={() => onDeleteKA(ka)}
+                                                    >
+                                                        <FaTrash /> Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Info message removed per request */}
+                            </div>
+                        )}
+                        {/* DETAIL: Tabs */}
+                        {selectedKA && (
+                            <div className="mt-4 space-y-4">
+                                {/* Composer — rendered from left card; show form only when requested */}
+                                {showTaskComposer && (
+                                    <form onSubmit={onCreateTask}>
+                                        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                                            <div className="grid md:grid-cols-2 gap-6">
+                                                {/* Left column: Title + Extra info */}
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900 block">
+                                                            Task Title *
+                                                        </label>
+                                                        <input
+                                                            name="title"
+                                                            required
+                                                            value={taskForm.title}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, title: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            placeholder="e.g., Draft Q3 campaign brief"
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid gap-4">
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Tags (comma separated)
+                                                            </label>
+                                                            <input
+                                                                name="tags"
+                                                                value={taskForm.tags}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({ ...s, tags: e.target.value }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                placeholder="e.g., q3,campaign,urgent"
+                                                            />
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Deadline
+                                                            </label>
+                                                            <input
+                                                                name="deadline"
+                                                                type="datetime-local"
+                                                                value={taskForm.deadline}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        deadline: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            />
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                mm/dd/yyyy, --:--
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Planned End
+                                                            </label>
+                                                            <input
+                                                                name="end_date"
+                                                                type="datetime-local"
+                                                                value={taskForm.end_date}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        end_date: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            />
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                mm/dd/yyyy, --:--
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Recurrence
+                                                            </label>
+                                                            <input
+                                                                name="recurrence"
+                                                                value={taskForm.recurrence}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        recurrence: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                placeholder='e.g., {"freq":"weekly","interval":1}'
+                                                            />
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Attachments
+                                                            </label>
+                                                            <div className="mt-1">
+                                                                <input
+                                                                    ref={(el) => (window.__slideFileInput = el)}
+                                                                    name="attachments_files"
+                                                                    type="file"
+                                                                    multiple
+                                                                    onChange={(e) => {
+                                                                        const incoming = Array.from(
+                                                                            e.target.files || [],
+                                                                        );
+                                                                        setTaskForm((s) => {
+                                                                            const existing = s.attachmentsFiles || [];
+                                                                            const combined = [...existing, ...incoming];
+                                                                            const uniq = Array.from(
+                                                                                new Map(
+                                                                                    combined.map((f) => [f.name, f]),
+                                                                                ).values(),
+                                                                            );
+                                                                            return { ...s, attachmentsFiles: uniq };
+                                                                        });
+                                                                    }}
+                                                                    className="hidden"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        window.__slideFileInput &&
+                                                                        window.__slideFileInput.click()
+                                                                    }
+                                                                    className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                                >
+                                                                    Choose files
+                                                                </button>
+                                                            </div>
+                                                            {taskForm.attachmentsFiles &&
+                                                            taskForm.attachmentsFiles.length > 0 ? (
+                                                                <ul className="mt-2 space-y-1 text-sm">
+                                                                    {taskForm.attachmentsFiles.map((f, i) => (
+                                                                        <li
+                                                                            key={i}
+                                                                            className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
+                                                                        >
+                                                                            <span className="truncate">{f.name}</span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    setTaskForm((s) => ({
+                                                                                        ...s,
+                                                                                        attachmentsFiles:
+                                                                                            s.attachmentsFiles.filter(
+                                                                                                (_, idx) => idx !== i,
+                                                                                            ),
+                                                                                    }))
+                                                                                }
+                                                                                className="text-xs rounded-lg text-slate-500 ml-2"
+                                                                            >
+                                                                                Remove
+                                                                            </button>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            ) : null}
+                                                            {/* storage picker removed */}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Right column: Meta + reordered fields per request */}
+                                                <div className="flex flex-col gap-4">
+                                                    <div>
+                                                        <div className="grid md:grid-cols-2 gap-4">
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    List (Tab)
+                                                                </label>
+                                                                <input
+                                                                    name="list_index"
+                                                                    type="number"
+                                                                    min={1}
+                                                                    value={taskForm.list_index}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            list_index: Number(e.target.value || 1),
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                />
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Importance
+                                                                </label>
+                                                                <select
+                                                                    name="importance"
+                                                                    value={taskForm.importance}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            importance: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                >
+                                                                    <option value="low">Low</option>
+                                                                    <option value="med">Medium</option>
+                                                                    <option value="high">High</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900">
+                                                            Category
+                                                        </label>
+                                                        <select
+                                                            name="category"
+                                                            value={taskForm.category}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, category: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                        >
+                                                            <option>Key Areas</option>
+                                                            <option>Don’t Forget</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900">
+                                                            Linked Goal (optional)
+                                                        </label>
+                                                        <select
+                                                            name="goal_id"
+                                                            value={taskForm.goal_id}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, goal_id: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                        >
+                                                            <option value="">— None (Activity Trap) —</option>
+                                                            {goals.map((g) => (
+                                                                <option key={g.id} value={g.id}>
+                                                                    {g.title}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900">
+                                                            Assignee
+                                                        </label>
+                                                        <input
+                                                            name="assignee"
+                                                            value={taskForm.assignee}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({ ...s, assignee: e.target.value }))
+                                                            }
+                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            placeholder="Name or ID"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="grid md:grid-cols-2 gap-4">
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Status
+                                                                </label>
+                                                                <select
+                                                                    name="status"
+                                                                    value={taskForm.status}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            status: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                >
+                                                                    <option value="open">Open</option>
+                                                                    <option value="in_progress">In Progress</option>
+                                                                    <option value="done">Done</option>
+                                                                    <option value="cancelled">Cancelled</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Priority
+                                                                </label>
+                                                                <select
+                                                                    name="priority"
+                                                                    value={taskForm.priority}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            priority: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                >
+                                                                    <option value="low">Low</option>
+                                                                    <option value="med">Medium</option>
+                                                                    <option value="high">High</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                        <label className="text-sm font-semibold text-slate-900 block">
+                                                            Description
+                                                        </label>
+                                                        <textarea
+                                                            name="description"
+                                                            rows={3}
+                                                            value={taskForm.description}
+                                                            onChange={(e) =>
+                                                                setTaskForm((s) => ({
+                                                                    ...s,
+                                                                    description: e.target.value,
+                                                                }))
+                                                            }
+                                                            className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
+                                                            placeholder="Details…"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions (span both columns) */}
+                                            <div className="mt-4 flex items-center gap-3 justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
+                                                        <FaSave /> Add Task
+                                                    </button>
+                                                    <span className="text-xs text-slate-700 flex items-center gap-1">
+                                                        <FaExclamationCircle /> Tasks must belong to the current Key
+                                                        Area.
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowTaskComposer(false)}
+                                                        className="rounded-lg text-sm text-slate-600 hover:underline"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {/* Tasks (List / Kanban / Calendar) */}
+                                {view === "list" && (
+                                    <div className="space-y-3">
+                                        {visibleTasks.length === 0 ? (
+                                            <EmptyState
+                                                title={`No tasks in List ${taskTab}`}
+                                                hint="Create your first task above."
+                                            />
+                                        ) : (
+                                            visibleTasks.map((t) => (
+                                                <div
+                                                    key={t.id}
+                                                    className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow transition"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="mt-1">
+                                                                <FaTags className="text-slate-700" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-semibold text-slate-900">
+                                                                    {t.title}
+                                                                </div>
+                                                                {t.description && (
+                                                                    <div className="text-sm text-slate-600">
+                                                                        {t.description}
+                                                                    </div>
+                                                                )}
+                                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                                    <Chip>Tab {t.list_index || 1}</Chip>
+                                                                    <Chip>Status: {t.status}</Chip>
+                                                                    <Chip>Priority: {t.priority}</Chip>
+                                                                    <Chip>Importance: {t.importance}</Chip>
+                                                                    <Chip>Category: {t.category}</Chip>
+                                                                    <Chip>Assignee: {t.assignee || "—"}</Chip>
+                                                                    {t.goal_id ? (
+                                                                        <Chip>Goal #{t.goal_id}</Chip>
+                                                                    ) : (
+                                                                        <Chip>Activity Trap</Chip>
+                                                                    )}
+                                                                    {t.eisenhower_quadrant && (
+                                                                        <Chip>Q{t.eisenhower_quadrant}</Chip>
+                                                                    )}
+                                                                    {t.tags && <Chip>Tags: {t.tags}</Chip>}
+                                                                    {t.attachments && (
+                                                                        <Chip>
+                                                                            Attachments:{" "}
+                                                                            {
+                                                                                t.attachments.split(",").filter(Boolean)
+                                                                                    .length
+                                                                            }
+                                                                        </Chip>
+                                                                    )}
+                                                                    {t.deadline && (
+                                                                        <Chip>
+                                                                            Deadline:{" "}
+                                                                            {new Date(t.deadline).toLocaleString()}
+                                                                        </Chip>
+                                                                    )}
+                                                                    {t.end_date && (
+                                                                        <Chip>
+                                                                            Planned End:{" "}
+                                                                            {new Date(t.end_date).toLocaleString()}
+                                                                        </Chip>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            className="rounded-lg text-slate-700 hover:text-slate-900 flex items-center gap-1 whitespace-nowrap"
+                                                            onClick={() => setSelectedTask(t)}
+                                                        >
+                                                            Open <FaChevronRight />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+
+                                {view === "kanban" && <KanbanView tasks={visibleTasks} onSelect={setSelectedTask} />}
+                                {view === "calendar" && (
+                                    <CalendarView tasks={visibleTasks} onSelect={setSelectedTask} />
+                                )}
+                            </div>
+                        )}
+                        {/* Create/Edit KA Modal */}
+                        {showForm && (
+                            <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
+                                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h2 className="text-lg font-bold text-slate-900">
+                                            {editing ? "Edit Key Area" : "New Key Area"}
+                                        </h2>
+                                        <button
+                                            className="p-2 rounded-lg hover:bg-slate-50"
+                                            onClick={() => {
+                                                setShowForm(false);
+                                                setEditing(null);
+                                            }}
+                                        >
+                                            <FaTimes />
+                                        </button>
+                                    </div>
+                                    <form onSubmit={onSaveKA} className="grid gap-3">
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-900">Title *</label>
+                                            <input
+                                                name="title"
+                                                required
+                                                defaultValue={editing?.title || ""}
+                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
+                                                placeholder="e.g., Finance"
+                                            />
                                         </div>
                                         <div>
+                                            <label className="text-sm font-semibold text-slate-900">Description</label>
+                                            <textarea
+                                                name="description"
+                                                rows={3}
+                                                defaultValue={editing?.description || ""}
+                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
+                                                placeholder="What belongs to this area?"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
+                                                <FaSave /> Save
+                                            </button>
                                             <button
                                                 type="button"
-                                                onClick={() => setShowTaskComposer(false)}
-                                                className="text-sm text-slate-600 hover:underline"
+                                                onClick={() => {
+                                                    setShowForm(false);
+                                                    setEditing(null);
+                                                }}
+                                                className="px-3 py-2 rounded-lg bg-white border text-slate-700 hover:bg-slate-50 font-semibold"
                                             >
                                                 Cancel
                                             </button>
                                         </div>
-                                    </div>
-                                </div>
-                            </form>
-                        )}
-
-                        {/* Tasks (List / Kanban / Calendar) */}
-                        {view === "list" && (
-                            <div className="space-y-3">
-                                {visibleTasks.length === 0 ? (
-                                    <EmptyState
-                                        title={`No tasks in List ${taskTab}`}
-                                        hint="Create your first task above."
-                                    />
-                                ) : (
-                                    visibleTasks.map((t) => (
-                                        <div
-                                            key={t.id}
-                                            className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow transition"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="mt-1">
-                                                        <FaTags className="text-slate-700" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-semibold text-slate-900">{t.title}</div>
-                                                        {t.description && (
-                                                            <div className="text-sm text-slate-600">
-                                                                {t.description}
-                                                            </div>
-                                                        )}
-                                                        <div className="mt-2 flex flex-wrap gap-2">
-                                                            <Chip>Tab {t.list_index || 1}</Chip>
-                                                            <Chip>Status: {t.status}</Chip>
-                                                            <Chip>Priority: {t.priority}</Chip>
-                                                            <Chip>Importance: {t.importance}</Chip>
-                                                            <Chip>Category: {t.category}</Chip>
-                                                            <Chip>Assignee: {t.assignee || "—"}</Chip>
-                                                            {t.goal_id ? (
-                                                                <Chip>Goal #{t.goal_id}</Chip>
-                                                            ) : (
-                                                                <Chip>Activity Trap</Chip>
-                                                            )}
-                                                            {t.eisenhower_quadrant && (
-                                                                <Chip>Q{t.eisenhower_quadrant}</Chip>
-                                                            )}
-                                                            {t.tags && <Chip>Tags: {t.tags}</Chip>}
-                                                            {t.attachments && (
-                                                                <Chip>
-                                                                    Attachments:{" "}
-                                                                    {t.attachments.split(",").filter(Boolean).length}
-                                                                </Chip>
-                                                            )}
-                                                            {t.deadline && (
-                                                                <Chip>
-                                                                    Deadline: {new Date(t.deadline).toLocaleString()}
-                                                                </Chip>
-                                                            )}
-                                                            {t.end_date && (
-                                                                <Chip>
-                                                                    Planned End: {new Date(t.end_date).toLocaleString()}
-                                                                </Chip>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    className="text-slate-700 hover:text-slate-900 flex items-center gap-1 whitespace-nowrap"
-                                                    onClick={() => setSelectedTask(t)}
-                                                >
-                                                    Open <FaChevronRight />
-                                                </button>
-                                            </div>
+                                        <div className="text-xs text-slate-700 flex items-start gap-2">
+                                            <FaExclamationCircle className="mt-0.5" />
+                                            <span>
+                                                “Ideas” is locked and always at position 10. Enforce max 10 on server
+                                                too.
+                                            </span>
                                         </div>
-                                    ))
-                                )}
+                                    </form>
+                                </div>
                             </div>
                         )}
-
-                        {view === "kanban" && <KanbanView tasks={visibleTasks} onSelect={setSelectedTask} />}
-                        {view === "calendar" && <CalendarView tasks={visibleTasks} onSelect={setSelectedTask} />}
+                        {/* SlideOver */}
+                        <TaskSlideOver
+                            task={selectedTask}
+                            goals={goals}
+                            onClose={() => setSelectedTask(null)}
+                            onSave={handleSaveTask}
+                            onDelete={handleDeleteTask}
+                            readOnly={selectedKA?.is_default || (selectedKA?.title || "").toLowerCase() === "ideas"}
+                        />
                     </div>
-                )}
-
-                {/* Create/Edit KA Modal */}
-                {showForm && (
-                    <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
-                        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-lg font-bold text-slate-900">
-                                    {editing ? "Edit Key Area" : "New Key Area"}
-                                </h2>
-                                <button
-                                    className="p-2 rounded-lg hover:bg-slate-50"
-                                    onClick={() => {
-                                        setShowForm(false);
-                                        setEditing(null);
-                                    }}
-                                >
-                                    <FaTimes />
-                                </button>
-                            </div>
-                            <form onSubmit={onSaveKA} className="grid gap-3">
-                                <div>
-                                    <label className="text-sm font-semibold text-slate-900">Title *</label>
-                                    <input
-                                        name="title"
-                                        required
-                                        defaultValue={editing?.title || ""}
-                                        className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
-                                        placeholder="e.g., Finance"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-semibold text-slate-900">Description</label>
-                                    <textarea
-                                        name="description"
-                                        rows={3}
-                                        defaultValue={editing?.description || ""}
-                                        className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
-                                        placeholder="What belongs to this area?"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
-                                        <FaSave /> Save
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowForm(false);
-                                            setEditing(null);
-                                        }}
-                                        className="px-3 py-2 rounded-lg bg-white border text-slate-700 hover:bg-slate-50 font-semibold"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                                <div className="text-xs text-slate-700 flex items-start gap-2">
-                                    <FaExclamationCircle className="mt-0.5" />
-                                    <span>
-                                        “Ideas” is locked and always at position 10. Enforce max 10 on server too.
-                                    </span>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* SlideOver */}
-                <TaskSlideOver
-                    task={selectedTask}
-                    goals={goals}
-                    onClose={() => setSelectedTask(null)}
-                    onSave={handleSaveTask}
-                    onDelete={handleDeleteTask}
-                />
-            </main>
+                </main>
+            </div>
         </div>
     );
 }
