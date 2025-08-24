@@ -25,6 +25,49 @@ const Chip = ({ children }) => (
     </span>
 );
 
+/* Small UI helpers used in the new KA layout */
+function Card({ title, titleIcon, children }) {
+    return (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">
+                    {title} {titleIcon && <span className="ml-1">{titleIcon}</span>}
+                </div>
+            </div>
+            <div className="mt-3">{children}</div>
+        </div>
+    );
+}
+
+function Tab({ active, onClick, children }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-2 py-1 rounded-lg text-sm ${active ? "bg-blue-600 text-white" : "bg-slate-100"}`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function DotLeader({ label, placeholder }) {
+    return (
+        <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-700">{label}</div>
+            <div className="text-sm text-slate-500">{placeholder}</div>
+        </div>
+    );
+}
+
+function GhostInput({ prefix, placeholder, value, onChange }) {
+    return (
+        <div className="flex items-center gap-2">
+            <div className="text-sm text-slate-600">{prefix}</div>
+            <input value={value} onChange={onChange} placeholder={placeholder} className="flex-1 p-2 border rounded" />
+        </div>
+    );
+}
+
 // StoragePicker removed per user request
 
 function RecurrenceInput({ value, onChange }) {
@@ -70,12 +113,14 @@ function RecurrenceInput({ value, onChange }) {
     );
 }
 
-const EmptyState = ({ title = "No items yet", hint }) => (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-        <div className="text-slate-900 font-semibold">{title}</div>
-        {hint && <div className="text-sm text-slate-600 mt-1">{hint}</div>}
-    </div>
-);
+function EmptyState({ title = "No items yet", hint }) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
+            <div className="text-slate-900 font-semibold">{title}</div>
+            {hint && <div className="text-sm text-slate-600 mt-1">{hint}</div>}
+        </div>
+    );
+}
 
 /* ------------------------------- Mocked API ------------------------------ */
 const api = {
@@ -87,15 +132,11 @@ const api = {
     createKeyArea: async (payload) => ({ ...payload, id: Math.random() }),
     updateKeyArea: async (id, payload) => ({ id, ...payload }),
     deleteKeyArea: async (id) => id,
-
     listGoals: async () => [
         { id: "g1", title: "Grow Sales Q1", parent_goal_id: null },
         { id: "g2", title: "Improve Customer Support", parent_goal_id: null },
-        { id: "g3", title: "Revamp Website", parent_goal_id: "g1" },
     ],
-
     listTasks: async (keyAreaId) => {
-        // Return different fake tasks per key area id so UI shows KA-specific lists
         const id = String(keyAreaId);
         if (id === "1") {
             return [
@@ -113,29 +154,9 @@ const api = {
                     deadline: null,
                     end_date: null,
                     eisenhower_quadrant: 2,
-                    tags: "onboarding,setup",
-                    recurrence: "",
+                    tags: "onboarding",
                     attachments: "",
                     assignee: "user1",
-                },
-                {
-                    id: 102,
-                    key_area_id: 1,
-                    title: "Plan Q3 campaign",
-                    description: "Draft brief & assets",
-                    status: "in_progress",
-                    priority: "high",
-                    importance: "high",
-                    category: "Key Areas",
-                    list_index: 1,
-                    goal_id: "g1",
-                    deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-                    end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 6).toISOString(),
-                    eisenhower_quadrant: 2,
-                    tags: "q3,campaign",
-                    recurrence: "",
-                    attachments: "https://example.com/brief.pdf",
-                    assignee: "maria",
                 },
             ];
         }
@@ -155,23 +176,17 @@ const api = {
                     deadline: null,
                     end_date: null,
                     eisenhower_quadrant: 3,
-                    tags: "support,triage",
-                    recurrence: "",
+                    tags: "support",
                     attachments: "",
                     assignee: "support1",
                 },
             ];
         }
-        if (id === "10" || id.includes("ideas")) {
-            return [];
-        }
-        // default: empty
         return [];
     },
     createTask: async (payload) => ({ ...payload, id: Math.floor(Math.random() * 100000) }),
     updateTask: async (id, payload) => ({ id, ...payload }),
     deleteTask: async (id) => id,
-    // storage picker removed
 };
 
 /* -------------------------- Quadrant Calculation ------------------------- */
@@ -621,10 +636,51 @@ export default function KeyAreas() {
         assignee: "",
     });
 
+    // Activities associated to tasks: { [taskIdOrNew]: [{ id, text, createdAt }] }
+    const [activitiesByTask, setActivitiesByTask] = useState({});
+    const [activityTaskId, setActivityTaskId] = useState("new");
+    const [activityName, setActivityName] = useState("");
+
+    // load persisted activities
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:kaActivities");
+            if (raw) setActivitiesByTask(JSON.parse(raw));
+        } catch (e) {}
+    }, []);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("pm:kaActivities", JSON.stringify(activitiesByTask));
+        } catch (e) {}
+    }, [activitiesByTask]);
+
+    // When the composer opens, ensure the visible tab matches the composer list_index
+    useEffect(() => {
+        if (showTaskComposer) {
+            const idx = Number(taskForm?.list_index || 1);
+            if (taskTab !== idx) setTaskTab(idx);
+        }
+    }, [showTaskComposer]);
+
+    // If the user switches tabs while the composer is open, keep the composer list_index in sync
+    useEffect(() => {
+        if (showTaskComposer) {
+            setTaskForm((s) => ({ ...s, list_index: taskTab }));
+        }
+    }, [taskTab]);
+
     useEffect(() => {
         (async () => {
             const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-            setKeyAreas(kas.sort((a, b) => a.position - b.position));
+            const sorted = kas.sort((a, b) => a.position - b.position);
+            setKeyAreas(sorted);
+            // emit key areas so sidebar can populate its dropdown
+            try {
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+            } catch (e) {
+                // ignore if window not available or dispatch fails
+            }
             setGoals(gs);
             setLoading(false);
         })();
@@ -648,6 +704,20 @@ export default function KeyAreas() {
             // ignore
         }
     }, [listNames]);
+
+    // reset activities selector when switching key areas
+    useEffect(() => {
+        setActivityTaskId("new");
+    }, [selectedKA]);
+
+    // when a task is opened, default the activities selector to that task (if it belongs to the current KA)
+    useEffect(() => {
+        if (selectedTask && selectedKA && String(selectedTask.key_area_id) === String(selectedKA.id)) {
+            setActivityTaskId(String(selectedTask.id));
+        } else if (!selectedTask) {
+            setActivityTaskId("new");
+        }
+    }, [selectedTask, selectedKA]);
 
     // React to sidebar clicks and query params: show all key areas or select Ideas
     useEffect(() => {
@@ -741,6 +811,11 @@ export default function KeyAreas() {
         if (editing) {
             const updated = await api.updateKeyArea(editing.id, { ...editing, ...payload });
             setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
+            // emit updated list
+            try {
+                const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: updatedList } }));
+            } catch (e) {}
         } else {
             const used = new Set(keyAreas.map((k) => k.position));
             let pos = 1;
@@ -751,6 +826,14 @@ export default function KeyAreas() {
                     (a, b) => a.position - b.position,
                 ),
             );
+            // emit updated list after create
+            try {
+                const after = [
+                    ...(keyAreas || []).filter((k) => k.position !== pos),
+                    { ...created, position: pos },
+                ].sort((a, b) => a.position - b.position);
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: after } }));
+            } catch (e) {}
         }
         setShowForm(false);
         setEditing(null);
@@ -760,12 +843,38 @@ export default function KeyAreas() {
         if (ka.is_default) return;
         if (!confirm(`Delete "${ka.title}"? Tasks will need reassignment.`)) return;
         await api.deleteKeyArea(ka.id);
-        setKeyAreas((prev) => prev.filter((k) => k.id !== ka.id));
+        const next = (keyAreas || []).filter((k) => k.id !== ka.id);
+        setKeyAreas(next);
+        try {
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
+        } catch (e) {}
         if (selectedKA?.id === ka.id) {
             setSelectedKA(null);
             setAllTasks([]);
         }
     };
+
+    // respond to sidebar open requests (if sidebar dispatches an event)
+    useEffect(() => {
+        const handler = (e) => {
+            const id = e?.detail?.id;
+            if (!id) return;
+            const found = (keyAreas || []).find((k) => String(k.id) === String(id));
+            if (found) openKA(found);
+        };
+        window.addEventListener("sidebar-open-ka", handler);
+        return () => window.removeEventListener("sidebar-open-ka", handler);
+    }, [keyAreas]);
+
+    // respond to ?ka=<id> query param
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const kaParam = params.get("ka");
+        if (kaParam && keyAreas.length) {
+            const found = keyAreas.find((k) => String(k.id) === String(kaParam));
+            if (found) openKA(found);
+        }
+    }, [location.search, keyAreas]);
 
     const openKA = async (ka) => {
         setSelectedKA(ka);
@@ -783,6 +892,19 @@ export default function KeyAreas() {
         allTasks.forEach((t) => s.add(t.list_index || 1));
         return Array.from(s).sort((a, b) => a - b);
     }, [allTasks]);
+
+    // Determine how many lists to show in the left card for the selected KA.
+    const leftListCount = useMemo(() => {
+        const kaId = selectedKA?.id;
+        const maxFromTabs = tabNumbers && tabNumbers.length ? Math.max(...tabNumbers) : 4;
+        const nameKeys = kaId
+            ? Object.keys(listNames[kaId] || {})
+                  .map((k) => Number(k))
+                  .filter(Boolean)
+            : [];
+        const maxFromNames = nameKeys.length ? Math.max(...nameKeys) : 0;
+        return Math.max(4, maxFromTabs, maxFromNames);
+    }, [selectedKA, listNames, tabNumbers]);
 
     // Helpers to manage per-key-area list names
     const getListName = (kaId, n) => {
@@ -899,18 +1021,6 @@ export default function KeyAreas() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Mobile header */}
-            <header className="md:hidden bg-white border-b border-slate-200 p-2 flex items-center">
-                <button
-                    aria-label="Open sidebar"
-                    className="p-2 rounded-lg text-blue-700"
-                    onClick={() => setMobileSidebarOpen(true)}
-                >
-                    <FaBars />
-                </button>
-                <div className="ml-2 font-semibold text-lg">Key Areas</div>
-            </header>
-
             <div className="flex w-full overflow-hidden">
                 {" "}
                 {/* ensure wrapper hides overflow */}
@@ -1050,6 +1160,316 @@ export default function KeyAreas() {
                                 </div>
                             </div>
                         )}
+                        {selectedKA && (
+                            <div className="mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {/* Your tasks column with list buttons + Add Task inside */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="text-sm font-semibold">Task Lists</div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center justify-between gap-3 p-3">
+                                            <div className="flex items-center gap-1 overflow-x-auto">
+                                                {Array.from({ length: leftListCount }).map((_, i) => {
+                                                    const n = i + 1;
+                                                    return (
+                                                        <div key={n} className="flex items-center gap-1">
+                                                            <button
+                                                                onClick={() => setTaskTab(n)}
+                                                                className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                    taskTab === n
+                                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
+                                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                                                                }`}
+                                                            >
+                                                                {getListName(selectedKA?.id, n)}
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => renameList(n)}
+                                                                title={`Rename ${getListName(selectedKA?.id, n)}`}
+                                                                className="text-xs p-1 rounded hover:bg-slate-100"
+                                                            >
+                                                                <svg
+                                                                    stroke="currentColor"
+                                                                    fill="currentColor"
+                                                                    strokeWidth="0"
+                                                                    viewBox="0 0 576 512"
+                                                                    height="1em"
+                                                                    width="1em"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                >
+                                                                    <path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path>
+                                                                </svg>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (!selectedKA) return;
+                                                                    const kaId = selectedKA.id;
+                                                                    // do not allow deleting a list that has tasks
+                                                                    const hasTasks = (allTasks || []).some(
+                                                                        (t) =>
+                                                                            (t.list_index || 1) === n &&
+                                                                            String(t.key_area_id) === String(kaId),
+                                                                    );
+                                                                    if (hasTasks) {
+                                                                        alert(
+                                                                            "Cannot delete list while it contains tasks. Move or remove tasks first.",
+                                                                        );
+                                                                        return;
+                                                                    }
+                                                                    const names = listNames[kaId] || {};
+                                                                    if (!names || !names[n]) {
+                                                                        // nothing custom to delete
+                                                                        if (
+                                                                            !confirm(
+                                                                                `Remove list ${n}? This will reset any custom name.`,
+                                                                            )
+                                                                        )
+                                                                            return;
+                                                                    }
+                                                                    setListNames((prev) => {
+                                                                        const copy = { ...(prev || {}) };
+                                                                        if (!copy[kaId]) return copy;
+                                                                        const { [n]: _rem, ...rest } = copy[kaId];
+                                                                        copy[kaId] = { ...rest };
+                                                                        return copy;
+                                                                    });
+                                                                    // if current tab was deleted, go back to 1
+                                                                    if (taskTab === n) setTaskTab(1);
+                                                                }}
+                                                                title={`Delete list ${n}`}
+                                                                className="text-xs p-1 rounded hover:bg-red-50 text-red-600"
+                                                            >
+                                                                <svg
+                                                                    stroke="currentColor"
+                                                                    fill="currentColor"
+                                                                    strokeWidth="0"
+                                                                    viewBox="0 0 448 512"
+                                                                    height="1em"
+                                                                    width="1em"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                >
+                                                                    <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96h384c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 295.8 0 283.2 0H164.8c-12.6 0-24.2 6.8-29.6 17.7zM53.2 467c6 26.3 29.8 45 56.8 45h175.9c27 0 50.8-18.7 56.8-45L360 128H88L53.2 467z"></path>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {leftListCount < 10 && (
+                                                    <div className="flex items-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!selectedKA) return;
+                                                                const kaId = selectedKA.id;
+                                                                const currentCount = leftListCount;
+                                                                const next = currentCount + 1;
+                                                                setListNames((prev) => {
+                                                                    const copy = { ...(prev || {}) };
+                                                                    copy[kaId] = { ...(copy[kaId] || {}) };
+                                                                    copy[kaId][next] = `List ${next}`;
+                                                                    return copy;
+                                                                });
+                                                                setTaskTab(next);
+                                                            }}
+                                                            title="Add list"
+                                                            className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
+                                                        >
+                                                            <svg
+                                                                stroke="currentColor"
+                                                                fill="currentColor"
+                                                                strokeWidth="0"
+                                                                viewBox="0 0 448 512"
+                                                                height="1em"
+                                                                width="1em"
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                            >
+                                                                <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaskForm((s) => ({ ...s, list_index: taskTab }));
+                                                        setShowTaskComposer(true);
+                                                    }}
+                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                >
+                                                    <svg
+                                                        stroke="currentColor"
+                                                        fill="currentColor"
+                                                        strokeWidth="0"
+                                                        viewBox="0 0 448 512"
+                                                        height="1em"
+                                                        width="1em"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                    </svg>
+                                                    Add Task
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Your activities column */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm font-semibold">Your activities</div>
+                                            <div className="text-xs text-slate-500">
+                                                Attach to a task or keep as new
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    value={activityTaskId}
+                                                    onChange={(e) => setActivityTaskId(e.target.value)}
+                                                    className="p-2 border rounded bg-white text-sm"
+                                                    aria-label="Select task for activity"
+                                                    disabled={!selectedKA}
+                                                >
+                                                    <option value="new">Select task</option>
+                                                    {allTasks
+                                                        .filter(
+                                                            (t) =>
+                                                                !selectedKA ||
+                                                                String(t.key_area_id) === String(selectedKA.id),
+                                                        )
+                                                        .map((t) => (
+                                                            <option key={t.id} value={t.id}>
+                                                                {t.title}
+                                                            </option>
+                                                        ))}
+                                                </select>
+
+                                                <input
+                                                    value={activityName}
+                                                    onChange={(e) => setActivityName(e.target.value)}
+                                                    placeholder="Activity name..."
+                                                    className="flex-1 p-2 border rounded text-sm"
+                                                />
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const key = String(activityTaskId || "new");
+                                                        if (!activityName.trim()) return;
+                                                        const item = {
+                                                            id: Date.now(),
+                                                            text: activityName.trim(),
+                                                            createdAt: new Date().toISOString(),
+                                                        };
+                                                        setActivitiesByTask((prev) => {
+                                                            const c = { ...(prev || {}) };
+                                                            c[key] = [...(c[key] || []), item];
+                                                            return c;
+                                                        });
+                                                        setActivityName("");
+                                                    }}
+                                                    className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                                                >
+                                                    Add
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        // clear activities for current selection
+                                                        const key = String(activityTaskId || "new");
+                                                        setActivitiesByTask((prev) => {
+                                                            const c = { ...(prev || {}) };
+                                                            delete c[key];
+                                                            return c;
+                                                        });
+                                                    }}
+                                                    title="Clear activities for current selection"
+                                                    className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+
+                                            <div>
+                                                {(activitiesByTask[String(activityTaskId)] || []).length === 0 ? (
+                                                    <div className="text-sm text-slate-500 mt-2">
+                                                        No activities yet.
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-2 space-y-2">
+                                                        {(activitiesByTask[String(activityTaskId)] || [])
+                                                            .slice()
+                                                            .reverse()
+                                                            .map((a) => (
+                                                                <div
+                                                                    key={a.id}
+                                                                    className="flex items-start justify-between p-2 border rounded bg-white"
+                                                                >
+                                                                    <div className="flex-1">
+                                                                        <div className="text-sm text-slate-800">
+                                                                            {a.text}
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 mt-1">
+                                                                            {new Date(a.createdAt).toLocaleString()}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="ml-3 flex items-start">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const key = String(
+                                                                                    activityTaskId || "new",
+                                                                                );
+                                                                                setActivitiesByTask((prev) => {
+                                                                                    const c = { ...(prev || {}) };
+                                                                                    c[key] = (c[key] || []).filter(
+                                                                                        (it) => it.id !== a.id,
+                                                                                    );
+                                                                                    return c;
+                                                                                });
+                                                                            }}
+                                                                            className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Summary column */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="text-sm font-semibold">Summary 📊</div>
+                                        <div className="mt-3 text-sm">Total Tasks: {allTasks.length}</div>
+                                        <div className="mt-1 text-sm">
+                                            Completed: {allTasks.filter((t) => t.status === "done").length}
+                                        </div>
+                                        <div className="mt-1 text-sm">
+                                            Pending: {allTasks.filter((t) => t.status !== "done").length}
+                                        </div>
+
+                                        <div className="mt-3 text-sm">
+                                            Total Activities:{" "}
+                                            {Object.values(activitiesByTask).reduce((s, a) => s + (a?.length || 0), 0)}
+                                        </div>
+                                        <div className="mt-1 text-sm">
+                                            Active: {Object.values(activitiesByTask).flat().length}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         {/* LIST: Key Areas */}
                         {!selectedKA && (
                             <div>
@@ -1159,59 +1579,8 @@ export default function KeyAreas() {
                         {/* DETAIL: Tabs */}
                         {selectedKA && (
                             <div className="mt-4 space-y-4">
-                                {/* Tabs */}
-                                <div className="sticky top-0 z-10 bg-white/80 backdrop-blur rounded-xl border border-slate-200">
-                                    <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                        <div className="flex items-center gap-1 overflow-x-auto">
-                                            {Array.from({ length: Math.max(4, Math.max(...tabNumbers, 4)) }).map(
-                                                (_, i) => {
-                                                    const n = i + 1;
-                                                    const active = taskTab === n;
-                                                    return (
-                                                        <div key={n} className="flex items-center gap-1">
-                                                            <button
-                                                                onClick={() => setTaskTab(n)}
-                                                                className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
-                                                                    active
-                                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
-                                                                }`}
-                                                            >
-                                                                {getListName(selectedKA?.id, n)}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => renameList(n)}
-                                                                title={`Rename ${getListName(selectedKA?.id, n)}`}
-                                                                className="text-xs p-1 rounded hover:bg-slate-100"
-                                                            >
-                                                                <FaEdit />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Composer — show toggle button; composer renders only when requested */}
-                                {!showTaskComposer ? (
-                                    <div className="mb-4">
-                                        {!selectedKA.is_default ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowTaskComposer(true)}
-                                                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                            >
-                                                <FaPlus /> Add Task
-                                            </button>
-                                        ) : (
-                                            <div className="text-sm text-slate-600">
-                                                Adding tasks is disabled for this Key Area.
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
+                                {/* Composer — rendered from left card; show form only when requested */}
+                                {showTaskComposer && (
                                     <form onSubmit={onCreateTask}>
                                         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                                             <div className="grid md:grid-cols-2 gap-6">
