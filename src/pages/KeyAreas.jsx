@@ -955,7 +955,8 @@ export default function KeyAreas() {
         // gather attachments from device uploads and composer state (including storage picks)
         const deviceFiles = f.getAll("attachments_files") || [];
         const deviceNames = deviceFiles.map((file) => file.name);
-        const stateNames = form && form.attachmentsFiles ? form.attachmentsFiles.map((f) => f.name || f) : [];
+        const stateNames =
+            taskForm && taskForm.attachmentsFiles ? taskForm.attachmentsFiles.map((ff) => ff.name || ff) : [];
         const allNames = Array.from(new Set([...(stateNames || []), ...deviceNames]));
         const attachments = allNames.join(",");
         const assignee = f.get("assignee").toString();
