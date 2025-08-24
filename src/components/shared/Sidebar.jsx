@@ -169,7 +169,10 @@ export default function Sidebar({
                                                     to={child.to}
                                                     className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                                                         location.pathname ===
-                                                        (child.to && child.to.pathname ? child.to.pathname : child.to)
+                                                            (child.to && child.to.pathname
+                                                                ? child.to.pathname
+                                                                : child.to) &&
+                                                        new URLSearchParams(location.search).get("select") === "ideas"
                                                             ? "bg-blue-200 text-blue-700 font-bold"
                                                             : "text-blue-900 hover:bg-blue-50"
                                                     }`}
@@ -214,17 +217,7 @@ export default function Sidebar({
                                 </Link>
                             ),
                         )}
-                    {/* Add Ideas quick link under Key Areas using a Link with query param so KeyAreas can react */}
-                    <div className="mt-4 mb-6 px-3">
-                        <Link
-                            to={{ pathname: "/key-areas", search: "?select=ideas" }}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition ${collapsed ? "justify-center px-0" : "text-blue-900 hover:bg-blue-50"}`}
-                            aria-label="Ideas"
-                        >
-                            <span className="text-xl">{collapsed ? <FaLightbulb /> : <FaLightbulb />}</span>
-                            {!collapsed && <span>Ideas</span>}
-                        </Link>
-                    </div>
+                    {/* Ideas quick link removed per request */}
                 </nav>
                 {!collapsed && (
                     <div className="mt-6 px-2">

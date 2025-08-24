@@ -94,65 +94,80 @@ const api = {
         { id: "g3", title: "Revamp Website", parent_goal_id: "g1" },
     ],
 
-    listTasks: async (keyAreaId) => [
-        {
-            id: 101,
-            key_area_id: keyAreaId,
-            title: "Welcome task",
-            description: "Kickoff activity",
-            status: "open",
-            priority: "med",
-            importance: "med",
-            category: "Key Areas",
-            list_index: 1,
-            goal_id: null,
-            deadline: null,
-            end_date: null,
-            eisenhower_quadrant: 2,
-            tags: "onboarding,setup",
-            recurrence: "",
-            attachments: "",
-            assignee: "user1",
-        },
-        {
-            id: 102,
-            key_area_id: keyAreaId,
-            title: "Plan Q3 campaign",
-            description: "Draft brief & assets",
-            status: "in_progress",
-            priority: "high",
-            importance: "high",
-            category: "Key Areas",
-            list_index: 1,
-            goal_id: "g1",
-            deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-            end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 6).toISOString(),
-            eisenhower_quadrant: 2,
-            tags: "q3,campaign",
-            recurrence: "",
-            attachments: "https://example.com/brief.pdf",
-            assignee: "maria",
-        },
-        {
-            id: 103,
-            key_area_id: keyAreaId,
-            title: "Close June tickets",
-            description: "Backlog triage",
-            status: "done",
-            priority: "low",
-            importance: "low",
-            category: "Don’t Forget",
-            list_index: 2,
-            goal_id: "g2",
-            deadline: null,
-            end_date: null,
-            eisenhower_quadrant: 4,
-            tags: "support,cleanup",
-            recurrence: '{"freq":"weekly","interval":1}',
-            attachments: "",
-            assignee: "",
-        },
-    ],
+    listTasks: async (keyAreaId) => {
+        // Return different fake tasks per key area id so UI shows KA-specific lists
+        const id = String(keyAreaId);
+        if (id === "1") {
+            return [
+                {
+                    id: 101,
+                    key_area_id: 1,
+                    title: "Welcome task",
+                    description: "Kickoff activity",
+                    status: "open",
+                    priority: "med",
+                    importance: "med",
+                    category: "Key Areas",
+                    list_index: 1,
+                    goal_id: null,
+                    deadline: null,
+                    end_date: null,
+                    eisenhower_quadrant: 2,
+                    tags: "onboarding,setup",
+                    recurrence: "",
+                    attachments: "",
+                    assignee: "user1",
+                },
+                {
+                    id: 102,
+                    key_area_id: 1,
+                    title: "Plan Q3 campaign",
+                    description: "Draft brief & assets",
+                    status: "in_progress",
+                    priority: "high",
+                    importance: "high",
+                    category: "Key Areas",
+                    list_index: 1,
+                    goal_id: "g1",
+                    deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+                    end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 6).toISOString(),
+                    eisenhower_quadrant: 2,
+                    tags: "q3,campaign",
+                    recurrence: "",
+                    attachments: "https://example.com/brief.pdf",
+                    assignee: "maria",
+                },
+            ];
+        }
+        if (id === "2") {
+            return [
+                {
+                    id: 201,
+                    key_area_id: 2,
+                    title: "Triage backlog",
+                    description: "Sort incoming tickets",
+                    status: "open",
+                    priority: "med",
+                    importance: "med",
+                    category: "Key Areas",
+                    list_index: 1,
+                    goal_id: null,
+                    deadline: null,
+                    end_date: null,
+                    eisenhower_quadrant: 3,
+                    tags: "support,triage",
+                    recurrence: "",
+                    attachments: "",
+                    assignee: "support1",
+                },
+            ];
+        }
+        if (id === "10" || id.includes("ideas")) {
+            return [];
+        }
+        // default: empty
+        return [];
+    },
     createTask: async (payload) => ({ ...payload, id: Math.floor(Math.random() * 100000) }),
     updateTask: async (id, payload) => ({ id, ...payload }),
     deleteTask: async (id) => id,
@@ -586,6 +601,7 @@ export default function KeyAreas() {
     const [showTaskComposer, setShowTaskComposer] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [listNames, setListNames] = useState({}); // per-key-area custom names for lists/tabs
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -613,6 +629,25 @@ export default function KeyAreas() {
             setLoading(false);
         })();
     }, []);
+
+    // load persisted list names from localStorage
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:listNames");
+            if (raw) setListNames(JSON.parse(raw));
+        } catch (e) {
+            // ignore parse errors
+        }
+    }, []);
+
+    // persist list names whenever they change
+    useEffect(() => {
+        try {
+            localStorage.setItem("pm:listNames", JSON.stringify(listNames));
+        } catch (e) {
+            // ignore
+        }
+    }, [listNames]);
 
     // React to sidebar clicks and query params: show all key areas or select Ideas
     useEffect(() => {
@@ -748,6 +783,25 @@ export default function KeyAreas() {
         allTasks.forEach((t) => s.add(t.list_index || 1));
         return Array.from(s).sort((a, b) => a - b);
     }, [allTasks]);
+
+    // Helpers to manage per-key-area list names
+    const getListName = (kaId, n) => {
+        if (!kaId) return `List ${n}`;
+        const names = listNames[kaId] || {};
+        return names[n] || `List ${n}`;
+    };
+
+    const renameList = (n) => {
+        if (!selectedKA) return;
+        const current = getListName(selectedKA.id, n);
+        const val = prompt("Rename list", current);
+        if (val === null) return; // cancelled
+        setListNames((prev) => {
+            const copy = { ...(prev || {}) };
+            copy[selectedKA.id] = { ...(copy[selectedKA.id] || {}), [n]: val };
+            return copy;
+        });
+    };
 
     const visibleTasks = useMemo(() => {
         let arr = allTasks.filter((t) => (t.list_index || 1) === taskTab);
@@ -931,7 +985,9 @@ export default function KeyAreas() {
                                         <FaArrowLeft /> Back
                                     </button>
 
-                                    <div className="ml-2 flex items-center gap-2 w-full">
+                                    {/* Title intentionally omitted here; shown below in the dedicated title block */}
+
+                                    <div className="ml-auto flex items-center gap-2">
                                         <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
                                             <FaSearch className="text-slate-700 mr-2" />
                                             <input
@@ -975,6 +1031,25 @@ export default function KeyAreas() {
                                 </div>
                             )}
                         </div>
+                        {/* Selected Key Area title/description (shown when a KA is open) */}
+                        {selectedKA && (
+                            <div className="mb-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-xl font-bold text-slate-900">{selectedKA.title}</h2>
+                                            {selectedKA.is_default && (
+                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                    <FaLock /> Locked
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* description removed per request */}
+                                    </div>
+                                    {/* Controls removed: search, quadrant filter, and view buttons */}
+                                </div>
+                            </div>
+                        )}
                         {/* LIST: Key Areas */}
                         {!selectedKA && (
                             <div>
@@ -1078,13 +1153,7 @@ export default function KeyAreas() {
                                     </div>
                                 )}
 
-                                <div className="mt-4 text-sm text-slate-600 flex items-start gap-2">
-                                    <FaExclamationCircle className="mt-0.5" />
-                                    <span>
-                                        Max 10 Key Areas per user. The last slot is <strong>Ideas</strong> and cannot be
-                                        deleted.
-                                    </span>
-                                </div>
+                                {/* Info message removed per request */}
                             </div>
                         )}
                         {/* DETAIL: Tabs */}
@@ -1099,17 +1168,25 @@ export default function KeyAreas() {
                                                     const n = i + 1;
                                                     const active = taskTab === n;
                                                     return (
-                                                        <button
-                                                            key={n}
-                                                            onClick={() => setTaskTab(n)}
-                                                            className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
-                                                                active
-                                                                    ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                                    : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
-                                                            }`}
-                                                        >
-                                                            List {n}
-                                                        </button>
+                                                        <div key={n} className="flex items-center gap-1">
+                                                            <button
+                                                                onClick={() => setTaskTab(n)}
+                                                                className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                    active
+                                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
+                                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                                                                }`}
+                                                            >
+                                                                {getListName(selectedKA?.id, n)}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => renameList(n)}
+                                                                title={`Rename ${getListName(selectedKA?.id, n)}`}
+                                                                className="text-xs p-1 rounded hover:bg-slate-100"
+                                                            >
+                                                                <FaEdit />
+                                                            </button>
+                                                        </div>
                                                     );
                                                 },
                                             )}
