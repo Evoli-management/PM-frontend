@@ -8,7 +8,7 @@ import TodoPanel from "./TodoPanel";
 import EventModal from "./EventModal";
 import AvailabilityBlock from "./AvailabilityBlock";
 
-const VIEWS = ["quarter", "month", "week", "day", "list"];
+const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
   focus: { color: "bg-blue-500", icon: "🧠" },
   meeting: { color: "bg-yellow-500", icon: "📅" },
@@ -36,7 +36,7 @@ const CalendarContainer = () => {
     setElephantTasks(copy);
     setElephantInput("");
   }
-  const [view, setView] = useState("month");
+  const [view, setView] = useState("day");
   const [events, setEvents] = useState([]);
   const [todos, setTodos] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -100,17 +100,59 @@ const CalendarContainer = () => {
         )}
       </div>
       <div className="flex gap-2 mb-4 flex-wrap">
-        {VIEWS.map(v => (
-          <button key={v} className={`px-4 py-2 rounded ${view===v?"bg-blue-600 text-white":"bg-gray-200"}`} onClick={()=>setView(v)}>{v.charAt(0).toUpperCase()+v.slice(1)}</button>
-        ))}
-        <select className="ml-2 px-3 py-2 rounded border" value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="all">All Types</option>
-          <option value="task">Tasks</option>
-          <option value="reminder">Reminders</option>
-          <option value="meeting">Meetings</option>
-          <option value="custom">Custom</option>
-        </select>
-        <button className="ml-auto bg-green-500 text-white px-3 py-2 rounded" onClick={()=>openModal()}>+ Add Event</button>
+        {/* Desktop: show buttons, Mobile: show dropdown */}
+        <div className="hidden md:flex gap-2 flex-wrap" role="tablist" aria-label="Calendar view navigation">
+          {VIEWS.map(v => (
+            <button
+              key={v}
+              className={`px-5 py-3 rounded text-base md:text-base font-bold focus:outline-none focus:ring-2 focus:ring-blue-700 ${view===v?"bg-blue-700 text-white":"bg-gray-100 text-blue-900"}`}
+              style={{ minWidth: 48, minHeight: 48 }}
+              onClick={()=>setView(v)}
+              aria-label={`Switch to ${v.charAt(0).toUpperCase()+v.slice(1)} view`}
+              aria-selected={view===v}
+              role="tab"
+            >
+              {v.charAt(0).toUpperCase()+v.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="md:hidden w-full">
+          <select
+            className="w-full px-4 py-4 rounded border text-lg font-bold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
+            style={{ minHeight: 48 }}
+            value={view}
+            onChange={e => setView(e.target.value)}
+            aria-label="Calendar view selector"
+          >
+            {VIEWS.map(v => (
+              <option key={v} value={v} className="text-lg">{v.charAt(0).toUpperCase()+v.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+        {/* Filter and Add Event: hide on mobile, show on desktop */}
+        <div className="hidden md:flex items-center gap-2 flex-1">
+          <select
+            className="ml-2 px-4 py-3 rounded border text-base font-bold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
+            style={{ minHeight: 44 }}
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            aria-label="Filter event types"
+          >
+            <option value="all">All Types</option>
+            <option value="task">Tasks</option>
+            <option value="reminder">Reminders</option>
+            <option value="meeting">Meetings</option>
+            <option value="custom">Custom</option>
+          </select>
+          <button
+            className="ml-auto bg-green-700 text-white px-5 py-3 rounded text-base font-bold focus:outline-none focus:ring-2 focus:ring-green-700"
+            style={{ minWidth: 48, minHeight: 48 }}
+            onClick={()=>openModal()}
+            aria-label="Add new event"
+          >
+            + Add Event
+          </button>
+        </div>
       </div>
       {/* Filter events by type */}
       {view === "quarter" && <QuarterView events={events.filter(e => filterType === "all" || e.type === filterType)} categories={EVENT_CATEGORIES} onDayClick={openModal} />}

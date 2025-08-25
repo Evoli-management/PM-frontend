@@ -1,6 +1,7 @@
 
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { FixedSizeList } from "react-window";
 
 const HOURS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2);
@@ -10,9 +11,25 @@ const HOURS = Array.from({ length: 48 }, (_, i) => {
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
 export default function MonthView({ events, categories, onEventClick }) {
+  // Working hours: 8:00 to 18:00
+  const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
+    const h = Math.floor(i / 2);
+    const m = i % 2 === 0 ? "00" : "30";
+    return `${h}:${m}`;
+  });
+  const WORKING_HOURS = ALL_HOURS.filter(h => {
+    const hour = Number(h.split(":")[0]);
+    return hour >= 8 && hour <= 18;
+  });
+  const [showAllHours, setShowAllHours] = useState(false);
+  const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
+  const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
+
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const [monthOffset, setMonthOffset] = useState(0);
+  const baseDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const monthDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
 
@@ -52,49 +69,67 @@ export default function MonthView({ events, categories, onEventClick }) {
 
   // Build grid rows: one per day
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-2">Month View</h2>
-      <div className="relative w-full">
-        <div className="overflow-x-auto" style={{ maxWidth: '100vw', margin: '0 auto' }} ref={gridRef}>
-          <table className="border border-sky-100 rounded" style={{ minWidth: '3200px', tableLayout: 'fixed', width: '3200px' }}>
-          <thead>
-            <tr className="bg-sky-50">
-              <th className="sticky left-0 bg-sky-50 text-left px-2 py-2 text-xs font-semibold text-gray-400 w-32 z-10">&nbsp;</th>
-              <th className="sticky left-32 bg-sky-50 text-center px-2 py-2 text-xs font-semibold text-gray-400 w-32 z-10">all day</th>
-              {HOURS.map((h, idx) => (
-                <th key={idx} className="text-center px-2 py-2 text-xs font-semibold text-gray-400 w-32">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {monthDays.map((date, idx) => {
-              const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-              const isToday = date.getDate() === today.getDate();
-              return (
-                <tr key={idx} className="border-b">
-                  <td className={`sticky left-0 bg-white px-2 py-2 text-xs font-semibold w-32 z-10 ${isWeekend ? "text-red-500" : "text-gray-700"} ${isToday ? "text-blue-600" : ""}`}>{date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</td>
-                  <td className="sticky left-32 bg-white px-2 py-2 text-center align-top w-32 z-10 cursor-pointer hover:bg-blue-50">{/* all day slot */}</td>
-                  {HOURS.map((h, hIdx) => {
-                    const [hr, min] = h.split(":");
-                    const key = `${date.getDate()}-${hr}:${min}`;
-                    const slotEvents = eventsBySlot[key] || [];
-                    return (
-                      <td key={hIdx} className="px-2 py-2 text-center align-top w-32 cursor-pointer hover:bg-blue-50" onClick={()=>onEventClick({ day: date, hour: h })}>
-                        {slotEvents.map((ev, i) => (
-                          <span key={i} className={`block px-2 py-1 rounded text-xs mb-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}>{ev.title}</span>
-                        ))}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
+    <>
+      <div className="p-4 bg-white rounded shadow" style={{ overflowX: 'hidden', maxWidth: '100vw' }}>
+        <div className="flex items-center justify-between mb-2">
+          <button className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" onClick={() => setMonthOffset(monthOffset - 1)}>
+            &lt; Previous Month
+          </button>
+          <h2 className="text-xl font-bold">{baseDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
+          <button className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" onClick={() => setMonthOffset(monthOffset + 1)}>
+            Next Month &gt;
+          </button>
+        </div>
+        <div className="flex items-center justify-end mb-2">
+          <label className="mr-2 text-sm text-gray-600">
+            <input type="checkbox" checked={showAllHours} onChange={e => setShowAllHours(e.target.checked)} className="mr-1" />
+            Show all hours
+          </label>
+        </div>
+        <div className="overflow-x-auto overflow-y-auto px-2 pb-6" style={{ maxWidth: '100vw', maxHeight: '60vh' }}>
+          <table className="min-w-full border border-sky-100 rounded-lg" style={{ minWidth: `${(HOURS.length + 2) * 110}px`, borderCollapse: 'separate', borderSpacing: 0 }}>
+            <thead>
+              <tr className="bg-sky-50">
+                <th className="sticky left-0 bg-sky-50 text-left px-2 py-2 text-xs font-semibold text-gray-400 w-24 z-10">&nbsp;</th>
+                <th className="sticky left-24 bg-sky-50 text-center px-2 py-2 text-xs font-semibold text-gray-400 w-24 z-10">all day</th>
+                {HOURS.map((h, idx) => (
+                  <th key={idx} className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16" style={{ minWidth: 40 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {monthDays.map((date, idx) => {
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                const isToday = date.getDate() === today.getDate() && monthOffset === 0;
+                return (
+                  <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
+                    <td className={`sticky left-0 bg-white px-2 py-2 text-sm font-semibold w-24 z-10 ${isWeekend ? "text-red-500" : "text-gray-700"} ${isToday ? "text-blue-600" : ""}`}>{date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</td>
+                    <td className="sticky left-24 bg-white px-2 py-2 text-center align-top w-24 z-10 cursor-pointer border border-sky-100 hover:bg-blue-100">{/* all day slot */}</td>
+                    {HOURS.map((h, hIdx) => {
+                      const [hr, min] = h.split(":");
+                      const key = `${date.getDate()}-${hr}:${min}`;
+                      const slotEvents = eventsBySlot[key] || [];
+                      return (
+                        <td key={hIdx} className="px-1 py-2 text-center align-top w-16 cursor-pointer border border-sky-100 hover:bg-blue-100" style={{ minWidth: 40 }} onClick={()=>onEventClick({ day: date, hour: h })}>
+                          {slotEvents.length === 0 ? (
+                            <span className="block text-xs text-gray-400">No events</span>
+                          ) : (
+                            slotEvents.map((ev, i) => (
+                              <span key={i} className={`block px-2 py-1 rounded text-xs mb-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}>{ev.title}</span>
+                            ))
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
           {/* Red line for current time */}
           <div style={{ position: 'absolute', left: 0, right: 0, top: 'var(--red-line-top)', height: '2px', background: 'red', zIndex: 10 }}></div>
         </div>
       </div>
-    </div>
-  );
+  </>
+);
 }

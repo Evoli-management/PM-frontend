@@ -1,6 +1,6 @@
 
 
-import React from "react";
+import React, { useState } from "react";
 
 function getWeekNumber(date) {
   const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -8,11 +8,14 @@ function getWeekNumber(date) {
   return Math.ceil((days + firstJan.getDay() + 1) / 7);
 }
 
-function getQuarterMonths(date) {
+function getQuarterMonths(date, quarterOffset = 0) {
   const month = date.getMonth();
   const year = date.getFullYear();
-  const startMonth = Math.floor(month / 3) * 3;
-  return [0, 1, 2].map(i => new Date(year, startMonth + i, 1));
+  const currentQuarter = Math.floor(month / 3);
+  const targetQuarter = currentQuarter + quarterOffset;
+  const targetYear = year + Math.floor(targetQuarter / 4);
+  const startMonth = (targetQuarter % 4) * 3;
+  return [0, 1, 2].map(i => new Date(targetYear, startMonth + i, 1));
 }
 
 function getWeeksInQuarter(months) {
@@ -28,9 +31,11 @@ function getWeeksInQuarter(months) {
   return rows;
 }
 
+  // ...existing code...
 export default function QuarterView({ events, categories, onDayClick }) {
   const today = new Date();
-  const months = getQuarterMonths(today);
+  const [quarterOffset, setQuarterOffset] = useState(0);
+  const months = getQuarterMonths(today, quarterOffset);
   const monthNames = months.map(m => m.toLocaleString('default', { month: 'long', year: 'numeric' }));
   const weeks = getWeeksInQuarter(months);
 
@@ -43,26 +48,23 @@ export default function QuarterView({ events, categories, onDayClick }) {
   });
 
   // Helper to get week number for a given date
-  function getWeekNumber(date) {
+  function getWeekNumberLocal(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
     const days = Math.floor((date - firstJan) / (24 * 60 * 60 * 1000));
     return Math.ceil((days + firstJan.getDay() + 1) / 7);
   }
 
   const rows = getWeeksInQuarter(months);
-  // Build week number and row grouping
-  // Build week number for each row (continuous, only in left column)
   let weekNums = [];
   for (let i = 0; i < rows.length; i++) {
     const weekDate = rows[i][0];
     let weekNum = '';
     if (weekDate) {
-      weekNum = getWeekNumber(weekDate);
+      weekNum = getWeekNumberLocal(weekDate);
     } else {
-      // If first month cell is empty, try next month
       for (let m = 1; m < rows[i].length; m++) {
         if (rows[i][m]) {
-          weekNum = getWeekNumber(rows[i][m]);
+          weekNum = getWeekNumberLocal(rows[i][m]);
           break;
         }
       }
@@ -83,16 +85,19 @@ export default function QuarterView({ events, categories, onDayClick }) {
           disabled
         />
       </div>
-      {/* Tab navigation - inside card */}
-      <div className="flex gap-2 px-6 py-3 bg-white border-b border-blue-100">
-        <button className="px-4 py-2 rounded bg-gray-200">Daily</button>
-        <button className="px-4 py-2 rounded bg-gray-200">Weekly</button>
-        <button className="px-4 py-2 rounded bg-gray-200">Monthly</button>
-        <button className="px-4 py-2 rounded bg-blue-500 text-white border border-blue-600">Quarterly</button>
+      {/* Quarter navigation */}
+      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-blue-100">
+        <button className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" onClick={() => setQuarterOffset(quarterOffset - 1)}>
+          &lt; Previous Quarter
+        </button>
+        <span className="text-lg font-semibold text-blue-700">{monthNames.join(" / ")}</span>
+        <button className="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" onClick={() => setQuarterOffset(quarterOffset + 1)}>
+          Next Quarter &gt;
+        </button>
       </div>
       {/* Calendar grid */}
-      <div className="overflow-x-auto px-6 pb-6">
-        <table className="min-w-full border border-blue-100 rounded">
+      <div className="overflow-x-auto px-6 pb-6" style={{ maxWidth: '100vw', maxHeight: '60vh', overflowY: 'auto' }}>
+        <table className="w-full border border-blue-100 rounded" style={{ tableLayout: 'auto', width: '100%' }}>
           <thead>
             <tr className="bg-blue-50">
               {months.map((m, mIdx) => (
@@ -103,27 +108,29 @@ export default function QuarterView({ events, categories, onDayClick }) {
           <tbody>
             {rows.map((row, rIdx) => (
               <React.Fragment key={rIdx}>
-                <tr className="align-top">
+                <tr className={rIdx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
                   {row.map((date, mIdx) => {
-                    if (!date) return <td key={mIdx}></td>;
+                    if (!date) return <td key={mIdx} className="px-2 py-2 text-center align-top text-gray-300">—</td>;
                     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                    // Show week number as small number next to Monday only
                     let weekNumSpan = null;
-                    if (date.getDay() === 1) { // Monday
+                    if (date.getDay() === 1) {
                       const weekNum = getWeekNumber(date);
                       weekNumSpan = <span className="text-xs text-gray-400 align-top mr-1" style={{position:'relative',top:'-2px'}}>{weekNum}</span>;
                     }
                     return (
-                      <td key={mIdx} className={`px-2 py-2 text-left align-top cursor-pointer hover:bg-blue-50`} onClick={()=>onDayClick(date)}>
-                        <span className={`text-xs font-semibold flex items-center gap-1 ${isWeekend ? "text-red-500" : "text-gray-700"}`}>
+                      <td key={mIdx} className={`px-3 py-3 text-center align-top cursor-pointer border border-blue-100 hover:bg-blue-100`} style={{ minWidth: 80 }} onClick={()=>onDayClick(date)}>
+                        <span className={`text-sm font-semibold flex items-center justify-center gap-1 ${isWeekend ? "text-red-500" : "text-gray-700"}`}>
                           {weekNumSpan}
                           {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
                         </span>
+                        {/* Placeholder for empty cell */}
+                        {(!eventsByDay[date.toLocaleDateString()] || eventsByDay[date.toLocaleDateString()].length === 0) && (
+                          <span className="block text-xs text-gray-400 mt-1">No events</span>
+                        )}
                       </td>
                     );
                   })}
                 </tr>
-                {/* Add horizontal line after each week (after Sunday) */}
                 {(rIdx+1)%7 === 0 && (
                   <tr>
                     <td colSpan={months.length}><hr className="border-t border-blue-200 my-0" /></td>
