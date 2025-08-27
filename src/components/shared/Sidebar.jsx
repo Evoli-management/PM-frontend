@@ -95,10 +95,11 @@ const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full";
 
 return (
 <aside
-className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border-r border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-t-3xl rounded-b-3xl rounded-l-3xl rounded-r-3xl ${mobileTranslate} fixed top-0 left-0 z-40 md:static md:translate-x-0`}
+className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border-r border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-t-3xl rounded-b-3xl rounded-l-3xl rounded-r-3xl ${mobileTranslate} fixed top-0 left-0 z-40 md:static md:translate-x-0 hidden-mobile`}
 aria-label="Sidebar"
 >
 <div>
+
 <div className="mb-6 flex items-center gap-2 px-2">
 <img src="/PM-frontend/logo.png" alt="Logo" className="w-8 h-8" />
 {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
