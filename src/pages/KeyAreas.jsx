@@ -2213,12 +2213,7 @@ export default function KeyAreas() {
                                                                         />
                                                                     </span>
 
-                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
-                                                                        <span className="text-[11px]">Category</span>
-                                                                        <CategoryBadge
-                                                                            category={t.category || "Key Areas"}
-                                                                        />
-                                                                    </span>
+                                                                    {/* Category removed per request */}
 
                                                                     <span
                                                                         className="inline-flex items-center gap-1 text-slate-600"
