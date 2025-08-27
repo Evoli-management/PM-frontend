@@ -1,6 +1,6 @@
 // src/pages/KeyAreas.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import {
     FaPlus,
@@ -16,6 +16,8 @@ import {
     FaTimes,
     FaBars,
     FaChevronRight,
+    FaKey,
+    FaUser,
 } from "react-icons/fa";
 
 /* ------------------------------ Helpers/UI ------------------------------ */
@@ -119,6 +121,64 @@ function EmptyState({ title = "No items yet", hint }) {
             <div className="text-slate-900 font-semibold">{title}</div>
             {hint && <div className="text-sm text-slate-600 mt-1">{hint}</div>}
         </div>
+    );
+}
+
+/* ------------------------------ Tiny Badges ------------------------------ */
+function StatusIndicator({ status }) {
+    const color =
+        status === "done"
+            ? "bg-green-500"
+            : status === "in_progress"
+              ? "bg-amber-500"
+              : status === "cancelled"
+                ? "bg-red-500"
+                : "bg-slate-400"; // open/default
+    return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} title={`Status: ${status}`} />;
+}
+
+function PriorityBadge({ priority }) {
+    const map = {
+        low: "bg-slate-100 text-slate-700",
+        med: "bg-orange-100 text-orange-700",
+        high: "bg-red-100 text-red-700",
+    };
+    const label = (priority || "med").slice(0, 1).toUpperCase();
+    return (
+        <span
+            className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${map[priority] || map.med}`}
+            title={`Priority: ${priority}`}
+        >
+            {label}
+        </span>
+    );
+}
+
+function ImportanceBadge({ importance }) {
+    const color = importance === "high" ? "text-red-600" : importance === "low" ? "text-slate-500" : "text-amber-600";
+    return <FaExclamationCircle className={`w-3.5 h-3.5 ${color}`} title={`Importance: ${importance}`} />;
+}
+
+function CategoryBadge({ category }) {
+    if ((category || "").toLowerCase() === "key areas") {
+        return <FaKey className="w-3.5 h-3.5 text-blue-600" title="Category: Key Areas" />;
+    }
+    return <FaExclamationCircle className="w-3.5 h-3.5 text-orange-600" title={`Category: ${category || "—"}`} />;
+}
+
+function QuadrantBadge({ q }) {
+    if (!q) return null;
+    const map = {
+        1: "bg-red-100 text-red-700",
+        2: "bg-green-100 text-green-700",
+        3: "bg-amber-100 text-amber-700",
+        4: "bg-slate-100 text-slate-700",
+    };
+    const cls = map[Number(q)] || map[4];
+    return (
+        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`} title={`Quadrant Q${q}`}>
+            Q{q}
+        </span>
     );
 }
 
@@ -598,6 +658,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
 /* --------------------------------- Screen -------------------------------- */
 export default function KeyAreas() {
     const location = useLocation();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [keyAreas, setKeyAreas] = useState([]);
     const [filter, setFilter] = useState("");
@@ -617,6 +678,9 @@ export default function KeyAreas() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [listNames, setListNames] = useState({}); // per-key-area custom names for lists/tabs
+    const [showViewMenu, setShowViewMenu] = useState(false);
+    const viewMenuRef = useRef(null);
+    const composerModalRef = useRef(null);
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -688,6 +752,64 @@ export default function KeyAreas() {
             setLoading(false);
         })();
     }, []);
+
+    // If navigated with openKA=1 but no specific ?ka, pick the first KA and open it.
+    useEffect(() => {
+        const isOnKeyAreas = location.pathname && location.pathname.startsWith("/key-areas");
+        if (!isOnKeyAreas) return;
+        const params = new URLSearchParams(location.search || "");
+        const hasOpenKA = params.get("openKA") === "1";
+        const hasKASelected = Boolean(params.get("ka"));
+        if (!hasOpenKA || hasKASelected) return;
+        if (!keyAreas || keyAreas.length === 0) return;
+        // Prefer first non-Ideas KA; fallback to absolute first by position
+        const sorted = [...keyAreas].sort((a, b) => (a.position || 0) - (b.position || 0));
+        const firstNonIdeas = sorted.find(
+            (k) => !((k.title || "").toLowerCase() === "ideas" || k.is_default || k.position === 10),
+        );
+        const first = firstNonIdeas || sorted[0];
+        if (!first?.id) return;
+        const next = new URLSearchParams(location.search || "");
+        next.set("ka", String(first.id));
+        next.set("openKA", "1");
+        navigate({ pathname: "/key-areas", search: `?${next.toString()}` }, { replace: true });
+        try {
+            window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: first.id } }));
+        } catch (e) {}
+    }, [location.pathname, location.search, keyAreas, navigate]);
+
+    // close view dropdown on outside click or Escape
+    useEffect(() => {
+        if (!showViewMenu) return;
+        const handleClick = (e) => {
+            if (!viewMenuRef.current) return;
+            if (!viewMenuRef.current.contains(e.target)) setShowViewMenu(false);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setShowViewMenu(false);
+        };
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, [showViewMenu]);
+
+    // also close when switching KA or view
+    useEffect(() => {
+        setShowViewMenu(false);
+    }, [selectedKA, view]);
+
+    // Close Add Task modal on Escape
+    useEffect(() => {
+        if (!showTaskComposer) return;
+        const onKey = (e) => {
+            if (e.key === "Escape") setShowTaskComposer(false);
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [showTaskComposer]);
 
     // load persisted list names from localStorage
     useEffect(() => {
@@ -1059,7 +1181,7 @@ export default function KeyAreas() {
                         {" "}
                         {/* content constrained to available width */}
                         {/* Header / Search / New KA */}
-                        <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6">
                             {!selectedKA ? (
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
@@ -1134,21 +1256,55 @@ export default function KeyAreas() {
                                             <option value="4">Q4 • Not Important, Not Urgent</option>
                                         </select>
 
-                                        <div className="ml-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
-                                            {["list", "kanban", "calendar"].map((v) => (
-                                                <button
-                                                    key={v}
-                                                    onClick={() => setView(v)}
-                                                    className={`px-2 py-1 rounded-lg text-sm font-semibold border border-slate-200 ${
-                                                        view === v
-                                                            ? "bg-blue-600 text-white"
-                                                            : "text-slate-800 hover:bg-slate-100"
-                                                    }`}
-                                                    title={`Switch to ${v} view`}
+                                        {/* View dropdown */}
+                                        <div className="relative" ref={viewMenuRef}>
+                                            <button
+                                                onClick={() => setShowViewMenu((s) => !s)}
+                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
+                                                aria-haspopup="menu"
+                                                aria-expanded={showViewMenu ? "true" : "false"}
+                                            >
+                                                View
+                                                <svg
+                                                    className={`w-4 h-4 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
                                                 >
-                                                    {v[0].toUpperCase() + v.slice(1)}
-                                                </button>
-                                            ))}
+                                                    <path d="M6 9l6 6 6-6" />
+                                                </svg>
+                                            </button>
+                                            {showViewMenu && (
+                                                <div
+                                                    role="menu"
+                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-10"
+                                                >
+                                                    {[
+                                                        { key: "list", label: "List" },
+                                                        { key: "kanban", label: "Kanban" },
+                                                        { key: "calendar", label: "Calendar" },
+                                                    ].map((opt) => (
+                                                        <button
+                                                            key={opt.key}
+                                                            role="menuitem"
+                                                            onClick={() => {
+                                                                setView(opt.key);
+                                                                setShowViewMenu(false);
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 text-sm rounded-lg ${
+                                                                view === opt.key
+                                                                    ? "bg-blue-100 text-blue-700 font-semibold"
+                                                                    : "text-slate-800 hover:bg-slate-50"
+                                                            }`}
+                                                        >
+                                                            {opt.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1176,85 +1332,121 @@ export default function KeyAreas() {
                         {selectedKA && (
                             <div className="mb-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {/* Your tasks column with list buttons + Add Task inside */}
-                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="text-sm font-semibold">Task Lists</div>
-                                        </div>
+                                    {/* LEFT COLUMN: Task Lists + Your activities stacked */}
+                                    <div className="space-y-4 md:col-span-2">
+                                        {/* Task Lists card with list buttons + Add Task inside */}
+                                        <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="text-sm font-semibold">Task Lists</div>
+                                            </div>
 
-                                        <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                            <div className="flex items-center gap-1 overflow-x-auto">
-                                                {Array.from({ length: leftListCount }).map((_, i) => {
-                                                    const n = i + 1;
-                                                    return (
-                                                        <div key={n} className="flex items-center gap-1">
-                                                            <button
-                                                                onClick={() => setTaskTab(n)}
-                                                                className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
-                                                                    taskTab === n
-                                                                        ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                                        : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
-                                                                }`}
-                                                            >
-                                                                {getListName(selectedKA?.id, n)}
-                                                            </button>
-
-                                                            <button
-                                                                onClick={() => renameList(n)}
-                                                                title={`Rename ${getListName(selectedKA?.id, n)}`}
-                                                                className="text-xs p-1 rounded hover:bg-slate-100"
-                                                            >
-                                                                <svg
-                                                                    stroke="currentColor"
-                                                                    fill="currentColor"
-                                                                    strokeWidth="0"
-                                                                    viewBox="0 0 576 512"
-                                                                    height="1em"
-                                                                    width="1em"
-                                                                    xmlns="http://www.w3.org/2000/svg"
+                                            <div className="flex flex-wrap items-center justify-between gap-3 p-3">
+                                                <div className="flex items-center gap-1 overflow-x-auto">
+                                                    {Array.from({ length: leftListCount }).map((_, i) => {
+                                                        const n = i + 1;
+                                                        return (
+                                                            <div key={n} className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => setTaskTab(n)}
+                                                                    className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                        taskTab === n
+                                                                            ? "bg-blue-600 text-white border-blue-600 shadow"
+                                                                            : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                                                                    }`}
                                                                 >
-                                                                    <path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path>
-                                                                </svg>
-                                                            </button>
+                                                                    {getListName(selectedKA?.id, n)}
+                                                                </button>
 
+                                                                <button
+                                                                    onClick={() => renameList(n)}
+                                                                    title={`Rename ${getListName(selectedKA?.id, n)}`}
+                                                                    className="text-xs p-1 rounded hover:bg-slate-100"
+                                                                >
+                                                                    <svg
+                                                                        stroke="currentColor"
+                                                                        fill="currentColor"
+                                                                        strokeWidth="0"
+                                                                        viewBox="0 0 576 512"
+                                                                        height="1em"
+                                                                        width="1em"
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                    >
+                                                                        <path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path>
+                                                                    </svg>
+                                                                </button>
+
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (!selectedKA) return;
+                                                                        const kaId = selectedKA.id;
+                                                                        // do not allow deleting a list that has tasks
+                                                                        const hasTasks = (allTasks || []).some(
+                                                                            (t) =>
+                                                                                (t.list_index || 1) === n &&
+                                                                                String(t.key_area_id) === String(kaId),
+                                                                        );
+                                                                        if (hasTasks) {
+                                                                            alert(
+                                                                                "Cannot delete list while it contains tasks. Move or remove tasks first.",
+                                                                            );
+                                                                            return;
+                                                                        }
+                                                                        const names = listNames[kaId] || {};
+                                                                        if (!names || !names[n]) {
+                                                                            // nothing custom to delete
+                                                                            if (
+                                                                                !confirm(
+                                                                                    `Remove list ${n}? This will reset any custom name.`,
+                                                                                )
+                                                                            )
+                                                                                return;
+                                                                        }
+                                                                        setListNames((prev) => {
+                                                                            const copy = { ...(prev || {}) };
+                                                                            if (!copy[kaId]) return copy;
+                                                                            const { [n]: _rem, ...rest } = copy[kaId];
+                                                                            copy[kaId] = { ...rest };
+                                                                            return copy;
+                                                                        });
+                                                                        // if current tab was deleted, go back to 1
+                                                                        if (taskTab === n) setTaskTab(1);
+                                                                    }}
+                                                                    title={`Delete list ${n}`}
+                                                                    className="text-xs p-1 rounded hover:bg-red-50 text-red-600"
+                                                                >
+                                                                    <svg
+                                                                        stroke="currentColor"
+                                                                        fill="currentColor"
+                                                                        strokeWidth="0"
+                                                                        viewBox="0 0 448 512"
+                                                                        height="1em"
+                                                                        width="1em"
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                    >
+                                                                        <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96h384c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 295.8 0 283.2 0H164.8c-12.6 0-24.2 6.8-29.6 17.7zM53.2 467c6 26.3 29.8 45 56.8 45h175.9c27 0 50.8-18.7 56.8-45L360 128H88L53.2 467z"></path>
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {leftListCount < 10 && (
+                                                        <div className="flex items-center">
                                                             <button
                                                                 onClick={() => {
                                                                     if (!selectedKA) return;
                                                                     const kaId = selectedKA.id;
-                                                                    // do not allow deleting a list that has tasks
-                                                                    const hasTasks = (allTasks || []).some(
-                                                                        (t) =>
-                                                                            (t.list_index || 1) === n &&
-                                                                            String(t.key_area_id) === String(kaId),
-                                                                    );
-                                                                    if (hasTasks) {
-                                                                        alert(
-                                                                            "Cannot delete list while it contains tasks. Move or remove tasks first.",
-                                                                        );
-                                                                        return;
-                                                                    }
-                                                                    const names = listNames[kaId] || {};
-                                                                    if (!names || !names[n]) {
-                                                                        // nothing custom to delete
-                                                                        if (
-                                                                            !confirm(
-                                                                                `Remove list ${n}? This will reset any custom name.`,
-                                                                            )
-                                                                        )
-                                                                            return;
-                                                                    }
+                                                                    const currentCount = leftListCount;
+                                                                    const next = currentCount + 1;
                                                                     setListNames((prev) => {
                                                                         const copy = { ...(prev || {}) };
-                                                                        if (!copy[kaId]) return copy;
-                                                                        const { [n]: _rem, ...rest } = copy[kaId];
-                                                                        copy[kaId] = { ...rest };
+                                                                        copy[kaId] = { ...(copy[kaId] || {}) };
+                                                                        copy[kaId][next] = `List ${next}`;
                                                                         return copy;
                                                                     });
-                                                                    // if current tab was deleted, go back to 1
-                                                                    if (taskTab === n) setTaskTab(1);
+                                                                    setTaskTab(next);
                                                                 }}
-                                                                title={`Delete list ${n}`}
-                                                                className="text-xs p-1 rounded hover:bg-red-50 text-red-600"
+                                                                title="Add list"
+                                                                className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
                                                             >
                                                                 <svg
                                                                     stroke="currentColor"
@@ -1265,204 +1457,171 @@ export default function KeyAreas() {
                                                                     width="1em"
                                                                     xmlns="http://www.w3.org/2000/svg"
                                                                 >
-                                                                    <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96h384c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 295.8 0 283.2 0H164.8c-12.6 0-24.2 6.8-29.6 17.7zM53.2 467c6 26.3 29.8 45 56.8 45h175.9c27 0 50.8-18.7 56.8-45L360 128H88L53.2 467z"></path>
+                                                                    <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
                                                                 </svg>
                                                             </button>
                                                         </div>
-                                                    );
-                                                })}
-                                                {leftListCount < 10 && (
-                                                    <div className="flex items-center">
-                                                        <button
-                                                            onClick={() => {
-                                                                if (!selectedKA) return;
-                                                                const kaId = selectedKA.id;
-                                                                const currentCount = leftListCount;
-                                                                const next = currentCount + 1;
-                                                                setListNames((prev) => {
-                                                                    const copy = { ...(prev || {}) };
-                                                                    copy[kaId] = { ...(copy[kaId] || {}) };
-                                                                    copy[kaId][next] = `List ${next}`;
-                                                                    return copy;
-                                                                });
-                                                                setTaskTab(next);
-                                                            }}
-                                                            title="Add list"
-                                                            className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
-                                                        >
-                                                            <svg
-                                                                stroke="currentColor"
-                                                                fill="currentColor"
-                                                                strokeWidth="0"
-                                                                viewBox="0 0 448 512"
-                                                                height="1em"
-                                                                width="1em"
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                            >
-                                                                <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    )}
+                                                </div>
 
-                                            <div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaskForm((s) => ({ ...s, list_index: taskTab }));
-                                                        setShowTaskComposer(true);
-                                                    }}
-                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                >
-                                                    <svg
-                                                        stroke="currentColor"
-                                                        fill="currentColor"
-                                                        strokeWidth="0"
-                                                        viewBox="0 0 448 512"
-                                                        height="1em"
-                                                        width="1em"
-                                                        xmlns="http://www.w3.org/2000/svg"
+                                                <div className="mt-3 w-full">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTaskForm((s) => ({ ...s, list_index: taskTab }));
+                                                            setShowTaskComposer(true);
+                                                        }}
+                                                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
                                                     >
-                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                    </svg>
-                                                    Add Task
-                                                </button>
+                                                        <svg
+                                                            stroke="currentColor"
+                                                            fill="currentColor"
+                                                            strokeWidth="0"
+                                                            viewBox="0 0 448 512"
+                                                            height="1em"
+                                                            width="1em"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                        >
+                                                            <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                        </svg>
+                                                        Add Task
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Your activities column */}
-                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div className="text-sm font-semibold">Your activities</div>
-                                            <div className="text-xs text-slate-500">
-                                                Attach to a task or keep as new
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-3 space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <select
-                                                    value={activityTaskId}
-                                                    onChange={(e) => setActivityTaskId(e.target.value)}
-                                                    className="p-2 border rounded bg-white text-sm"
-                                                    aria-label="Select task for activity"
-                                                    disabled={!selectedKA}
-                                                >
-                                                    <option value="new">Select task</option>
-                                                    {allTasks
-                                                        .filter(
-                                                            (t) =>
-                                                                !selectedKA ||
-                                                                String(t.key_area_id) === String(selectedKA.id),
-                                                        )
-                                                        .map((t) => (
-                                                            <option key={t.id} value={t.id}>
-                                                                {t.title}
-                                                            </option>
-                                                        ))}
-                                                </select>
-
-                                                <input
-                                                    value={activityName}
-                                                    onChange={(e) => setActivityName(e.target.value)}
-                                                    placeholder="Activity name..."
-                                                    className="flex-1 p-2 border rounded text-sm"
-                                                />
+                                        {/* Your activities card */}
+                                        <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="text-sm font-semibold">Your activities</div>
+                                                <div className="text-xs text-slate-500">
+                                                    Attach to a task or keep as new
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        const key = String(activityTaskId || "new");
-                                                        if (!activityName.trim()) return;
-                                                        const item = {
-                                                            id: Date.now(),
-                                                            text: activityName.trim(),
-                                                            createdAt: new Date().toISOString(),
-                                                        };
-                                                        setActivitiesByTask((prev) => {
-                                                            const c = { ...(prev || {}) };
-                                                            c[key] = [...(c[key] || []), item];
-                                                            return c;
-                                                        });
-                                                        setActivityName("");
-                                                    }}
-                                                    className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
-                                                >
-                                                    Add
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        // clear activities for current selection
-                                                        const key = String(activityTaskId || "new");
-                                                        setActivitiesByTask((prev) => {
-                                                            const c = { ...(prev || {}) };
-                                                            delete c[key];
-                                                            return c;
-                                                        });
-                                                    }}
-                                                    title="Clear activities for current selection"
-                                                    className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
-                                                >
-                                                    Clear
-                                                </button>
-                                            </div>
-
-                                            <div>
-                                                {(activitiesByTask[String(activityTaskId)] || []).length === 0 ? (
-                                                    <div className="text-sm text-slate-500 mt-2">
-                                                        No activities yet.
-                                                    </div>
-                                                ) : (
-                                                    <div className="mt-2 space-y-2">
-                                                        {(activitiesByTask[String(activityTaskId)] || [])
-                                                            .slice()
-                                                            .reverse()
-                                                            .map((a) => (
-                                                                <div
-                                                                    key={a.id}
-                                                                    className="flex items-start justify-between p-2 border rounded bg-white"
-                                                                >
-                                                                    <div className="flex-1">
-                                                                        <div className="text-sm text-slate-800">
-                                                                            {a.text}
-                                                                        </div>
-                                                                        <div className="text-xs text-slate-500 mt-1">
-                                                                            {new Date(a.createdAt).toLocaleString()}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="ml-3 flex items-start">
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                const key = String(
-                                                                                    activityTaskId || "new",
-                                                                                );
-                                                                                setActivitiesByTask((prev) => {
-                                                                                    const c = { ...(prev || {}) };
-                                                                                    c[key] = (c[key] || []).filter(
-                                                                                        (it) => it.id !== a.id,
-                                                                                    );
-                                                                                    return c;
-                                                                                });
-                                                                            }}
-                                                                            className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
-                                                                        >
-                                                                            Delete
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
+                                            <div className="mt-3 space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={activityTaskId}
+                                                        onChange={(e) => setActivityTaskId(e.target.value)}
+                                                        className="p-2 border rounded bg-white text-sm"
+                                                        aria-label="Select task for activity"
+                                                        disabled={!selectedKA}
+                                                    >
+                                                        <option value="new">Select task</option>
+                                                        {allTasks
+                                                            .filter(
+                                                                (t) =>
+                                                                    !selectedKA ||
+                                                                    String(t.key_area_id) === String(selectedKA.id),
+                                                            )
+                                                            .map((t) => (
+                                                                <option key={t.id} value={t.id}>
+                                                                    {t.title}
+                                                                </option>
                                                             ))}
-                                                    </div>
-                                                )}
+                                                    </select>
+
+                                                    <input
+                                                        value={activityName}
+                                                        onChange={(e) => setActivityName(e.target.value)}
+                                                        placeholder="Activity name..."
+                                                        className="flex-1 p-2 border rounded text-sm"
+                                                    />
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            const key = String(activityTaskId || "new");
+                                                            if (!activityName.trim()) return;
+                                                            const item = {
+                                                                id: Date.now(),
+                                                                text: activityName.trim(),
+                                                                createdAt: new Date().toISOString(),
+                                                            };
+                                                            setActivitiesByTask((prev) => {
+                                                                const c = { ...(prev || {}) };
+                                                                c[key] = [...(c[key] || []), item];
+                                                                return c;
+                                                            });
+                                                            setActivityName("");
+                                                        }}
+                                                        className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                                                    >
+                                                        Add
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            // clear activities for current selection
+                                                            const key = String(activityTaskId || "new");
+                                                            setActivitiesByTask((prev) => {
+                                                                const c = { ...(prev || {}) };
+                                                                delete c[key];
+                                                                return c;
+                                                            });
+                                                        }}
+                                                        title="Clear activities for current selection"
+                                                        className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
+
+                                                <div>
+                                                    {(activitiesByTask[String(activityTaskId)] || []).length === 0 ? (
+                                                        <div className="text-sm text-slate-500 mt-2">
+                                                            No activities yet.
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mt-2 space-y-2">
+                                                            {(activitiesByTask[String(activityTaskId)] || [])
+                                                                .slice()
+                                                                .reverse()
+                                                                .map((a) => (
+                                                                    <div
+                                                                        key={a.id}
+                                                                        className="flex items-start justify-between p-2 border rounded bg-white"
+                                                                    >
+                                                                        <div className="flex-1">
+                                                                            <div className="text-sm text-slate-800">
+                                                                                {a.text}
+                                                                            </div>
+                                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                                {new Date(a.createdAt).toLocaleString()}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="ml-3 flex items-start">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const key = String(
+                                                                                        activityTaskId || "new",
+                                                                                    );
+                                                                                    setActivitiesByTask((prev) => {
+                                                                                        const c = { ...(prev || {}) };
+                                                                                        c[key] = (c[key] || []).filter(
+                                                                                            (it) => it.id !== a.id,
+                                                                                        );
+                                                                                        return c;
+                                                                                    });
+                                                                                }}
+                                                                                className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                                                                            >
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Summary column */}
-                                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                    {/* RIGHT COLUMN: Summary */}
+                                    <div className="bg-white rounded-xl border border-slate-200 p-4 w-full">
                                         <div className="text-sm font-semibold">Summary 📊</div>
                                         <div className="mt-3 text-sm">Total Tasks: {allTasks.length}</div>
                                         <div className="mt-1 text-sm">
@@ -1594,364 +1753,411 @@ export default function KeyAreas() {
                             <div className="mt-4 space-y-4">
                                 {/* Composer — rendered from left card; show form only when requested */}
                                 {showTaskComposer && (
-                                    <form onSubmit={onCreateTask}>
-                                        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                                            <div className="grid md:grid-cols-2 gap-6">
-                                                {/* Left column: Title + Extra info */}
-                                                <div className="flex flex-col gap-4">
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900 block">
-                                                            Task Title *
-                                                        </label>
-                                                        <input
-                                                            name="title"
-                                                            required
-                                                            value={taskForm.title}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, title: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                            placeholder="e.g., Draft Q3 campaign brief"
-                                                        />
-                                                    </div>
-
-                                                    <div className="grid gap-4">
+                                    <div
+                                        className="fixed inset-0 bg-black/40 z-50 grid place-items-center"
+                                        onClick={() => setShowTaskComposer(false)}
+                                    >
+                                        <div
+                                            ref={composerModalRef}
+                                            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xl w-[92vw] max-w-3xl max-h-[85vh] overflow-auto"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h2 className="text-lg font-bold text-slate-900">New Task</h2>
+                                                <button
+                                                    type="button"
+                                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                                                    onClick={() => setShowTaskComposer(false)}
+                                                    aria-label="Close"
+                                                >
+                                                    <FaTimes />
+                                                </button>
+                                            </div>
+                                            <form onSubmit={onCreateTask}>
+                                                <div className="grid md:grid-cols-2 gap-6">
+                                                    {/* Left column: Title + Extra info */}
+                                                    <div className="flex flex-col gap-4">
                                                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Tags (comma separated)
+                                                            <label className="text-sm font-semibold text-slate-900 block">
+                                                                Task Title *
                                                             </label>
                                                             <input
-                                                                name="tags"
-                                                                value={taskForm.tags}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({ ...s, tags: e.target.value }))
-                                                                }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                placeholder="e.g., q3,campaign,urgent"
-                                                            />
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Deadline
-                                                            </label>
-                                                            <input
-                                                                name="deadline"
-                                                                type="datetime-local"
-                                                                value={taskForm.deadline}
+                                                                name="title"
+                                                                required
+                                                                value={taskForm.title}
                                                                 onChange={(e) =>
                                                                     setTaskForm((s) => ({
                                                                         ...s,
-                                                                        deadline: e.target.value,
+                                                                        title: e.target.value,
                                                                     }))
                                                                 }
                                                                 className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                            />
-                                                            <div className="text-xs text-slate-500 mt-1">
-                                                                mm/dd/yyyy, --:--
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Planned End
-                                                            </label>
-                                                            <input
-                                                                name="end_date"
-                                                                type="datetime-local"
-                                                                value={taskForm.end_date}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        end_date: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                            />
-                                                            <div className="text-xs text-slate-500 mt-1">
-                                                                mm/dd/yyyy, --:--
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Recurrence
-                                                            </label>
-                                                            <input
-                                                                name="recurrence"
-                                                                value={taskForm.recurrence}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        recurrence: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                placeholder='e.g., {"freq":"weekly","interval":1}'
+                                                                placeholder="e.g., Draft Q3 campaign brief"
                                                             />
                                                         </div>
 
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Attachments
-                                                            </label>
-                                                            <div className="mt-1">
+                                                        <div className="grid gap-4">
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Tags (comma separated)
+                                                                </label>
                                                                 <input
-                                                                    ref={(el) => (window.__slideFileInput = el)}
-                                                                    name="attachments_files"
-                                                                    type="file"
-                                                                    multiple
-                                                                    onChange={(e) => {
-                                                                        const incoming = Array.from(
-                                                                            e.target.files || [],
-                                                                        );
-                                                                        setTaskForm((s) => {
-                                                                            const existing = s.attachmentsFiles || [];
-                                                                            const combined = [...existing, ...incoming];
-                                                                            const uniq = Array.from(
-                                                                                new Map(
-                                                                                    combined.map((f) => [f.name, f]),
-                                                                                ).values(),
+                                                                    name="tags"
+                                                                    value={taskForm.tags}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            tags: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    placeholder="e.g., q3,campaign,urgent"
+                                                                />
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Deadline
+                                                                </label>
+                                                                <input
+                                                                    name="deadline"
+                                                                    type="datetime-local"
+                                                                    value={taskForm.deadline}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            deadline: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                />
+                                                                <div className="text-xs text-slate-500 mt-1">
+                                                                    mm/dd/yyyy, --:--
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Planned End
+                                                                </label>
+                                                                <input
+                                                                    name="end_date"
+                                                                    type="datetime-local"
+                                                                    value={taskForm.end_date}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            end_date: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                />
+                                                                <div className="text-xs text-slate-500 mt-1">
+                                                                    mm/dd/yyyy, --:--
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Recurrence
+                                                                </label>
+                                                                <input
+                                                                    name="recurrence"
+                                                                    value={taskForm.recurrence}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            recurrence: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    placeholder='e.g., {"freq":"weekly","interval":1}'
+                                                                />
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
+                                                                    Attachments
+                                                                </label>
+                                                                <div className="mt-1">
+                                                                    <input
+                                                                        ref={(el) =>
+                                                                            (window.__composerModalFileInput = el)
+                                                                        }
+                                                                        name="attachments_files"
+                                                                        type="file"
+                                                                        multiple
+                                                                        onChange={(e) => {
+                                                                            const incoming = Array.from(
+                                                                                e.target.files || [],
                                                                             );
-                                                                            return { ...s, attachmentsFiles: uniq };
-                                                                        });
-                                                                    }}
-                                                                    className="hidden"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        window.__slideFileInput &&
-                                                                        window.__slideFileInput.click()
-                                                                    }
-                                                                    className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                                                >
-                                                                    Choose files
-                                                                </button>
-                                                            </div>
-                                                            {taskForm.attachmentsFiles &&
-                                                            taskForm.attachmentsFiles.length > 0 ? (
-                                                                <ul className="mt-2 space-y-1 text-sm">
-                                                                    {taskForm.attachmentsFiles.map((f, i) => (
-                                                                        <li
-                                                                            key={i}
-                                                                            className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
-                                                                        >
-                                                                            <span className="truncate">{f.name}</span>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() =>
-                                                                                    setTaskForm((s) => ({
-                                                                                        ...s,
-                                                                                        attachmentsFiles:
-                                                                                            s.attachmentsFiles.filter(
-                                                                                                (_, idx) => idx !== i,
-                                                                                            ),
-                                                                                    }))
-                                                                                }
-                                                                                className="text-xs rounded-lg text-slate-500 ml-2"
+                                                                            setTaskForm((s) => {
+                                                                                const existing =
+                                                                                    s.attachmentsFiles || [];
+                                                                                const combined = [
+                                                                                    ...existing,
+                                                                                    ...incoming,
+                                                                                ];
+                                                                                const uniq = Array.from(
+                                                                                    new Map(
+                                                                                        combined.map((f) => [
+                                                                                            f.name,
+                                                                                            f,
+                                                                                        ]),
+                                                                                    ).values(),
+                                                                                );
+                                                                                return { ...s, attachmentsFiles: uniq };
+                                                                            });
+                                                                        }}
+                                                                        className="hidden"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            window.__composerModalFileInput &&
+                                                                            window.__composerModalFileInput.click()
+                                                                        }
+                                                                        className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                                    >
+                                                                        Choose files
+                                                                    </button>
+                                                                </div>
+                                                                {taskForm.attachmentsFiles &&
+                                                                taskForm.attachmentsFiles.length > 0 ? (
+                                                                    <ul className="mt-2 space-y-1 text-sm">
+                                                                        {taskForm.attachmentsFiles.map((f, i) => (
+                                                                            <li
+                                                                                key={i}
+                                                                                className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
                                                                             >
-                                                                                Remove
-                                                                            </button>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            ) : null}
-                                                            {/* storage picker removed */}
+                                                                                <span className="truncate">
+                                                                                    {f.name}
+                                                                                </span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setTaskForm((s) => ({
+                                                                                            ...s,
+                                                                                            attachmentsFiles:
+                                                                                                s.attachmentsFiles.filter(
+                                                                                                    (_, idx) =>
+                                                                                                        idx !== i,
+                                                                                                ),
+                                                                                        }))
+                                                                                    }
+                                                                                    className="text-xs rounded-lg text-slate-500 ml-2"
+                                                                                >
+                                                                                    Remove
+                                                                                </button>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                ) : null}
+                                                                {/* storage picker removed */}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Right column: Meta + reordered fields per request */}
+                                                    <div className="flex flex-col gap-4">
+                                                        <div>
+                                                            <div className="grid md:grid-cols-2 gap-4">
+                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                    <label className="text-sm font-semibold text-slate-900">
+                                                                        List (Tab)
+                                                                    </label>
+                                                                    <input
+                                                                        name="list_index"
+                                                                        type="number"
+                                                                        min={1}
+                                                                        value={taskForm.list_index}
+                                                                        onChange={(e) =>
+                                                                            setTaskForm((s) => ({
+                                                                                ...s,
+                                                                                list_index: Number(e.target.value || 1),
+                                                                            }))
+                                                                        }
+                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    />
+                                                                </div>
+
+                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                    <label className="text-sm font-semibold text-slate-900">
+                                                                        Importance
+                                                                    </label>
+                                                                    <select
+                                                                        name="importance"
+                                                                        value={taskForm.importance}
+                                                                        onChange={(e) =>
+                                                                            setTaskForm((s) => ({
+                                                                                ...s,
+                                                                                importance: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    >
+                                                                        <option value="low">Low</option>
+                                                                        <option value="med">Medium</option>
+                                                                        <option value="high">High</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Category
+                                                            </label>
+                                                            <select
+                                                                name="category"
+                                                                value={taskForm.category}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        category: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            >
+                                                                <option>Key Areas</option>
+                                                                <option>Don’t Forget</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Linked Goal (optional)
+                                                            </label>
+                                                            <select
+                                                                name="goal_id"
+                                                                value={taskForm.goal_id}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        goal_id: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                            >
+                                                                <option value="">— None (Activity Trap) —</option>
+                                                                {goals.map((g) => (
+                                                                    <option key={g.id} value={g.id}>
+                                                                        {g.title}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900">
+                                                                Assignee
+                                                            </label>
+                                                            <input
+                                                                name="assignee"
+                                                                value={taskForm.assignee}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        assignee: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                placeholder="Name or ID"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="grid md:grid-cols-2 gap-4">
+                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                    <label className="text-sm font-semibold text-slate-900">
+                                                                        Status
+                                                                    </label>
+                                                                    <select
+                                                                        name="status"
+                                                                        value={taskForm.status}
+                                                                        onChange={(e) =>
+                                                                            setTaskForm((s) => ({
+                                                                                ...s,
+                                                                                status: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    >
+                                                                        <option value="open">Open</option>
+                                                                        <option value="in_progress">In Progress</option>
+                                                                        <option value="done">Done</option>
+                                                                        <option value="cancelled">Cancelled</option>
+                                                                    </select>
+                                                                </div>
+
+                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                    <label className="text-sm font-semibold text-slate-900">
+                                                                        Priority
+                                                                    </label>
+                                                                    <select
+                                                                        name="priority"
+                                                                        value={taskForm.priority}
+                                                                        onChange={(e) =>
+                                                                            setTaskForm((s) => ({
+                                                                                ...s,
+                                                                                priority: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    >
+                                                                        <option value="low">Low</option>
+                                                                        <option value="med">Medium</option>
+                                                                        <option value="high">High</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                            <label className="text-sm font-semibold text-slate-900 block">
+                                                                Description
+                                                            </label>
+                                                            <textarea
+                                                                name="description"
+                                                                rows={3}
+                                                                value={taskForm.description}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        description: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
+                                                                placeholder="Details…"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Right column: Meta + reordered fields per request */}
-                                                <div className="flex flex-col gap-4">
+                                                {/* Actions (span both columns) */}
+                                                <div className="mt-4 flex items-center gap-3 justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
+                                                            <FaSave /> Add Task
+                                                        </button>
+                                                        <span className="text-xs text-slate-700 flex items-center gap-1">
+                                                            <FaExclamationCircle /> Tasks must belong to the current Key
+                                                            Area.
+                                                        </span>
+                                                    </div>
                                                     <div>
-                                                        <div className="grid md:grid-cols-2 gap-4">
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    List (Tab)
-                                                                </label>
-                                                                <input
-                                                                    name="list_index"
-                                                                    type="number"
-                                                                    min={1}
-                                                                    value={taskForm.list_index}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            list_index: Number(e.target.value || 1),
-                                                                        }))
-                                                                    }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                />
-                                                            </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Importance
-                                                                </label>
-                                                                <select
-                                                                    name="importance"
-                                                                    value={taskForm.importance}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            importance: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                >
-                                                                    <option value="low">Low</option>
-                                                                    <option value="med">Medium</option>
-                                                                    <option value="high">High</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Category
-                                                        </label>
-                                                        <select
-                                                            name="category"
-                                                            value={taskForm.category}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, category: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowTaskComposer(false)}
+                                                            className="rounded-lg text-sm text-slate-600 hover:underline"
                                                         >
-                                                            <option>Key Areas</option>
-                                                            <option>Don’t Forget</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Linked Goal (optional)
-                                                        </label>
-                                                        <select
-                                                            name="goal_id"
-                                                            value={taskForm.goal_id}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, goal_id: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                        >
-                                                            <option value="">— None (Activity Trap) —</option>
-                                                            {goals.map((g) => (
-                                                                <option key={g.id} value={g.id}>
-                                                                    {g.title}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900">
-                                                            Assignee
-                                                        </label>
-                                                        <input
-                                                            name="assignee"
-                                                            value={taskForm.assignee}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({ ...s, assignee: e.target.value }))
-                                                            }
-                                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                            placeholder="Name or ID"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <div className="grid md:grid-cols-2 gap-4">
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Status
-                                                                </label>
-                                                                <select
-                                                                    name="status"
-                                                                    value={taskForm.status}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            status: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                >
-                                                                    <option value="open">Open</option>
-                                                                    <option value="in_progress">In Progress</option>
-                                                                    <option value="done">Done</option>
-                                                                    <option value="cancelled">Cancelled</option>
-                                                                </select>
-                                                            </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Priority
-                                                                </label>
-                                                                <select
-                                                                    name="priority"
-                                                                    value={taskForm.priority}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            priority: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                >
-                                                                    <option value="low">Low</option>
-                                                                    <option value="med">Medium</option>
-                                                                    <option value="high">High</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                        <label className="text-sm font-semibold text-slate-900 block">
-                                                            Description
-                                                        </label>
-                                                        <textarea
-                                                            name="description"
-                                                            rows={3}
-                                                            value={taskForm.description}
-                                                            onChange={(e) =>
-                                                                setTaskForm((s) => ({
-                                                                    ...s,
-                                                                    description: e.target.value,
-                                                                }))
-                                                            }
-                                                            className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
-                                                            placeholder="Details…"
-                                                        />
+                                                            Cancel
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            </div>
-
-                                            {/* Actions (span both columns) */}
-                                            <div className="mt-4 flex items-center gap-3 justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
-                                                        <FaSave /> Add Task
-                                                    </button>
-                                                    <span className="text-xs text-slate-700 flex items-center gap-1">
-                                                        <FaExclamationCircle /> Tasks must belong to the current Key
-                                                        Area.
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowTaskComposer(false)}
-                                                        className="rounded-lg text-sm text-slate-600 hover:underline"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            </div>
+                                            </form>
                                         </div>
-                                    </form>
+                                    </div>
                                 )}
 
                                 {/* Tasks (List / Kanban / Calendar) */}
@@ -1982,42 +2188,108 @@ export default function KeyAreas() {
                                                                         {t.description}
                                                                     </div>
                                                                 )}
-                                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                                    <Chip>Tab {t.list_index || 1}</Chip>
-                                                                    <Chip>Status: {t.status}</Chip>
-                                                                    <Chip>Priority: {t.priority}</Chip>
-                                                                    <Chip>Importance: {t.importance}</Chip>
-                                                                    <Chip>Category: {t.category}</Chip>
-                                                                    <Chip>Assignee: {t.assignee || "—"}</Chip>
+                                                                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                                                                    <span
+                                                                        className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700"
+                                                                        title="List tab"
+                                                                    >
+                                                                        Tab {t.list_index || 1}
+                                                                    </span>
+
+                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
+                                                                        <span className="text-[11px]">Status</span>
+                                                                        <StatusIndicator status={t.status || "open"} />
+                                                                    </span>
+
+                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
+                                                                        <span className="text-[11px]">Priority</span>
+                                                                        <PriorityBadge priority={t.priority || "med"} />
+                                                                    </span>
+
+                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
+                                                                        <span className="text-[11px]">Importance</span>
+                                                                        <ImportanceBadge
+                                                                            importance={t.importance || "med"}
+                                                                        />
+                                                                    </span>
+
+                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
+                                                                        <span className="text-[11px]">Category</span>
+                                                                        <CategoryBadge
+                                                                            category={t.category || "Key Areas"}
+                                                                        />
+                                                                    </span>
+
+                                                                    <span
+                                                                        className="inline-flex items-center gap-1 text-slate-600"
+                                                                        title="Assignee"
+                                                                    >
+                                                                        <span className="text-[11px]">Assignee</span>
+                                                                        <FaUser className="w-3.5 h-3.5" />{" "}
+                                                                        {t.assignee || "—"}
+                                                                    </span>
+
                                                                     {t.goal_id ? (
-                                                                        <Chip>Goal #{t.goal_id}</Chip>
+                                                                        <span
+                                                                            className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold"
+                                                                            title={`Goal #${t.goal_id}`}
+                                                                        >
+                                                                            G#{t.goal_id}
+                                                                        </span>
                                                                     ) : (
-                                                                        <Chip>Activity Trap</Chip>
+                                                                        <span
+                                                                            className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700"
+                                                                            title="Activity Trap"
+                                                                        >
+                                                                            Trap
+                                                                        </span>
                                                                     )}
-                                                                    {t.eisenhower_quadrant && (
-                                                                        <Chip>Q{t.eisenhower_quadrant}</Chip>
+
+                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
+                                                                        <span className="text-[11px]">Quadrant</span>
+                                                                        <QuadrantBadge q={t.eisenhower_quadrant} />
+                                                                    </span>
+
+                                                                    {t.tags && (
+                                                                        <span
+                                                                            className="inline-flex items-center gap-1 text-slate-600"
+                                                                            title={`Tags: ${t.tags}`}
+                                                                        >
+                                                                            <span className="text-[11px]">Tags</span>
+                                                                            <FaTags className="w-3.5 h-3.5" />
+                                                                            {t.tags.split(",").filter(Boolean).length}
+                                                                        </span>
                                                                     )}
-                                                                    {t.tags && <Chip>Tags: {t.tags}</Chip>}
                                                                     {t.attachments && (
-                                                                        <Chip>
-                                                                            Attachments:{" "}
+                                                                        <span
+                                                                            className="inline-flex items-center gap-1 text-slate-600"
+                                                                            title="Attachments"
+                                                                        >
+                                                                            <span className="text-[11px]">
+                                                                                Attachments
+                                                                            </span>
                                                                             {
                                                                                 t.attachments.split(",").filter(Boolean)
                                                                                     .length
-                                                                            }
-                                                                        </Chip>
+                                                                            }{" "}
+                                                                            files
+                                                                        </span>
                                                                     )}
                                                                     {t.deadline && (
-                                                                        <Chip>
-                                                                            Deadline:{" "}
+                                                                        <span
+                                                                            className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"
+                                                                            title="Deadline"
+                                                                        >
                                                                             {new Date(t.deadline).toLocaleString()}
-                                                                        </Chip>
+                                                                        </span>
                                                                     )}
                                                                     {t.end_date && (
-                                                                        <Chip>
-                                                                            Planned End:{" "}
+                                                                        <span
+                                                                            className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"
+                                                                            title="Planned End"
+                                                                        >
                                                                             {new Date(t.end_date).toLocaleString()}
-                                                                        </Chip>
+                                                                        </span>
                                                                     )}
                                                                 </div>
                                                             </div>
