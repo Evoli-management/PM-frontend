@@ -34,13 +34,11 @@ export default function Calendar() {
                                 >
                                     <FaBars />
                                 </button>
-                                <h1 className="text-3xl font-bold text-blue-700">Calendar</h1>
+                                {/* Title removed per request */}
                             </div>
                         </div>
                         <div className="px-4 md:px-8">
-                            <p className="text-gray-500 text-base mb-4">
-                                Modern interactive calendar. All views enabled. Tasks & activities shown as events.
-                            </p>
+                            {/* Description removed per request */}
                             <CalendarContainer />
                         </div>
                     </div>
