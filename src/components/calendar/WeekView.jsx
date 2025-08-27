@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
-import TodoPanel from "./TodoPanel";
 
 function getWeekNumber(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -20,16 +19,17 @@ const timeSlots = (slotSize) => {
     return slots;
 };
 
-const WeekView = ({ events = [], todos = [], categories = {}, onTaskDrop, onEventClick }) => {
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+
+const WeekView = ({ currentDate, onShiftDate, events = [], todos = [], categories = {}, onTaskDrop, onEventClick }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
-    const [currentDate, setCurrentDate] = useState(new Date());
     const [elephantTask, setElephantTask] = useState("");
     // Fixed column widths to keep header and grid aligned
     const TIME_COL_PX = 80; // matches w-20
     const DAY_COL_PX = 140;
 
     // Calculate week start (Monday)
-    const weekStart = new Date(currentDate);
+    const weekStart = new Date(currentDate || new Date());
     weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
     const days = Array.from(
         { length: 7 },
@@ -40,31 +40,39 @@ const WeekView = ({ events = [], todos = [], categories = {}, onTaskDrop, onEven
     const totalWidth = TIME_COL_PX + days.length * DAY_COL_PX;
 
     // Navigation handlers
-    const goPrevWeek = () => {
-        const d = new Date(weekStart);
-        d.setDate(d.getDate() - 7);
-        setCurrentDate(d);
-    };
-    const goNextWeek = () => {
-        const d = new Date(weekStart);
-        d.setDate(d.getDate() + 7);
-        setCurrentDate(d);
-    };
-    const goToday = () => {
-        setCurrentDate(new Date());
-    };
+    // Navigation is handled by container; keep internal handlers unused or remove if not needed
     // Drag-and-drop handler
     const handleDrop = (e, day, slot) => {
         const taskId = e.dataTransfer.getData("taskId");
         // ...handle drop logic...
     };
+    // Range label for the week
+    const endOfWeek = new Date(weekStart);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${endOfWeek.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+
     return (
-        <div
-            className="p-0 bg-white border border-blue-200 rounded-xl"
-            style={{ boxShadow: "none", overflow: "hidden" }}
-        >
-            {/* Top controls */}
-            {/* ...existing code... */}
+        <div className="p-0" style={{ overflow: "hidden" }}>
+            {/* Header with navigation inside the view */}
+            <div className="flex items-center justify-between mb-2">
+                <button
+                    className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                    style={{ minWidth: 36, minHeight: 36 }}
+                    aria-label="Previous week"
+                    onClick={() => onShiftDate && onShiftDate(-1)}
+                >
+                    <FaChevronLeft />
+                </button>
+                <h2 className="text-xl font-bold">{weekLabel}</h2>
+                <button
+                    className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                    style={{ minWidth: 36, minHeight: 36 }}
+                    aria-label="Next week"
+                    onClick={() => onShiftDate && onShiftDate(1)}
+                >
+                    <FaChevronRight />
+                </button>
+            </div>
             {/* Calendar grid */}
             <div
                 className="overflow-x-auto px-2 pb-6"
@@ -189,10 +197,7 @@ const WeekView = ({ events = [], todos = [], categories = {}, onTaskDrop, onEven
                     ))}
                 </div>
             </div>
-            {/* To-Do List Panel */}
-            <div className="w-72 mx-4">
-                <TodoPanel todos={todos} onTaskDrop={onTaskDrop} />
-            </div>
+            {/* Removed To-Do List Panel per request */}
         </div>
     );
 };
