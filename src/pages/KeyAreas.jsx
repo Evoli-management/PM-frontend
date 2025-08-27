@@ -675,6 +675,9 @@ export default function KeyAreas() {
             const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
             const sorted = kas.sort((a, b) => a.position - b.position);
             setKeyAreas(sorted);
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(sorted));
+            } catch (e) {}
             // emit key areas so sidebar can populate its dropdown
             try {
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
@@ -814,6 +817,9 @@ export default function KeyAreas() {
             // emit updated list
             try {
                 const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
+                try {
+                    localStorage.setItem("pm:keyareas", JSON.stringify(updatedList));
+                } catch (e) {}
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: updatedList } }));
             } catch (e) {}
         } else {
@@ -832,6 +838,9 @@ export default function KeyAreas() {
                     ...(keyAreas || []).filter((k) => k.position !== pos),
                     { ...created, position: pos },
                 ].sort((a, b) => a.position - b.position);
+                try {
+                    localStorage.setItem("pm:keyareas", JSON.stringify(after));
+                } catch (e) {}
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: after } }));
             } catch (e) {}
         }
@@ -846,6 +855,9 @@ export default function KeyAreas() {
         const next = (keyAreas || []).filter((k) => k.id !== ka.id);
         setKeyAreas(next);
         try {
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(next));
+            } catch (e) {}
             window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
         } catch (e) {}
         if (selectedKA?.id === ka.id) {
