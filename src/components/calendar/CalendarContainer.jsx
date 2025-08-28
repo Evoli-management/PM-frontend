@@ -175,19 +175,19 @@ const CalendarContainer = () => {
     return (
         <div className="w-full">
             {/* Unified calendar card */}
-            <div className="bg-white border border-blue-200 rounded-xl shadow-sm p-4">
-                <div className="flex gap-2 mb-4 flex-wrap items-center">
+            <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
+                <div className="flex gap-2 mb-2 flex-wrap items-center">
                     {/* View dropdown */}
                     <div className="relative" ref={viewMenuRef}>
                         <button
-                            className="px-3 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                            style={{ minWidth: 44, minHeight: 36 }}
+                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                            style={{ minWidth: 36, minHeight: 28 }}
                             onClick={() => setShowViewMenu((s) => !s)}
                             aria-haspopup="menu"
                             aria-expanded={showViewMenu}
                         >
                             <span>View</span>
-                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                                 {view.charAt(0).toUpperCase() + view.slice(1)}
                             </span>
                             <FaChevronDown
@@ -197,7 +197,7 @@ const CalendarContainer = () => {
                         {showViewMenu && (
                             <div
                                 role="menu"
-                                className="absolute z-10 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                             >
                                 {VIEWS.map((v) => {
                                     const label = v.charAt(0).toUpperCase() + v.slice(1);
@@ -221,11 +221,11 @@ const CalendarContainer = () => {
                         )}
                     </div>
 
-                    {/* Filter and Add Event: hide on mobile, show on desktop */}
+                    {/* Filter (Add Event removed per request) */}
                     <div className="hidden md:flex items-center gap-2 flex-1">
                         <select
-                            className="ml-2 px-3 py-2 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                            style={{ minHeight: 36 }}
+                            className="ml-2 px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
+                            style={{ minHeight: 28 }}
                             value={filterType}
                             onChange={(e) => setFilterType(e.target.value)}
                             aria-label="Filter event types"
@@ -236,23 +236,16 @@ const CalendarContainer = () => {
                             <option value="meeting">Meetings</option>
                             <option value="custom">Custom</option>
                         </select>
-                        <button
-                            className="ml-auto bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-700"
-                            style={{ minWidth: 44, minHeight: 36 }}
-                            onClick={() => openModal()}
-                            aria-label="Add new event"
-                        >
-                            + Add Event
-                        </button>
+                        {/* Add Event button removed */}
                     </div>
                 </div>
                 {/* Each view renders its own navigation header */}
                 {/* Elephant Task Input */}
                 <div
-                    className="w-full flex items-center gap-3 mb-4 bg-gradient-to-r from-sky-100 to-blue-50 border border-sky-200 px-4 py-3 rounded-lg"
-                    style={{ minHeight: 56 }}
+                    className="w-full flex items-center gap-2 mb-2 bg-gradient-to-r from-sky-100 to-blue-50 border border-sky-200 px-2 py-1 rounded"
+                    style={{ minHeight: 36 }}
                 >
-                    <span className="text-3xl mr-2" title="Your most important task of the day.">
+                    <span className="text-2xl mr-2" title="Your most important task of the day.">
                         🐘
                     </span>
                     <input
@@ -260,11 +253,11 @@ const CalendarContainer = () => {
                         value={elephantInput}
                         onChange={(e) => setElephantInput(e.target.value)}
                         placeholder="Enter your elephant task..."
-                        className="flex-1 px-4 py-3 rounded-lg border border-sky-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        className="flex-1 px-2 py-1 rounded border border-sky-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                     />
                     {elephantInput && (
                         <button
-                            className="bg-sky-500 hover:bg-sky-600 text-white px-5 py-3 rounded-lg font-semibold transition-all duration-150 ml-2 shadow"
+                            className="bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 rounded font-semibold text-sm transition-all duration-150 ml-1 shadow"
                             onClick={handleSaveElephant}
                         >
                             {elephantTasks[dateKey] ? "Update" : "Save"}
@@ -272,7 +265,7 @@ const CalendarContainer = () => {
                     )}
                     {elephantTasks[dateKey] && (
                         <button
-                            className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-lg ml-2"
+                            className="bg-red-100 hover:bg-red-200 text-red-600 px-1.5 py-1 rounded ml-1"
                             onClick={handleDeleteElephant}
                             title="Delete Elephant Task"
                         >

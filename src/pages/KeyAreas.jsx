@@ -10,7 +10,7 @@ import {
     FaListUl,
     FaTags,
     FaExclamationCircle,
-    FaArrowLeft,
+    FaChevronLeft,
     FaSearch,
     FaSave,
     FaTimes,
@@ -1221,16 +1221,23 @@ export default function KeyAreas() {
                                         <FaBars />
                                     </button>
                                     <button
-                                        className="text-slate-700 hover:text-slate-900 flex items-center gap-2"
+                                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                        aria-label="Back"
+                                        style={{ minWidth: 36, minHeight: 36 }}
                                         onClick={() => {
                                             setSelectedKA(null);
                                             setAllTasks([]);
                                         }}
                                     >
-                                        <FaArrowLeft /> Back
+                                        <FaChevronLeft />
                                     </button>
 
-                                    {/* Title intentionally omitted here; shown below in the dedicated title block */}
+                                    {/* Show selected KA title inline next to Back */}
+                                    {selectedKA && (
+                                        <span className="text-base md:text-lg font-bold text-slate-900 truncate">
+                                            {selectedKA.title}
+                                        </span>
+                                    )}
 
                                     <div className="ml-auto flex items-center gap-2">
                                         <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
@@ -1310,25 +1317,7 @@ export default function KeyAreas() {
                                 </div>
                             )}
                         </div>
-                        {/* Selected Key Area title/description (shown when a KA is open) */}
-                        {selectedKA && (
-                            <div className="mb-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <h2 className="text-xl font-bold text-slate-900">{selectedKA.title}</h2>
-                                            {selectedKA.is_default && (
-                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                                    <FaLock /> Locked
-                                                </span>
-                                            )}
-                                        </div>
-                                        {/* description removed per request */}
-                                    </div>
-                                    {/* Controls removed: search, quadrant filter, and view buttons */}
-                                </div>
-                            </div>
-                        )}
+                        {/* Title block removed; title now shown inline with Back */}
                         {selectedKA && (
                             <div className="mb-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
