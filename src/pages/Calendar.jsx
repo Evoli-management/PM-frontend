@@ -25,7 +25,7 @@ export default function Calendar() {
                 )}
                 <main className={`flex-1 min-w-0 w-full transition-all md:ml-[3mm]`}>
                     <div className="max-w-full overflow-x-hidden">
-                        <div className="flex items-center justify-between gap-3 mb-4 p-4 md:p-8 pb-0 md:pb-0">
+                        <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
                             <div className="flex items-center gap-3">
                                 <button
                                     className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"

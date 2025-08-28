@@ -103,7 +103,11 @@ export default function MonthView({ currentDate, onShiftDate, events, categories
                         Show all hours
                     </label>
                 </div>
-                <div ref={gridRef} className="relative overflow-x-auto px-2 pb-6" style={{ maxWidth: "100vw" }}>
+                <div
+                    ref={gridRef}
+                    className="relative overflow-x-auto px-2 pb-6"
+                    style={{ maxWidth: "100vw", maxHeight: "60vh", overflowY: "auto" }}
+                >
                     <table
                         className="min-w-full border border-sky-100 rounded-lg"
                         style={{
