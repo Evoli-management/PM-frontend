@@ -68,6 +68,17 @@ export default function Sidebar({
 
     const navigate = useNavigate();
 
+    // Prime from cached key areas so dropdown isn't empty before events arrive
+    React.useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:keyareas");
+            const cached = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(cached) && cached.length) {
+                setKeyAreasList(cached);
+            }
+        } catch (e) {}
+    }, []);
+
     const handleKeyAreasClick = (e, item) => {
         e.preventDefault();
         // navigate to Key Areas main view and toggle submenu
