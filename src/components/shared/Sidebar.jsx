@@ -79,6 +79,8 @@ export default function Sidebar({
         } catch (e) {}
     }, []);
 
+    // No backend dependency here; cache + page event provide the data
+
     const handleKeyAreasClick = (e, item) => {
         e.preventDefault();
         // navigate to Key Areas main view and toggle submenu
