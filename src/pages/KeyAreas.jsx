@@ -6,19 +6,15 @@ import {
     FaPlus,
     FaLock,
     FaEdit,
-    FaTrash,
-    FaListUl,
-    FaTags,
-    FaExclamationCircle,
+    FaBars,
     FaChevronLeft,
     FaSearch,
-    FaSave,
-    FaTimes,
-    FaBars,
-    FaChevronRight,
-    FaKey,
-    FaUser,
     FaEllipsisV,
+    FaTimes,
+    FaSave,
+    FaTrash,
+    FaListUl,
+    FaExclamationCircle,
 } from "react-icons/fa";
 
 /* ------------------------------ Helpers/UI ------------------------------ */
@@ -40,230 +36,177 @@ function StatusIndicator({ status }) {
     return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} title={`Status: ${status}`} />;
 }
 
-function PriorityBadge({ priority }) {
+const ImportanceBadge = ({ importance = "med" }) => {
     const map = {
         low: "bg-slate-100 text-slate-700",
-        med: "bg-orange-100 text-orange-700",
-        high: "bg-red-100 text-red-700",
+        med: "bg-indigo-100 text-indigo-700",
+        high: "bg-purple-100 text-purple-700",
     };
-    const label = (priority || "med").slice(0, 1).toUpperCase();
     return (
         <span
-            className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${map[priority] || map.med}`}
-            title={`Priority: ${priority}`}
+            className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[importance] || "bg-slate-100 text-slate-700"}`}
         >
-            {label}
+            {importance}
         </span>
     );
-}
+};
 
-function ImportanceBadge({ importance }) {
-    const color = importance === "high" ? "text-red-600" : importance === "low" ? "text-slate-500" : "text-amber-600";
-    return <FaExclamationCircle className={`w-3.5 h-3.5 ${color}`} title={`Importance: ${importance}`} />;
-}
-
-function CategoryBadge({ category }) {
-    if ((category || "").toLowerCase() === "key areas") {
-        return <FaKey className="w-3.5 h-3.5 text-blue-600" title="Category: Key Areas" />;
-    }
-    return <FaExclamationCircle className="w-3.5 h-3.5 text-orange-600" title={`Category: ${category || "—"}`} />;
-}
-
-function QuadrantBadge({ q }) {
-    if (!q) return null;
+const QuadrantBadge = ({ q }) => {
+    const label = q ? `Q${q}` : "—";
     const map = {
         1: "bg-red-100 text-red-700",
         2: "bg-green-100 text-green-700",
-        3: "bg-amber-100 text-amber-700",
+        3: "bg-yellow-100 text-yellow-700",
         4: "bg-slate-100 text-slate-700",
     };
-    const cls = map[Number(q)] || map[4];
     return (
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`} title={`Quadrant Q${q}`}>
-            Q{q}
+        <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[q] || "bg-slate-100 text-slate-700"}`}>
+            {label}
         </span>
     );
-}
-
-/* ------------------------------ Empty State ------------------------------ */
-function EmptyState({ title = "Nothing here yet", hint = "" }) {
-    return (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-            <div className="text-sm font-semibold text-slate-700">{title}</div>
-            {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
-        </div>
-    );
-}
-
-/* ------------------------------- Mocked API ------------------------------ */
-const api = {
-    listKeyAreas: async () => [
-        { id: 1, title: "Marketing", description: "Campaigns & content", position: 1, is_default: false },
-        { id: 2, title: "Support", description: "Tickets & FAQs", position: 2, is_default: false },
-        { id: 10, title: "Ideas", description: "Scratchpad for thoughts", position: 10, is_default: true },
-    ],
-    createKeyArea: async (payload) => ({ ...payload, id: Math.random() }),
-    updateKeyArea: async (id, payload) => ({ id, ...payload }),
-    deleteKeyArea: async (id) => id,
-    listGoals: async () => [
-        { id: "g1", title: "Grow Sales Q1", parent_goal_id: null },
-        { id: "g2", title: "Improve Customer Support", parent_goal_id: null },
-    ],
-    listTasks: async (keyAreaId) => {
-        const id = String(keyAreaId);
-        if (id === "1") {
-            return [
-                {
-                    id: 101,
-                    key_area_id: 1,
-                    title: "Welcome task",
-                    description: "Kickoff activity",
-                    status: "open",
-                    priority: "med",
-                    importance: "med",
-                    category: "Key Areas",
-                    list_index: 1,
-                    goal_id: null,
-                    deadline: null,
-                    end_date: null,
-                    eisenhower_quadrant: 2,
-                    tags: "onboarding",
-                    attachments: "",
-                    assignee: "user1",
-                },
-            ];
-        }
-        if (id === "2") {
-            return [
-                {
-                    id: 201,
-                    key_area_id: 2,
-                    title: "Triage backlog",
-                    description: "Sort incoming tickets",
-                    status: "open",
-                    priority: "med",
-                    importance: "med",
-                    category: "Key Areas",
-                    list_index: 1,
-                    goal_id: null,
-                    deadline: null,
-                    end_date: null,
-                    eisenhower_quadrant: 3,
-                    tags: "support",
-                    attachments: "",
-                    assignee: "support1",
-                },
-            ];
-        }
-        return [];
-    },
-    createTask: async (payload) => ({ ...payload, id: Math.floor(Math.random() * 100000) }),
-    updateTask: async (id, payload) => ({ id, ...payload }),
-    deleteTask: async (id) => id,
 };
 
-/* -------------------------- Quadrant Calculation ------------------------- */
-function computeEisenhowerQuadrant({ deadline, end_date, importance }) {
-    const imp = (importance || "med").toLowerCase();
-    const urgent = (() => {
-        const ts = deadline || end_date;
-        if (!ts) return false;
-        const due = new Date(ts).getTime();
-        const now = Date.now();
-        const diffHours = (due - now) / (1000 * 60 * 60);
-        return diffHours <= 48; // due within 48h → urgent
+const EmptyState = ({ title = "Nothing here", hint = "" }) => (
+    <div className="text-sm text-slate-600 py-8 text-center">
+        <div className="font-semibold text-slate-800">{title}</div>
+        {hint ? <div className="text-slate-500 mt-1">{hint}</div> : null}
+    </div>
+);
+
+// very small heuristic for quadrant based on importance and time
+const computeEisenhowerQuadrant = ({ deadline, end_date, importance = "med" }) => {
+    const important = importance === "high" || importance === "med";
+    const dueSoon = (() => {
+        const ref = deadline || end_date;
+        if (!ref) return false;
+        const diff = new Date(ref).getTime() - Date.now();
+        return diff <= 1000 * 60 * 60 * 24 * 2; // within 2 days
     })();
-    if (imp === "high" && urgent) return 1;
-    if (imp === "high" && !urgent) return 2;
-    if (imp !== "high" && urgent) return 3;
+    if (important && dueSoon) return 1;
+    if (important && !dueSoon) return 2;
+    if (!important && dueSoon) return 3;
     return 4;
-}
+};
 
-/* ---------------------------- Inline Views ---------------------------- */
-function KanbanView({ tasks, onSelect }) {
-    const columns = [
-        { key: "open", title: "To Do" },
-        { key: "in_progress", title: "In Progress" },
-        { key: "done", title: "Done" },
-        { key: "cancelled", title: "Cancelled" },
-    ];
-    return (
-        <div className="grid gap-4 md:grid-cols-4">
-            {columns.map((col) => {
-                const items = tasks.filter((t) => (t.status || "open") === col.key);
-                return (
-                    <div key={col.key} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                        <div className="font-semibold text-slate-900 mb-2">{col.title}</div>
-                        {items.length === 0 ? (
-                            <div className="text-sm text-slate-600">No cards</div>
-                        ) : (
-                            items.map((t) => (
-                                <div
-                                    key={t.id}
-                                    className="bg-white border border-slate-200 rounded-lg p-2 mb-2 shadow-sm cursor-pointer hover:shadow"
-                                    onClick={() => onSelect(t)}
-                                >
-                                    <div className="text-sm font-semibold text-slate-900">{t.title}</div>
-                                    <div className="text-xs text-slate-600">
-                                        {(t.tags || "").split(",").filter(Boolean).slice(0, 3).join(", ")}
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-1">
-                                        <Chip>P:{t.priority}</Chip>
-                                        {t.goal_id ? <Chip>Goal #{t.goal_id}</Chip> : <Chip>Trap</Chip>}
-                                        {t.eisenhower_quadrant && <Chip>Q{t.eisenhower_quadrant}</Chip>}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
+// Minimal localStorage-backed API for this page
+const api = {
+    async listKeyAreas() {
+        try {
+            const raw = localStorage.getItem("pm:keyareas");
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    },
+    async listGoals() {
+        // Keep empty for now; integrate real service later
+        return [];
+    },
+    async updateKeyArea(id, data) {
+        const raw = (await this.listKeyAreas()) || [];
+        const next = raw.map((k) => (String(k.id) === String(id) ? { ...k, ...data } : k));
+        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        return next.find((k) => String(k.id) === String(id)) || data;
+    },
+    async createKeyArea(data) {
+        const raw = (await this.listKeyAreas()) || [];
+        const item = { id: data.id || Date.now(), ...data };
+        const next = [...raw, item];
+        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        return item;
+    },
+    async deleteKeyArea(id) {
+        const raw = (await this.listKeyAreas()) || [];
+        const next = raw.filter((k) => String(k.id) !== String(id));
+        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        return true;
+    },
+    async listTasks(keyAreaId) {
+        try {
+            const raw = localStorage.getItem(`pm:tasks:${keyAreaId}`);
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    },
+    async createTask(task) {
+        const id = task.id || Date.now();
+        const ka = task.key_area_id;
+        const raw = await this.listTasks(ka);
+        const item = { ...task, id };
+        localStorage.setItem(`pm:tasks:${ka}`, JSON.stringify([...raw, item]));
+        return item;
+    },
+    async updateTask(id, task) {
+        const ka = task.key_area_id || task.keyAreaId || task.key_area;
+        const raw = await this.listTasks(ka);
+        const next = raw.map((t) => (String(t.id) === String(id) ? { ...t, ...task } : t));
+        localStorage.setItem(`pm:tasks:${ka}`, JSON.stringify(next));
+        return next.find((t) => String(t.id) === String(id)) || task;
+    },
+    async deleteTask(id) {
+        // find KA bucket containing this task
+        const allKeys = Object.keys(localStorage).filter((k) => k.startsWith("pm:tasks:"));
+        for (const key of allKeys) {
+            const arr = JSON.parse(localStorage.getItem(key) || "[]");
+            const next = arr.filter((t) => String(t.id) !== String(id));
+            if (next.length !== arr.length) localStorage.setItem(key, JSON.stringify(next));
+        }
+        return true;
+    },
+};
 
-function CalendarView({ tasks, onSelect }) {
-    const groups = tasks.reduce((acc, t) => {
-        const d = t.deadline || t.end_date ? new Date(t.deadline || t.end_date).toISOString().slice(0, 10) : "No Date";
-        acc[d] = acc[d] || [];
-        acc[d].push(t);
-        return acc;
-    }, {});
-    const keys = Object.keys(groups).sort();
-
-    return (
-        <div className="space-y-3">
-            {keys.map((k) => (
-                <div key={k} className="bg-white border border-slate-200 rounded-xl">
-                    <div className="px-3 py-2 border-b bg-slate-50 text-slate-900 font-semibold">{k}</div>
-                    <div className="p-3 space-y-2">
-                        {groups[k].map((t) => (
-                            <div
-                                key={t.id}
-                                className="flex items-start gap-2 cursor-pointer py-1"
-                                onClick={() => onSelect && onSelect(t)}
-                            >
-                                <FaTags className="mt-1 text-slate-700" />
-                                <div>
-                                    <div className="font-semibold text-slate-900">{t.title}</div>
-                                    <div className="text-xs text-slate-600">
-                                        {t.description || "—"} • {t.goal_id ? `Goal #${t.goal_id}` : "Activity Trap"}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+// Minimal placeholders to keep non-list views functional
+const KanbanView = ({ tasks = [], onSelect }) => (
+    <div className="p-4 border border-dashed rounded-lg text-sm text-slate-600">
+        Kanban view (placeholder). {tasks.length} tasks. Clicks will open details.
+        <div className="mt-2 flex flex-wrap gap-2">
+            {tasks.map((t) => (
+                <button
+                    key={t.id}
+                    onClick={() => onSelect && onSelect(t)}
+                    className="px-2 py-1 bg-white border rounded shadow-sm"
+                >
+                    {t.title}
+                </button>
             ))}
-            {keys.length === 0 && (
-                <EmptyState title="No scheduled items" hint="Add deadlines or planned ends to see them here." />
-            )}
         </div>
-    );
-}
+    </div>
+);
+
+const CalendarView = ({ tasks = [], onSelect }) => (
+    <div className="p-4 border border-dashed rounded-lg text-sm text-slate-600">
+        Calendar view (placeholder). {tasks.length} tasks.
+        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {tasks.map((t) => (
+                <button
+                    key={t.id}
+                    onClick={() => onSelect && onSelect(t)}
+                    className="px-2 py-1 bg-white border rounded shadow-sm text-left"
+                >
+                    <div className="font-semibold truncate">{t.title}</div>
+                    <div className="text-xs text-slate-500">
+                        {t.deadline ? new Date(t.deadline).toLocaleString() : "—"}
+                    </div>
+                </button>
+            ))}
+        </div>
+    </div>
+);
 
 /* --------------------------- Slide Over (Edit) --------------------------- */
-function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = false }) {
+function TaskSlideOver({
+    task,
+    goals,
+    onClose,
+    onSave,
+    onDelete,
+    readOnly = false,
+    activitiesByTask = {},
+    onAddActivity,
+    onDeleteActivity,
+    onClearActivities,
+}) {
     const [form, setForm] = useState(null);
     const [activeTab, setActiveTab] = useState("details"); // details | activities
     const [taskActivities, setTaskActivities] = useState([]);
@@ -277,6 +220,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
             setTaskActivities([]);
             return;
         }
+
         setActiveTab("details");
         setForm({
             ...task,
@@ -363,10 +307,32 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
             <div className="relative w-full max-w-3xl">
                 <div className="bg-slate-50 rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                        <h3 className="text-lg font-bold text-slate-900">Edit Task</h3>
-                        <div className="flex items-center gap-2">
-                            <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
-                                <FaTimes />
+                        <h3 className="text-lg font-bold text-slate-900">Task</h3>
+                        <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
+                            <FaTimes />
+                        </button>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="px-4 pt-3">
+                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
+                                    activeTab === "details" ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
+                                }`}
+                                onClick={() => setActiveTab("details")}
+                            >
+                                Details
+                            </button>
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
+                                    activeTab === "activities" ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
+                                }`}
+                                onClick={() => setActiveTab("activities")}
+                            >
+                                Activities
                             </button>
                         </div>
                     </div>
@@ -682,6 +648,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
                                     <button
                                         type="button"
                                         onClick={addActivity}
+
                                         className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
                                     >
                                         Add
@@ -741,6 +708,7 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
                             </div>
                         </div>
                     )}
+
                 </div>
             </div>
         </div>
@@ -1487,7 +1455,7 @@ export default function KeyAreas() {
                                                                 setView(opt.key);
                                                                 setShowViewMenu(false);
                                                             }}
-                                                            className={`w-full text-left px-3 py-2 text-sm rounded-lg ${
+                                                            className={`block w-full text-left px-3 py-2 text-sm ${
                                                                 view === opt.key
                                                                     ? "bg-blue-100 text-blue-700 font-semibold"
                                                                     : "text-slate-800 hover:bg-slate-50"
@@ -1507,7 +1475,6 @@ export default function KeyAreas() {
                         {selectedKA && (
                             <div className="mb-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* LEFT COLUMN: Task Lists + Your activities stacked */}
                                     <div className="space-y-4 md:col-span-2">
                                         {/* Task Lists card with list buttons + Add Task inside */}
                                         <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -1530,6 +1497,7 @@ export default function KeyAreas() {
                                                                             taskTab === n
                                                                                 ? "bg-white text-slate-900 border-slate-300 shadow"
                                                                                 : "bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
+
                                                                         }`}
                                                                     >
                                                                         <span>{getListName(selectedKA?.id, n)}</span>
@@ -1561,6 +1529,7 @@ export default function KeyAreas() {
                                                                             }`}
                                                                             role="button"
                                                                         >
+
                                                                             <FaEllipsisV className="w-3.5 h-3.5" />
                                                                         </span>
                                                                     </button>
@@ -1578,6 +1547,7 @@ export default function KeyAreas() {
                                                                                 style={{
                                                                                     top: `${listMenuPos.top}px`,
                                                                                     left: `${listMenuPos.left}px`,
+
                                                                                 }}
                                                                             >
                                                                                 <button
@@ -1655,11 +1625,13 @@ export default function KeyAreas() {
                                                         )}
                                                     </div>
                                                 </div>
+
                                                 {/* Add Task moved into the three-dots menu per list */}
                                             </div>
 
                                             {/* Render the tasks list directly below the tabs row when in List view */}
                                             {view === "list" && (
+
                                                 <div className="pt-2 border-t border-slate-100">
                                                     {visibleTasks.length === 0 ? (
                                                         <EmptyState
@@ -1669,6 +1641,7 @@ export default function KeyAreas() {
                                                     ) : (
                                                         <div className="overflow-x-auto">
                                                             <table className="min-w-full text-sm">
+
                                                                 <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                     <tr>
                                                                         <th className="px-3 py-2 text-left font-semibold">
@@ -1702,10 +1675,12 @@ export default function KeyAreas() {
                                                                             Deadline
                                                                         </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
+
                                                                             Planned End
                                                                         </th>
                                                                     </tr>
                                                                 </thead>
+
                                                                 <tbody className="bg-white">
                                                                     {visibleTasks.map((t) => {
                                                                         const filesCount = (t.attachments || "")
@@ -1810,7 +1785,9 @@ export default function KeyAreas() {
                                             )}
                                         </div>
 
+
                                         {/* Your activities card removed per request (now only inside the task slide-over > Activities tab) */}
+
                                     </div>
 
                                     {/* Summary card removed per request */}
