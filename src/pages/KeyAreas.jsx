@@ -18,6 +18,7 @@ import {
     FaChevronRight,
     FaKey,
     FaUser,
+    FaEllipsisV,
 } from "react-icons/fa";
 
 /* ------------------------------ Helpers/UI ------------------------------ */
@@ -27,7 +28,6 @@ const Chip = ({ children }) => (
     </span>
 );
 
-/* Small UI helpers used in the new KA layout */
 function Card({ title, titleIcon, children }) {
     return (
         <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -70,60 +70,6 @@ function GhostInput({ prefix, placeholder, value, onChange }) {
     );
 }
 
-// StoragePicker removed per user request
-
-function RecurrenceInput({ value, onChange }) {
-    const parsed = value ? JSON.parse(value) : { freq: "", interval: 1, byweekday: null };
-    return (
-        <div className="grid grid-cols-3 gap-2">
-            <select
-                value={parsed.freq || ""}
-                onChange={(e) => onChange(JSON.stringify({ ...parsed, freq: e.target.value }))}
-                className="rounded-md p-2 bg-slate-50 border border-slate-200"
-            >
-                <option value="">No repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-            </select>
-            <input
-                type="number"
-                min={1}
-                value={parsed.interval || 1}
-                onChange={(e) => onChange(JSON.stringify({ ...parsed, interval: Number(e.target.value) }))}
-                className="rounded-md p-2 bg-slate-50 border border-slate-200"
-            />
-            {parsed.freq === "weekly" ? (
-                <select
-                    value={parsed.byweekday || ""}
-                    onChange={(e) => onChange(JSON.stringify({ ...parsed, byweekday: e.target.value || null }))}
-                    className="rounded-md p-2 bg-slate-50 border border-slate-200"
-                >
-                    <option value="">Any day</option>
-                    <option value="mon">Mon</option>
-                    <option value="tue">Tue</option>
-                    <option value="wed">Wed</option>
-                    <option value="thu">Thu</option>
-                    <option value="fri">Fri</option>
-                    <option value="sat">Sat</option>
-                    <option value="sun">Sun</option>
-                </select>
-            ) : (
-                <div />
-            )}
-        </div>
-    );
-}
-
-function EmptyState({ title = "No items yet", hint }) {
-    return (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-            <div className="text-slate-900 font-semibold">{title}</div>
-            {hint && <div className="text-sm text-slate-600 mt-1">{hint}</div>}
-        </div>
-    );
-}
-
 /* ------------------------------ Tiny Badges ------------------------------ */
 function StatusIndicator({ status }) {
     const color =
@@ -133,7 +79,7 @@ function StatusIndicator({ status }) {
               ? "bg-amber-500"
               : status === "cancelled"
                 ? "bg-red-500"
-                : "bg-slate-400"; // open/default
+                : "bg-slate-400";
     return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} title={`Status: ${status}`} />;
 }
 
@@ -179,6 +125,16 @@ function QuadrantBadge({ q }) {
         <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`} title={`Quadrant Q${q}`}>
             Q{q}
         </span>
+    );
+}
+
+/* ------------------------------ Empty State ------------------------------ */
+function EmptyState({ title = "Nothing here yet", hint = "" }) {
+    return (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+            <div className="text-sm font-semibold text-slate-700">{title}</div>
+            {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
+        </div>
     );
 }
 
@@ -680,7 +636,10 @@ export default function KeyAreas() {
     const [listNames, setListNames] = useState({}); // per-key-area custom names for lists/tabs
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
+    const [openListMenu, setOpenListMenu] = useState(null); // list number for context menu
+    const [listMenuPos, setListMenuPos] = useState({ top: 0, left: 0 }); // popup menu position
     const composerModalRef = useRef(null);
+    const tabsRef = useRef(null);
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -796,10 +755,46 @@ export default function KeyAreas() {
         };
     }, [showViewMenu]);
 
+    // close list ellipsis menu on outside click or Escape (based on the tabs container)
+    useEffect(() => {
+        if (openListMenu == null) return;
+        const handleClick = (e) => {
+            if (!tabsRef.current) return;
+            if (!tabsRef.current.contains(e.target)) setOpenListMenu(null);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setOpenListMenu(null);
+        };
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, [openListMenu]);
+
     // also close when switching KA or view
     useEffect(() => {
         setShowViewMenu(false);
     }, [selectedKA, view]);
+
+    // Close list menu on outside click or Escape
+    useEffect(() => {
+        if (openListMenu == null) return;
+        const handleClick = (e) => {
+            if (!tabsRef.current) return;
+            if (!tabsRef.current.contains(e.target)) setOpenListMenu(null);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setOpenListMenu(null);
+        };
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, [openListMenu]);
 
     // Close Add Task modal on Escape
     useEffect(() => {
@@ -1057,6 +1052,31 @@ export default function KeyAreas() {
             copy[selectedKA.id] = { ...(copy[selectedKA.id] || {}), [n]: val };
             return copy;
         });
+    };
+
+    const deleteList = (n) => {
+        if (!selectedKA) return;
+        const kaId = selectedKA.id;
+        // do not allow deleting a list that has tasks
+        const hasTasks = (allTasks || []).some(
+            (t) => (t.list_index || 1) === n && String(t.key_area_id) === String(kaId),
+        );
+        if (hasTasks) {
+            alert("Cannot delete list while it contains tasks. Move or remove tasks first.");
+            return;
+        }
+        const names = listNames[kaId] || {};
+        if (!names || !names[n]) {
+            if (!confirm(`Remove list ${n}? This will reset any custom name.`)) return;
+        }
+        setListNames((prev) => {
+            const copy = { ...(prev || {}) };
+            if (!copy[kaId]) return copy;
+            const { [n]: _rem, ...rest } = copy[kaId];
+            copy[kaId] = { ...rest };
+            return copy;
+        });
+        if (taskTab === n) setTaskTab(1);
     };
 
     const visibleTasks = useMemo(() => {
@@ -1320,101 +1340,118 @@ export default function KeyAreas() {
                         {/* Title block removed; title now shown inline with Back */}
                         {selectedKA && (
                             <div className="mb-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* LEFT COLUMN: Task Lists + Your activities stacked */}
                                     <div className="space-y-4 md:col-span-2">
                                         {/* Task Lists card with list buttons + Add Task inside */}
                                         <div className="bg-white rounded-xl border border-slate-200 p-4">
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="text-sm font-semibold">Task Lists</div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaskForm((s) => ({ ...s, list_index: taskTab }));
+                                                        setShowTaskComposer(true);
+                                                    }}
+                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                >
+                                                    <svg
+                                                        stroke="currentColor"
+                                                        fill="currentColor"
+                                                        strokeWidth="0"
+                                                        viewBox="0 0 448 512"
+                                                        height="1em"
+                                                        width="1em"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                    </svg>
+                                                    Add Task
+                                                </button>
                                             </div>
 
                                             <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                                <div className="flex items-center gap-1 overflow-x-auto">
+                                                <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto">
                                                     {Array.from({ length: leftListCount }).map((_, i) => {
                                                         const n = i + 1;
                                                         return (
-                                                            <div key={n} className="flex items-center gap-1">
+                                                            <div key={n} className="relative">
                                                                 <button
                                                                     onClick={() => setTaskTab(n)}
-                                                                    className={`px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
                                                                         taskTab === n
                                                                             ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                                            : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                                                                            : "bg-slate-100 text-slate-900 border-slate-300 hover:bg-slate-200"
                                                                     }`}
                                                                 >
-                                                                    {getListName(selectedKA?.id, n)}
-                                                                </button>
-
-                                                                <button
-                                                                    onClick={() => renameList(n)}
-                                                                    title={`Rename ${getListName(selectedKA?.id, n)}`}
-                                                                    className="text-xs p-1 rounded hover:bg-slate-100"
-                                                                >
-                                                                    <svg
-                                                                        stroke="currentColor"
-                                                                        fill="currentColor"
-                                                                        strokeWidth="0"
-                                                                        viewBox="0 0 576 512"
-                                                                        height="1em"
-                                                                        width="1em"
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                    >
-                                                                        <path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path>
-                                                                    </svg>
-                                                                </button>
-
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (!selectedKA) return;
-                                                                        const kaId = selectedKA.id;
-                                                                        // do not allow deleting a list that has tasks
-                                                                        const hasTasks = (allTasks || []).some(
-                                                                            (t) =>
-                                                                                (t.list_index || 1) === n &&
-                                                                                String(t.key_area_id) === String(kaId),
-                                                                        );
-                                                                        if (hasTasks) {
-                                                                            alert(
-                                                                                "Cannot delete list while it contains tasks. Move or remove tasks first.",
+                                                                    <span>{getListName(selectedKA?.id, n)}</span>
+                                                                    <span
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const rect =
+                                                                                e.currentTarget.getBoundingClientRect();
+                                                                            setListMenuPos({
+                                                                                top: rect.bottom + window.scrollY + 6,
+                                                                                left: rect.left + window.scrollX,
+                                                                            });
+                                                                            setOpenListMenu((cur) =>
+                                                                                cur === n ? null : n,
                                                                             );
-                                                                            return;
+                                                                        }}
+                                                                        aria-haspopup="menu"
+                                                                        aria-expanded={
+                                                                            openListMenu === n ? "true" : "false"
                                                                         }
-                                                                        const names = listNames[kaId] || {};
-                                                                        if (!names || !names[n]) {
-                                                                            // nothing custom to delete
-                                                                            if (
-                                                                                !confirm(
-                                                                                    `Remove list ${n}? This will reset any custom name.`,
-                                                                                )
-                                                                            )
-                                                                                return;
-                                                                        }
-                                                                        setListNames((prev) => {
-                                                                            const copy = { ...(prev || {}) };
-                                                                            if (!copy[kaId]) return copy;
-                                                                            const { [n]: _rem, ...rest } = copy[kaId];
-                                                                            copy[kaId] = { ...rest };
-                                                                            return copy;
-                                                                        });
-                                                                        // if current tab was deleted, go back to 1
-                                                                        if (taskTab === n) setTaskTab(1);
-                                                                    }}
-                                                                    title={`Delete list ${n}`}
-                                                                    className="text-xs p-1 rounded hover:bg-red-50 text-red-600"
-                                                                >
-                                                                    <svg
-                                                                        stroke="currentColor"
-                                                                        fill="currentColor"
-                                                                        strokeWidth="0"
-                                                                        viewBox="0 0 448 512"
-                                                                        height="1em"
-                                                                        width="1em"
-                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                        title={`Options for ${getListName(selectedKA?.id, n)}`}
+                                                                        className={`ml-1 p-1 rounded cursor-pointer ${
+                                                                            taskTab === n
+                                                                                ? "text-white/90 hover:bg-blue-700"
+                                                                                : "text-slate-700 hover:bg-slate-300"
+                                                                        }`}
+                                                                        role="button"
                                                                     >
-                                                                        <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96h384c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 295.8 0 283.2 0H164.8c-12.6 0-24.2 6.8-29.6 17.7zM53.2 467c6 26.3 29.8 45 56.8 45h175.9c27 0 50.8-18.7 56.8-45L360 128H88L53.2 467z"></path>
-                                                                    </svg>
+                                                                        <FaEllipsisV className="w-3.5 h-3.5" />
+                                                                    </span>
                                                                 </button>
+
+                                                                {openListMenu === n && (
+                                                                    <>
+                                                                        {/* Backdrop to behave like popup */}
+                                                                        <div
+                                                                            className="fixed inset-0 z-40"
+                                                                            onClick={() => setOpenListMenu(null)}
+                                                                        />
+                                                                        <div
+                                                                            role="menu"
+                                                                            className="fixed z-50 w-32 bg-white border border-slate-200 rounded-lg shadow"
+                                                                            style={{
+                                                                                top: `${listMenuPos.top}px`,
+                                                                                left: `${listMenuPos.left}px`,
+                                                                            }}
+                                                                        >
+                                                                            <button
+                                                                                role="menuitem"
+                                                                                onClick={() => {
+                                                                                    renameList(n);
+                                                                                    setOpenListMenu(null);
+                                                                                }}
+                                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                            >
+                                                                                Edit
+                                                                            </button>
+                                                                            <button
+                                                                                role="menuitem"
+                                                                                onClick={() => {
+                                                                                    deleteList(n);
+                                                                                    setOpenListMenu(null);
+                                                                                }}
+                                                                                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                            >
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         );
                                                     })}
@@ -1452,31 +1489,39 @@ export default function KeyAreas() {
                                                         </div>
                                                     )}
                                                 </div>
-
-                                                <div className="mt-3 w-full">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setTaskForm((s) => ({ ...s, list_index: taskTab }));
-                                                            setShowTaskComposer(true);
-                                                        }}
-                                                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                    >
-                                                        <svg
-                                                            stroke="currentColor"
-                                                            fill="currentColor"
-                                                            strokeWidth="0"
-                                                            viewBox="0 0 448 512"
-                                                            height="1em"
-                                                            width="1em"
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                        >
-                                                            <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                        </svg>
-                                                        Add Task
-                                                    </button>
-                                                </div>
+                                                {/* Add Task button moved to header */}
                                             </div>
+
+                                            {/* Render the tasks list directly below the tabs row when in List view */}
+                                            {view === "list" && (
+                                                <div className="mt-2 pt-2 border-t border-slate-100">
+                                                    <div className="mb-2 text-sm font-semibold text-slate-900">
+                                                        Tasks
+                                                    </div>
+                                                    {visibleTasks.length === 0 ? (
+                                                        <EmptyState
+                                                            title={`No tasks in List ${taskTab}`}
+                                                            hint="Create your first task from Add Task."
+                                                        />
+                                                    ) : (
+                                                        <ul className="space-y-1">
+                                                            {visibleTasks.map((t) => (
+                                                                <li key={t.id}>
+                                                                    <button
+                                                                        className="w-full text-left px-2 py-1.5 rounded-md text-slate-900 hover:bg-slate-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition"
+                                                                        title={t.title}
+                                                                        onClick={() => setSelectedTask(t)}
+                                                                    >
+                                                                        <span className="block truncate">
+                                                                            {t.title}
+                                                                        </span>
+                                                                    </button>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Your activities card */}
@@ -1609,25 +1654,7 @@ export default function KeyAreas() {
                                         </div>
                                     </div>
 
-                                    {/* RIGHT COLUMN: Summary */}
-                                    <div className="bg-white rounded-xl border border-slate-200 p-4 w-full">
-                                        <div className="text-sm font-semibold">Summary 📊</div>
-                                        <div className="mt-3 text-sm">Total Tasks: {allTasks.length}</div>
-                                        <div className="mt-1 text-sm">
-                                            Completed: {allTasks.filter((t) => t.status === "done").length}
-                                        </div>
-                                        <div className="mt-1 text-sm">
-                                            Pending: {allTasks.filter((t) => t.status !== "done").length}
-                                        </div>
-
-                                        <div className="mt-3 text-sm">
-                                            Total Activities:{" "}
-                                            {Object.values(activitiesByTask).reduce((s, a) => s + (a?.length || 0), 0)}
-                                        </div>
-                                        <div className="mt-1 text-sm">
-                                            Active: {Object.values(activitiesByTask).flat().length}
-                                        </div>
-                                    </div>
+                                    {/* Summary card removed per request */}
                                 </div>
                             </div>
                         )}
@@ -2149,147 +2176,7 @@ export default function KeyAreas() {
                                     </div>
                                 )}
 
-                                {/* Tasks (List / Kanban / Calendar) */}
-                                {view === "list" && (
-                                    <div className="space-y-3">
-                                        {visibleTasks.length === 0 ? (
-                                            <EmptyState
-                                                title={`No tasks in List ${taskTab}`}
-                                                hint="Create your first task above."
-                                            />
-                                        ) : (
-                                            visibleTasks.map((t) => (
-                                                <div
-                                                    key={t.id}
-                                                    className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm hover:shadow transition"
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="mt-1">
-                                                                <FaTags className="text-slate-700" />
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-semibold text-slate-900">
-                                                                    {t.title}
-                                                                </div>
-                                                                {t.description && (
-                                                                    <div className="text-sm text-slate-600">
-                                                                        {t.description}
-                                                                    </div>
-                                                                )}
-                                                                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                                                                    <span
-                                                                        className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700"
-                                                                        title="List tab"
-                                                                    >
-                                                                        Tab {t.list_index || 1}
-                                                                    </span>
-
-                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
-                                                                        <span className="text-[11px]">Status</span>
-                                                                        <StatusIndicator status={t.status || "open"} />
-                                                                    </span>
-
-                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
-                                                                        <span className="text-[11px]">Priority</span>
-                                                                        <PriorityBadge priority={t.priority || "med"} />
-                                                                    </span>
-
-                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
-                                                                        <span className="text-[11px]">Importance</span>
-                                                                        <ImportanceBadge
-                                                                            importance={t.importance || "med"}
-                                                                        />
-                                                                    </span>
-
-                                                                    {/* Category removed per request */}
-
-                                                                    <span
-                                                                        className="inline-flex items-center gap-1 text-slate-600"
-                                                                        title="Assignee"
-                                                                    >
-                                                                        <span className="text-[11px]">Assignee</span>
-                                                                        <FaUser className="w-3.5 h-3.5" />{" "}
-                                                                        {t.assignee || "—"}
-                                                                    </span>
-
-                                                                    {t.goal_id ? (
-                                                                        <span
-                                                                            className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold"
-                                                                            title={`Goal #${t.goal_id}`}
-                                                                        >
-                                                                            G#{t.goal_id}
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span
-                                                                            className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700"
-                                                                            title="Activity Trap"
-                                                                        >
-                                                                            Trap
-                                                                        </span>
-                                                                    )}
-
-                                                                    <span className="inline-flex items-center gap-1 text-slate-600">
-                                                                        <span className="text-[11px]">Quadrant</span>
-                                                                        <QuadrantBadge q={t.eisenhower_quadrant} />
-                                                                    </span>
-
-                                                                    {t.tags && (
-                                                                        <span
-                                                                            className="inline-flex items-center gap-1 text-slate-600"
-                                                                            title={`Tags: ${t.tags}`}
-                                                                        >
-                                                                            <span className="text-[11px]">Tags</span>
-                                                                            <FaTags className="w-3.5 h-3.5" />
-                                                                            {t.tags.split(",").filter(Boolean).length}
-                                                                        </span>
-                                                                    )}
-                                                                    {t.attachments && (
-                                                                        <span
-                                                                            className="inline-flex items-center gap-1 text-slate-600"
-                                                                            title="Attachments"
-                                                                        >
-                                                                            <span className="text-[11px]">
-                                                                                Attachments
-                                                                            </span>
-                                                                            {
-                                                                                t.attachments.split(",").filter(Boolean)
-                                                                                    .length
-                                                                            }{" "}
-                                                                            files
-                                                                        </span>
-                                                                    )}
-                                                                    {t.deadline && (
-                                                                        <span
-                                                                            className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"
-                                                                            title="Deadline"
-                                                                        >
-                                                                            {new Date(t.deadline).toLocaleString()}
-                                                                        </span>
-                                                                    )}
-                                                                    {t.end_date && (
-                                                                        <span
-                                                                            className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"
-                                                                            title="Planned End"
-                                                                        >
-                                                                            {new Date(t.end_date).toLocaleString()}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            className="rounded-lg text-slate-700 hover:text-slate-900 flex items-center gap-1 whitespace-nowrap"
-                                                            onClick={() => setSelectedTask(t)}
-                                                        >
-                                                            Open <FaChevronRight />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                )}
+                                {/* Tasks list rendering moved inside the Task Lists card above */}
 
                                 {view === "kanban" && <KanbanView tasks={visibleTasks} onSelect={setSelectedTask} />}
                                 {view === "calendar" && (
