@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 
 function getWeekNumber(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -34,7 +34,17 @@ function getWeeksInQuarter(months) {
 }
 
 // ...existing code...
-export default function QuarterView({ currentDate, onShiftDate, events, categories, onDayClick }) {
+export default function QuarterView({
+    currentDate,
+    onShiftDate,
+    events,
+    categories,
+    onDayClick,
+    view,
+    onChangeView,
+    filterType,
+    onChangeFilter,
+}) {
     const today = new Date();
     const months = getQuarterMonths(currentDate || today, 0);
     const monthNames = months.map((m) => m.toLocaleString("default", { month: "long", year: "numeric" }));
@@ -73,27 +83,84 @@ export default function QuarterView({ currentDate, onShiftDate, events, categori
         weekNums.push(weekNum);
     }
 
+    const [showViewMenu, setShowViewMenu] = useState(false);
     return (
         <div className="p-0" style={{ boxShadow: "none" }}>
             {/* Quarter navigation inside view */}
             <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-blue-100">
-                <button
-                    className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                    style={{ minWidth: 36, minHeight: 36 }}
-                    aria-label="Previous quarter"
-                    onClick={() => onShiftDate && onShiftDate(-1)}
-                >
-                    <FaChevronLeft />
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Back first, then View dropdown */}
+                    <button
+                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                        style={{ minWidth: 36, minHeight: 36 }}
+                        aria-label="Previous quarter"
+                        onClick={() => onShiftDate && onShiftDate(-1)}
+                    >
+                        <FaChevronLeft />
+                    </button>
+                    <div className="relative">
+                        <button
+                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                            style={{ minWidth: 36, minHeight: 28 }}
+                            onClick={() => setShowViewMenu((s) => !s)}
+                            aria-haspopup="menu"
+                            aria-expanded={showViewMenu ? "true" : "false"}
+                        >
+                            <span>View</span>
+                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                {view?.charAt(0).toUpperCase() + view?.slice(1)}
+                            </span>
+                            <FaChevronDown
+                                className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
+                            />
+                        </button>
+                        {showViewMenu && (
+                            <div
+                                role="menu"
+                                className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                            >
+                                {["day", "week", "month", "quarter", "list"].map((v) => (
+                                    <button
+                                        key={v}
+                                        role="menuitemradio"
+                                        aria-checked={view === v}
+                                        className={`w-full text-left px-3 py-2 text-sm ${view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
+                                        onClick={() => {
+                                            onChangeView && onChangeView(v);
+                                            setShowViewMenu(false);
+                                        }}
+                                    >
+                                        {v.charAt(0).toUpperCase() + v.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
                 <span className="text-lg font-semibold text-blue-700">{monthNames.join(" / ")}</span>
-                <button
-                    className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                    style={{ minWidth: 36, minHeight: 36 }}
-                    aria-label="Next quarter"
-                    onClick={() => onShiftDate && onShiftDate(1)}
-                >
-                    <FaChevronRight />
-                </button>
+                <div className="flex items-center gap-2">
+                    <select
+                        className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
+                        style={{ minHeight: 28 }}
+                        value={filterType}
+                        onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
+                        aria-label="Filter event types"
+                    >
+                        <option value="all">All Types</option>
+                        <option value="task">Tasks</option>
+                        <option value="reminder">Reminders</option>
+                        <option value="meeting">Meetings</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <button
+                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                        style={{ minWidth: 36, minHeight: 36 }}
+                        aria-label="Next quarter"
+                        onClick={() => onShiftDate && onShiftDate(1)}
+                    >
+                        <FaChevronRight />
+                    </button>
+                </div>
             </div>
             {/* Calendar grid */}
             <div

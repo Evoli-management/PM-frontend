@@ -176,69 +176,7 @@ const CalendarContainer = () => {
         <div className="w-full">
             {/* Unified calendar card */}
             <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
-                <div className="flex gap-2 mb-2 flex-wrap items-center">
-                    {/* View dropdown */}
-                    <div className="relative" ref={viewMenuRef}>
-                        <button
-                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                            style={{ minWidth: 36, minHeight: 28 }}
-                            onClick={() => setShowViewMenu((s) => !s)}
-                            aria-haspopup="menu"
-                            aria-expanded={showViewMenu}
-                        >
-                            <span>View</span>
-                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                {view.charAt(0).toUpperCase() + view.slice(1)}
-                            </span>
-                            <FaChevronDown
-                                className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
-                            />
-                        </button>
-                        {showViewMenu && (
-                            <div
-                                role="menu"
-                                className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
-                            >
-                                {VIEWS.map((v) => {
-                                    const label = v.charAt(0).toUpperCase() + v.slice(1);
-                                    const active = view === v;
-                                    return (
-                                        <button
-                                            key={v}
-                                            role="menuitemradio"
-                                            aria-checked={active}
-                                            className={`w-full text-left px-3 py-2 text-sm ${active ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
-                                            onClick={() => {
-                                                setView(v);
-                                                setShowViewMenu(false);
-                                            }}
-                                        >
-                                            {label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Filter (Add Event removed per request) */}
-                    <div className="hidden md:flex items-center gap-2 flex-1">
-                        <select
-                            className="ml-2 px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                            style={{ minHeight: 28 }}
-                            value={filterType}
-                            onChange={(e) => setFilterType(e.target.value)}
-                            aria-label="Filter event types"
-                        >
-                            <option value="all">All Types</option>
-                            <option value="task">Tasks</option>
-                            <option value="reminder">Reminders</option>
-                            <option value="meeting">Meetings</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                        {/* Add Event button removed */}
-                    </div>
-                </div>
+                {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
                 {/* Elephant Task Input */}
                 <div
@@ -278,6 +216,10 @@ const CalendarContainer = () => {
                     <QuarterView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        view={view}
+                        onChangeView={setView}
+                        filterType={filterType}
+                        onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.type === filterType)}
                         categories={EVENT_CATEGORIES}
                         onDayClick={openModal}
@@ -287,6 +229,10 @@ const CalendarContainer = () => {
                     <MonthView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        view={view}
+                        onChangeView={setView}
+                        filterType={filterType}
+                        onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.type === filterType)}
                         categories={EVENT_CATEGORIES}
                         onEventClick={openModal}
@@ -296,6 +242,10 @@ const CalendarContainer = () => {
                     <WeekView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        view={view}
+                        onChangeView={setView}
+                        filterType={filterType}
+                        onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.type === filterType)}
                         todos={todos}
                         categories={EVENT_CATEGORIES}
@@ -307,6 +257,10 @@ const CalendarContainer = () => {
                     <DayView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        view={view}
+                        onChangeView={setView}
+                        filterType={filterType}
+                        onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.type === filterType)}
                         todos={todos}
                         categories={EVENT_CATEGORIES}
@@ -319,6 +273,10 @@ const CalendarContainer = () => {
                     <ListView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        view={view}
+                        onChangeView={setView}
+                        filterType={filterType}
+                        onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.type === filterType)}
                         onEventClick={openModal}
                     />
