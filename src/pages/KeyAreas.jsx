@@ -28,49 +28,6 @@ const Chip = ({ children }) => (
     </span>
 );
 
-function Card({ title, titleIcon, children }) {
-    return (
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">
-                    {title} {titleIcon && <span className="ml-1">{titleIcon}</span>}
-                </div>
-            </div>
-            <div className="mt-3">{children}</div>
-        </div>
-    );
-}
-
-function Tab({ active, onClick, children }) {
-    return (
-        <button
-            onClick={onClick}
-            className={`px-2 py-1 rounded-lg text-sm ${active ? "bg-blue-600 text-white" : "bg-slate-100"}`}
-        >
-            {children}
-        </button>
-    );
-}
-
-function DotLeader({ label, placeholder }) {
-    return (
-        <div className="flex items-center justify-between">
-            <div className="text-sm text-slate-700">{label}</div>
-            <div className="text-sm text-slate-500">{placeholder}</div>
-        </div>
-    );
-}
-
-function GhostInput({ prefix, placeholder, value, onChange }) {
-    return (
-        <div className="flex items-center gap-2">
-            <div className="text-sm text-slate-600">{prefix}</div>
-            <input value={value} onChange={onChange} placeholder={placeholder} className="flex-1 p-2 border rounded" />
-        </div>
-    );
-}
-
-/* ------------------------------ Tiny Badges ------------------------------ */
 function StatusIndicator({ status }) {
     const color =
         status === "done"
@@ -308,9 +265,19 @@ function CalendarView({ tasks, onSelect }) {
 /* --------------------------- Slide Over (Edit) --------------------------- */
 function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = false }) {
     const [form, setForm] = useState(null);
+    const [activeTab, setActiveTab] = useState("details"); // details | activities
+    const [taskActivities, setTaskActivities] = useState([]);
+    const [newActivity, setNewActivity] = useState("");
+    // Allow attaching activities to this task or keep as 'new' (unattached)
+    const [activitiesTarget, setActivitiesTarget] = useState("new"); // String(task.id) | "new"
 
     useEffect(() => {
-        if (!task) return setForm(null);
+        if (!task) {
+            setForm(null);
+            setTaskActivities([]);
+            return;
+        }
+        setActiveTab("details");
         setForm({
             ...task,
             attachmentsFiles: task.attachments
@@ -320,7 +287,59 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
                       .map((n) => ({ name: n }))
                 : [],
         });
+        // default target to this task when opening
+        setActivitiesTarget(String(task.id));
+        try {
+            const raw = localStorage.getItem("pm:kaActivities");
+            const map = raw ? JSON.parse(raw) : {};
+            const list = map[String(task.id)] || [];
+            setTaskActivities(Array.isArray(list) ? list : []);
+        } catch (e) {
+            setTaskActivities([]);
+        }
     }, [task]);
+
+    // When switching target (this task vs new), load that list
+    useEffect(() => {
+        if (!task) return;
+        try {
+            const raw = localStorage.getItem("pm:kaActivities");
+            const map = raw ? JSON.parse(raw) : {};
+            const list = map[String(activitiesTarget)] || [];
+            setTaskActivities(Array.isArray(list) ? list : []);
+        } catch (e) {
+            setTaskActivities([]);
+        }
+    }, [activitiesTarget, task]);
+
+    const persistActivities = (list) => {
+        setTaskActivities(list);
+        try {
+            const raw = localStorage.getItem("pm:kaActivities");
+            const map = raw ? JSON.parse(raw) : {};
+            map[String(activitiesTarget)] = list;
+            localStorage.setItem("pm:kaActivities", JSON.stringify(map));
+            // notify parent to refresh its in-memory cache
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { activities: map } }));
+        } catch (e) {}
+    };
+
+    const addActivity = () => {
+        const text = (newActivity || "").trim();
+        if (!text) return;
+        const item = { id: Date.now(), text, createdAt: new Date().toISOString() };
+        persistActivities([...(taskActivities || []), item]);
+        setNewActivity("");
+    };
+
+    const removeActivity = (id) => {
+        persistActivities((taskActivities || []).filter((a) => a.id !== id));
+    };
+
+    const clearActivities = () => {
+        if (!confirm("Clear all activities for this selection?")) return;
+        persistActivities([]);
+    };
 
     if (!task || !form) return null;
 
@@ -352,259 +371,376 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
                         </div>
                     </div>
 
-                    <form onSubmit={submit} className="p-4 max-h-[80vh] overflow-auto">
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Title</label>
+                    {/* Tabs: Details (default) and Activities */}
+                    <div className="px-4 pt-3 border-b border-slate-200 bg-white">
+                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                            <button
+                                className={`px-3 py-1 rounded-md text-sm font-semibold ${activeTab === "details" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
+                                onClick={() => setActiveTab("details")}
+                                type="button"
+                            >
+                                Details
+                            </button>
+                            <button
+                                className={`px-3 py-1 rounded-md text-sm font-semibold ${activeTab === "activities" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
+                                onClick={() => setActiveTab("activities")}
+                                type="button"
+                            >
+                                Activities
+                            </button>
+                        </div>
+                    </div>
+
+                    {activeTab === "details" ? (
+                        <form onSubmit={submit} className="p-4 max-h-[80vh] overflow-auto">
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Title</label>
+                                        <input
+                                            required
+                                            value={form.title || ""}
+                                            onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            disabled={readOnly}
+                                        />
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Tags</label>
+                                        <input
+                                            value={form.tags || ""}
+                                            onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
+                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            placeholder="e.g., q3,campaign"
+                                            disabled={readOnly}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Deadline</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={
+                                                    form.deadline
+                                                        ? new Date(form.deadline).toISOString().slice(0, 16)
+                                                        : ""
+                                                }
+                                                onChange={(e) => setForm((s) => ({ ...s, deadline: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            />
+                                            <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
+                                        </div>
+
+                                        <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Planned End</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={
+                                                    form.end_date
+                                                        ? new Date(form.end_date).toISOString().slice(0, 16)
+                                                        : ""
+                                                }
+                                                onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            />
+                                            <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Recurrence</label>
+                                        <input
+                                            value={form.recurrence || ""}
+                                            onChange={(e) => setForm((s) => ({ ...s, recurrence: e.target.value }))}
+                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            placeholder='e.g., {"freq":"weekly","interval":1}'
+                                        />
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Attachments</label>
+                                        <div className="mt-1">
+                                            <input
+                                                ref={(el) => (window.__composerFileInput = el)}
+                                                type="file"
+                                                multiple
+                                                name="attachments_files"
+                                                onChange={(e) => {
+                                                    const incoming = Array.from(e.target.files || []);
+                                                    setForm((s) => {
+                                                        const existing = s.attachmentsFiles || [];
+                                                        const combined = [...existing, ...incoming];
+                                                        const uniq = Array.from(
+                                                            new Map(combined.map((f) => [f.name, f])).values(),
+                                                        );
+                                                        return { ...s, attachmentsFiles: uniq };
+                                                    });
+                                                }}
+                                                className="hidden"
+                                            />
+                                            {!readOnly && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        window.__composerFileInput && window.__composerFileInput.click()
+                                                    }
+                                                    className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                >
+                                                    Choose files
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* show selected files */}
+                                        {form.attachmentsFiles && form.attachmentsFiles.length > 0 ? (
+                                            <ul className="mt-2 space-y-1 text-sm">
+                                                {form.attachmentsFiles.map((f, i) => (
+                                                    <li
+                                                        key={i}
+                                                        className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
+                                                    >
+                                                        <span className="truncate">{f.name}</span>
+                                                        {!readOnly && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setForm((s) => ({
+                                                                        ...s,
+                                                                        attachmentsFiles: s.attachmentsFiles.filter(
+                                                                            (_, idx) => idx !== i,
+                                                                        ),
+                                                                    }))
+                                                                }
+                                                                className="text-xs rounded-lg text-slate-500 ml-2"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : null}
+                                        {/* storage picker removed */}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="grid md:grid-cols-2 gap-2">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Status</label>
+                                            <select
+                                                value={form.status || "open"}
+                                                onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            >
+                                                <option value="open">Open</option>
+                                                <option value="in_progress">In Progress</option>
+                                                <option value="done">Done</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Priority</label>
+                                            <select
+                                                value={form.priority || "med"}
+                                                onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="med">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-2">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Importance</label>
+                                            <select
+                                                value={form.importance || "med"}
+                                                onChange={(e) => setForm((s) => ({ ...s, importance: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="med">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">List (Tab)</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={form.list_index || 1}
+                                                onChange={(e) =>
+                                                    setForm((s) => ({ ...s, list_index: Number(e.target.value) }))
+                                                }
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Linked Goal</label>
+                                        <select
+                                            value={form.goal_id || ""}
+                                            onChange={(e) =>
+                                                setForm((s) => ({ ...s, goal_id: e.target.value || null }))
+                                            }
+                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                        >
+                                            <option value="">— None (Activity Trap) —</option>
+                                            {goals.map((g) => (
+                                                <option key={g.id} value={g.id}>
+                                                    {g.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Assignee</label>
+                                        <input
+                                            value={form.assignee || ""}
+                                            onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))}
+                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            placeholder="Name or ID"
+                                        />
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                        <label className="text-sm font-semibold text-slate-900">Description</label>
+                                        <textarea
+                                            rows={3}
+                                            value={form.description || ""}
+                                            onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex items-center gap-2">
+                                {!readOnly && (
+                                    <>
+                                        <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
+                                            <FaSave /> Save
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (confirm("Delete this task?")) onDelete(task);
+                                            }}
+                                            className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
+                                        >
+                                            <FaTrash /> Delete
+                                        </button>
+                                    </>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </form>
+                    ) : (
+                        <div className="p-4 max-h-[80vh] overflow-auto">
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm font-semibold">Your activities</div>
+                                <div className="text-xs text-slate-500">Attach to a task or keep as new</div>
+                            </div>
+
+                            <div className="mt-3 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={activitiesTarget}
+                                        onChange={(e) => setActivitiesTarget(e.target.value)}
+                                        className="p-2 border rounded bg-white text-sm"
+                                        aria-label="Select task for activity"
+                                    >
+                                        <option value={String(task.id)}>This task</option>
+                                        <option value="new">New (unattached)</option>
+                                    </select>
+
                                     <input
-                                        required
-                                        value={form.title || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        disabled={readOnly}
+                                        value={newActivity}
+                                        onChange={(e) => setNewActivity(e.target.value)}
+                                        placeholder="Activity name..."
+                                        className="flex-1 p-2 border rounded text-sm"
                                     />
                                 </div>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Tags</label>
-                                    <input
-                                        value={form.tags || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        placeholder="e.g., q3,campaign"
-                                        disabled={readOnly}
-                                    />
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={addActivity}
+                                        className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                                    >
+                                        Add
+                                    </button>
+
+                                    {taskActivities && taskActivities.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={clearActivities}
+                                            className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div>
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Deadline</label>
-                                        <input
-                                            type="datetime-local"
-                                            value={
-                                                form.deadline ? new Date(form.deadline).toISOString().slice(0, 16) : ""
-                                            }
-                                            onChange={(e) => setForm((s) => ({ ...s, deadline: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                            disabled={readOnly}
-                                        />
-                                        <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                    </div>
-
-                                    <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Planned End</label>
-                                        <input
-                                            type="datetime-local"
-                                            value={
-                                                form.end_date ? new Date(form.end_date).toISOString().slice(0, 16) : ""
-                                            }
-                                            onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                            disabled={readOnly}
-                                        />
-                                        <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Recurrence</label>
-                                    <input
-                                        value={form.recurrence || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, recurrence: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        placeholder='e.g., {"freq":"weekly","interval":1}'
-                                    />
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Attachments</label>
-                                    <div className="mt-1">
-                                        <input
-                                            ref={(el) => (window.__composerFileInput = el)}
-                                            type="file"
-                                            multiple
-                                            name="attachments_files"
-                                            onChange={(e) => {
-                                                const incoming = Array.from(e.target.files || []);
-                                                setForm((s) => {
-                                                    const existing = s.attachmentsFiles || [];
-                                                    const combined = [...existing, ...incoming];
-                                                    const uniq = Array.from(
-                                                        new Map(combined.map((f) => [f.name, f])).values(),
-                                                    );
-                                                    return { ...s, attachmentsFiles: uniq };
-                                                });
-                                            }}
-                                            className="hidden"
-                                        />
-                                        {!readOnly && (
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    window.__composerFileInput && window.__composerFileInput.click()
-                                                }
-                                                className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                            >
-                                                Choose files
-                                            </button>
-                                        )}
-                                    </div>
-                                    {/* show selected files */}
-                                    {form.attachmentsFiles && form.attachmentsFiles.length > 0 ? (
-                                        <ul className="mt-2 space-y-1 text-sm">
-                                            {form.attachmentsFiles.map((f, i) => (
-                                                <li
-                                                    key={i}
-                                                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
+                                    {taskActivities && taskActivities.length > 0 ? (
+                                        <div className="mt-2 space-y-2">
+                                            {taskActivities.map((a) => (
+                                                <div
+                                                    key={a.id}
+                                                    className="flex items-start justify-between p-2 border rounded bg-white"
                                                 >
-                                                    <span className="truncate">{f.name}</span>
-                                                    {!readOnly && (
+                                                    <div className="flex-1">
+                                                        <div className="text-sm text-slate-800">{a.text}</div>
+                                                        <div className="text-xs text-slate-500 mt-1">
+                                                            {a.createdAt ? new Date(a.createdAt).toLocaleString() : ""}
+                                                        </div>
+                                                    </div>
+                                                    <div className="ml-3 flex items-start">
                                                         <button
                                                             type="button"
-                                                            onClick={() =>
-                                                                setForm((s) => ({
-                                                                    ...s,
-                                                                    attachmentsFiles: s.attachmentsFiles.filter(
-                                                                        (_, idx) => idx !== i,
-                                                                    ),
-                                                                }))
-                                                            }
-                                                            className="text-xs rounded-lg text-slate-500 ml-2"
+                                                            onClick={() => removeActivity(a.id)}
+                                                            className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
                                                         >
-                                                            Remove
+                                                            Delete
                                                         </button>
-                                                    )}
-                                                </li>
+                                                    </div>
+                                                </div>
                                             ))}
-                                        </ul>
-                                    ) : null}
-                                    {/* storage picker removed */}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
-                                <div className="grid md:grid-cols-2 gap-2">
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Status</label>
-                                        <select
-                                            value={form.status || "open"}
-                                            onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        >
-                                            <option value="open">Open</option>
-                                            <option value="in_progress">In Progress</option>
-                                            <option value="done">Done</option>
-                                            <option value="cancelled">Cancelled</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Priority</label>
-                                        <select
-                                            value={form.priority || "med"}
-                                            onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        >
-                                            <option value="low">Low</option>
-                                            <option value="med">Medium</option>
-                                            <option value="high">High</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="grid md:grid-cols-2 gap-2">
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Importance</label>
-                                        <select
-                                            value={form.importance || "med"}
-                                            onChange={(e) => setForm((s) => ({ ...s, importance: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        >
-                                            <option value="low">Low</option>
-                                            <option value="med">Medium</option>
-                                            <option value="high">High</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">List (Tab)</label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={form.list_index || 1}
-                                            onChange={(e) =>
-                                                setForm((s) => ({ ...s, list_index: Number(e.target.value) }))
-                                            }
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Linked Goal</label>
-                                    <select
-                                        value={form.goal_id || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, goal_id: e.target.value || null }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                    >
-                                        <option value="">— None (Activity Trap) —</option>
-                                        {goals.map((g) => (
-                                            <option key={g.id} value={g.id}>
-                                                {g.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Assignee</label>
-                                    <input
-                                        value={form.assignee || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        placeholder="Name or ID"
-                                    />
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Description</label>
-                                    <textarea
-                                        rows={3}
-                                        value={form.description || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                    />
-                                </div>
+                            <div className="mt-4 flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
+                                >
+                                    Close
+                                </button>
                             </div>
                         </div>
-
-                        <div className="mt-4 flex items-center gap-2">
-                            {!readOnly && (
-                                <>
-                                    <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
-                                        <FaSave /> Save
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (confirm("Delete this task?")) onDelete(task);
-                                        }}
-                                        className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
-                                    >
-                                        <FaTrash /> Delete
-                                    </button>
-                                </>
-                            )}
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </form>
+                    )}
                 </div>
             </div>
         </div>
@@ -678,6 +814,16 @@ export default function KeyAreas() {
         } catch (e) {}
     }, [activitiesByTask]);
 
+    // keep in-memory activities in sync if slide-over updates them
+    useEffect(() => {
+        const handler = (e) => {
+            const map = e?.detail?.activities;
+            if (map && typeof map === "object") setActivitiesByTask(map);
+        };
+        window.addEventListener("ka-activities-updated", handler);
+        return () => window.removeEventListener("ka-activities-updated", handler);
+    }, []);
+
     // When the composer opens, ensure the visible tab matches the composer list_index
     useEffect(() => {
         if (showTaskComposer) {
@@ -711,6 +857,26 @@ export default function KeyAreas() {
             setLoading(false);
         })();
     }, []);
+
+    // Prime Sidebar with cached key areas immediately (before async load completes)
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:keyareas");
+            const cached = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(cached) && cached.length) {
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: cached } }));
+            }
+        } catch (e) {}
+    }, []);
+
+    // Re-emit to Sidebar whenever the in-memory list changes (after edits/deletes)
+    useEffect(() => {
+        if (loading) return;
+        try {
+            const sorted = [...keyAreas].sort((a, b) => (a.position || 0) - (b.position || 0));
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+        } catch (e) {}
+    }, [keyAreas, loading]);
 
     // If navigated with openKA=1 but no specific ?ka, pick the first KA and open it.
     useEffect(() => {
@@ -1345,313 +1511,306 @@ export default function KeyAreas() {
                                     <div className="space-y-4 md:col-span-2">
                                         {/* Task Lists card with list buttons + Add Task inside */}
                                         <div className="bg-white rounded-xl border border-slate-200 p-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <div className="text-sm font-semibold">Task Lists</div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaskForm((s) => ({ ...s, list_index: taskTab }));
-                                                        setShowTaskComposer(true);
-                                                    }}
-                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                >
-                                                    <svg
-                                                        stroke="currentColor"
-                                                        fill="currentColor"
-                                                        strokeWidth="0"
-                                                        viewBox="0 0 448 512"
-                                                        height="1em"
-                                                        width="1em"
-                                                        xmlns="http://www.w3.org/2000/svg"
+                                            <div className="flex items-center justify-between gap-2 mb-3">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="text-sm font-semibold whitespace-nowrap mr-1">
+                                                        Task Lists
+                                                    </div>
+                                                    <div
+                                                        ref={tabsRef}
+                                                        className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
                                                     >
-                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                    </svg>
-                                                    Add Task
-                                                </button>
-                                            </div>
-
-                                            <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                                <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto">
-                                                    {Array.from({ length: leftListCount }).map((_, i) => {
-                                                        const n = i + 1;
-                                                        return (
-                                                            <div key={n} className="relative">
-                                                                <button
-                                                                    onClick={() => setTaskTab(n)}
-                                                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
-                                                                        taskTab === n
-                                                                            ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                                            : "bg-slate-100 text-slate-900 border-slate-300 hover:bg-slate-200"
-                                                                    }`}
-                                                                >
-                                                                    <span>{getListName(selectedKA?.id, n)}</span>
-                                                                    <span
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const rect =
-                                                                                e.currentTarget.getBoundingClientRect();
-                                                                            setListMenuPos({
-                                                                                top: rect.bottom + window.scrollY + 6,
-                                                                                left: rect.left + window.scrollX,
-                                                                            });
-                                                                            setOpenListMenu((cur) =>
-                                                                                cur === n ? null : n,
-                                                                            );
-                                                                        }}
-                                                                        aria-haspopup="menu"
-                                                                        aria-expanded={
-                                                                            openListMenu === n ? "true" : "false"
-                                                                        }
-                                                                        title={`Options for ${getListName(selectedKA?.id, n)}`}
-                                                                        className={`ml-1 p-1 rounded cursor-pointer ${
+                                                        {Array.from({ length: leftListCount }).map((_, i) => {
+                                                            const n = i + 1;
+                                                            return (
+                                                                <div key={n} className="relative">
+                                                                    <button
+                                                                        onClick={() => setTaskTab(n)}
+                                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
                                                                             taskTab === n
-                                                                                ? "text-white/90 hover:bg-blue-700"
-                                                                                : "text-slate-700 hover:bg-slate-300"
+                                                                                ? "bg-white text-slate-900 border-slate-300 shadow"
+                                                                                : "bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
                                                                         }`}
-                                                                        role="button"
                                                                     >
-                                                                        <FaEllipsisV className="w-3.5 h-3.5" />
-                                                                    </span>
-                                                                </button>
-
-                                                                {openListMenu === n && (
-                                                                    <>
-                                                                        {/* Backdrop to behave like popup */}
-                                                                        <div
-                                                                            className="fixed inset-0 z-40"
-                                                                            onClick={() => setOpenListMenu(null)}
-                                                                        />
-                                                                        <div
-                                                                            role="menu"
-                                                                            className="fixed z-50 w-32 bg-white border border-slate-200 rounded-lg shadow"
-                                                                            style={{
-                                                                                top: `${listMenuPos.top}px`,
-                                                                                left: `${listMenuPos.left}px`,
+                                                                        <span>{getListName(selectedKA?.id, n)}</span>
+                                                                        <span
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const rect =
+                                                                                    e.currentTarget.getBoundingClientRect();
+                                                                                setListMenuPos({
+                                                                                    top:
+                                                                                        rect.bottom +
+                                                                                        window.scrollY +
+                                                                                        6,
+                                                                                    left: rect.left + window.scrollX,
+                                                                                });
+                                                                                setOpenListMenu((cur) =>
+                                                                                    cur === n ? null : n,
+                                                                                );
                                                                             }}
+                                                                            aria-haspopup="menu"
+                                                                            aria-expanded={
+                                                                                openListMenu === n ? "true" : "false"
+                                                                            }
+                                                                            title={`Options for ${getListName(selectedKA?.id, n)}`}
+                                                                            className={`ml-1 p-1 rounded cursor-pointer ${
+                                                                                taskTab === n
+                                                                                    ? "text-slate-600 hover:bg-slate-100"
+                                                                                    : "text-slate-700 hover:bg-slate-200"
+                                                                            }`}
+                                                                            role="button"
                                                                         >
-                                                                            <button
-                                                                                role="menuitem"
-                                                                                onClick={() => {
-                                                                                    renameList(n);
-                                                                                    setOpenListMenu(null);
+                                                                            <FaEllipsisV className="w-3.5 h-3.5" />
+                                                                        </span>
+                                                                    </button>
+
+                                                                    {openListMenu === n && (
+                                                                        <>
+                                                                            {/* Backdrop to behave like popup */}
+                                                                            <div
+                                                                                className="fixed inset-0 z-40"
+                                                                                onClick={() => setOpenListMenu(null)}
+                                                                            />
+                                                                            <div
+                                                                                role="menu"
+                                                                                className="fixed z-50 w-32 bg-white border border-slate-200 rounded-lg shadow"
+                                                                                style={{
+                                                                                    top: `${listMenuPos.top}px`,
+                                                                                    left: `${listMenuPos.left}px`,
                                                                                 }}
-                                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                                                             >
-                                                                                Edit
-                                                                            </button>
-                                                                            <button
-                                                                                role="menuitem"
-                                                                                onClick={() => {
-                                                                                    deleteList(n);
-                                                                                    setOpenListMenu(null);
-                                                                                }}
-                                                                                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                                                            >
-                                                                                Delete
-                                                                            </button>
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    {leftListCount < 10 && (
-                                                        <div className="flex items-center">
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (!selectedKA) return;
-                                                                    const kaId = selectedKA.id;
-                                                                    const currentCount = leftListCount;
-                                                                    const next = currentCount + 1;
-                                                                    setListNames((prev) => {
-                                                                        const copy = { ...(prev || {}) };
-                                                                        copy[kaId] = { ...(copy[kaId] || {}) };
-                                                                        copy[kaId][next] = `List ${next}`;
-                                                                        return copy;
-                                                                    });
-                                                                    setTaskTab(next);
-                                                                }}
-                                                                title="Add list"
-                                                                className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
-                                                            >
-                                                                <svg
-                                                                    stroke="currentColor"
-                                                                    fill="currentColor"
-                                                                    strokeWidth="0"
-                                                                    viewBox="0 0 448 512"
-                                                                    height="1em"
-                                                                    width="1em"
-                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                                <button
+                                                                                    role="menuitem"
+                                                                                    onClick={() => {
+                                                                                        setTaskForm((s) => ({
+                                                                                            ...s,
+                                                                                            list_index: n,
+                                                                                        }));
+                                                                                        setShowTaskComposer(true);
+                                                                                        setOpenListMenu(null);
+                                                                                    }}
+                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                >
+                                                                                    Add Task
+                                                                                </button>
+                                                                                <button
+                                                                                    role="menuitem"
+                                                                                    onClick={() => {
+                                                                                        renameList(n);
+                                                                                        setOpenListMenu(null);
+                                                                                    }}
+                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                >
+                                                                                    Rename
+                                                                                </button>
+                                                                                <button
+                                                                                    role="menuitem"
+                                                                                    onClick={() => {
+                                                                                        deleteList(n);
+                                                                                        setOpenListMenu(null);
+                                                                                    }}
+                                                                                    className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                                >
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {leftListCount < 10 && (
+                                                            <div className="flex items-center">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (!selectedKA) return;
+                                                                        const kaId = selectedKA.id;
+                                                                        const currentCount = leftListCount;
+                                                                        const next = currentCount + 1;
+                                                                        setListNames((prev) => {
+                                                                            const copy = { ...(prev || {}) };
+                                                                            copy[kaId] = { ...(copy[kaId] || {}) };
+                                                                            copy[kaId][next] = `List ${next}`;
+                                                                            return copy;
+                                                                        });
+                                                                        setTaskTab(next);
+                                                                    }}
+                                                                    title="Add list"
+                                                                    className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
                                                                 >
-                                                                    <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                                </svg>
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                                    <svg
+                                                                        stroke="currentColor"
+                                                                        fill="currentColor"
+                                                                        strokeWidth="0"
+                                                                        viewBox="0 0 448 512"
+                                                                        height="1em"
+                                                                        width="1em"
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                    >
+                                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {/* Add Task button moved to header */}
+                                                {/* Add Task moved into the three-dots menu per list */}
                                             </div>
 
                                             {/* Render the tasks list directly below the tabs row when in List view */}
                                             {view === "list" && (
-                                                <div className="mt-2 pt-2 border-t border-slate-100">
-                                                    <div className="mb-2 text-sm font-semibold text-slate-900">
-                                                        Tasks
-                                                    </div>
+                                                <div className="pt-2 border-t border-slate-100">
                                                     {visibleTasks.length === 0 ? (
                                                         <EmptyState
                                                             title={`No tasks in List ${taskTab}`}
-                                                            hint="Create your first task from Add Task."
+                                                            hint="Use the three-dots menu to add a task."
                                                         />
                                                     ) : (
-                                                        <ul className="space-y-1">
-                                                            {visibleTasks.map((t) => (
-                                                                <li key={t.id}>
-                                                                    <button
-                                                                        className="w-full text-left px-2 py-1.5 rounded-md text-slate-900 hover:bg-slate-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition"
-                                                                        title={t.title}
-                                                                        onClick={() => setSelectedTask(t)}
-                                                                    >
-                                                                        <span className="block truncate">
-                                                                            {t.title}
-                                                                        </span>
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
+                                                        <div className="overflow-x-auto">
+                                                            <table className="min-w-full text-sm">
+                                                                <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                                    <tr>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Task
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Assignee
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Status
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Priority
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Importance
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Quadrant
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Goal
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Tags
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Files
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Deadline
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Planned End
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="bg-white">
+                                                                    {visibleTasks.map((t) => {
+                                                                        const filesCount = (t.attachments || "")
+                                                                            .split(",")
+                                                                            .filter(Boolean).length;
+                                                                        const q =
+                                                                            t.eisenhower_quadrant ||
+                                                                            computeEisenhowerQuadrant({
+                                                                                deadline: t.deadline,
+                                                                                end_date: t.end_date,
+                                                                                importance: t.importance,
+                                                                            });
+                                                                        return (
+                                                                            <tr
+                                                                                key={t.id}
+                                                                                className="border-t border-slate-200 hover:bg-slate-50"
+                                                                            >
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <button
+                                                                                        className="text-blue-700 hover:underline font-semibold"
+                                                                                        title={t.title}
+                                                                                        onClick={() =>
+                                                                                            setSelectedTask(t)
+                                                                                        }
+                                                                                    >
+                                                                                        {t.title}
+                                                                                    </button>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.assignee || "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <StatusIndicator
+                                                                                            status={t.status || "open"}
+                                                                                        />
+                                                                                        <span className="capitalize text-slate-800">
+                                                                                            {String(
+                                                                                                t.status || "open",
+                                                                                            ).replace("_", " ")}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <PriorityBadge
+                                                                                        priority={t.priority || "med"}
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <ImportanceBadge
+                                                                                        importance={
+                                                                                            t.importance || "med"
+                                                                                        }
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <QuadrantBadge q={q} />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.goal_id ? (
+                                                                                        `#${t.goal_id}`
+                                                                                    ) : (
+                                                                                        <span className="text-slate-500">
+                                                                                            Trap
+                                                                                        </span>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top max-w-[240px]">
+                                                                                    <span className="block truncate text-slate-800">
+                                                                                        {(t.tags || "")
+                                                                                            .split(",")
+                                                                                            .filter(Boolean)
+                                                                                            .slice(0, 4)
+                                                                                            .join(", ") || "—"}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {filesCount}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.deadline
+                                                                                        ? new Date(
+                                                                                              t.deadline,
+                                                                                          ).toLocaleString()
+                                                                                        : "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.end_date
+                                                                                        ? new Date(
+                                                                                              t.end_date,
+                                                                                          ).toLocaleString()
+                                                                                        : "—"}
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Your activities card */}
-                                        <div className="bg-white rounded-xl border border-slate-200 p-4">
-                                            <div className="flex items-center justify-between">
-                                                <div className="text-sm font-semibold">Your activities</div>
-                                                <div className="text-xs text-slate-500">
-                                                    Attach to a task or keep as new
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-3 space-y-3">
-                                                <div className="flex items-center gap-2">
-                                                    <select
-                                                        value={activityTaskId}
-                                                        onChange={(e) => setActivityTaskId(e.target.value)}
-                                                        className="p-2 border rounded bg-white text-sm"
-                                                        aria-label="Select task for activity"
-                                                        disabled={!selectedKA}
-                                                    >
-                                                        <option value="new">Select task</option>
-                                                        {allTasks
-                                                            .filter(
-                                                                (t) =>
-                                                                    !selectedKA ||
-                                                                    String(t.key_area_id) === String(selectedKA.id),
-                                                            )
-                                                            .map((t) => (
-                                                                <option key={t.id} value={t.id}>
-                                                                    {t.title}
-                                                                </option>
-                                                            ))}
-                                                    </select>
-
-                                                    <input
-                                                        value={activityName}
-                                                        onChange={(e) => setActivityName(e.target.value)}
-                                                        placeholder="Activity name..."
-                                                        className="flex-1 p-2 border rounded text-sm"
-                                                    />
-                                                </div>
-
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            const key = String(activityTaskId || "new");
-                                                            if (!activityName.trim()) return;
-                                                            const item = {
-                                                                id: Date.now(),
-                                                                text: activityName.trim(),
-                                                                createdAt: new Date().toISOString(),
-                                                            };
-                                                            setActivitiesByTask((prev) => {
-                                                                const c = { ...(prev || {}) };
-                                                                c[key] = [...(c[key] || []), item];
-                                                                return c;
-                                                            });
-                                                            setActivityName("");
-                                                        }}
-                                                        className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
-                                                    >
-                                                        Add
-                                                    </button>
-
-                                                    <button
-                                                        onClick={() => {
-                                                            // clear activities for current selection
-                                                            const key = String(activityTaskId || "new");
-                                                            setActivitiesByTask((prev) => {
-                                                                const c = { ...(prev || {}) };
-                                                                delete c[key];
-                                                                return c;
-                                                            });
-                                                        }}
-                                                        title="Clear activities for current selection"
-                                                        className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                </div>
-
-                                                <div>
-                                                    {(activitiesByTask[String(activityTaskId)] || []).length === 0 ? (
-                                                        <div className="text-sm text-slate-500 mt-2">
-                                                            No activities yet.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="mt-2 space-y-2">
-                                                            {(activitiesByTask[String(activityTaskId)] || [])
-                                                                .slice()
-                                                                .reverse()
-                                                                .map((a) => (
-                                                                    <div
-                                                                        key={a.id}
-                                                                        className="flex items-start justify-between p-2 border rounded bg-white"
-                                                                    >
-                                                                        <div className="flex-1">
-                                                                            <div className="text-sm text-slate-800">
-                                                                                {a.text}
-                                                                            </div>
-                                                                            <div className="text-xs text-slate-500 mt-1">
-                                                                                {new Date(a.createdAt).toLocaleString()}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="ml-3 flex items-start">
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    const key = String(
-                                                                                        activityTaskId || "new",
-                                                                                    );
-                                                                                    setActivitiesByTask((prev) => {
-                                                                                        const c = { ...(prev || {}) };
-                                                                                        c[key] = (c[key] || []).filter(
-                                                                                            (it) => it.id !== a.id,
-                                                                                        );
-                                                                                        return c;
-                                                                                    });
-                                                                                }}
-                                                                                className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
-                                                                            >
-                                                                                Delete
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
+                                        {/* Your activities card removed per request (now only inside the task slide-over > Activities tab) */}
                                     </div>
 
                                     {/* Summary card removed per request */}
