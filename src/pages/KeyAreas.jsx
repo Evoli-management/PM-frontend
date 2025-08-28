@@ -51,6 +51,21 @@ const ImportanceBadge = ({ importance = "med" }) => {
     );
 };
 
+const PriorityBadge = ({ priority = "med" }) => {
+    const map = {
+        low: "bg-emerald-100 text-emerald-700",
+        med: "bg-amber-100 text-amber-700",
+        high: "bg-red-100 text-red-700",
+    };
+    return (
+        <span
+            className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[priority] || "bg-slate-100 text-slate-700"}`}
+        >
+            {priority}
+        </span>
+    );
+};
+
 const QuadrantBadge = ({ q }) => {
     const label = q ? `Q${q}` : "—";
     const map = {
@@ -93,7 +108,19 @@ const api = {
     async listKeyAreas() {
         try {
             const raw = localStorage.getItem("pm:keyareas");
-            return raw ? JSON.parse(raw) : [];
+            const cached = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(cached) && cached.length) return cached;
+            // Seed with a few defaults when empty
+            const seed = [
+                { id: 1, title: "Marketing", description: "Grow brand and leads", position: 1 },
+                { id: 2, title: "Sales", description: "Close deals", position: 2 },
+                { id: 3, title: "Product", description: "Build and ship", position: 3 },
+                { id: 10, title: "Ideas", description: "Locked ideas slot", position: 10, is_default: true },
+            ];
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(seed));
+            } catch (e) {}
+            return seed;
         } catch {
             return [];
         }
@@ -124,7 +151,50 @@ const api = {
     async listTasks(keyAreaId) {
         try {
             const raw = localStorage.getItem(`pm:tasks:${keyAreaId}`);
-            return raw ? JSON.parse(raw) : [];
+            const existing = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(existing) && existing.length > 0) return existing;
+            // Seed with two tasks if none exist for this key area
+            const now = Date.now();
+            const seed = [
+                {
+                    id: now,
+                    key_area_id: keyAreaId,
+                    title: `Kickoff planning (KA ${keyAreaId})`,
+                    description: "Define scope, owners, and timeline",
+                    assignee: "Alex",
+                    status: "open",
+                    priority: "med",
+                    importance: "high",
+                    goal_id: "",
+                    tags: "q3,planning",
+                    attachments: "",
+                    deadline: new Date(now + 1000 * 60 * 60 * 24 * 3).toISOString(),
+                    end_date: new Date(now + 1000 * 60 * 60 * 24 * 7).toISOString(),
+                    list_index: 1,
+                    recurrence: "",
+                },
+                {
+                    id: now + 1,
+                    key_area_id: keyAreaId,
+                    title: `Baseline metrics (KA ${keyAreaId})`,
+                    description: "Collect current KPIs to compare",
+                    assignee: "Jamie",
+                    status: "in_progress",
+                    priority: "high",
+                    importance: "med",
+                    goal_id: "",
+                    tags: "metrics,report",
+                    attachments: "",
+                    deadline: new Date(now + 1000 * 60 * 60 * 24 * 10).toISOString(),
+                    end_date: new Date(now + 1000 * 60 * 60 * 24 * 14).toISOString(),
+                    list_index: 2,
+                    recurrence: "",
+                },
+            ];
+            try {
+                localStorage.setItem(`pm:tasks:${keyAreaId}`, JSON.stringify(seed));
+            } catch (e) {}
+            return seed;
         } catch {
             return [];
         }
@@ -313,29 +383,7 @@ function TaskSlideOver({
                         </button>
                     </div>
 
-                    {/* Tabs */}
-                    <div className="px-4 pt-3">
-                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                            <button
-                                type="button"
-                                className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
-                                    activeTab === "details" ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
-                                }`}
-                                onClick={() => setActiveTab("details")}
-                            >
-                                Details
-                            </button>
-                            <button
-                                type="button"
-                                className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
-                                    activeTab === "activities" ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
-                                }`}
-                                onClick={() => setActiveTab("activities")}
-                            >
-                                Activities
-                            </button>
-                        </div>
-                    </div>
+                    {/* Tabs (single source of truth below) */}
 
                     {/* Tabs: Details (default) and Activities */}
                     <div className="px-4 pt-3 border-b border-slate-200 bg-white">
@@ -648,7 +696,6 @@ function TaskSlideOver({
                                     <button
                                         type="button"
                                         onClick={addActivity}
-
                                         className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
                                     >
                                         Add
@@ -708,7 +755,6 @@ function TaskSlideOver({
                             </div>
                         </div>
                     )}
-
                 </div>
             </div>
         </div>
@@ -810,7 +856,7 @@ export default function KeyAreas() {
     useEffect(() => {
         (async () => {
             const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-            const sorted = kas.sort((a, b) => a.position - b.position);
+            const sorted = (kas || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
             setKeyAreas(sorted);
             try {
                 localStorage.setItem("pm:keyareas", JSON.stringify(sorted));
@@ -821,7 +867,7 @@ export default function KeyAreas() {
             } catch (e) {
                 // ignore if window not available or dispatch fails
             }
-            setGoals(gs);
+            setGoals(gs || []);
             setLoading(false);
         })();
     }, []);
@@ -1011,7 +1057,6 @@ export default function KeyAreas() {
         window.addEventListener("sidebar-keyareas-click", showAll);
         window.addEventListener("sidebar-ideas-click", selectIdeas);
 
-        
         // also respect query params when navigated via Link
         const params = new URLSearchParams(location.search);
         if (params.get("view") === "all") showAll();
@@ -1498,7 +1543,6 @@ export default function KeyAreas() {
                                                                             taskTab === n
                                                                                 ? "bg-white text-slate-900 border-slate-300 shadow"
                                                                                 : "bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
-
                                                                         }`}
                                                                     >
                                                                         <span>{getListName(selectedKA?.id, n)}</span>
@@ -1530,7 +1574,6 @@ export default function KeyAreas() {
                                                                             }`}
                                                                             role="button"
                                                                         >
-
                                                                             <FaEllipsisV className="w-3.5 h-3.5" />
                                                                         </span>
                                                                     </button>
@@ -1548,7 +1591,6 @@ export default function KeyAreas() {
                                                                                 style={{
                                                                                     top: `${listMenuPos.top}px`,
                                                                                     left: `${listMenuPos.left}px`,
-
                                                                                 }}
                                                                             >
                                                                                 <button
@@ -1632,7 +1674,6 @@ export default function KeyAreas() {
 
                                             {/* Render the tasks list directly below the tabs row when in List view */}
                                             {view === "list" && (
-
                                                 <div className="pt-2 border-t border-slate-100">
                                                     {visibleTasks.length === 0 ? (
                                                         <EmptyState
@@ -1642,7 +1683,6 @@ export default function KeyAreas() {
                                                     ) : (
                                                         <div className="overflow-x-auto">
                                                             <table className="min-w-full text-sm">
-
                                                                 <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                     <tr>
                                                                         <th className="px-3 py-2 text-left font-semibold">
@@ -1676,7 +1716,6 @@ export default function KeyAreas() {
                                                                             Deadline
                                                                         </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
-
                                                                             Planned End
                                                                         </th>
                                                                     </tr>
@@ -1786,9 +1825,7 @@ export default function KeyAreas() {
                                             )}
                                         </div>
 
-
                                         {/* Your activities card removed per request (now only inside the task slide-over > Activities tab) */}
-
                                     </div>
 
                                     {/* Summary card removed per request */}
