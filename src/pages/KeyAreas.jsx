@@ -6,311 +6,222 @@ import {
     FaPlus,
     FaLock,
     FaEdit,
-    FaTrash,
-    FaListUl,
-    FaTags,
-    FaExclamationCircle,
+    FaBars,
     FaChevronLeft,
     FaSearch,
-    FaSave,
-    FaTimes,
-    FaBars,
-    FaChevronRight,
-    FaKey,
-    FaUser,
     FaEllipsisV,
+    FaTimes,
+    FaSave,
+    FaTrash,
+    FaListUl,
+    FaExclamationCircle,
 } from "react-icons/fa";
 
-/* ------------------------------ Helpers/UI ------------------------------ */
-const Chip = ({ children }) => (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
-        {children}
-    </span>
-);
-
-function Card({ title, titleIcon, children }) {
-    return (
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">
-                    {title} {titleIcon && <span className="ml-1">{titleIcon}</span>}
-                </div>
-            </div>
-            <div className="mt-3">{children}</div>
-        </div>
-    );
-}
-
-function Tab({ active, onClick, children }) {
-    return (
-        <button
-            onClick={onClick}
-            className={`px-2 py-1 rounded-lg text-sm ${active ? "bg-blue-600 text-white" : "bg-slate-100"}`}
-        >
-            {children}
-        </button>
-    );
-}
-
-function DotLeader({ label, placeholder }) {
-    return (
-        <div className="flex items-center justify-between">
-            <div className="text-sm text-slate-700">{label}</div>
-            <div className="text-sm text-slate-500">{placeholder}</div>
-        </div>
-    );
-}
-
-function GhostInput({ prefix, placeholder, value, onChange }) {
-    return (
-        <div className="flex items-center gap-2">
-            <div className="text-sm text-slate-600">{prefix}</div>
-            <input value={value} onChange={onChange} placeholder={placeholder} className="flex-1 p-2 border rounded" />
-        </div>
-    );
-}
-
-/* ------------------------------ Tiny Badges ------------------------------ */
-function StatusIndicator({ status }) {
-    const color =
-        status === "done"
-            ? "bg-green-500"
-            : status === "in_progress"
-              ? "bg-amber-500"
-              : status === "cancelled"
-                ? "bg-red-500"
-                : "bg-slate-400";
-    return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} title={`Status: ${status}`} />;
-}
-
-function PriorityBadge({ priority }) {
+// Helpers and UI badges used in this page
+const StatusIndicator = ({ status = "open" }) => {
     const map = {
-        low: "bg-slate-100 text-slate-700",
-        med: "bg-orange-100 text-orange-700",
+        open: "bg-amber-500",
+        in_progress: "bg-blue-500",
+        blocked: "bg-red-500",
+        done: "bg-green-600",
+        cancelled: "bg-slate-400",
+    };
+    return <span className={`inline-block w-2 h-2 rounded-full ${map[status] || "bg-slate-400"}`} />;
+};
+
+const PriorityBadge = ({ priority = "med" }) => {
+    const map = {
+        low: "bg-green-100 text-green-700",
+        med: "bg-yellow-100 text-yellow-700",
         high: "bg-red-100 text-red-700",
     };
-    const label = (priority || "med").slice(0, 1).toUpperCase();
     return (
         <span
-            className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${map[priority] || map.med}`}
-            title={`Priority: ${priority}`}
+            className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[priority] || "bg-slate-100 text-slate-700"}`}
         >
-            {label}
+            {priority}
         </span>
     );
-}
+};
 
-function ImportanceBadge({ importance }) {
-    const color = importance === "high" ? "text-red-600" : importance === "low" ? "text-slate-500" : "text-amber-600";
-    return <FaExclamationCircle className={`w-3.5 h-3.5 ${color}`} title={`Importance: ${importance}`} />;
-}
+const ImportanceBadge = ({ importance = "med" }) => {
+    const map = {
+        low: "bg-slate-100 text-slate-700",
+        med: "bg-indigo-100 text-indigo-700",
+        high: "bg-purple-100 text-purple-700",
+    };
+    return (
+        <span
+            className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[importance] || "bg-slate-100 text-slate-700"}`}
+        >
+            {importance}
+        </span>
+    );
+};
 
-function CategoryBadge({ category }) {
-    if ((category || "").toLowerCase() === "key areas") {
-        return <FaKey className="w-3.5 h-3.5 text-blue-600" title="Category: Key Areas" />;
-    }
-    return <FaExclamationCircle className="w-3.5 h-3.5 text-orange-600" title={`Category: ${category || "—"}`} />;
-}
-
-function QuadrantBadge({ q }) {
-    if (!q) return null;
+const QuadrantBadge = ({ q }) => {
+    const label = q ? `Q${q}` : "—";
     const map = {
         1: "bg-red-100 text-red-700",
         2: "bg-green-100 text-green-700",
-        3: "bg-amber-100 text-amber-700",
+        3: "bg-yellow-100 text-yellow-700",
         4: "bg-slate-100 text-slate-700",
     };
-    const cls = map[Number(q)] || map[4];
     return (
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`} title={`Quadrant Q${q}`}>
-            Q{q}
+        <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[q] || "bg-slate-100 text-slate-700"}`}>
+            {label}
         </span>
     );
-}
-
-/* ------------------------------ Empty State ------------------------------ */
-function EmptyState({ title = "Nothing here yet", hint = "" }) {
-    return (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-            <div className="text-sm font-semibold text-slate-700">{title}</div>
-            {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
-        </div>
-    );
-}
-
-/* ------------------------------- Mocked API ------------------------------ */
-const api = {
-    listKeyAreas: async () => [
-        { id: 1, title: "Marketing", description: "Campaigns & content", position: 1, is_default: false },
-        { id: 2, title: "Support", description: "Tickets & FAQs", position: 2, is_default: false },
-        { id: 10, title: "Ideas", description: "Scratchpad for thoughts", position: 10, is_default: true },
-    ],
-    createKeyArea: async (payload) => ({ ...payload, id: Math.random() }),
-    updateKeyArea: async (id, payload) => ({ id, ...payload }),
-    deleteKeyArea: async (id) => id,
-    listGoals: async () => [
-        { id: "g1", title: "Grow Sales Q1", parent_goal_id: null },
-        { id: "g2", title: "Improve Customer Support", parent_goal_id: null },
-    ],
-    listTasks: async (keyAreaId) => {
-        const id = String(keyAreaId);
-        if (id === "1") {
-            return [
-                {
-                    id: 101,
-                    key_area_id: 1,
-                    title: "Welcome task",
-                    description: "Kickoff activity",
-                    status: "open",
-                    priority: "med",
-                    importance: "med",
-                    category: "Key Areas",
-                    list_index: 1,
-                    goal_id: null,
-                    deadline: null,
-                    end_date: null,
-                    eisenhower_quadrant: 2,
-                    tags: "onboarding",
-                    attachments: "",
-                    assignee: "user1",
-                },
-            ];
-        }
-        if (id === "2") {
-            return [
-                {
-                    id: 201,
-                    key_area_id: 2,
-                    title: "Triage backlog",
-                    description: "Sort incoming tickets",
-                    status: "open",
-                    priority: "med",
-                    importance: "med",
-                    category: "Key Areas",
-                    list_index: 1,
-                    goal_id: null,
-                    deadline: null,
-                    end_date: null,
-                    eisenhower_quadrant: 3,
-                    tags: "support",
-                    attachments: "",
-                    assignee: "support1",
-                },
-            ];
-        }
-        return [];
-    },
-    createTask: async (payload) => ({ ...payload, id: Math.floor(Math.random() * 100000) }),
-    updateTask: async (id, payload) => ({ id, ...payload }),
-    deleteTask: async (id) => id,
 };
 
-/* -------------------------- Quadrant Calculation ------------------------- */
-function computeEisenhowerQuadrant({ deadline, end_date, importance }) {
-    const imp = (importance || "med").toLowerCase();
-    const urgent = (() => {
-        const ts = deadline || end_date;
-        if (!ts) return false;
-        const due = new Date(ts).getTime();
-        const now = Date.now();
-        const diffHours = (due - now) / (1000 * 60 * 60);
-        return diffHours <= 48; // due within 48h → urgent
+const EmptyState = ({ title = "Nothing here", hint = "" }) => (
+    <div className="text-sm text-slate-600 py-8 text-center">
+        <div className="font-semibold text-slate-800">{title}</div>
+        {hint ? <div className="text-slate-500 mt-1">{hint}</div> : null}
+    </div>
+);
+
+// very small heuristic for quadrant based on importance and time
+const computeEisenhowerQuadrant = ({ deadline, end_date, importance = "med" }) => {
+    const important = importance === "high" || importance === "med";
+    const dueSoon = (() => {
+        const ref = deadline || end_date;
+        if (!ref) return false;
+        const diff = new Date(ref).getTime() - Date.now();
+        return diff <= 1000 * 60 * 60 * 24 * 2; // within 2 days
     })();
-    if (imp === "high" && urgent) return 1;
-    if (imp === "high" && !urgent) return 2;
-    if (imp !== "high" && urgent) return 3;
+    if (important && dueSoon) return 1;
+    if (important && !dueSoon) return 2;
+    if (!important && dueSoon) return 3;
     return 4;
-}
+};
 
-/* ---------------------------- Inline Views ---------------------------- */
-function KanbanView({ tasks, onSelect }) {
-    const columns = [
-        { key: "open", title: "To Do" },
-        { key: "in_progress", title: "In Progress" },
-        { key: "done", title: "Done" },
-        { key: "cancelled", title: "Cancelled" },
-    ];
-    return (
-        <div className="grid gap-4 md:grid-cols-4">
-            {columns.map((col) => {
-                const items = tasks.filter((t) => (t.status || "open") === col.key);
-                return (
-                    <div key={col.key} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                        <div className="font-semibold text-slate-900 mb-2">{col.title}</div>
-                        {items.length === 0 ? (
-                            <div className="text-sm text-slate-600">No cards</div>
-                        ) : (
-                            items.map((t) => (
-                                <div
-                                    key={t.id}
-                                    className="bg-white border border-slate-200 rounded-lg p-2 mb-2 shadow-sm cursor-pointer hover:shadow"
-                                    onClick={() => onSelect(t)}
-                                >
-                                    <div className="text-sm font-semibold text-slate-900">{t.title}</div>
-                                    <div className="text-xs text-slate-600">
-                                        {(t.tags || "").split(",").filter(Boolean).slice(0, 3).join(", ")}
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-1">
-                                        <Chip>P:{t.priority}</Chip>
-                                        {t.goal_id ? <Chip>Goal #{t.goal_id}</Chip> : <Chip>Trap</Chip>}
-                                        {t.eisenhower_quadrant && <Chip>Q{t.eisenhower_quadrant}</Chip>}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
+// Minimal localStorage-backed API for this page
+const api = {
+    async listKeyAreas() {
+        try {
+            const raw = localStorage.getItem("pm:keyareas");
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    },
+    async listGoals() {
+        // Keep empty for now; integrate real service later
+        return [];
+    },
+    async updateKeyArea(id, data) {
+        const raw = (await this.listKeyAreas()) || [];
+        const next = raw.map((k) => (String(k.id) === String(id) ? { ...k, ...data } : k));
+        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        return next.find((k) => String(k.id) === String(id)) || data;
+    },
+    async createKeyArea(data) {
+        const raw = (await this.listKeyAreas()) || [];
+        const item = { id: data.id || Date.now(), ...data };
+        const next = [...raw, item];
+        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        return item;
+    },
+    async deleteKeyArea(id) {
+        const raw = (await this.listKeyAreas()) || [];
+        const next = raw.filter((k) => String(k.id) !== String(id));
+        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        return true;
+    },
+    async listTasks(keyAreaId) {
+        try {
+            const raw = localStorage.getItem(`pm:tasks:${keyAreaId}`);
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    },
+    async createTask(task) {
+        const id = task.id || Date.now();
+        const ka = task.key_area_id;
+        const raw = await this.listTasks(ka);
+        const item = { ...task, id };
+        localStorage.setItem(`pm:tasks:${ka}`, JSON.stringify([...raw, item]));
+        return item;
+    },
+    async updateTask(id, task) {
+        const ka = task.key_area_id || task.keyAreaId || task.key_area;
+        const raw = await this.listTasks(ka);
+        const next = raw.map((t) => (String(t.id) === String(id) ? { ...t, ...task } : t));
+        localStorage.setItem(`pm:tasks:${ka}`, JSON.stringify(next));
+        return next.find((t) => String(t.id) === String(id)) || task;
+    },
+    async deleteTask(id) {
+        // find KA bucket containing this task
+        const allKeys = Object.keys(localStorage).filter((k) => k.startsWith("pm:tasks:"));
+        for (const key of allKeys) {
+            const arr = JSON.parse(localStorage.getItem(key) || "[]");
+            const next = arr.filter((t) => String(t.id) !== String(id));
+            if (next.length !== arr.length) localStorage.setItem(key, JSON.stringify(next));
+        }
+        return true;
+    },
+};
 
-function CalendarView({ tasks, onSelect }) {
-    const groups = tasks.reduce((acc, t) => {
-        const d = t.deadline || t.end_date ? new Date(t.deadline || t.end_date).toISOString().slice(0, 10) : "No Date";
-        acc[d] = acc[d] || [];
-        acc[d].push(t);
-        return acc;
-    }, {});
-    const keys = Object.keys(groups).sort();
-
-    return (
-        <div className="space-y-3">
-            {keys.map((k) => (
-                <div key={k} className="bg-white border border-slate-200 rounded-xl">
-                    <div className="px-3 py-2 border-b bg-slate-50 text-slate-900 font-semibold">{k}</div>
-                    <div className="p-3 space-y-2">
-                        {groups[k].map((t) => (
-                            <div
-                                key={t.id}
-                                className="flex items-start gap-2 cursor-pointer py-1"
-                                onClick={() => onSelect && onSelect(t)}
-                            >
-                                <FaTags className="mt-1 text-slate-700" />
-                                <div>
-                                    <div className="font-semibold text-slate-900">{t.title}</div>
-                                    <div className="text-xs text-slate-600">
-                                        {t.description || "—"} • {t.goal_id ? `Goal #${t.goal_id}` : "Activity Trap"}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+// Minimal placeholders to keep non-list views functional
+const KanbanView = ({ tasks = [], onSelect }) => (
+    <div className="p-4 border border-dashed rounded-lg text-sm text-slate-600">
+        Kanban view (placeholder). {tasks.length} tasks. Clicks will open details.
+        <div className="mt-2 flex flex-wrap gap-2">
+            {tasks.map((t) => (
+                <button
+                    key={t.id}
+                    onClick={() => onSelect && onSelect(t)}
+                    className="px-2 py-1 bg-white border rounded shadow-sm"
+                >
+                    {t.title}
+                </button>
             ))}
-            {keys.length === 0 && (
-                <EmptyState title="No scheduled items" hint="Add deadlines or planned ends to see them here." />
-            )}
         </div>
-    );
-}
+    </div>
+);
+
+const CalendarView = ({ tasks = [], onSelect }) => (
+    <div className="p-4 border border-dashed rounded-lg text-sm text-slate-600">
+        Calendar view (placeholder). {tasks.length} tasks.
+        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {tasks.map((t) => (
+                <button
+                    key={t.id}
+                    onClick={() => onSelect && onSelect(t)}
+                    className="px-2 py-1 bg-white border rounded shadow-sm text-left"
+                >
+                    <div className="font-semibold truncate">{t.title}</div>
+                    <div className="text-xs text-slate-500">
+                        {t.deadline ? new Date(t.deadline).toLocaleString() : "—"}
+                    </div>
+                </button>
+            ))}
+        </div>
+    </div>
+);
 
 /* --------------------------- Slide Over (Edit) --------------------------- */
-function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = false }) {
+function TaskSlideOver({
+    task,
+    goals,
+    onClose,
+    onSave,
+    onDelete,
+    readOnly = false,
+    activitiesByTask = {},
+    onAddActivity,
+    onDeleteActivity,
+    onClearActivities,
+}) {
     const [form, setForm] = useState(null);
+    const [activeTab, setActiveTab] = useState("details");
+    const [activityText, setActivityText] = useState("");
 
     useEffect(() => {
         if (!task) return setForm(null);
+        setActiveTab("details");
         setForm({
             ...task,
             attachmentsFiles: task.attachments
@@ -344,267 +255,366 @@ function TaskSlideOver({ task, goals, onClose, onSave, onDelete, readOnly = fals
             <div className="relative w-full max-w-3xl">
                 <div className="bg-slate-50 rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                        <h3 className="text-lg font-bold text-slate-900">Edit Task</h3>
-                        <div className="flex items-center gap-2">
-                            <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
-                                <FaTimes />
+                        <h3 className="text-lg font-bold text-slate-900">Task</h3>
+                        <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
+                            <FaTimes />
+                        </button>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="px-4 pt-3">
+                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
+                                    activeTab === "details" ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
+                                }`}
+                                onClick={() => setActiveTab("details")}
+                            >
+                                Details
+                            </button>
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
+                                    activeTab === "activities" ? "bg-white text-slate-900 shadow-sm" : "text-slate-700"
+                                }`}
+                                onClick={() => setActiveTab("activities")}
+                            >
+                                Activities
                             </button>
                         </div>
                     </div>
 
-                    <form onSubmit={submit} className="p-4 max-h-[80vh] overflow-auto">
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Title</label>
-                                    <input
-                                        required
-                                        value={form.title || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        disabled={readOnly}
-                                    />
-                                </div>
+                    {/* Body */}
+                    <div className="p-4 max-h-[75vh] overflow-auto">
+                        {activeTab === "details" ? (
+                            <form onSubmit={submit}>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="space-y-3">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Title</label>
+                                            <input
+                                                required
+                                                value={form.title || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Tags</label>
-                                    <input
-                                        value={form.tags || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        placeholder="e.g., q3,campaign"
-                                        disabled={readOnly}
-                                    />
-                                </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Tags</label>
+                                            <input
+                                                value={form.tags || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                placeholder="e.g., q3,campaign"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
 
-                                <div>
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Deadline</label>
-                                        <input
-                                            type="datetime-local"
-                                            value={
-                                                form.deadline ? new Date(form.deadline).toISOString().slice(0, 16) : ""
-                                            }
-                                            onChange={(e) => setForm((s) => ({ ...s, deadline: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                            disabled={readOnly}
-                                        />
-                                        <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                    </div>
+                                        <div>
+                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                <label className="text-sm font-semibold text-slate-900">Deadline</label>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={
+                                                        form.deadline
+                                                            ? new Date(form.deadline).toISOString().slice(0, 16)
+                                                            : ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setForm((s) => ({ ...s, deadline: e.target.value }))
+                                                    }
+                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                    disabled={readOnly}
+                                                />
+                                                <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
+                                            </div>
 
-                                    <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Planned End</label>
-                                        <input
-                                            type="datetime-local"
-                                            value={
-                                                form.end_date ? new Date(form.end_date).toISOString().slice(0, 16) : ""
-                                            }
-                                            onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                            disabled={readOnly}
-                                        />
-                                        <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
-                                    </div>
-                                </div>
+                                            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                <label className="text-sm font-semibold text-slate-900">
+                                                    Planned End
+                                                </label>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={
+                                                        form.end_date
+                                                            ? new Date(form.end_date).toISOString().slice(0, 16)
+                                                            : ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setForm((s) => ({ ...s, end_date: e.target.value }))
+                                                    }
+                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                    disabled={readOnly}
+                                                />
+                                                <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
+                                            </div>
+                                        </div>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Recurrence</label>
-                                    <input
-                                        value={form.recurrence || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, recurrence: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        placeholder='e.g., {"freq":"weekly","interval":1}'
-                                    />
-                                </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Recurrence</label>
+                                            <input
+                                                value={form.recurrence || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, recurrence: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                placeholder='e.g., {"freq":"weekly","interval":1}'
+                                            />
+                                        </div>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Attachments</label>
-                                    <div className="mt-1">
-                                        <input
-                                            ref={(el) => (window.__composerFileInput = el)}
-                                            type="file"
-                                            multiple
-                                            name="attachments_files"
-                                            onChange={(e) => {
-                                                const incoming = Array.from(e.target.files || []);
-                                                setForm((s) => {
-                                                    const existing = s.attachmentsFiles || [];
-                                                    const combined = [...existing, ...incoming];
-                                                    const uniq = Array.from(
-                                                        new Map(combined.map((f) => [f.name, f])).values(),
-                                                    );
-                                                    return { ...s, attachmentsFiles: uniq };
-                                                });
-                                            }}
-                                            className="hidden"
-                                        />
-                                        {!readOnly && (
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    window.__composerFileInput && window.__composerFileInput.click()
-                                                }
-                                                className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                            >
-                                                Choose files
-                                            </button>
-                                        )}
-                                    </div>
-                                    {/* show selected files */}
-                                    {form.attachmentsFiles && form.attachmentsFiles.length > 0 ? (
-                                        <ul className="mt-2 space-y-1 text-sm">
-                                            {form.attachmentsFiles.map((f, i) => (
-                                                <li
-                                                    key={i}
-                                                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
-                                                >
-                                                    <span className="truncate">{f.name}</span>
-                                                    {!readOnly && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setForm((s) => ({
-                                                                    ...s,
-                                                                    attachmentsFiles: s.attachmentsFiles.filter(
-                                                                        (_, idx) => idx !== i,
-                                                                    ),
-                                                                }))
-                                                            }
-                                                            className="text-xs rounded-lg text-slate-500 ml-2"
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Attachments</label>
+                                            <div className="mt-1">
+                                                <input
+                                                    ref={(el) => (window.__composerFileInput = el)}
+                                                    type="file"
+                                                    multiple
+                                                    name="attachments_files"
+                                                    onChange={(e) => {
+                                                        const incoming = Array.from(e.target.files || []);
+                                                        setForm((s) => {
+                                                            const existing = s.attachmentsFiles || [];
+                                                            const combined = [...existing, ...incoming];
+                                                            const uniq = Array.from(
+                                                                new Map(combined.map((f) => [f.name, f])).values(),
+                                                            );
+                                                            return { ...s, attachmentsFiles: uniq };
+                                                        });
+                                                    }}
+                                                    className="hidden"
+                                                />
+                                                {!readOnly && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            window.__composerFileInput &&
+                                                            window.__composerFileInput.click()
+                                                        }
+                                                        className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                                    >
+                                                        Choose files
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {form.attachmentsFiles && form.attachmentsFiles.length > 0 ? (
+                                                <ul className="mt-2 space-y-1 text-sm">
+                                                    {form.attachmentsFiles.map((f, i) => (
+                                                        <li
+                                                            key={i}
+                                                            className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
                                                         >
-                                                            Remove
-                                                        </button>
-                                                    )}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : null}
-                                    {/* storage picker removed */}
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="grid md:grid-cols-2 gap-2">
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Status</label>
-                                        <select
-                                            value={form.status || "open"}
-                                            onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        >
-                                            <option value="open">Open</option>
-                                            <option value="in_progress">In Progress</option>
-                                            <option value="done">Done</option>
-                                            <option value="cancelled">Cancelled</option>
-                                        </select>
+                                                            <span className="truncate">{f.name}</span>
+                                                            {!readOnly && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setForm((s) => ({
+                                                                            ...s,
+                                                                            attachmentsFiles: s.attachmentsFiles.filter(
+                                                                                (_, idx) => idx !== i,
+                                                                            ),
+                                                                        }))
+                                                                    }
+                                                                    className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <div className="mt-2 text-xs text-slate-500">No files</div>
+                                            )}
+                                        </div>
                                     </div>
-
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Priority</label>
-                                        <select
-                                            value={form.priority || "med"}
-                                            onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        >
-                                            <option value="low">Low</option>
-                                            <option value="med">Medium</option>
-                                            <option value="high">High</option>
-                                        </select>
+                                    <div className="space-y-3">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">List</label>
+                                            <input
+                                                value={`List ${task.list_index || 1}`}
+                                                disabled
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            />
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Assignee</label>
+                                            <input
+                                                value={form.assignee || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                placeholder="e.g., Jane Doe"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Status</label>
+                                            <select
+                                                value={form.status || "open"}
+                                                onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            >
+                                                <option value="open">Open</option>
+                                                <option value="in_progress">In progress</option>
+                                                <option value="blocked">Blocked</option>
+                                                <option value="done">Done</option>
+                                            </select>
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Priority</label>
+                                            <select
+                                                value={form.priority || "med"}
+                                                onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="med">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Importance</label>
+                                            <select
+                                                value={form.importance || "med"}
+                                                onChange={(e) => setForm((s) => ({ ...s, importance: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            >
+                                                <option value="low">Low</option>
+                                                <option value="med">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Quadrant</label>
+                                            <input
+                                                value={String(task.eisenhower_quadrant || "")}
+                                                disabled
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                            />
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Goal</label>
+                                            <select
+                                                value={form.goal_id || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, goal_id: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            >
+                                                <option value="">— None (Activity Trap) —</option>
+                                                {goals.map((g) => (
+                                                    <option key={g.id} value={g.id}>
+                                                        {g.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Description</label>
+                                            <textarea
+                                                value={form.description || ""}
+                                                onChange={(e) =>
+                                                    setForm((s) => ({ ...s, description: e.target.value }))
+                                                }
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                rows={6}
+                                                placeholder="Details…"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="grid md:grid-cols-2 gap-2">
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">Importance</label>
-                                        <select
-                                            value={form.importance || "med"}
-                                            onChange={(e) => setForm((s) => ({ ...s, importance: e.target.value }))}
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        >
-                                            <option value="low">Low</option>
-                                            <option value="med">Medium</option>
-                                            <option value="high">High</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                        <label className="text-sm font-semibold text-slate-900">List (Tab)</label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={form.list_index || 1}
-                                            onChange={(e) =>
-                                                setForm((s) => ({ ...s, list_index: Number(e.target.value) }))
-                                            }
-                                            className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Linked Goal</label>
-                                    <select
-                                        value={form.goal_id || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, goal_id: e.target.value || null }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                    >
-                                        <option value="">— None (Activity Trap) —</option>
-                                        {goals.map((g) => (
-                                            <option key={g.id} value={g.id}>
-                                                {g.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Assignee</label>
-                                    <input
-                                        value={form.assignee || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                        placeholder="Name or ID"
-                                    />
-                                </div>
-
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                    <label className="text-sm font-semibold text-slate-900">Description</label>
-                                    <textarea
-                                        rows={3}
-                                        value={form.description || ""}
-                                        onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center gap-2">
-                            {!readOnly && (
-                                <>
-                                    <button className="rounded-lg bg-blue-600 text-white flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
-                                        <FaSave /> Save
-                                    </button>
+                                <div className="mt-4 flex items-center gap-2">
+                                    {!readOnly && (
+                                        <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
+                                            <FaSave /> Save
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            if (confirm("Delete this task?")) onDelete(task);
-                                        }}
-                                        className="rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 px-2 py-1 text-sm"
+                                        onClick={onClose}
+                                        className="rounded-lg text-sm text-slate-600 hover:underline"
                                     >
-                                        <FaTrash /> Delete
+                                        Cancel
                                     </button>
-                                </>
-                            )}
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </form>
+                                    {!readOnly && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onDelete(task)}
+                                            className="ml-auto px-3 py-2 rounded-lg bg-white border text-red-600 hover:bg-red-50 font-semibold flex items-center gap-2"
+                                        >
+                                            <FaTrash /> Delete Task
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+                        ) : (
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        value={activityText}
+                                        onChange={(e) => setActivityText(e.target.value)}
+                                        placeholder="Activity name..."
+                                        className="flex-1 p-2 border rounded text-sm"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const text = activityText.trim();
+                                            if (!text || !onAddActivity) return;
+                                            onAddActivity(task.id, text);
+                                            setActivityText("");
+                                        }}
+                                        className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
+                                    >
+                                        Add
+                                    </button>
+                                    <button
+                                        onClick={() => onClearActivities && onClearActivities(task.id)}
+                                        className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+
+                                <div className="mt-3">
+                                    {((activitiesByTask && activitiesByTask[String(task.id)]) || []).length === 0 ? (
+                                        <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
+                                    ) : (
+                                        <div className="mt-2 space-y-2">
+                                            {activitiesByTask[String(task.id)]
+                                                .slice()
+                                                .reverse()
+                                                .map((a) => (
+                                                    <div
+                                                        key={a.id}
+                                                        className="flex items-start justify-between p-2 border rounded bg-white"
+                                                    >
+                                                        <div className="flex-1">
+                                                            <div className="text-sm text-slate-800">{a.text}</div>
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                {new Date(a.createdAt).toLocaleString()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="ml-3 flex items-start">
+                                                            <button
+                                                                onClick={() =>
+                                                                    onDeleteActivity && onDeleteActivity(task.id, a.id)
+                                                                }
+                                                                className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -1321,7 +1331,7 @@ export default function KeyAreas() {
                                                                 setView(opt.key);
                                                                 setShowViewMenu(false);
                                                             }}
-                                                            className={`w-full text-left px-3 py-2 text-sm rounded-lg ${
+                                                            className={`block w-full text-left px-3 py-2 text-sm ${
                                                                 view === opt.key
                                                                     ? "bg-blue-100 text-blue-700 font-semibold"
                                                                     : "text-slate-800 hover:bg-slate-50"
@@ -1341,37 +1351,15 @@ export default function KeyAreas() {
                         {selectedKA && (
                             <div className="mb-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* LEFT COLUMN: Task Lists + Your activities stacked */}
                                     <div className="space-y-4 md:col-span-2">
                                         {/* Task Lists card with list buttons + Add Task inside */}
                                         <div className="bg-white rounded-xl border border-slate-200 p-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <div className="text-sm font-semibold">Task Lists</div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaskForm((s) => ({ ...s, list_index: taskTab }));
-                                                        setShowTaskComposer(true);
-                                                    }}
-                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="text-sm font-semibold shrink-0">Task Lists</div>
+                                                <div
+                                                    ref={tabsRef}
+                                                    className="flex items-center gap-1 overflow-x-auto bg-slate-100 rounded-lg p-1"
                                                 >
-                                                    <svg
-                                                        stroke="currentColor"
-                                                        fill="currentColor"
-                                                        strokeWidth="0"
-                                                        viewBox="0 0 448 512"
-                                                        height="1em"
-                                                        width="1em"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                    >
-                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-                                                    </svg>
-                                                    Add Task
-                                                </button>
-                                            </div>
-
-                                            <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                                                <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto">
                                                     {Array.from({ length: leftListCount }).map((_, i) => {
                                                         const n = i + 1;
                                                         return (
@@ -1380,8 +1368,8 @@ export default function KeyAreas() {
                                                                     onClick={() => setTaskTab(n)}
                                                                     className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
                                                                         taskTab === n
-                                                                            ? "bg-blue-600 text-white border-blue-600 shadow"
-                                                                            : "bg-slate-100 text-slate-900 border-slate-300 hover:bg-slate-200"
+                                                                            ? "bg-white text-slate-900 border-slate-300 shadow-sm"
+                                                                            : "bg-transparent text-slate-900 border-transparent hover:bg-slate-200"
                                                                     }`}
                                                                 >
                                                                     <span>{getListName(selectedKA?.id, n)}</span>
@@ -1405,7 +1393,7 @@ export default function KeyAreas() {
                                                                         title={`Options for ${getListName(selectedKA?.id, n)}`}
                                                                         className={`ml-1 p-1 rounded cursor-pointer ${
                                                                             taskTab === n
-                                                                                ? "text-white/90 hover:bg-blue-700"
+                                                                                ? "text-slate-700 hover:bg-slate-200"
                                                                                 : "text-slate-700 hover:bg-slate-300"
                                                                         }`}
                                                                         role="button"
@@ -1432,12 +1420,26 @@ export default function KeyAreas() {
                                                                             <button
                                                                                 role="menuitem"
                                                                                 onClick={() => {
+                                                                                    setTaskForm((s) => ({
+                                                                                        ...s,
+                                                                                        list_index: n,
+                                                                                    }));
+                                                                                    setShowTaskComposer(true);
+                                                                                    setOpenListMenu(null);
+                                                                                }}
+                                                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                            >
+                                                                                Add Task
+                                                                            </button>
+                                                                            <button
+                                                                                role="menuitem"
+                                                                                onClick={() => {
                                                                                     renameList(n);
                                                                                     setOpenListMenu(null);
                                                                                 }}
                                                                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                                                             >
-                                                                                Edit
+                                                                                Rename
                                                                             </button>
                                                                             <button
                                                                                 role="menuitem"
@@ -1447,7 +1449,7 @@ export default function KeyAreas() {
                                                                                 }}
                                                                                 className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                                                                             >
-                                                                                Delete
+                                                                                Delete List
                                                                             </button>
                                                                         </div>
                                                                     </>
@@ -1461,15 +1463,13 @@ export default function KeyAreas() {
                                                                 onClick={() => {
                                                                     if (!selectedKA) return;
                                                                     const kaId = selectedKA.id;
-                                                                    const currentCount = leftListCount;
-                                                                    const next = currentCount + 1;
+                                                                    const next = leftListCount + 1;
                                                                     setListNames((prev) => {
                                                                         const copy = { ...(prev || {}) };
                                                                         copy[kaId] = { ...(copy[kaId] || {}) };
                                                                         copy[kaId][next] = `List ${next}`;
                                                                         return copy;
                                                                     });
-                                                                    setTaskTab(next);
                                                                 }}
                                                                 title="Add list"
                                                                 className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
@@ -1489,42 +1489,148 @@ export default function KeyAreas() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                {/* Add Task button moved to header */}
                                             </div>
 
                                             {/* Render the tasks list directly below the tabs row when in List view */}
                                             {view === "list" && (
                                                 <div className="mt-2 pt-2 border-t border-slate-100">
-                                                    <div className="mb-2 text-sm font-semibold text-slate-900">
-                                                        Tasks
-                                                    </div>
                                                     {visibleTasks.length === 0 ? (
                                                         <EmptyState
                                                             title={`No tasks in List ${taskTab}`}
                                                             hint="Create your first task from Add Task."
                                                         />
                                                     ) : (
-                                                        <ul className="space-y-1">
-                                                            {visibleTasks.map((t) => (
-                                                                <li key={t.id}>
-                                                                    <button
-                                                                        className="w-full text-left px-2 py-1.5 rounded-md text-slate-900 hover:bg-slate-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition"
-                                                                        title={t.title}
-                                                                        onClick={() => setSelectedTask(t)}
-                                                                    >
-                                                                        <span className="block truncate">
-                                                                            {t.title}
-                                                                        </span>
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
+                                                        <div className="overflow-x-auto">
+                                                            <table className="min-w-full text-sm">
+                                                                <thead className="bg-slate-50 text-slate-700">
+                                                                    <tr>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Task
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Assignee
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Status
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Priority
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Importance
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Quadrant
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Goal
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Tags
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Files
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Deadline
+                                                                        </th>
+                                                                        <th className="text-left font-semibold px-2 py-2">
+                                                                            Planned End
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-200">
+                                                                    {visibleTasks.map((t) => (
+                                                                        <tr key={t.id} className="hover:bg-slate-50">
+                                                                            <td className="px-2 py-2 align-top">
+                                                                                <button
+                                                                                    className="text-left font-semibold text-slate-900 hover:underline truncate max-w-[280px]"
+                                                                                    title={t.title}
+                                                                                    onClick={() => setSelectedTask(t)}
+                                                                                >
+                                                                                    {t.title}
+                                                                                </button>
+                                                                            </td>
+                                                                            <td className="px-2 py-2 text-slate-800 align-top">
+                                                                                {t.assignee || "—"}
+                                                                            </td>
+                                                                            <td className="px-2 py-2 align-top">
+                                                                                <div className="inline-flex items-center gap-2">
+                                                                                    <StatusIndicator
+                                                                                        status={t.status || "open"}
+                                                                                    />
+                                                                                    <span className="text-xs text-slate-700 capitalize">
+                                                                                        {(t.status || "open").replace(
+                                                                                            "_",
+                                                                                            " ",
+                                                                                        )}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-2 py-2 align-top">
+                                                                                <PriorityBadge
+                                                                                    priority={t.priority || "med"}
+                                                                                />
+                                                                            </td>
+                                                                            <td className="px-2 py-2 align-top">
+                                                                                <ImportanceBadge
+                                                                                    importance={t.importance || "med"}
+                                                                                />
+                                                                            </td>
+                                                                            <td className="px-2 py-2 align-top">
+                                                                                <QuadrantBadge
+                                                                                    q={t.eisenhower_quadrant}
+                                                                                />
+                                                                            </td>
+                                                                            <td className="px-2 py-2 align-top">
+                                                                                {t.goal_id ? (
+                                                                                    <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold">
+                                                                                        G#{t.goal_id}
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                                                                        Trap
+                                                                                    </span>
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="px-2 py-2 text-slate-700 align-top">
+                                                                                {t.tags
+                                                                                    ? t.tags.split(",").filter(Boolean)
+                                                                                          .length
+                                                                                    : 0}
+                                                                            </td>
+                                                                            <td className="px-2 py-2 text-slate-700 align-top">
+                                                                                {t.attachments
+                                                                                    ? t.attachments
+                                                                                          .split(",")
+                                                                                          .filter(Boolean).length
+                                                                                    : 0}
+                                                                            </td>
+                                                                            <td className="px-2 py-2 text-slate-700 align-top">
+                                                                                {t.deadline
+                                                                                    ? new Date(
+                                                                                          t.deadline,
+                                                                                      ).toLocaleString()
+                                                                                    : "—"}
+                                                                            </td>
+                                                                            <td className="px-2 py-2 text-slate-700 align-top">
+                                                                                {t.end_date
+                                                                                    ? new Date(
+                                                                                          t.end_date,
+                                                                                      ).toLocaleString()
+                                                                                    : "—"}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Your activities card */}
+                                        {/* Your activities card — commented out per request
                                         <div className="bg-white rounded-xl border border-slate-200 p-4">
                                             <div className="flex items-center justify-between">
                                                 <div className="text-sm font-semibold">Your activities</div>
@@ -1652,6 +1758,7 @@ export default function KeyAreas() {
                                                 </div>
                                             </div>
                                         </div>
+                                        */}
                                     </div>
 
                                     {/* Summary card removed per request */}
