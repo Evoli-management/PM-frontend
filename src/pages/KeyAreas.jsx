@@ -1011,6 +1011,7 @@ export default function KeyAreas() {
         window.addEventListener("sidebar-keyareas-click", showAll);
         window.addEventListener("sidebar-ideas-click", selectIdeas);
 
+        
         // also respect query params when navigated via Link
         const params = new URLSearchParams(location.search);
         if (params.get("view") === "all") showAll();
