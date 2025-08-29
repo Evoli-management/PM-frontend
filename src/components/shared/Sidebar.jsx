@@ -22,6 +22,19 @@ const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
     // Tasks & Activities removed per request
     { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
+    // Quick access for tasks not tied to Key Areas ("Activity Trap")
+    {
+        label: "Don't Forget",
+        icon: (
+            <img
+                src={`${import.meta.env.BASE_URL}dont-forget.png`}
+                alt="Don't forget"
+                className="w-5 h-5 object-contain"
+            />
+        ),
+        to: { pathname: "/tasks", search: "?dontforget=1" },
+        section: "Main",
+    },
     { label: "Goals & Tracking", icon: <FaBullseye />, to: "/goals", section: "Main", badge: 2 },
     {
         label: "Key Areas",
