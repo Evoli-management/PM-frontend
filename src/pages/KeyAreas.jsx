@@ -817,6 +817,17 @@ export default function KeyAreas() {
         assignee: "",
     });
 
+    // Expanded inline activities (tree mode) per task id
+    const [expandedActivityRows, setExpandedActivityRows] = useState(new Set());
+    const toggleActivitiesRow = (id) => {
+        setExpandedActivityRows((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
     // Activities associated to tasks: { [taskIdOrNew]: [{ id, text, createdAt }] }
     const [activitiesByTask, setActivitiesByTask] = useState({});
     const [activityTaskId, setActivityTaskId] = useState("new");
@@ -1967,7 +1978,44 @@ export default function KeyAreas() {
                                                                         <th className="px-3 py-2 text-left font-semibold">
                                                                             Duration
                                                                         </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold w-10"></th>
+                                                                        <th
+                                                                            className="px-3 py-2 text-center font-semibold w-16"
+                                                                            title="Activities"
+                                                                        >
+                                                                            {/* Hamburger as column name */}
+                                                                            <span className="inline-flex items-center justify-center w-full text-slate-700">
+                                                                                <svg
+                                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                                    width="16"
+                                                                                    height="16"
+                                                                                    viewBox="0 0 24 24"
+                                                                                    fill="none"
+                                                                                    stroke="currentColor"
+                                                                                    strokeWidth="2"
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                >
+                                                                                    <line
+                                                                                        x1="3"
+                                                                                        y1="6"
+                                                                                        x2="21"
+                                                                                        y2="6"
+                                                                                    />
+                                                                                    <line
+                                                                                        x1="3"
+                                                                                        y1="12"
+                                                                                        x2="21"
+                                                                                        y2="12"
+                                                                                    />
+                                                                                    <line
+                                                                                        x1="3"
+                                                                                        y1="18"
+                                                                                        x2="21"
+                                                                                        y2="18"
+                                                                                    />
+                                                                                </svg>
+                                                                            </span>
+                                                                        </th>
                                                                     </tr>
                                                                 </thead>
 
@@ -1981,150 +2029,198 @@ export default function KeyAreas() {
                                                                                 priority: t.priority,
                                                                             });
                                                                         return (
-                                                                            <tr
-                                                                                key={t.id}
-                                                                                className="border-t border-slate-200 hover:bg-slate-50"
-                                                                            >
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        aria-label={`Select ${t.title}`}
-                                                                                        checked={isSelected(t.id)}
-                                                                                        onChange={() =>
-                                                                                            toggleSelect(t.id)
-                                                                                        }
-                                                                                    />
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <button
-                                                                                        className="text-blue-700 hover:underline font-semibold"
-                                                                                        title="Click to open task"
-                                                                                        onClick={() => {
-                                                                                            setSlideOverInitialTab(
-                                                                                                "details",
-                                                                                            );
-                                                                                            setSelectedTask(t);
-                                                                                        }}
-                                                                                    >
-                                                                                        {t.title}
-                                                                                    </button>
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.assignee || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <StatusIndicator
-                                                                                            status={t.status || "open"}
+                                                                            <React.Fragment key={t.id}>
+                                                                                <tr className="border-t border-slate-200 hover:bg-slate-50">
+                                                                                    <td className="px-3 py-2 align-top">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            aria-label={`Select ${t.title}`}
+                                                                                            checked={isSelected(t.id)}
+                                                                                            onChange={() =>
+                                                                                                toggleSelect(t.id)
+                                                                                            }
                                                                                         />
-                                                                                        <span className="capitalize text-slate-800">
-                                                                                            {String(
-                                                                                                t.status || "open",
-                                                                                            ).replace("_", " ")}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top">
+                                                                                        <div className="flex items-start gap-2">
+                                                                                            <span
+                                                                                                className={`mt-0.5 inline-block text-sm font-bold ${
+                                                                                                    (t.priority ||
+                                                                                                        "med") ===
+                                                                                                    "high"
+                                                                                                        ? "text-red-600"
+                                                                                                        : (t.priority ||
+                                                                                                                "med") ===
+                                                                                                            "low"
+                                                                                                          ? "text-emerald-600"
+                                                                                                          : "text-amber-600"
+                                                                                                }`}
+                                                                                                title={`Priority: ${t.priority || "med"}`}
+                                                                                            >
+                                                                                                !
+                                                                                            </span>
+                                                                                            <button
+                                                                                                className="text-blue-700 hover:underline font-semibold"
+                                                                                                title="Click to open task"
+                                                                                                onClick={() => {
+                                                                                                    setSlideOverInitialTab(
+                                                                                                        "details",
+                                                                                                    );
+                                                                                                    setSelectedTask(t);
+                                                                                                }}
+                                                                                            >
+                                                                                                {t.title}
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        {t.assignee || "—"}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <StatusIndicator
+                                                                                                status={
+                                                                                                    t.status || "open"
+                                                                                                }
+                                                                                            />
+                                                                                            <span className="capitalize text-slate-800">
+                                                                                                {String(
+                                                                                                    t.status || "open",
+                                                                                                ).replace("_", " ")}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top">
+                                                                                        <PriorityBadge
+                                                                                            priority={
+                                                                                                t.priority || "med"
+                                                                                            }
+                                                                                        />
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top">
+                                                                                        <QuadrantBadge q={q} />
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        {t.goal_id ? (
+                                                                                            `#${t.goal_id}`
+                                                                                        ) : (
+                                                                                            <span className="text-slate-500">
+                                                                                                Trap
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top max-w-[240px]">
+                                                                                        <span className="block truncate text-slate-800">
+                                                                                            {(t.tags || "")
+                                                                                                .split(",")
+                                                                                                .filter(Boolean)
+                                                                                                .slice(0, 4)
+                                                                                                .join(", ") || "—"}
                                                                                         </span>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <PriorityBadge
-                                                                                        priority={t.priority || "med"}
-                                                                                    />
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <QuadrantBadge q={q} />
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.goal_id ? (
-                                                                                        `#${t.goal_id}`
-                                                                                    ) : (
-                                                                                        <span className="text-slate-500">
-                                                                                            Trap
-                                                                                        </span>
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top max-w-[240px]">
-                                                                                    <span className="block truncate text-slate-800">
-                                                                                        {(t.tags || "")
-                                                                                            .split(",")
-                                                                                            .filter(Boolean)
-                                                                                            .slice(0, 4)
-                                                                                            .join(", ") || "—"}
-                                                                                    </span>
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.start_date) || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.deadline) || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.end_date) || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {formatDuration(
-                                                                                        t.start_date || t.deadline,
-                                                                                        t.end_date,
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-right">
-                                                                                    <button
-                                                                                        title="Show activities"
-                                                                                        className="p-2 rounded hover:bg-slate-100 text-slate-600"
-                                                                                        onClick={(e) => {
-                                                                                            const rect =
-                                                                                                e.currentTarget.getBoundingClientRect();
-                                                                                            const top =
-                                                                                                rect.bottom +
-                                                                                                window.scrollY +
-                                                                                                6;
-                                                                                            const left =
-                                                                                                rect.right +
-                                                                                                window.scrollX -
-                                                                                                288; // 18rem width
-                                                                                            setActivitiesMenuPos({
-                                                                                                top,
-                                                                                                left: Math.max(8, left),
-                                                                                            });
-                                                                                            setOpenActivitiesMenu(
-                                                                                                (cur) =>
-                                                                                                    cur === t.id
-                                                                                                        ? null
-                                                                                                        : t.id,
-                                                                                            );
-                                                                                        }}
-                                                                                    >
-                                                                                        <svg
-                                                                                            xmlns="http://www.w3.org/2000/svg"
-                                                                                            width="16"
-                                                                                            height="16"
-                                                                                            viewBox="0 0 24 24"
-                                                                                            fill="none"
-                                                                                            stroke="currentColor"
-                                                                                            strokeWidth="2"
-                                                                                            strokeLinecap="round"
-                                                                                            strokeLinejoin="round"
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        {toDateOnly(t.start_date) ||
+                                                                                            "—"}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        {toDateOnly(t.deadline) || "—"}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        {toDateOnly(t.end_date) || "—"}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                                                        {formatDuration(
+                                                                                            t.start_date || t.deadline,
+                                                                                            t.end_date,
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 align-top text-center w-16">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            title="Show activities inline"
+                                                                                            onClick={() =>
+                                                                                                toggleActivitiesRow(
+                                                                                                    t.id,
+                                                                                                )
+                                                                                            }
+                                                                                            className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-semibold min-w-[1.5rem] border ${
+                                                                                                expandedActivityRows.has(
+                                                                                                    t.id,
+                                                                                                )
+                                                                                                    ? "bg-blue-100 text-blue-700 border-blue-200"
+                                                                                                    : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                                                                            }`}
                                                                                         >
-                                                                                            <line
-                                                                                                x1="3"
-                                                                                                y1="6"
-                                                                                                x2="21"
-                                                                                                y2="6"
-                                                                                            />
-                                                                                            <line
-                                                                                                x1="3"
-                                                                                                y1="12"
-                                                                                                x2="21"
-                                                                                                y2="12"
-                                                                                            />
-                                                                                            <line
-                                                                                                x1="3"
-                                                                                                y1="18"
-                                                                                                x2="21"
-                                                                                                y2="18"
-                                                                                            />
-                                                                                        </svg>
-                                                                                    </button>
-                                                                                </td>
-                                                                            </tr>
+                                                                                            {(() => {
+                                                                                                const c = (
+                                                                                                    activitiesByTask[
+                                                                                                        String(t.id)
+                                                                                                    ] || []
+                                                                                                ).length;
+                                                                                                return c || 0;
+                                                                                            })()}
+                                                                                        </button>
+                                                                                    </td>
+                                                                                </tr>
+                                                                                {expandedActivityRows.has(t.id) && (
+                                                                                    <tr className="bg-slate-50">
+                                                                                        <td
+                                                                                            colSpan={13}
+                                                                                            className="px-3 py-2"
+                                                                                        >
+                                                                                            <div className="pl-8">
+                                                                                                <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+                                                                                                    Activities
+                                                                                                </div>
+                                                                                                {(() => {
+                                                                                                    const list =
+                                                                                                        activitiesByTask[
+                                                                                                            String(t.id)
+                                                                                                        ] || [];
+                                                                                                    if (!list.length)
+                                                                                                        return (
+                                                                                                            <div className="text-sm text-slate-500">
+                                                                                                                No
+                                                                                                                activities
+                                                                                                                yet.
+                                                                                                            </div>
+                                                                                                        );
+                                                                                                    return (
+                                                                                                        <ul className="space-y-1">
+                                                                                                            {list.map(
+                                                                                                                (a) => (
+                                                                                                                    <li
+                                                                                                                        key={
+                                                                                                                            a.id
+                                                                                                                        }
+                                                                                                                        className="text-sm text-slate-800 flex items-start gap-2"
+                                                                                                                    >
+                                                                                                                        <span className="mt-1 inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                                                                                        <div>
+                                                                                                                            <div className="leading-5">
+                                                                                                                                {
+                                                                                                                                    a.text
+                                                                                                                                }
+                                                                                                                            </div>
+                                                                                                                            {a.createdAt ? (
+                                                                                                                                <div className="text-[11px] text-slate-500">
+                                                                                                                                    {new Date(
+                                                                                                                                        a.createdAt,
+                                                                                                                                    ).toLocaleString()}
+                                                                                                                                </div>
+                                                                                                                            ) : null}
+                                                                                                                        </div>
+                                                                                                                    </li>
+                                                                                                                ),
+                                                                                                            )}
+                                                                                                        </ul>
+                                                                                                    );
+                                                                                                })()}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                )}
+                                                                            </React.Fragment>
                                                                         );
                                                                     })}
                                                                 </tbody>
