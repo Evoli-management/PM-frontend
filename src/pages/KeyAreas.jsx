@@ -36,21 +36,6 @@ function StatusIndicator({ status }) {
     return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} title={`Status: ${status}`} />;
 }
 
-const ImportanceBadge = ({ importance = "med" }) => {
-    const map = {
-        low: "bg-slate-100 text-slate-700",
-        med: "bg-indigo-100 text-indigo-700",
-        high: "bg-purple-100 text-purple-700",
-    };
-    return (
-        <span
-            className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[importance] || "bg-slate-100 text-slate-700"}`}
-        >
-            {importance}
-        </span>
-    );
-};
-
 const PriorityBadge = ({ priority = "med" }) => {
     const map = {
         low: "bg-emerald-100 text-emerald-700",
@@ -88,9 +73,30 @@ const EmptyState = ({ title = "Nothing here", hint = "" }) => (
     </div>
 );
 
-// very small heuristic for quadrant based on importance and time
-const computeEisenhowerQuadrant = ({ deadline, end_date, importance = "med" }) => {
-    const important = importance === "high" || importance === "med";
+// normalize a date value (ISO string or YYYY-MM-DD) to YYYY-MM-DD
+const toDateOnly = (val) => {
+    if (!val) return "";
+    // if already date-only
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+};
+
+// format duration between two ISO timestamps (start, end)
+const formatDuration = (startIso, endIso) => {
+    if (!startIso || !endIso) return "—";
+    // treat inputs as date-only if provided that way
+    const start = new Date(toDateOnly(startIso)).getTime();
+    const end = new Date(toDateOnly(endIso)).getTime();
+    if (isNaN(start) || isNaN(end)) return "—";
+    const days = Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+    return `${days}d`;
+};
+
+// very small heuristic for quadrant based on priority and time
+const computeEisenhowerQuadrant = ({ deadline, end_date, priority = "med" }) => {
+    const important = priority === "high" || priority === "med";
     const dueSoon = (() => {
         const ref = deadline || end_date;
         if (!ref) return false;
@@ -164,7 +170,7 @@ const api = {
                     assignee: "Alex",
                     status: "open",
                     priority: "med",
-                    importance: "high",
+                    start_date: new Date(now + 1000 * 60 * 60 * 24 * 1).toISOString(),
                     goal_id: "",
                     tags: "q3,planning",
                     attachments: "",
@@ -181,7 +187,7 @@ const api = {
                     assignee: "Jamie",
                     status: "in_progress",
                     priority: "high",
-                    importance: "med",
+                    start_date: new Date(now + 1000 * 60 * 60 * 24 * 8).toISOString(),
                     goal_id: "",
                     tags: "metrics,report",
                     attachments: "",
@@ -255,9 +261,7 @@ const CalendarView = ({ tasks = [], onSelect }) => (
                     className="px-2 py-1 bg-white border rounded shadow-sm text-left"
                 >
                     <div className="font-semibold truncate">{t.title}</div>
-                    <div className="text-xs text-slate-500">
-                        {t.deadline ? new Date(t.deadline).toLocaleString() : "—"}
-                    </div>
+                    <div className="text-xs text-slate-500">{toDateOnly(t.deadline) || "—"}</div>
                 </button>
             ))}
         </div>
@@ -276,6 +280,7 @@ function TaskSlideOver({
     onAddActivity,
     onDeleteActivity,
     onClearActivities,
+    initialTab = "details",
 }) {
     const [form, setForm] = useState(null);
     const [activeTab, setActiveTab] = useState("details"); // details | activities
@@ -291,7 +296,7 @@ function TaskSlideOver({
             return;
         }
 
-        setActiveTab("details");
+        setActiveTab(initialTab || "details");
         setForm({
             ...task,
             attachmentsFiles: task.attachments
@@ -311,7 +316,7 @@ function TaskSlideOver({
         } catch (e) {
             setTaskActivities([]);
         }
-    }, [task]);
+    }, [task, initialTab]);
 
     // When switching target (this task vs new), load that list
     useEffect(() => {
@@ -364,8 +369,9 @@ function TaskSlideOver({
         const payload = {
             ...form,
             attachments: attachmentsNames.join(","),
-            deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
-            end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
+            start_date: form.start_date ? toDateOnly(form.start_date) : null,
+            deadline: form.deadline ? toDateOnly(form.deadline) : null,
+            end_date: form.end_date ? toDateOnly(form.end_date) : null,
         };
         onSave(payload);
     };
@@ -433,35 +439,36 @@ function TaskSlideOver({
 
                                     <div>
                                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                            <label className="text-sm font-semibold text-slate-900">Start Date</label>
+                                            <input
+                                                type="date"
+                                                value={toDateOnly(form.start_date)}
+                                                onChange={(e) => setForm((s) => ({ ...s, start_date: e.target.value }))}
+                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
+
+                                        <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
                                             <label className="text-sm font-semibold text-slate-900">Deadline</label>
                                             <input
-                                                type="datetime-local"
-                                                value={
-                                                    form.deadline
-                                                        ? new Date(form.deadline).toISOString().slice(0, 16)
-                                                        : ""
-                                                }
+                                                type="date"
+                                                value={toDateOnly(form.deadline)}
                                                 onChange={(e) => setForm((s) => ({ ...s, deadline: e.target.value }))}
                                                 className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                                 disabled={readOnly}
                                             />
-                                            <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
                                         </div>
 
                                         <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
                                             <label className="text-sm font-semibold text-slate-900">Planned End</label>
                                             <input
-                                                type="datetime-local"
-                                                value={
-                                                    form.end_date
-                                                        ? new Date(form.end_date).toISOString().slice(0, 16)
-                                                        : ""
-                                                }
+                                                type="date"
+                                                value={toDateOnly(form.end_date)}
                                                 onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))}
                                                 className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                                 disabled={readOnly}
                                             />
-                                            <div className="text-xs text-slate-500 mt-1">mm/dd/yyyy, --:--</div>
                                         </div>
                                     </div>
 
@@ -572,19 +579,6 @@ function TaskSlideOver({
                                     </div>
 
                                     <div className="grid md:grid-cols-2 gap-2">
-                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                            <label className="text-sm font-semibold text-slate-900">Importance</label>
-                                            <select
-                                                value={form.importance || "med"}
-                                                onChange={(e) => setForm((s) => ({ ...s, importance: e.target.value }))}
-                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                            >
-                                                <option value="low">Low</option>
-                                                <option value="med">Medium</option>
-                                                <option value="high">High</option>
-                                            </select>
-                                        </div>
-
                                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
                                             <label className="text-sm font-semibold text-slate-900">List (Tab)</label>
                                             <input
@@ -777,6 +771,20 @@ export default function KeyAreas() {
     const [searchTerm, setSearchTerm] = useState("");
     const [quadrant, setQuadrant] = useState("all");
     const [selectedTask, setSelectedTask] = useState(null);
+    const [slideOverInitialTab, setSlideOverInitialTab] = useState("details");
+    // Inline Activities popover state
+    const [openActivitiesMenu, setOpenActivitiesMenu] = useState(null); // task id or null
+    const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
+    // Mass edit selection & form state
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [bulkForm, setBulkForm] = useState({
+        assignee: "",
+        status: "",
+        priority: "",
+        start_date: "",
+        deadline: "",
+        end_date: "",
+    });
     const [view, setView] = useState("list");
     const [goals, setGoals] = useState([]);
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -795,9 +803,9 @@ export default function KeyAreas() {
         title: "",
         description: "",
         list_index: 1,
-        importance: "med",
         category: "Key Areas",
         goal_id: "",
+        start_date: "",
         deadline: "",
         end_date: "",
         status: "open",
@@ -871,6 +879,18 @@ export default function KeyAreas() {
             setLoading(false);
         })();
     }, []);
+
+    // Close activities popover on Escape
+    useEffect(() => {
+        if (!openActivitiesMenu) return;
+        const onKey = (e) => {
+            if (e.key === "Escape") setOpenActivitiesMenu(null);
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [openActivitiesMenu]);
+
+    // no global listeners needed for initial tab
 
     // Prime Sidebar with cached key areas immediately (before async load completes)
     useEffect(() => {
@@ -1271,6 +1291,70 @@ export default function KeyAreas() {
         return arr;
     }, [allTasks, taskTab, searchTerm, quadrant]);
 
+    // Selection helpers
+    const isSelected = (id) => selectedIds.has(id);
+    const toggleSelect = (id) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+    const clearSelection = () => setSelectedIds(new Set());
+    const selectAllVisible = () => {
+        const all = new Set(selectedIds);
+        const allSelected = visibleTasks.every((t) => all.has(t.id));
+        if (allSelected) {
+            // unselect all visible
+            visibleTasks.forEach((t) => all.delete(t.id));
+        } else {
+            visibleTasks.forEach((t) => all.add(t.id));
+        }
+        setSelectedIds(all);
+    };
+
+    const applyBulkEdit = async (e) => {
+        e.preventDefault();
+        if (!selectedKA) return;
+        if (selectedIds.size === 0) return;
+        // Build patch of only provided fields
+        const patch = {};
+        if (bulkForm.assignee.trim()) patch.assignee = bulkForm.assignee.trim();
+        if (bulkForm.status) patch.status = bulkForm.status;
+        if (bulkForm.priority) patch.priority = bulkForm.priority;
+        if (bulkForm.start_date) patch.start_date = toDateOnly(bulkForm.start_date);
+        if (bulkForm.deadline) patch.deadline = toDateOnly(bulkForm.deadline);
+        if (bulkForm.end_date) patch.end_date = toDateOnly(bulkForm.end_date);
+        const hasAny = Object.keys(patch).length > 0;
+        if (!hasAny) return;
+
+        const updates = [];
+        for (const id of Array.from(selectedIds)) {
+            const original = allTasks.find((t) => String(t.id) === String(id));
+            if (!original) continue;
+            const next = { ...original, ...patch };
+            next.eisenhower_quadrant = computeEisenhowerQuadrant({
+                deadline: next.deadline,
+                end_date: next.end_date,
+                priority: next.priority,
+            });
+            // Persist
+            // eslint-disable-next-line no-await-in-loop
+            const saved = await api.updateTask(next.id, next);
+            updates.push(saved);
+        }
+        // Update state in one pass
+        setAllTasks((prev) => {
+            const map = new Map(prev.map((t) => [String(t.id), t]));
+            updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
+            return Array.from(map.values());
+        });
+        // Reset bulk form and selection
+        setBulkForm({ assignee: "", status: "", priority: "", start_date: "", deadline: "", end_date: "" });
+        clearSelection();
+    };
+
     const onCreateTask = async (e) => {
         e.preventDefault();
         if (!selectedKA) return;
@@ -1280,7 +1364,6 @@ export default function KeyAreas() {
         const title = f.get("title").toString().trim();
         if (!title) return;
 
-        const importance = f.get("importance").toString();
         const category = f.get("category").toString();
         const status = f.get("status").toString();
         const priority = f.get("priority").toString();
@@ -1294,8 +1377,9 @@ export default function KeyAreas() {
         const allNames = Array.from(new Set([...(stateNames || []), ...deviceNames]));
         const attachments = allNames.join(",");
         const assignee = f.get("assignee").toString();
-        const deadline = f.get("deadline") ? new Date(f.get("deadline")).toISOString() : null;
-        const end_date = f.get("end_date") ? new Date(f.get("end_date")).toISOString() : null;
+        const start_date = f.get("start_date") ? toDateOnly(f.get("start_date")) : null;
+        const deadline = f.get("deadline") ? toDateOnly(f.get("deadline")) : null;
+        const end_date = f.get("end_date") ? toDateOnly(f.get("end_date")) : null;
 
         const payload = {
             key_area_id: selectedKA.id,
@@ -1303,10 +1387,10 @@ export default function KeyAreas() {
             description: f.get("description").toString(),
             status,
             priority,
-            importance,
             category,
             goal_id: f.get("goal_id").toString() || null,
             list_index: Number(f.get("list_index")) || 1,
+            start_date,
             deadline,
             end_date,
             tags,
@@ -1315,7 +1399,7 @@ export default function KeyAreas() {
             assignee,
         };
 
-        payload.eisenhower_quadrant = computeEisenhowerQuadrant({ deadline, end_date, importance });
+        payload.eisenhower_quadrant = computeEisenhowerQuadrant({ deadline, end_date, priority });
 
         const created = await api.createTask(payload);
         setAllTasks((prev) => [...prev, created]);
@@ -1325,6 +1409,7 @@ export default function KeyAreas() {
             title: "",
             description: "",
             goal_id: "",
+            start_date: "",
             deadline: "",
             end_date: "",
             tags: "",
@@ -1340,7 +1425,7 @@ export default function KeyAreas() {
         const q = computeEisenhowerQuadrant({
             deadline: updated.deadline,
             end_date: updated.end_date,
-            importance: updated.importance,
+            priority: updated.priority,
         });
         const payload = { ...updated, eisenhower_quadrant: q };
         const saved = await api.updateTask(payload.id, payload);
@@ -1675,6 +1760,157 @@ export default function KeyAreas() {
                                             {/* Render the tasks list directly below the tabs row when in List view */}
                                             {view === "list" && (
                                                 <div className="pt-2 border-t border-slate-100">
+                                                    {selectedIds.size > 0 && (
+                                                        <form
+                                                            onSubmit={applyBulkEdit}
+                                                            className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg"
+                                                            aria-label="Mass edit selected tasks"
+                                                        >
+                                                            <div className="flex items-center flex-wrap gap-2">
+                                                                <div className="text-sm font-semibold text-amber-900 mr-2">
+                                                                    Mass edit ({selectedIds.size} selected):
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <label
+                                                                        htmlFor="bulk-assignee"
+                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
+                                                                    >
+                                                                        Assignee
+                                                                    </label>
+                                                                    <input
+                                                                        id="bulk-assignee"
+                                                                        value={bulkForm.assignee}
+                                                                        onChange={(e) =>
+                                                                            setBulkForm((s) => ({
+                                                                                ...s,
+                                                                                assignee: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="px-2 py-1 border rounded text-sm bg-white"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <label
+                                                                        htmlFor="bulk-status"
+                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
+                                                                    >
+                                                                        Status
+                                                                    </label>
+                                                                    <select
+                                                                        id="bulk-status"
+                                                                        value={bulkForm.status}
+                                                                        onChange={(e) =>
+                                                                            setBulkForm((s) => ({
+                                                                                ...s,
+                                                                                status: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="px-2 py-1 border rounded text-sm bg-white"
+                                                                    >
+                                                                        <option value="">Status…</option>
+                                                                        <option value="open">Open</option>
+                                                                        <option value="in_progress">In Progress</option>
+                                                                        <option value="done">Done</option>
+                                                                        <option value="cancelled">Cancelled</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <label
+                                                                        htmlFor="bulk-priority"
+                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
+                                                                    >
+                                                                        Priority
+                                                                    </label>
+                                                                    <select
+                                                                        id="bulk-priority"
+                                                                        value={bulkForm.priority}
+                                                                        onChange={(e) =>
+                                                                            setBulkForm((s) => ({
+                                                                                ...s,
+                                                                                priority: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="px-2 py-1 border rounded text-sm bg-white"
+                                                                    >
+                                                                        <option value="">Priority…</option>
+                                                                        <option value="low">Low</option>
+                                                                        <option value="med">Medium</option>
+                                                                        <option value="high">High</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <label
+                                                                        htmlFor="bulk-start"
+                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
+                                                                    >
+                                                                        Start Date
+                                                                    </label>
+                                                                    <input
+                                                                        id="bulk-start"
+                                                                        type="date"
+                                                                        value={bulkForm.start_date}
+                                                                        onChange={(e) =>
+                                                                            setBulkForm((s) => ({
+                                                                                ...s,
+                                                                                start_date: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="px-2 py-1 border rounded text-sm bg-white"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <label
+                                                                        htmlFor="bulk-deadline"
+                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
+                                                                    >
+                                                                        Deadline
+                                                                    </label>
+                                                                    <input
+                                                                        id="bulk-deadline"
+                                                                        type="date"
+                                                                        value={bulkForm.deadline}
+                                                                        onChange={(e) =>
+                                                                            setBulkForm((s) => ({
+                                                                                ...s,
+                                                                                deadline: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="px-2 py-1 border rounded text-sm bg-white"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <label
+                                                                        htmlFor="bulk-end"
+                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
+                                                                    >
+                                                                        Planned End
+                                                                    </label>
+                                                                    <input
+                                                                        id="bulk-end"
+                                                                        type="date"
+                                                                        value={bulkForm.end_date}
+                                                                        onChange={(e) =>
+                                                                            setBulkForm((s) => ({
+                                                                                ...s,
+                                                                                end_date: e.target.value,
+                                                                            }))
+                                                                        }
+                                                                        className="px-2 py-1 border rounded text-sm bg-white"
+                                                                    />
+                                                                </div>
+                                                                <button className="ml-2 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm">
+                                                                    Apply
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={clearSelection}
+                                                                    className="px-2 py-1 rounded bg-white border border-slate-200 text-slate-700 text-sm hover:bg-slate-50"
+                                                                >
+                                                                    Clear
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    )}
                                                     {visibleTasks.length === 0 ? (
                                                         <EmptyState
                                                             title={`No tasks in List ${taskTab}`}
@@ -1685,6 +1921,19 @@ export default function KeyAreas() {
                                                             <table className="min-w-full text-sm">
                                                                 <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                     <tr>
+                                                                        <th className="px-3 py-2 text-left w-8">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                aria-label="Select all visible"
+                                                                                checked={
+                                                                                    visibleTasks.length > 0 &&
+                                                                                    visibleTasks.every((t) =>
+                                                                                        selectedIds.has(t.id),
+                                                                                    )
+                                                                                }
+                                                                                onChange={selectAllVisible}
+                                                                            />
+                                                                        </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
                                                                             Task
                                                                         </th>
@@ -1698,9 +1947,6 @@ export default function KeyAreas() {
                                                                             Priority
                                                                         </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
-                                                                            Importance
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
                                                                             Quadrant
                                                                         </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
@@ -1710,7 +1956,7 @@ export default function KeyAreas() {
                                                                             Tags
                                                                         </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
-                                                                            Files
+                                                                            Start Date
                                                                         </th>
                                                                         <th className="px-3 py-2 text-left font-semibold">
                                                                             Deadline
@@ -1718,20 +1964,21 @@ export default function KeyAreas() {
                                                                         <th className="px-3 py-2 text-left font-semibold">
                                                                             Planned End
                                                                         </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Duration
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-left font-semibold w-10"></th>
                                                                     </tr>
                                                                 </thead>
 
                                                                 <tbody className="bg-white">
                                                                     {visibleTasks.map((t) => {
-                                                                        const filesCount = (t.attachments || "")
-                                                                            .split(",")
-                                                                            .filter(Boolean).length;
                                                                         const q =
                                                                             t.eisenhower_quadrant ||
                                                                             computeEisenhowerQuadrant({
                                                                                 deadline: t.deadline,
                                                                                 end_date: t.end_date,
-                                                                                importance: t.importance,
+                                                                                priority: t.priority,
                                                                             });
                                                                         return (
                                                                             <tr
@@ -1739,12 +1986,25 @@ export default function KeyAreas() {
                                                                                 className="border-t border-slate-200 hover:bg-slate-50"
                                                                             >
                                                                                 <td className="px-3 py-2 align-top">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        aria-label={`Select ${t.title}`}
+                                                                                        checked={isSelected(t.id)}
+                                                                                        onChange={() =>
+                                                                                            toggleSelect(t.id)
+                                                                                        }
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
                                                                                     <button
                                                                                         className="text-blue-700 hover:underline font-semibold"
-                                                                                        title={t.title}
-                                                                                        onClick={() =>
-                                                                                            setSelectedTask(t)
-                                                                                        }
+                                                                                        title="Click to open task"
+                                                                                        onClick={() => {
+                                                                                            setSlideOverInitialTab(
+                                                                                                "details",
+                                                                                            );
+                                                                                            setSelectedTask(t);
+                                                                                        }}
                                                                                     >
                                                                                         {t.title}
                                                                                     </button>
@@ -1770,13 +2030,6 @@ export default function KeyAreas() {
                                                                                     />
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top">
-                                                                                    <ImportanceBadge
-                                                                                        importance={
-                                                                                            t.importance || "med"
-                                                                                        }
-                                                                                    />
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
                                                                                     <QuadrantBadge q={q} />
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
@@ -1798,21 +2051,78 @@ export default function KeyAreas() {
                                                                                     </span>
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {filesCount}
+                                                                                    {toDateOnly(t.start_date) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.deadline
-                                                                                        ? new Date(
-                                                                                              t.deadline,
-                                                                                          ).toLocaleString()
-                                                                                        : "—"}
+                                                                                    {toDateOnly(t.deadline) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.end_date
-                                                                                        ? new Date(
-                                                                                              t.end_date,
-                                                                                          ).toLocaleString()
-                                                                                        : "—"}
+                                                                                    {toDateOnly(t.end_date) || "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {formatDuration(
+                                                                                        t.start_date || t.deadline,
+                                                                                        t.end_date,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-right">
+                                                                                    <button
+                                                                                        title="Show activities"
+                                                                                        className="p-2 rounded hover:bg-slate-100 text-slate-600"
+                                                                                        onClick={(e) => {
+                                                                                            const rect =
+                                                                                                e.currentTarget.getBoundingClientRect();
+                                                                                            const top =
+                                                                                                rect.bottom +
+                                                                                                window.scrollY +
+                                                                                                6;
+                                                                                            const left =
+                                                                                                rect.right +
+                                                                                                window.scrollX -
+                                                                                                288; // 18rem width
+                                                                                            setActivitiesMenuPos({
+                                                                                                top,
+                                                                                                left: Math.max(8, left),
+                                                                                            });
+                                                                                            setOpenActivitiesMenu(
+                                                                                                (cur) =>
+                                                                                                    cur === t.id
+                                                                                                        ? null
+                                                                                                        : t.id,
+                                                                                            );
+                                                                                        }}
+                                                                                    >
+                                                                                        <svg
+                                                                                            xmlns="http://www.w3.org/2000/svg"
+                                                                                            width="16"
+                                                                                            height="16"
+                                                                                            viewBox="0 0 24 24"
+                                                                                            fill="none"
+                                                                                            stroke="currentColor"
+                                                                                            strokeWidth="2"
+                                                                                            strokeLinecap="round"
+                                                                                            strokeLinejoin="round"
+                                                                                        >
+                                                                                            <line
+                                                                                                x1="3"
+                                                                                                y1="6"
+                                                                                                x2="21"
+                                                                                                y2="6"
+                                                                                            />
+                                                                                            <line
+                                                                                                x1="3"
+                                                                                                y1="12"
+                                                                                                x2="21"
+                                                                                                y2="12"
+                                                                                            />
+                                                                                            <line
+                                                                                                x1="3"
+                                                                                                y1="18"
+                                                                                                x2="21"
+                                                                                                y2="18"
+                                                                                            />
+                                                                                        </svg>
+                                                                                    </button>
                                                                                 </td>
                                                                             </tr>
                                                                         );
@@ -1831,6 +2141,75 @@ export default function KeyAreas() {
                                     {/* Summary card removed per request */}
                                 </div>
                             </div>
+                        )}
+                        {/* Global Activities popover (attached to hamburger) */}
+                        {openActivitiesMenu && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setOpenActivitiesMenu(null)} />
+                                <div
+                                    className="fixed z-50 w-72 bg-white border border-slate-200 rounded-lg shadow"
+                                    style={{ top: `${activitiesMenuPos.top}px`, left: `${activitiesMenuPos.left}px` }}
+                                    role="dialog"
+                                    aria-label="Task activities"
+                                >
+                                    <div className="px-3 py-2 border-b text-sm font-semibold text-slate-900">
+                                        Activities
+                                    </div>
+                                    <div className="max-h-60 overflow-auto">
+                                        {(() => {
+                                            const list = activitiesByTask[String(openActivitiesMenu)] || [];
+                                            if (!list.length)
+                                                return (
+                                                    <div className="px-3 py-3 text-sm text-slate-500">
+                                                        No activities yet.
+                                                    </div>
+                                                );
+                                            return (
+                                                <ul className="py-1">
+                                                    {list.map((a) => (
+                                                        <li
+                                                            key={a.id}
+                                                            className="px-3 py-2 text-sm text-slate-800 border-b last:border-b-0"
+                                                        >
+                                                            <div className="truncate">{a.text}</div>
+                                                            {a.createdAt ? (
+                                                                <div className="text-xs text-slate-500 mt-0.5">
+                                                                    {new Date(a.createdAt).toLocaleString()}
+                                                                </div>
+                                                            ) : null}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            );
+                                        })()}
+                                    </div>
+                                    <div className="px-3 py-2 border-t flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                                            onClick={() => {
+                                                const tsk = allTasks.find(
+                                                    (x) => String(x.id) === String(openActivitiesMenu),
+                                                );
+                                                if (tsk) {
+                                                    setSlideOverInitialTab("activities");
+                                                    setSelectedTask(tsk);
+                                                }
+                                                setOpenActivitiesMenu(null);
+                                            }}
+                                        >
+                                            Open
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="px-2 py-1 rounded bg-white border border-slate-200 text-slate-700 text-sm hover:bg-slate-50"
+                                            onClick={() => setOpenActivitiesMenu(null)}
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
                         {/* LIST: Key Areas */}
                         {!selectedKA && (
@@ -2007,12 +2386,30 @@ export default function KeyAreas() {
 
                                                             <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
                                                                 <label className="text-sm font-semibold text-slate-900">
+                                                                    Start Date
+                                                                </label>
+                                                                <input
+                                                                    name="start_date"
+                                                                    type="date"
+                                                                    value={toDateOnly(taskForm.start_date)}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            start_date: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                />
+                                                            </div>
+
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                                <label className="text-sm font-semibold text-slate-900">
                                                                     Deadline
                                                                 </label>
                                                                 <input
                                                                     name="deadline"
-                                                                    type="datetime-local"
-                                                                    value={taskForm.deadline}
+                                                                    type="date"
+                                                                    value={toDateOnly(taskForm.deadline)}
                                                                     onChange={(e) =>
                                                                         setTaskForm((s) => ({
                                                                             ...s,
@@ -2021,9 +2418,6 @@ export default function KeyAreas() {
                                                                     }
                                                                     className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                                                 />
-                                                                <div className="text-xs text-slate-500 mt-1">
-                                                                    mm/dd/yyyy, --:--
-                                                                </div>
                                                             </div>
 
                                                             <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
@@ -2032,8 +2426,8 @@ export default function KeyAreas() {
                                                                 </label>
                                                                 <input
                                                                     name="end_date"
-                                                                    type="datetime-local"
-                                                                    value={taskForm.end_date}
+                                                                    type="date"
+                                                                    value={toDateOnly(taskForm.end_date)}
                                                                     onChange={(e) =>
                                                                         setTaskForm((s) => ({
                                                                             ...s,
@@ -2042,9 +2436,6 @@ export default function KeyAreas() {
                                                                     }
                                                                     className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                                                 />
-                                                                <div className="text-xs text-slate-500 mt-1">
-                                                                    mm/dd/yyyy, --:--
-                                                                </div>
                                                             </div>
 
                                                             <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
@@ -2169,27 +2560,6 @@ export default function KeyAreas() {
                                                                         }
                                                                         className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
                                                                     />
-                                                                </div>
-
-                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                    <label className="text-sm font-semibold text-slate-900">
-                                                                        Importance
-                                                                    </label>
-                                                                    <select
-                                                                        name="importance"
-                                                                        value={taskForm.importance}
-                                                                        onChange={(e) =>
-                                                                            setTaskForm((s) => ({
-                                                                                ...s,
-                                                                                importance: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    >
-                                                                        <option value="low">Low</option>
-                                                                        <option value="med">Medium</option>
-                                                                        <option value="high">High</option>
-                                                                    </select>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2427,10 +2797,14 @@ export default function KeyAreas() {
                         <TaskSlideOver
                             task={selectedTask}
                             goals={goals}
-                            onClose={() => setSelectedTask(null)}
+                            onClose={() => {
+                                setSelectedTask(null);
+                                setSlideOverInitialTab("details");
+                            }}
                             onSave={handleSaveTask}
                             onDelete={handleDeleteTask}
                             readOnly={selectedKA?.is_default || (selectedKA?.title || "").toLowerCase() === "ideas"}
+                            initialTab={slideOverInitialTab}
                         />
                     </div>
                 </main>
