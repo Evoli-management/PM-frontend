@@ -375,6 +375,17 @@ export default function ProfileSetting() {
         oldPw: "",
         newPw: "",
         confirmPw: "",
+        // Dashboard Preferences
+        dashboardTheme: "light",
+        dashboardLayout: "default",
+        widgetPreferences: {
+            showProjects: true,
+            showTasks: true,
+            showTeam: true,
+            showRecentActivity: true,
+            showQuickActions: true,
+        },
+        dashboardRefreshRate: "auto",
     });
 
     const upd = (k) => (e) => {
@@ -384,6 +395,17 @@ export default function ProfileSetting() {
         if (errors[k]) {
             setErrors((prev) => ({ ...prev, [k]: null }));
         }
+    };
+
+    // Helper function for updating widget preferences
+    const updateWidgetPreference = (widgetKey) => (checked) => {
+        setForm((s) => ({
+            ...s,
+            widgetPreferences: {
+                ...s.widgetPreferences,
+                [widgetKey]: checked,
+            },
+        }));
     };
 
     const validateForm = () => {
@@ -897,6 +919,169 @@ export default function ProfileSetting() {
                                                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                                                     </select>
                                                 </Field>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Dashboard Preferences">
+                                            <div className="space-y-4">
+                                                {/* Dashboard Theme & Layout */}
+                                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                    <Field label="Dashboard Theme">
+                                                        <select 
+                                                            value={form.dashboardTheme}
+                                                            onChange={upd("dashboardTheme")}
+                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                        >
+                                                            <option value="light">Light Theme</option>
+                                                            <option value="dark">Dark Theme</option>
+                                                            <option value="blue">Blue Theme</option>
+                                                            <option value="green">Green Theme</option>
+                                                            <option value="purple">Purple Theme</option>
+                                                        </select>
+                                                    </Field>
+                                                    <Field label="Dashboard Layout">
+                                                        <select 
+                                                            value={form.dashboardLayout}
+                                                            onChange={upd("dashboardLayout")}
+                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                        >
+                                                            <option value="default">Default Layout</option>
+                                                            <option value="compact">Compact Layout</option>
+                                                            <option value="expanded">Expanded Layout</option>
+                                                            <option value="minimalist">Minimalist Layout</option>
+                                                        </select>
+                                                    </Field>
+                                                </div>
+
+                                                {/* Widget Visibility Settings */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Widget Visibility</h4>
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-2xl">📁</span>
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-gray-700">Projects Widget</span>
+                                                                    <p className="text-xs text-gray-500">Show projects overview and quick actions</p>
+                                                                </div>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.widgetPreferences.showProjects}
+                                                                onChange={updateWidgetPreference("showProjects")}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-2xl">✅</span>
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-gray-700">Tasks Widget</span>
+                                                                    <p className="text-xs text-gray-500">Display task summary and assignment options</p>
+                                                                </div>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.widgetPreferences.showTasks}
+                                                                onChange={updateWidgetPreference("showTasks")}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-2xl">👥</span>
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-gray-700">Team Widget</span>
+                                                                    <p className="text-xs text-gray-500">Show team overview and member management</p>
+                                                                </div>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.widgetPreferences.showTeam}
+                                                                onChange={updateWidgetPreference("showTeam")}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-2xl">📈</span>
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-gray-700">Recent Activity Widget</span>
+                                                                    <p className="text-xs text-gray-500">Display recent activity and updates</p>
+                                                                </div>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.widgetPreferences.showRecentActivity}
+                                                                onChange={updateWidgetPreference("showRecentActivity")}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-2xl">⚡</span>
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-gray-700">Quick Actions Widget</span>
+                                                                    <p className="text-xs text-gray-500">Show quick action buttons for common tasks</p>
+                                                                </div>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.widgetPreferences.showQuickActions}
+                                                                onChange={updateWidgetPreference("showQuickActions")}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Refresh Rate */}
+                                                <div className="border-t pt-4">
+                                                    <Field label="Dashboard Refresh Rate">
+                                                        <select 
+                                                            value={form.dashboardRefreshRate}
+                                                            onChange={upd("dashboardRefreshRate")}
+                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                        >
+                                                            <option value="auto">Auto Refresh</option>
+                                                            <option value="30s">Every 30 seconds</option>
+                                                            <option value="1m">Every minute</option>
+                                                            <option value="5m">Every 5 minutes</option>
+                                                            <option value="15m">Every 15 minutes</option>
+                                                            <option value="manual">Manual only</option>
+                                                        </select>
+                                                    </Field>
+                                                </div>
+
+                                                {/* Preview Card */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Dashboard Preview</h4>
+                                                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                                        <div className="text-xs text-gray-600 mb-2">Preview of your customized dashboard:</div>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {form.widgetPreferences.showProjects && (
+                                                                <div className="h-16 rounded bg-green-100 border border-green-200 flex items-center justify-center text-xs text-green-700 font-semibold">
+                                                                    📁 Projects
+                                                                </div>
+                                                            )}
+                                                            {form.widgetPreferences.showTasks && (
+                                                                <div className="h-16 rounded bg-blue-100 border border-blue-200 flex items-center justify-center text-xs text-blue-700 font-semibold">
+                                                                    ✅ Tasks
+                                                                </div>
+                                                            )}
+                                                            {form.widgetPreferences.showTeam && (
+                                                                <div className="h-16 rounded bg-purple-100 border border-purple-200 flex items-center justify-center text-xs text-purple-700 font-semibold">
+                                                                    👥 Team
+                                                                </div>
+                                                            )}
+                                                            {form.widgetPreferences.showRecentActivity && (
+                                                                <div className="h-16 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-700 font-semibold col-span-2">
+                                                                    📈 Recent Activity
+                                                                </div>
+                                                            )}
+                                                            {form.widgetPreferences.showQuickActions && (
+                                                                <div className="h-16 rounded bg-yellow-100 border border-yellow-200 flex items-center justify-center text-xs text-yellow-700 font-semibold">
+                                                                    ⚡ Quick Actions
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {!Object.values(form.widgetPreferences).some(Boolean) && (
+                                                            <div className="text-center text-gray-400 text-xs py-4">
+                                                                No widgets selected - please enable at least one widget above
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </Section>
                                     </div>
