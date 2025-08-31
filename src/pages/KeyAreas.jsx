@@ -76,7 +76,6 @@ const EmptyState = ({ title = "Nothing here", hint = "" }) => (
 // normalize a date value (ISO string or YYYY-MM-DD) to YYYY-MM-DD
 const toDateOnly = (val) => {
     if (!val) return "";
-    // if already date-only
     if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
     const d = new Date(val);
     if (isNaN(d.getTime())) return "";
@@ -86,7 +85,6 @@ const toDateOnly = (val) => {
 // format duration between two ISO timestamps (start, end)
 const formatDuration = (startIso, endIso) => {
     if (!startIso || !endIso) return "—";
-    // treat inputs as date-only if provided that way
     const start = new Date(toDateOnly(startIso)).getTime();
     const end = new Date(toDateOnly(endIso)).getTime();
     if (isNaN(start) || isNaN(end)) return "—";
@@ -116,7 +114,6 @@ const api = {
             const raw = localStorage.getItem("pm:keyareas");
             const cached = raw ? JSON.parse(raw) : [];
             if (Array.isArray(cached) && cached.length) return cached;
-            // Seed with a few defaults when empty
             const seed = [
                 { id: 1, title: "Marketing", description: "Grow brand and leads", position: 1 },
                 { id: 2, title: "Sales", description: "Close deals", position: 2 },
@@ -132,7 +129,6 @@ const api = {
         }
     },
     async listGoals() {
-        // Keep empty for now; integrate real service later
         return [];
     },
     async updateKeyArea(id, data) {
@@ -159,7 +155,6 @@ const api = {
             const raw = localStorage.getItem(`pm:tasks:${keyAreaId}`);
             const existing = raw ? JSON.parse(raw) : [];
             if (Array.isArray(existing) && existing.length > 0) return existing;
-            // Seed with two tasks if none exist for this key area
             const now = Date.now();
             const seed = [
                 {
@@ -187,12 +182,12 @@ const api = {
                     assignee: "Jamie",
                     status: "in_progress",
                     priority: "high",
-                    start_date: new Date(now + 1000 * 60 * 60 * 24 * 8).toISOString(),
+                    start_date: new Date(now + 1000 * 60 * 60 * 60 * 24 * 8).toISOString(),
                     goal_id: "",
                     tags: "metrics,report",
                     attachments: "",
-                    deadline: new Date(now + 1000 * 60 * 60 * 24 * 10).toISOString(),
-                    end_date: new Date(now + 1000 * 60 * 60 * 24 * 14).toISOString(),
+                    deadline: new Date(now + 1000 * 60 * 60 * 60 * 24 * 10).toISOString(),
+                    end_date: new Date(now + 1000 * 60 * 60 * 60 * 24 * 14).toISOString(),
                     list_index: 2,
                     recurrence: "",
                 },
@@ -221,7 +216,6 @@ const api = {
         return next.find((t) => String(t.id) === String(id)) || task;
     },
     async deleteTask(id) {
-        // find KA bucket containing this task
         const allKeys = Object.keys(localStorage).filter((k) => k.startsWith("pm:tasks:"));
         for (const key of allKeys) {
             const arr = JSON.parse(localStorage.getItem(key) || "[]");
@@ -755,6 +749,442 @@ function TaskSlideOver({
     );
 }
 
+/* ------------------------ Full Page Task Detail View ------------------------ */
+function TaskFullView({
+    task,
+    goals,
+    kaTitle,
+    readOnly = false,
+    onBack,
+    onSave,
+    onDelete,
+    activitiesByTask = {},
+    onUpdateActivities,
+    initialTab = "activities",
+}) {
+    const [tab, setTab] = useState(initialTab || "activities");
+    const [isEditing, setIsEditing] = useState(false);
+    const [form, setForm] = useState(task || null);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef(null);
+    const [newActivity, setNewActivity] = useState("");
+
+    useEffect(() => {
+        setTab(initialTab || "activities");
+    }, [initialTab]);
+
+    useEffect(() => {
+        setForm(task || null);
+    }, [task]);
+
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onClick = (e) => {
+            if (!menuRef.current) return;
+            if (!menuRef.current.contains(e.target)) setMenuOpen(false);
+        };
+        const onKey = (e) => e.key === "Escape" && setMenuOpen(false);
+        document.addEventListener("mousedown", onClick);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onClick);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, [menuOpen]);
+
+    if (!task) return null;
+
+    const list = activitiesByTask[String(task.id)] || [];
+
+    const addActivity = (text) => {
+        const t = (text || "").trim();
+        if (!t) return;
+        const item = { id: Date.now(), text: t, createdAt: new Date().toISOString() };
+        const next = [...list, item];
+        onUpdateActivities && onUpdateActivities(String(task.id), next);
+    };
+    const removeActivity = (id) => {
+        const next = list.filter((a) => a.id !== id);
+        onUpdateActivities && onUpdateActivities(String(task.id), next);
+    };
+    const clearActivities = () => {
+        if (!confirm("Clear all activities for this task?")) return;
+        onUpdateActivities && onUpdateActivities(String(task.id), []);
+    };
+
+    const save = async () => {
+        if (readOnly) return;
+        const payload = {
+            ...form,
+            start_date: form.start_date ? toDateOnly(form.start_date) : null,
+            deadline: form.deadline ? toDateOnly(form.deadline) : null,
+            end_date: form.end_date ? toDateOnly(form.end_date) : null,
+        };
+        onSave && (await onSave(payload));
+        setIsEditing(false);
+    };
+
+    const markDone = async () => {
+        if (!task) return;
+        const upd = { ...task, status: "done" };
+        onSave && (await onSave(upd));
+    };
+
+    return (
+        <div className="bg-white rounded-xl border border-slate-200">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2 p-4 border-b border-slate-200">
+                <div className="flex items-center gap-2 min-w-0">
+                    <button
+                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                        aria-label="Back to list"
+                        style={{ minWidth: 36, minHeight: 36 }}
+                        onClick={onBack}
+                    >
+                        <FaChevronLeft />
+                    </button>
+                    <div className="min-w-0">
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate" title={task.title}>
+                            {task.title}
+                        </h1>
+                        {kaTitle ? <div className="text-xs text-slate-500 truncate">in {kaTitle}</div> : null}
+                    </div>
+                </div>
+                <div className="relative" ref={menuRef}>
+                    <button
+                        className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50"
+                        aria-haspopup="menu"
+                        aria-expanded={menuOpen ? "true" : "false"}
+                        onClick={() => setMenuOpen((s) => !s)}
+                        title="Task menu"
+                    >
+                        <FaEllipsisV />
+                    </button>
+                    {menuOpen && (
+                        <div
+                            role="menu"
+                            className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10"
+                        >
+                            <div className="py-1">
+                                <button
+                                    role="menuitem"
+                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => {
+                                        setIsEditing(false);
+                                        setTab("details");
+                                        setMenuOpen(false);
+                                    }}
+                                >
+                                    View details
+                                </button>
+                                <button
+                                    role="menuitem"
+                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => {
+                                        setIsEditing(false);
+                                        setTab("activities");
+                                        setMenuOpen(false);
+                                    }}
+                                >
+                                    Show activities
+                                </button>
+                                {/* Mark as done removed per request */}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Label row: show current tab label outside the menu */}
+            <div className="px-4 pt-3 border-b border-slate-200 bg-white">
+                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg px-3 py-1">
+                    <span className="text-sm font-semibold text-slate-800 select-none">
+                        {tab === "details" ? "Details" : "Activities"}
+                    </span>
+                </div>
+            </div>
+
+            {/* Body */}
+            {tab === "activities" ? (
+                <div className="p-4">
+                    {list.length === 0 ? (
+                        <div className="text-sm text-slate-500">No activities yet.</div>
+                    ) : (
+                        <ul className="space-y-2">
+                            {list.map((a) => (
+                                <li
+                                    key={a.id}
+                                    className="text-sm text-slate-800 flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2"
+                                >
+                                    <span className="mt-1 inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                    <div className="flex-1">
+                                        <div className="leading-5">{a.text}</div>
+                                        {a.createdAt ? (
+                                            <div className="text-[11px] text-slate-500">
+                                                {new Date(a.createdAt).toLocaleString()}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <button
+                                        className="text-xs text-slate-600 hover:underline"
+                                        onClick={() => removeActivity(a.id)}
+                                    >
+                                        Remove
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className="mt-3 flex items-center gap-2">
+                        <input
+                            className="flex-1 px-3 py-2 border rounded-lg bg-white"
+                            placeholder="Add activity"
+                            value={newActivity}
+                            onChange={(e) => setNewActivity(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const t = (newActivity || "").trim();
+                                    if (!t) return;
+                                    addActivity(t);
+                                    setNewActivity("");
+                                }
+                            }}
+                        />
+                        <button
+                            className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                            onClick={() => {
+                                const t = (newActivity || "").trim();
+                                if (!t) return;
+                                addActivity(t);
+                                setNewActivity("");
+                            }}
+                        >
+                            Add
+                        </button>
+                        <button
+                            className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                            onClick={clearActivities}
+                        >
+                            Clear all
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="p-2 grid md:grid-cols-3 gap-2 items-stretch">
+                    {/* Left column: Title + Description */}
+                    <div className="md:col-span-2 h-full flex flex-col text-sm">
+                        <div className="grid grid-rows-[auto_1fr] gap-1 flex-1">
+                            <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
+                                <div className="text-[10px] uppercase tracking-wide text-slate-500">Title</div>
+                                <input
+                                    className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                    value={isEditing && !readOnly ? (form.title ?? "") : (task.title ?? "")}
+                                    onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+                                    readOnly={!isEditing || readOnly}
+                                    disabled={!isEditing || readOnly}
+                                />
+                            </div>
+                            <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
+                                <div className="text-[10px] uppercase tracking-wide text-slate-500">Description</div>
+                                <textarea
+                                    rows={5}
+                                    className="mt-1.5 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                    value={isEditing && !readOnly ? form.description || "" : task.description || ""}
+                                    onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+                                    placeholder="Add more context…"
+                                    readOnly={!isEditing || readOnly}
+                                    disabled={!isEditing || readOnly}
+                                />
+                                {/* Meta (moved here) */}
+                                <div className="mt-2 border-t border-slate-200 pt-2">
+                                    <div className="grid md:grid-cols-3 gap-2">
+                                        {/* Linked Goal */}
+                                        <div>
+                                            <div className="text-[11px] text-slate-600">Linked Goal</div>
+                                            <select
+                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                                value={isEditing && !readOnly ? form.goal_id || "" : task.goal_id || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, goal_id: e.target.value }))}
+                                                disabled={!isEditing || readOnly}
+                                            >
+                                                <option value="">— None —</option>
+                                                {goals.map((g) => (
+                                                    <option key={g.id} value={g.id}>
+                                                        {g.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {/* Tags */}
+                                        <div>
+                                            <div className="text-[11px] text-slate-600">Tags</div>
+                                            <input
+                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                                value={isEditing && !readOnly ? form.tags || "" : task.tags || ""}
+                                                onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
+                                                placeholder="comma,separated"
+                                                readOnly={!isEditing || readOnly}
+                                                disabled={!isEditing || readOnly}
+                                            />
+                                        </div>
+                                        {/* List (Tab) */}
+                                        <div>
+                                            <div className="text-[11px] text-slate-600">List (Tab)</div>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                                value={
+                                                    isEditing && !readOnly ? form.list_index || 1 : task.list_index || 1
+                                                }
+                                                onChange={(e) =>
+                                                    setForm((s) => ({
+                                                        ...s,
+                                                        list_index: Number(e.target.value || 1),
+                                                    }))
+                                                }
+                                                readOnly={!isEditing || readOnly}
+                                                disabled={!isEditing || readOnly}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {isEditing && !readOnly ? (
+                            <div className="mt-1.5 flex items-center gap-2">
+                                <button
+                                    className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
+                                    onClick={save}
+                                >
+                                    <FaSave /> Save changes
+                                </button>
+                                <button
+                                    className="px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs"
+                                    onClick={() => {
+                                        setIsEditing(false);
+                                        setForm(task);
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {/* Right column: Summary, Schedule, Meta */}
+                    <div className="grid grid-rows-[1fr_1fr] gap-1.5 h-full text-sm">
+                        {/* Summary */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
+                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Summary</div>
+                            {/* Assignee */}
+                            <div className="mb-1.5">
+                                <div className="text-[11px] text-slate-600">Assignee</div>
+                                <input
+                                    className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                    value={isEditing && !readOnly ? form.assignee || "" : task.assignee || ""}
+                                    onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))}
+                                    readOnly={!isEditing || readOnly}
+                                    disabled={!isEditing || readOnly}
+                                />
+                            </div>
+                            {/* Status & Priority */}
+                            <div className="grid grid-cols-2 gap-1.5">
+                                <div>
+                                    <div className="text-[11px] text-slate-600">Status</div>
+                                    <select
+                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                        value={isEditing && !readOnly ? form.status || "open" : task.status || "open"}
+                                        onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
+                                        disabled={!isEditing || readOnly}
+                                    >
+                                        <option value="open">Open</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="done">Done</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-slate-600">Priority</div>
+                                    <select
+                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                        value={isEditing && !readOnly ? form.priority || "med" : task.priority || "med"}
+                                        onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))}
+                                        disabled={!isEditing || readOnly}
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="med">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Schedule */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
+                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Schedule</div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {[
+                                    { key: "start_date", label: "Start" },
+                                    { key: "deadline", label: "Deadline" },
+                                    { key: "end_date", label: "Planned End" },
+                                ].map((f) => (
+                                    <div key={f.key}>
+                                        <div className="text-[11px] text-slate-600">{f.label}</div>
+                                        <input
+                                            type="date"
+                                            className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
+                                            value={
+                                                isEditing && !readOnly
+                                                    ? toDateOnly(form[f.key]) || ""
+                                                    : toDateOnly(task[f.key]) || ""
+                                            }
+                                            onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                                            readOnly={!isEditing || readOnly}
+                                            disabled={!isEditing || readOnly}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* (Meta moved to left column) */}
+                    </div>
+
+                    {/* Actions under details when not editing */}
+                    {!isEditing && (
+                        <div className="md:col-span-3 mt-1 flex items-center gap-2">
+                            {!readOnly && (
+                                <button
+                                    className="px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs"
+                                    onClick={() => {
+                                        setTab("details");
+                                        setIsEditing(true);
+                                    }}
+                                >
+                                    Edit
+                                </button>
+                            )}
+                            {!readOnly && (
+                                <button
+                                    className="px-2.5 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs"
+                                    onClick={() => {
+                                        if (!confirm("Delete this task?")) return;
+                                        onDelete && onDelete(task);
+                                    }}
+                                >
+                                    Delete
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* --------------------------------- Screen -------------------------------- */
 export default function KeyAreas() {
     const location = useLocation();
@@ -772,6 +1202,9 @@ export default function KeyAreas() {
     const [quadrant, setQuadrant] = useState("all");
     const [selectedTask, setSelectedTask] = useState(null);
     const [slideOverInitialTab, setSlideOverInitialTab] = useState("details");
+    // Full page task view state
+    const [selectedTaskFull, setSelectedTaskFull] = useState(null);
+    const [taskFullInitialTab, setTaskFullInitialTab] = useState("activities");
     // Inline Activities popover state
     const [openActivitiesMenu, setOpenActivitiesMenu] = useState(null); // task id or null
     const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
@@ -1477,7 +1910,10 @@ export default function KeyAreas() {
                         {" "}
                         {/* content constrained to available width */}
                         {/* Header / Search / New KA */}
-                        <div className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6">
+                        <div
+                            className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6"
+                            style={{ display: selectedTaskFull ? "none" : undefined }}
+                        >
                             {!selectedKA ? (
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
@@ -1614,8 +2050,35 @@ export default function KeyAreas() {
                             )}
                         </div>
                         {/* Title block removed; title now shown inline with Back */}
-                        {selectedKA && (
+                        {selectedTaskFull && selectedKA && (
                             <div className="mb-4">
+                                <TaskFullView
+                                    task={selectedTaskFull}
+                                    goals={goals}
+                                    kaTitle={selectedKA?.title}
+                                    readOnly={
+                                        selectedKA?.is_default || (selectedKA?.title || "").toLowerCase() === "ideas"
+                                    }
+                                    onBack={() => setSelectedTaskFull(null)}
+                                    onSave={async (payload) => {
+                                        await handleSaveTask(payload);
+                                        const updated = allTasks.find((x) => x.id === payload.id) || payload;
+                                        setSelectedTaskFull(updated);
+                                    }}
+                                    onDelete={async (tsk) => {
+                                        await handleDeleteTask(tsk);
+                                        setSelectedTaskFull(null);
+                                    }}
+                                    activitiesByTask={activitiesByTask}
+                                    onUpdateActivities={(id, nextList) => {
+                                        setActivitiesByTask((prev) => ({ ...prev, [id]: nextList }));
+                                    }}
+                                    initialTab={taskFullInitialTab}
+                                />
+                            </div>
+                        )}
+                        {selectedKA && (
+                            <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-4 md:col-span-2">
                                         {/* Task Lists card with list buttons + Add Task inside */}
@@ -2063,10 +2526,13 @@ export default function KeyAreas() {
                                                                                                 className="text-blue-700 hover:underline font-semibold"
                                                                                                 title="Click to open task"
                                                                                                 onClick={() => {
-                                                                                                    setSlideOverInitialTab(
-                                                                                                        "details",
+                                                                                                    // Open full-page detail view instead of popup
+                                                                                                    setSelectedTaskFull(
+                                                                                                        t,
                                                                                                     );
-                                                                                                    setSelectedTask(t);
+                                                                                                    setTaskFullInitialTab(
+                                                                                                        "activities",
+                                                                                                    );
                                                                                                 }}
                                                                                             >
                                                                                                 {t.title}
@@ -2288,8 +2754,8 @@ export default function KeyAreas() {
                                                     (x) => String(x.id) === String(openActivitiesMenu),
                                                 );
                                                 if (tsk) {
-                                                    setSlideOverInitialTab("activities");
-                                                    setSelectedTask(tsk);
+                                                    setTaskFullInitialTab("activities");
+                                                    setSelectedTaskFull(tsk);
                                                 }
                                                 setOpenActivitiesMenu(null);
                                             }}
@@ -2818,9 +3284,23 @@ export default function KeyAreas() {
 
                                 {/* Tasks list rendering moved inside the Task Lists card above */}
 
-                                {view === "kanban" && <KanbanView tasks={visibleTasks} onSelect={setSelectedTask} />}
+                                {view === "kanban" && (
+                                    <KanbanView
+                                        tasks={visibleTasks}
+                                        onSelect={(t) => {
+                                            setSelectedTaskFull(t);
+                                            setTaskFullInitialTab("activities");
+                                        }}
+                                    />
+                                )}
                                 {view === "calendar" && (
-                                    <CalendarView tasks={visibleTasks} onSelect={setSelectedTask} />
+                                    <CalendarView
+                                        tasks={visibleTasks}
+                                        onSelect={(t) => {
+                                            setSelectedTaskFull(t);
+                                            setTaskFullInitialTab("activities");
+                                        }}
+                                    />
                                 )}
                             </div>
                         )}
@@ -2889,19 +3369,6 @@ export default function KeyAreas() {
                                 </div>
                             </div>
                         )}
-                        {/* SlideOver */}
-                        <TaskSlideOver
-                            task={selectedTask}
-                            goals={goals}
-                            onClose={() => {
-                                setSelectedTask(null);
-                                setSlideOverInitialTab("details");
-                            }}
-                            onSave={handleSaveTask}
-                            onDelete={handleDeleteTask}
-                            readOnly={selectedKA?.is_default || (selectedKA?.title || "").toLowerCase() === "ideas"}
-                            initialTab={slideOverInitialTab}
-                        />
                     </div>
                 </main>
             </div>
