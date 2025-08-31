@@ -7,6 +7,7 @@ import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
+import AdminSettings from "./pages/AdminSettings.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import Calendar from "./pages/Calendar.jsx";
@@ -27,6 +28,8 @@ export default function App() {
                         <Route path="/registration" element={<Registration />} />
                         <Route path="/profile-settings" element={<ProfileSetting />} />
                         <Route path="/profile" element={<ProfileSetting />} />
+                        <Route path="/admin-settings" element={<AdminSettings />} />
+                        <Route path="/settings" element={<AdminSettings />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/calendar" element={<Calendar />} />
                         <Route path="/tasks" element={<Tasks />} />

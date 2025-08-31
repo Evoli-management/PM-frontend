@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/shared/Sidebar";
 import EnpsWidget from "../components/shared/EnpsWidget";
+import OrgSummaryWidget from "../components/shared/OrgSummaryWidget";
 
 const summary = [
   { label: "Projects", value: null, color: "green", icon: "📁", action: "Add Project", tooltip: "Create a new project" },
@@ -13,6 +14,7 @@ const recentActivity = null;
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showEnpsWidget, setShowEnpsWidget] = useState(true);
+  const [userRole, setUserRole] = useState('admin'); // Mock user role - in real app, get from auth context
   
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 800);
@@ -72,6 +74,50 @@ export default function Dashboard() {
                 </div>
               ))}
         </div>
+        
+        {/* Admin Organization Summary Widget - Only for administrators */}
+        {userRole === 'admin' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-1">
+              <OrgSummaryWidget showQuickAccess={true} />
+            </div>
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Admin Quick Actions</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <a
+                    href="#/admin-settings"
+                    className="flex flex-col items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center"
+                  >
+                    <span className="text-2xl mb-1">⚙️</span>
+                    <span className="text-xs font-medium text-blue-700">Admin Settings</span>
+                  </a>
+                  <a
+                    href="#/admin-settings"
+                    className="flex flex-col items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center"
+                  >
+                    <span className="text-2xl mb-1">🔒</span>
+                    <span className="text-xs font-medium text-green-700">Security</span>
+                  </a>
+                  <a
+                    href="#/admin-settings"
+                    className="flex flex-col items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
+                  >
+                    <span className="text-2xl mb-1">📊</span>
+                    <span className="text-xs font-medium text-purple-700">Reports</span>
+                  </a>
+                  <a
+                    href="#/admin-settings"
+                    className="flex flex-col items-center p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors text-center"
+                  >
+                    <span className="text-2xl mb-1">🔌</span>
+                    <span className="text-xs font-medium text-yellow-700">Integrations</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
           <h2 className="text-lg font-bold text-blue-700 mb-4">Recent Activity</h2>
           {loading ? (
