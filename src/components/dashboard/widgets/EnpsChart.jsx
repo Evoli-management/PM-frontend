@@ -92,14 +92,14 @@ export default function EnpsChart({ data = [], labels = [] }) {
             </svg>
             {tooltip && (
                 <div
-                    className="absolute bg-white shadow rounded px-3 py-2 text-sm text-gray-700 z-50 pointer-events-none"
+                    className="absolute bg-[Canvas] shadow rounded px-3 py-2 text-sm text-[CanvasText] z-50 pointer-events-none"
                     style={{
                         left: Math.min(Math.max(tooltip.x - 40, 8), width + margin.left + margin.right - 120),
                         top: tooltip.y - 56,
                     }}
                 >
                     <div className="font-semibold">{tooltip.label}</div>
-                    <div className="text-xs text-gray-500">Value: {tooltip.value}</div>
+                    <div className="text-xs opacity-70">Value: {tooltip.value}</div>
                 </div>
             )}
         </div>

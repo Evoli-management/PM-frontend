@@ -18,10 +18,10 @@ export default function CalendarPreview({ events = [], onReorder, getCountdownBa
         dragIdxRef.current = null;
     }
     if (!events.length) {
-        return <div className="text-gray-400">No appointments today.</div>;
+        return <div className="opacity-60 text-[CanvasText]">No appointments today.</div>;
     }
     return (
-        <ul className="divide-y">
+        <ul className="divide-y text-[CanvasText]">
             {events.map((ev, i) => (
                 <li
                     key={ev.id}
@@ -32,12 +32,12 @@ export default function CalendarPreview({ events = [], onReorder, getCountdownBa
                     onDrop={() => onDrop(i)}
                     title={`${ev.title} • ${ev.start}–${ev.end}`}
                 >
-                    <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    <span className="text-xs px-2 py-0.5 rounded border border-[CanvasText]/20 bg-[Canvas] text-[CanvasText]">
                         {ev.start}
                     </span>
                     <div className="flex-1">
-                        <div className="font-medium text-gray-800 dark:text-slate-200">{ev.title}</div>
-                        <div className="text-xs text-gray-400">ends {ev.end}</div>
+                        <div className="font-medium">{ev.title}</div>
+                        <div className="text-xs opacity-60">ends {ev.end}</div>
                     </div>
                     {getCountdownBadge &&
                         (() => {
@@ -51,7 +51,7 @@ export default function CalendarPreview({ events = [], onReorder, getCountdownBa
                                 </span>
                             );
                         })()}
-                    <span className="cursor-grab text-gray-400" title="Drag to reprioritize">
+                    <span className="cursor-grab opacity-60" title="Drag to reprioritize">
                         ⋮⋮
                     </span>
                 </li>

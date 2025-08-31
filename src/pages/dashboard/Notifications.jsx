@@ -8,7 +8,7 @@ export default function Notifications() {
         { title: "New recognition received", time: "3d" },
     ];
     return (
-        <div className="flex min-h-screen bg-gray-50 dark:bg-neutral-900">
+        <div className="flex min-h-screen bg-[Canvas] text-[CanvasText]">
             <Sidebar user={{ name: "Hussein" }} />
             <main className="flex-1 p-6">
                 <div className="mb-4">
@@ -20,7 +20,7 @@ export default function Notifications() {
                 <p className="text-gray-600 dark:text-gray-300">Your recent activity and alerts.</p>
                 <ul className="mt-6 space-y-3">
                     {items.map((it, i) => (
-                        <li key={i} className="bg-white dark:bg-neutral-800 border rounded p-4 flex justify-between">
+                        <li key={i} className="bg-[Canvas] border rounded p-4 flex justify-between text-[CanvasText]">
                             <div className="text-gray-800 dark:text-slate-200">{it.title}</div>
                             <div className="text-xs text-gray-400">{it.time}</div>
                         </li>

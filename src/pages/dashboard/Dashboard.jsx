@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
+// Reusable dashboard widgets
+import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
+import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
+import ActivityFeed from "../../components/dashboard/widgets/ActivityFeed.jsx";
+import QuickAddBar from "../../components/dashboard/widgets/QuickAddBar.jsx";
+import StrokesPanel from "../../components/dashboard/widgets/StrokesPanel.jsx";
+import StatsCard from "../../components/dashboard/widgets/StatsCard.jsx";
+import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
+import WeeklyTrendBars from "../../components/dashboard/widgets/WeeklyTrendBars.jsx";
 
 // Demo data (replace with real services later)
 const recentActivity = [
@@ -141,14 +150,14 @@ function EChart({ data = [], labels = [] }) {
 
             {tooltip && (
                 <div
-                    className="absolute bg-white shadow rounded px-3 py-2 text-sm text-gray-700 z-50 pointer-events-none"
+                    className="absolute bg-[Canvas] shadow rounded px-3 py-2 text-sm text-[CanvasText] z-50 pointer-events-none"
                     style={{
                         left: Math.min(Math.max(tooltip.x - 40, 8), width + margin.left + margin.right - 120),
                         top: tooltip.y - 56,
                     }}
                 >
                     <div className="font-semibold">{tooltip.label}</div>
-                    <div className="text-xs text-gray-500">Value: {tooltip.value}</div>
+                    <div className="text-xs opacity-70">Value: {tooltip.value}</div>
                 </div>
             )}
         </div>
@@ -178,7 +187,6 @@ export default function Dashboard() {
             teamOverview: false,
             analytics: false,
         },
-        view: "employee",
         theme: "light", // or 'dark'
     };
 
@@ -191,6 +199,8 @@ export default function Dashboard() {
                 ...defaultPrefs,
                 ...stored,
                 widgets: { ...defaultPrefs.widgets, ...(stored.widgets || {}) },
+                // Force light mode regardless of stored value
+                theme: "light",
             };
         } catch {
             return defaultPrefs;
@@ -203,18 +213,40 @@ export default function Dashboard() {
         } catch {}
     }, [prefs]);
 
-    // Theme
+    // Theme: force light mode (dark disabled)
     useEffect(() => {
         const root = document.documentElement;
-        if (prefs.theme === "dark") root.classList.add("dark");
-        else root.classList.remove("dark");
+        root.classList.remove("dark");
     }, [prefs.theme]);
 
     const toggleWidget = (key) => {
         setPrefs((p) => ({ ...p, widgets: { ...p.widgets, [key]: !p.widgets[key] } }));
     };
-    const setView = (v) => setPrefs((p) => ({ ...p, view: v }));
-    const toggleTheme = () => setPrefs((p) => ({ ...p, theme: p.theme === "light" ? "dark" : "light" }));
+    // Dark mode disabled; keep theme as light while retaining the button UI
+    const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
+
+    // Close Widgets dropdown on outside click / Escape
+    const widgetsDetailsRef = useRef(null);
+    useEffect(() => {
+        function handlePointerDown(e) {
+            const el = widgetsDetailsRef.current;
+            if (el && el.open && !el.contains(e.target)) {
+                el.open = false;
+            }
+        }
+        function handleKey(e) {
+            if (e.key === "Escape") {
+                const el = widgetsDetailsRef.current;
+                if (el && el.open) el.open = false;
+            }
+        }
+        document.addEventListener("pointerdown", handlePointerDown);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("pointerdown", handlePointerDown);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, []);
 
     // Data state
     const [activeGoals, setActiveGoals] = useState(initialActiveGoals);
@@ -236,7 +268,7 @@ export default function Dashboard() {
     const [quickAddOpen, setQuickAddOpen] = useState(null); // 'task'|'goal'|'stroke'|'note'|'appointment'
     const [message, setMessage] = useState("");
     function doQuickAdd(type) {
-        setMessage(`Added ${type} (demo)`);
+        setMessage(`Added ${type}`);
         setTimeout(() => setMessage(""), 2500);
         setQuickAddOpen(null);
     }
@@ -261,7 +293,14 @@ export default function Dashboard() {
         ? Math.round(activeGoals.reduce((s, g) => s + g.progress, 0) / activeGoals.length)
         : 0;
     const myDayStats = { tasksDueToday: 3, overdue: 1, appointments: calendarToday.length };
-    const productivity = { productive: 24, trap: 6 }; // hours this week (demo)
+    const productivity = { productive: 24, trap: 6 };
+    const [prodTrend, setProdTrend] = useState([6, 7, 6, 8, 7, 9, 8]);
+    const [analyticsPeriod, setAnalyticsPeriod] = useState("Week"); // Week | Month
+    const [analyticsCompare, setAnalyticsCompare] = useState("None"); // None | Previous
+
+    // Activity filter + drill modal
+    const [activityFilter, setActivityFilter] = useState("all"); // all|tasks|goals|recognitions
+    const [drillItem, setDrillItem] = useState(null);
 
     // Drag-and-drop for calendar preview
     const dragIdxRef = useRef(null);
@@ -311,47 +350,45 @@ export default function Dashboard() {
             const urgent = mins <= 60;
             return {
                 text: `in ${formatDiff(mins)}`,
-                className: urgent ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-700",
+                className: urgent
+                    ? "border border-yellow-400/40 text-yellow-700 bg-[Canvas]"
+                    : "border border-[CanvasText]/20 text-[CanvasText] bg-[Canvas]",
             };
         }
         if (now >= start && now <= end) {
-            return { text: "now", className: "bg-green-100 text-green-800" };
+            return { text: "now", className: "border border-green-500/40 text-green-700 bg-[Canvas]" };
         }
         const minsAgo = (now - end) / 60000;
-        return { text: `${formatDiff(minsAgo)} ago`, className: "bg-gray-100 text-gray-700" };
+        return {
+            text: `${formatDiff(minsAgo)} ago`,
+            className: "border border-[CanvasText]/20 text-[CanvasText] bg-[Canvas]",
+        };
+    }
+
+    // Simple CSV export helper for client-side downloads
+    function exportCsv(filename, rows) {
+        try {
+            const csv = Array.isArray(rows) ? rows.map((r) => r.join(",")).join("\n") : String(rows);
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {}
     }
 
     return (
-        <div className="flex min-h-screen bg-gray-50 dark:bg-neutral-900">
+        <div className="flex min-h-screen bg-[Canvas]">
             <Sidebar user={{ name: "Hussein" }} />
-            <main className="flex-1 p-4 md:p-8">
+            <main className="flex-1 p-4 md:p-8 text-[CanvasText]">
                 <div className="mb-4 flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400">Dashboard</h1>
-                        <p className="text-gray-600 dark:text-gray-300 text-sm">Your daily habit entry point.</p>
-                    </div>
-
                     <div className="flex items-center gap-3">
-                        {/* View toggle */}
-                        <div className="flex items-center gap-1 bg-white dark:bg-neutral-800 border rounded p-1">
-                            <button
-                                onClick={() => setView("employee")}
-                                className={`px-3 py-1 rounded ${prefs.view === "employee" ? "bg-blue-600 text-white" : "text-slate-700 dark:text-slate-200"}`}
-                            >
-                                Employee
-                            </button>
-                            <button
-                                onClick={() => setView("manager")}
-                                className={`px-3 py-1 rounded ${prefs.view === "manager" ? "bg-blue-600 text-white" : "text-slate-700 dark:text-slate-200"}`}
-                            >
-                                Manager
-                            </button>
-                        </div>
-
                         {/* Theme toggle */}
                         <button
                             onClick={toggleTheme}
-                            className="px-3 py-1 bg-white dark:bg-neutral-800 border rounded"
+                            className="px-3 py-1 bg-[Canvas] border rounded"
                             title="Toggle theme"
                         >
                             {prefs.theme === "light" ? "🌞 Light" : "🌙 Dark"}
@@ -359,15 +396,15 @@ export default function Dashboard() {
 
                         {/* Widget toggles dropdown */}
                         <div className="relative">
-                            <details className="relative">
-                                <summary className="px-3 py-1 bg-white dark:bg-neutral-800 border rounded cursor-pointer">
+                            <details ref={widgetsDetailsRef} className="relative">
+                                <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText]">
                                     Widgets
                                 </summary>
-                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-800 border rounded shadow p-3 z-40 max-h-80 overflow-auto">
+                                <div className="absolute right-0 mt-2 w-64 bg-[Canvas] border rounded shadow p-3 z-40 max-h-80 overflow-auto text-[CanvasText]">
                                     {Object.keys(prefs.widgets).map((k) => (
                                         <label
                                             key={k}
-                                            className="flex items-center justify-between gap-2 mb-2 text-sm text-slate-700 dark:text-slate-200"
+                                            className="flex items-center justify-between gap-2 mb-2 text-sm text-[CanvasText] opacity-90"
                                         >
                                             <span className="capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
                                             <input
@@ -389,7 +426,7 @@ export default function Dashboard() {
                         <span>New here? Take a 30-second tour of your dashboard.</span>
                         <button
                             className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                            onClick={() => setMessage("Tour is coming soon (demo)")}
+                            onClick={() => setMessage("Tour is coming soon")}
                         >
                             Start Tour
                         </button>
@@ -402,123 +439,137 @@ export default function Dashboard() {
                 {/* Top Section: Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
                     {prefs.widgets.myDay && (
-                        <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-4 border">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">My Day</div>
-                                <span
-                                    className="text-xs text-gray-400"
-                                    title="Your daily schedule: appointments and tasks"
-                                >
-                                    ℹ️
-                                </span>
+                        <StatsCard
+                            title="My Day"
+                            tooltip="Your daily schedule: appointments and tasks"
+                            href="#/calendar"
+                        >
+                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                                {myDayStats.tasksDueToday} tasks
                             </div>
-                            <a href="#/calendar" className="block">
-                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                    {myDayStats.tasksDueToday} tasks
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">
-                                    {myDayStats.overdue} overdue • {myDayStats.appointments} appointments
-                                </div>
-                            </a>
-                        </div>
+                            <div className="text-xs text-[CanvasText] opacity-80">
+                                {myDayStats.overdue} overdue • {myDayStats.appointments} appointments
+                            </div>
+                        </StatsCard>
                     )}
 
                     {prefs.widgets.goals && (
-                        <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-4 border">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    Goals Progress
-                                </div>
-                                <span
-                                    className="text-xs text-gray-400"
-                                    title="Average progress across your active goals"
-                                >
-                                    ℹ️
-                                </span>
+                        <StatsCard
+                            title="Goals Progress"
+                            tooltip="Average progress across your active goals"
+                            href="#/goals"
+                        >
+                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{avgGoal}%</div>
+                            <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
+                                <div className="h-2 bg-blue-500" style={{ width: `${avgGoal}%` }} />
                             </div>
-                            <a href="#/goals" className="block">
-                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{avgGoal}%</div>
-                                <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
-                                    <div className="h-2 bg-blue-500" style={{ width: `${avgGoal}%` }} />
-                                </div>
-                            </a>
-                        </div>
+                        </StatsCard>
                     )}
 
                     {prefs.widgets.enps && (
-                        <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-4 border">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">eNPS</div>
-                                <span
-                                    className="text-xs text-gray-400"
-                                    title="Employee Net Promoter Score (−100..+100)"
-                                >
-                                    ℹ️
-                                </span>
-                            </div>
-                            <a href="#/enps" className="block">
-                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">0</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">
-                                    Survey status: up to date
-                                </div>
-                            </a>
-                        </div>
+                        <StatsCard title="eNPS" tooltip="Employee Net Promoter Score (−100..+100)" href="#/enps">
+                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">0</div>
+                            <div className="text-xs text-[CanvasText] opacity-80">Survey status: up to date</div>
+                        </StatsCard>
                     )}
 
                     {prefs.widgets.strokes && (
-                        <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-4 border">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Strokes</div>
-                                <span className="text-xs text-gray-400" title="Recognition received and given">
-                                    ℹ️
-                                </span>
+                        <StatsCard title="Strokes" tooltip="Recognition received and given" href="#/recognition">
+                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                                {strokes.received.length}
                             </div>
-                            <a href="#/recognition" className="block">
-                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                    {strokes.received.length}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">
-                                    received • {strokes.given.length} given
-                                </div>
-                            </a>
-                        </div>
+                            <div className="text-xs text-[CanvasText] opacity-80">
+                                received • {strokes.given.length} given
+                            </div>
+                        </StatsCard>
                     )}
 
                     {prefs.widgets.productivity && (
-                        <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-4 border">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    Productivity
-                                </div>
-                                <span
-                                    className="text-xs text-gray-400"
-                                    title="Hours logged this week: productive vs trap"
-                                >
-                                    ℹ️
-                                </span>
+                        <StatsCard
+                            title="Productivity"
+                            tooltip="Hours logged this week: productive vs trap"
+                            href="#/analytics"
+                        >
+                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                                {productivity.productive}h
                             </div>
-                            <a href="#/analytics" className="block">
-                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                    {productivity.productive}h
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">
-                                    productive • {productivity.trap}h trap
-                                </div>
-                                <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
-                                    {(() => {
-                                        const total = productivity.productive + productivity.trap || 1;
-                                        const prodW = (productivity.productive / total) * 100;
-                                        const trapW = (productivity.trap / total) * 100;
-                                        return (
-                                            <>
-                                                <div className="h-2 bg-green-500" style={{ width: `${prodW}%` }} />
-                                                <div className="h-2 bg-red-500" style={{ width: `${trapW}%` }} />
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            </a>
-                        </div>
+                            <div className="text-xs text-[CanvasText] opacity-80">
+                                productive • {productivity.trap}h trap
+                            </div>
+                            <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
+                                {(() => {
+                                    const total = productivity.productive + productivity.trap || 1;
+                                    const prodW = (productivity.productive / total) * 100;
+                                    const trapW = (productivity.trap / total) * 100;
+                                    return (
+                                        <>
+                                            <div className="h-2 bg-green-500" style={{ width: `${prodW}%` }} />
+                                            <div className="h-2 bg-red-500" style={{ width: `${trapW}%` }} />
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                            <div className="mt-2">
+                                {(() => {
+                                    const data = prodTrend;
+                                    const W = 120;
+                                    const H = 28;
+                                    const max = 10;
+                                    const pts = data
+                                        .map((v, i) => {
+                                            const x = (i / Math.max(1, data.length - 1)) * W;
+                                            const y = H - (Math.min(max, Math.max(0, v)) / max) * H;
+                                            return `${x},${y}`;
+                                        })
+                                        .join(" ");
+                                    return (
+                                        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-7">
+                                            <polyline
+                                                fill="none"
+                                                stroke="#22c55e"
+                                                strokeWidth="2"
+                                                strokeLinejoin="round"
+                                                strokeLinecap="round"
+                                                points={pts}
+                                            />
+                                        </svg>
+                                    );
+                                })()}
+                            </div>
+                            <div className="mt-2 flex justify-end gap-2">
+                                <button
+                                    className="px-2 py-1 border rounded text-xs"
+                                    title="Export productivity summary"
+                                    onClick={() => {
+                                        const total = productivity.productive + productivity.trap;
+                                        const pct = total ? (productivity.productive / total) * 100 : 0;
+                                        exportCsv("productivity-summary.csv", [
+                                            ["Metric", "Value"],
+                                            ["Productive (h)", productivity.productive],
+                                            ["Trap (h)", productivity.trap],
+                                            ["Total (h)", total],
+                                            ["Productive (%)", pct.toFixed(1)],
+                                        ]);
+                                    }}
+                                >
+                                    Export summary
+                                </button>
+                                <button
+                                    className="px-2 py-1 border rounded text-xs"
+                                    title="Export productivity trend"
+                                    onClick={() => {
+                                        const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                                        const rows = [
+                                            ["Label", "Hours"],
+                                            ...prodTrend.map((v, i) => [labels[i] || `P${i + 1}`, v]),
+                                        ];
+                                        exportCsv("productivity-trend.csv", rows);
+                                    }}
+                                >
+                                    Export trend
+                                </button>
+                            </div>
+                        </StatsCard>
                     )}
                 </div>
 
@@ -526,36 +577,72 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
                     {/* eNPS detailed snapshot */}
                     {prefs.widgets.enps && (
-                        <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
                             <div className="flex items-start justify-between">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">
                                     eNPS Snapshot
                                 </h2>
-                                <div className="text-xs text-gray-400 flex items-center gap-2">
+                                <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
                                     <span title="eNPS measures employee net promoter score; range -100 to +100">
                                         ℹ️
                                     </span>
+                                    <button
+                                        className="px-2 py-1 border rounded text-[CanvasText]"
+                                        title="Export eNPS report"
+                                        onClick={() =>
+                                            exportCsv("enps-report.csv", [
+                                                ["Week", "Score"],
+                                                ...enpsData.map((v, i) => ["W" + (i + 1), v]),
+                                            ])
+                                        }
+                                    >
+                                        Export
+                                    </button>
                                 </div>
                             </div>
                             <a href="#/enps">
-                                <EChart data={enpsData} labels={enpsData.map((_, i) => `W${i + 1}`)} />
+                                <EnpsChart data={enpsData} labels={enpsData.map((_, i) => `W${i + 1}`)} />
                             </a>
                         </section>
                     )}
 
                     {/* Goals list */}
                     {prefs.widgets.goals && (
-                        <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">
                                     Your active goals
                                 </h2>
-                                <a href="#/goals" className="text-sm text-blue-600">
-                                    View all
-                                </a>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        className="px-2 py-1 border rounded text-sm"
+                                        title="Export goals"
+                                        onClick={() => {
+                                            const header = ["Title", "Progress (%)", "Status", "Last updated"];
+                                            const toStatus = (p) =>
+                                                p >= 70 ? "On track" : p >= 40 ? "At risk" : "Behind";
+                                            const now = new Date().toISOString();
+                                            const rows = [
+                                                header,
+                                                ...activeGoals.map((g) => [
+                                                    g.title,
+                                                    g.progress,
+                                                    toStatus(g.progress),
+                                                    now,
+                                                ]),
+                                            ];
+                                            exportCsv("goals-export.csv", rows);
+                                        }}
+                                    >
+                                        Export
+                                    </button>
+                                    <a href="#/goals" className="text-sm text-blue-600">
+                                        View all
+                                    </a>
+                                </div>
                             </div>
                             {activeGoals.length === 0 ? (
-                                <div className="text-gray-400">
+                                <div className="text-[CanvasText] opacity-70">
                                     No goals yet.{" "}
                                     <a href="#/goals" className="text-blue-600">
                                         Add one
@@ -567,10 +654,8 @@ export default function Dashboard() {
                                     {activeGoals.map((g, i) => (
                                         <li key={i} className="p-3 border rounded">
                                             <div className="flex justify-between items-center">
-                                                <div className="font-semibold text-gray-700 dark:text-slate-200">
-                                                    {g.title}
-                                                </div>
-                                                <div className="text-sm text-gray-400">{g.progress}%</div>
+                                                <div className="font-semibold">{g.title}</div>
+                                                <div className="text-sm opacity-70">{g.progress}%</div>
                                             </div>
                                             <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
                                                 <div className="h-2 bg-blue-500" style={{ width: `${g.progress}%` }} />
@@ -586,7 +671,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
                     {/* Calendar Preview with drag-and-drop */}
                     {prefs.widgets.calendarPreview && (
-                        <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">
                                     Calendar Preview (Today)
@@ -596,7 +681,7 @@ export default function Dashboard() {
                                 </a>
                             </div>
                             {calendarToday.length === 0 ? (
-                                <div className="text-gray-400">
+                                <div className="text-[CanvasText] opacity-70">
                                     No appointments today.{" "}
                                     <a href="#/calendar" className="text-blue-600">
                                         Add appointment
@@ -604,249 +689,185 @@ export default function Dashboard() {
                                     .
                                 </div>
                             ) : (
-                                <ul className="divide-y">
-                                    {calendarToday.map((ev, i) => (
-                                        <li
-                                            key={ev.id}
-                                            className="py-3 flex items-center gap-3"
-                                            draggable
-                                            onDragStart={() => onDragStart(i)}
-                                            onDragOver={onDragOver}
-                                            onDrop={() => onDrop(i)}
-                                            title={`${ev.title} • ${ev.start}–${ev.end}`}
-                                        >
-                                            <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                                {ev.start}
-                                            </span>
-                                            <div className="flex-1">
-                                                <div className="font-medium text-gray-800 dark:text-slate-200">
-                                                    {ev.title}
-                                                </div>
-                                                <div className="text-xs text-gray-400">ends {ev.end}</div>
-                                            </div>
-                                            {(() => {
-                                                const b = getCountdownBadge(ev);
-                                                return (
-                                                    <span
-                                                        className={`text-xs px-2 py-1 rounded ${b.className}`}
-                                                        title="Time until start/end"
-                                                    >
-                                                        {b.text}
-                                                    </span>
-                                                );
-                                            })()}
-                                            <span className="cursor-grab text-gray-400" title="Drag to reprioritize">
-                                                ⋮⋮
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                <CalendarPreview
+                                    events={calendarToday}
+                                    onReorder={(next) => {
+                                        setCalendarToday(next);
+                                        try {
+                                            localStorage.setItem(
+                                                "pm:calendarPreviewOrder",
+                                                JSON.stringify(next.map((e) => e.id)),
+                                            );
+                                        } catch {}
+                                    }}
+                                    getCountdownBadge={getCountdownBadge}
+                                />
                             )}
                         </section>
                     )}
 
-                    {/* What's New Feed */}
+                    {/* What’s New Feed */}
                     {prefs.widgets.activity && (
-                        <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What’s New</h2>
-                                <a href="#/notifications" className="text-sm text-blue-600">
-                                    Open Feed
-                                </a>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        className="border rounded text-sm bg-[Canvas]"
+                                        value={activityFilter}
+                                        onChange={(e) => setActivityFilter(e.target.value)}
+                                        title="Filter feed"
+                                    >
+                                        <option value="all">All</option>
+                                        <option value="tasks">Tasks</option>
+                                        <option value="goals">Goals</option>
+                                        <option value="recognitions">Recognitions</option>
+                                    </select>
+                                    <a href="#/notifications" className="text-sm text-blue-600">
+                                        Open Feed
+                                    </a>
+                                </div>
                             </div>
-                            <ul className="space-y-3">
-                                {recentActivity.map((it, idx) => (
-                                    <li key={idx} className="flex justify-between items-start">
-                                        <div>
-                                            <div className="font-medium text-gray-700 dark:text-slate-200">
-                                                {it.desc}
-                                            </div>
-                                            <div className="text-xs text-gray-400">by system</div>
-                                        </div>
-                                        <div className="text-xs text-gray-400">{it.time}</div>
-                                    </li>
-                                ))}
-                            </ul>
+                            <ActivityFeed
+                                items={recentActivity.filter((it) => {
+                                    if (activityFilter === "all") return true;
+                                    if (activityFilter === "recognitions") return /stroke|recognition/i.test(it.desc);
+                                    if (activityFilter === "goals") return /goal/i.test(it.desc);
+                                    if (activityFilter === "tasks") return /task|moved/i.test(it.desc);
+                                    return true;
+                                })}
+                                onItemClick={(it) => setDrillItem(it)}
+                            />
                         </section>
                     )}
                 </div>
 
                 {/* Quick Add full-width row */}
-                {prefs.widgets.quickAdd && (
-                    <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-3 mb-6 flex items-center gap-3 border">
-                        <div className="flex gap-2">
-                            {["task", "goal", "stroke", "note", "appointment"].map((t) => (
-                                <button
-                                    key={t}
-                                    onClick={() => setQuickAddOpen(t)}
-                                    className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm"
-                                >
-                                    + {t.charAt(0).toUpperCase() + t.slice(1)}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="flex-1 text-sm text-gray-500 dark:text-gray-300">
-                            Quick Add: tasks, goals, strokes, notes, and appointments.
-                        </div>
-                        {message && <div className="text-sm text-green-600 font-medium">{message}</div>}
-                    </div>
-                )}
+                {prefs.widgets.quickAdd && <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />}
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
                     {/* Strokes detail */}
                     {prefs.widgets.strokes && (
-                        <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
-                                <button className="text-sm text-blue-600" onClick={() => setQuickAddOpen("stroke")}>
-                                    + Give Stroke
-                                </button>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <div className="font-semibold text-sm mb-2 text-slate-700 dark:text-slate-200">
-                                        Received
-                                    </div>
-                                    {strokes.received.length === 0 ? (
-                                        <div className="text-gray-400 text-sm">No recognitions yet.</div>
-                                    ) : (
-                                        <ul className="space-y-2">
-                                            {strokes.received.map((s) => (
-                                                <li key={s.id} className="p-3 border rounded">
-                                                    <div className="text-sm">
-                                                        <span className="font-medium">{s.from}</span>: {s.msg}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">{s.time} ago</div>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-sm mb-2 text-slate-700 dark:text-slate-200">
-                                        Given
-                                    </div>
-                                    {strokes.given.length === 0 ? (
-                                        <div className="text-gray-400 text-sm">Haven’t given any recognitions yet.</div>
-                                    ) : (
-                                        <ul className="space-y-2">
-                                            {strokes.given.map((s) => (
-                                                <li key={s.id} className="p-3 border rounded">
-                                                    <div className="text-sm">
-                                                        To <span className="font-medium">{s.to}</span>: {s.msg}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">{s.time} ago</div>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            </div>
+                            <StrokesPanel strokes={strokes} />
                         </section>
                     )}
 
-                    {/* Suggestions (AI placeholder) */}
+                    {/* Suggestions */}
                     {prefs.widgets.suggestions && (
-                        <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
                             <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
-                            <ul className="list-disc pl-6 text-sm text-slate-700 dark:text-slate-200">
+                            <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                                 <li>Recommend goal: "Automate weekly reporting" (template)</li>
                                 <li>Next best action: Finish API tests before lunch</li>
                                 <li>Insight: You’re most productive in the morning (9–12)</li>
                             </ul>
-                            <div className="mt-3 text-xs text-gray-400">
-                                AI features are placeholders; wire to backend later.
+                            {/* Reserved for AI-related guidance */}
+                        </section>
+                    )}
+                </div>
+
+                {/* Manager/Analytics area — always visible */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    {prefs.widgets.teamOverview && (
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                            <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">
+                                Team Performance Overview
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div className="p-3 border rounded">Team goals completion: 68%</div>
+                                <div className="p-3 border rounded">Avg workload: 32h/week</div>
+                                <div className="p-3 border rounded">eNPS trend: steady ↑</div>
+                                <div className="p-3 border rounded">Strokes leaderboard: Dana (5)</div>
+                            </div>
+                            <div className="mt-3 flex justify-end">
+                                <button
+                                    className="px-3 py-1 border rounded text-sm"
+                                    title="Export team report"
+                                    onClick={() =>
+                                        exportCsv("team-overview.csv", [
+                                            ["Metric", "Value"],
+                                            ["Team goals completion", "68%"],
+                                            ["Avg workload", "32h/week"],
+                                            ["eNPS trend", "steady"],
+                                            ["Top recognitions", "Dana (5)"],
+                                        ])
+                                    }
+                                >
+                                    Export report
+                                </button>
+                            </div>
+                        </section>
+                    )}
+
+                    {prefs.widgets.analytics && (
+                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                            <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
+                            <div className="mb-3 flex items-center gap-2 text-sm">
+                                <span className="opacity-70">Period:</span>
+                                <select
+                                    className="border rounded bg-[Canvas]"
+                                    value={analyticsPeriod}
+                                    onChange={(e) => setAnalyticsPeriod(e.target.value)}
+                                >
+                                    <option value="Week">Week</option>
+                                    <option value="Month">Month</option>
+                                </select>
+                                <span className="opacity-70 ml-3">Compare to:</span>
+                                <select
+                                    className="border rounded bg-[Canvas]"
+                                    value={analyticsCompare}
+                                    onChange={(e) => setAnalyticsCompare(e.target.value)}
+                                >
+                                    <option value="None">None</option>
+                                    <option value="Previous">Previous</option>
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Time usage pie (Goals vs Trap) */}
+                                <div className="p-3 border rounded">
+                                    <div className="font-semibold text-sm mb-2">Time usage</div>
+                                    <TimeUsagePie productive={productivity.productive} trap={productivity.trap} />
+                                </div>
+                                {/* Weekly trend bars */}
+                                <div className="p-3 border rounded">
+                                    <div className="font-semibold text-sm mb-2">Weekly trend</div>
+                                    {(() => {
+                                        const values =
+                                            analyticsPeriod === "Week" ? [8, 6, 7, 5, 9, 4, 3] : [35, 42, 38, 44];
+                                        const compareValues =
+                                            analyticsCompare === "Previous"
+                                                ? analyticsPeriod === "Week"
+                                                    ? [6, 5, 6, 4, 7, 3, 2]
+                                                    : [32, 39, 36, 40]
+                                                : [];
+                                        return <WeeklyTrendBars values={values} compareValues={compareValues} />;
+                                    })()}
+                                </div>
                             </div>
                         </section>
                     )}
                 </div>
 
-                {/* Manager/Analytics area */}
-                {prefs.view === "manager" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        {prefs.widgets.teamOverview && (
-                            <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
-                                <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">
-                                    Team Performance Overview
-                                </h3>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    <div className="p-3 border rounded">Team goals completion: 68%</div>
-                                    <div className="p-3 border rounded">Avg workload: 32h/week</div>
-                                    <div className="p-3 border rounded">eNPS trend: steady ↑</div>
-                                    <div className="p-3 border rounded">Strokes leaderboard: Dana (5)</div>
-                                </div>
-                            </section>
-                        )}
-
-                        {prefs.widgets.analytics && (
-                            <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 border">
-                                <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Time usage pie (Goals vs Trap) */}
-                                    <div className="p-3 border rounded">
-                                        <div className="font-semibold text-sm mb-2">Time usage</div>
-                                        <div className="flex items-center gap-4">
-                                            <svg viewBox="0 0 32 32" className="w-24 h-24">
-                                                <circle r="16" cx="16" cy="16" fill="#e5e7eb" />
-                                                {/* green arc for goals */}
-                                                <circle
-                                                    r="16"
-                                                    cx="16"
-                                                    cy="16"
-                                                    fill="transparent"
-                                                    stroke="#22c55e"
-                                                    strokeWidth="32"
-                                                    strokeDasharray={`${(productivity.productive / (productivity.productive + productivity.trap)) * 100} 100`}
-                                                    transform="rotate(-90 16 16)"
-                                                />
-                                            </svg>
-                                            <div className="text-sm text-gray-600 dark:text-gray-300">
-                                                <div>
-                                                    <span className="inline-block w-3 h-3 bg-green-500 mr-2" />
-                                                    Goal-aligned
-                                                </div>
-                                                <div>
-                                                    <span className="inline-block w-3 h-3 bg-red-500 mr-2" />
-                                                    Trap
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {/* Weekly trend bars */}
-                                    <div className="p-3 border rounded">
-                                        <div className="font-semibold text-sm mb-2">Weekly trend</div>
-                                        <div className="flex items-end gap-2 h-32">
-                                            {[8, 6, 7, 5, 9, 4, 3].map((v, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="w-6 bg-blue-500"
-                                                    style={{ height: `${v * 10}%` }}
-                                                    title={`Day ${i + 1}: ${v}h`}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-                    </div>
-                )}
-
-                <div className="text-center text-gray-400 dark:text-gray-300 text-xs">
-                    All data shown is demo-only. Use the Widgets menu to customize.
-                </div>
+                {/* Footer note intentionally left blank */}
 
                 {/* Quick Add inline form area */}
                 {quickAddOpen && (
-                    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 w-96 bg-white dark:bg-neutral-800 border rounded shadow p-4">
+                    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 w-96 bg-[Canvas] border rounded shadow p-4 text-[CanvasText]">
                         <div className="flex items-center justify-between mb-2">
                             <div className="font-semibold">Quick Add — {quickAddOpen}</div>
-                            <button onClick={() => setQuickAddOpen(null)} className="text-xs text-gray-400">
+                            <button
+                                onClick={() => setQuickAddOpen(null)}
+                                className="text-xs text-[CanvasText] opacity-60"
+                            >
                                 Close
                             </button>
                         </div>
                         <input
-                            className="w-full border rounded p-2 mb-2 bg-white dark:bg-neutral-900"
+                            className="w-full border rounded p-2 mb-2 bg-[Canvas]"
                             placeholder={`Enter ${quickAddOpen} title`}
                         />
                         <div className="flex justify-end gap-2">
@@ -859,6 +880,24 @@ export default function Dashboard() {
                             >
                                 Add
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Drill-in modal for Activity */}
+                {drillItem && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                        <div className="bg-[Canvas] text-[CanvasText] border rounded shadow p-4 w-[28rem]">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="font-semibold">Activity details</div>
+                                <button className="text-sm opacity-60" onClick={() => setDrillItem(null)}>
+                                    Close
+                                </button>
+                            </div>
+                            <div className="text-sm">
+                                <div className="font-medium mb-1">{drillItem.desc}</div>
+                                <div className="opacity-70">When: {drillItem.time} • Source: system</div>
+                            </div>
                         </div>
                     </div>
                 )}
