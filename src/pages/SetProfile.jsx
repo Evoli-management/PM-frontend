@@ -385,10 +385,16 @@ export default function ProfileSetting() {
             showRecentActivity: true,
             showQuickActions: true,
         },
-        dashboardRefreshRate: "auto",
-    });
-
-    const upd = (k) => (e) => {
+                                        dashboardRefreshRate: "auto",
+        // Privacy Controls for eNPS
+        enpsPrivacySettings: {
+            allowAnonymousScoring: true,
+            showIndividualScores: false,
+            enableTeamReports: true,
+            enableOrgReports: true,
+            dataRetentionDays: 365,
+        },
+    });    const upd = (k) => (e) => {
         const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
         setForm((s) => ({ ...s, [k]: value }));
         // Clear error when user starts typing
@@ -404,6 +410,17 @@ export default function ProfileSetting() {
             widgetPreferences: {
                 ...s.widgetPreferences,
                 [widgetKey]: checked,
+            },
+        }));
+    };
+
+    // Helper function for updating eNPS privacy settings
+    const updateEnpsPrivacySetting = (settingKey) => (checked) => {
+        setForm((s) => ({
+            ...s,
+            enpsPrivacySettings: {
+                ...s.enpsPrivacySettings,
+                [settingKey]: checked,
             },
         }));
     };
@@ -1080,6 +1097,179 @@ export default function ProfileSetting() {
                                                                 No widgets selected - please enable at least one widget above
                                                             </div>
                                                         )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Privacy Controls">
+                                            <div className="space-y-6">
+                                                {/* eNPS Privacy Notice */}
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-2xl">🔒</div>
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-blue-800 mb-2">eNPS Privacy Protection</h4>
+                                                            <p className="text-sm text-blue-700 mb-2">
+                                                                <strong>Anonymous by Design:</strong> eNPS scores are always anonymous. The system only records the answer but never the user identity.
+                                                            </p>
+                                                            <p className="text-sm text-blue-700">
+                                                                Even admin reports only show cumulative scores for each team and the organization but not for individuals.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* eNPS Data Collection Settings */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-4">eNPS Data Collection Settings</h4>
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                                                            <div>
+                                                                <span className="text-sm font-medium text-gray-700">Allow Anonymous Scoring</span>
+                                                                <p className="text-xs text-gray-500 mt-1">Enable employees to submit eNPS scores anonymously</p>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.enpsPrivacySettings.allowAnonymousScoring}
+                                                                onChange={updateEnpsPrivacySetting("allowAnonymousScoring")}
+                                                            />
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                                                            <div>
+                                                                <span className="text-sm font-medium text-gray-700">Show Individual Scores to Admins</span>
+                                                                <p className="text-xs text-gray-500 mt-1">
+                                                                    <span className="text-red-600 font-semibold">⚠️ Not Recommended:</span> This would compromise anonymity
+                                                                </p>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.enpsPrivacySettings.showIndividualScores}
+                                                                onChange={updateEnpsPrivacySetting("showIndividualScores")}
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                                                            <div>
+                                                                <span className="text-sm font-medium text-gray-700">Enable Team-Level Reports</span>
+                                                                <p className="text-xs text-gray-500 mt-1">Show aggregated eNPS scores by team (minimum 5 responses)</p>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.enpsPrivacySettings.enableTeamReports}
+                                                                onChange={updateEnpsPrivacySetting("enableTeamReports")}
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                                                            <div>
+                                                                <span className="text-sm font-medium text-gray-700">Enable Organization Reports</span>
+                                                                <p className="text-xs text-gray-500 mt-1">Show aggregated eNPS scores for entire organization</p>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.enpsPrivacySettings.enableOrgReports}
+                                                                onChange={updateEnpsPrivacySetting("enableOrgReports")}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Data Retention Settings */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Data Retention</h4>
+                                                    <Field label="eNPS Data Retention Period">
+                                                        <select 
+                                                            value={form.enpsPrivacySettings.dataRetentionDays}
+                                                            onChange={(e) => setForm(s => ({
+                                                                ...s,
+                                                                enpsPrivacySettings: {
+                                                                    ...s.enpsPrivacySettings,
+                                                                    dataRetentionDays: parseInt(e.target.value)
+                                                                }
+                                                            }))}
+                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                        >
+                                                            <option value={90}>3 months (90 days)</option>
+                                                            <option value={180}>6 months (180 days)</option>
+                                                            <option value={365}>1 year (365 days)</option>
+                                                            <option value={730}>2 years (730 days)</option>
+                                                            <option value={-1}>Indefinite (until manually deleted)</option>
+                                                        </select>
+                                                    </Field>
+                                                    <p className="text-xs text-gray-500 mt-2">
+                                                        Anonymous eNPS responses will be automatically deleted after this period to protect privacy.
+                                                    </p>
+                                                </div>
+
+                                                {/* Privacy Compliance Status */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Privacy Compliance Status</h4>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                        <div className={`p-3 rounded-lg border ${
+                                                            form.enpsPrivacySettings.allowAnonymousScoring 
+                                                                ? 'bg-green-50 border-green-200' 
+                                                                : 'bg-red-50 border-red-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={form.enpsPrivacySettings.allowAnonymousScoring ? 'text-green-600' : 'text-red-600'}>
+                                                                    {form.enpsPrivacySettings.allowAnonymousScoring ? '✅' : '❌'}
+                                                                </span>
+                                                                <span className="text-xs font-medium">Anonymous Collection</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className={`p-3 rounded-lg border ${
+                                                            !form.enpsPrivacySettings.showIndividualScores 
+                                                                ? 'bg-green-50 border-green-200' 
+                                                                : 'bg-red-50 border-red-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={!form.enpsPrivacySettings.showIndividualScores ? 'text-green-600' : 'text-red-600'}>
+                                                                    {!form.enpsPrivacySettings.showIndividualScores ? '✅' : '⚠️'}
+                                                                </span>
+                                                                <span className="text-xs font-medium">Individual Privacy</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className={`p-3 rounded-lg border ${
+                                                            form.enpsPrivacySettings.enableTeamReports 
+                                                                ? 'bg-blue-50 border-blue-200' 
+                                                                : 'bg-gray-50 border-gray-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-blue-600">📊</span>
+                                                                <span className="text-xs font-medium">Team Insights</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className={`p-3 rounded-lg border ${
+                                                            form.enpsPrivacySettings.dataRetentionDays > 0 
+                                                                ? 'bg-purple-50 border-purple-200' 
+                                                                : 'bg-gray-50 border-gray-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-purple-600">🗓️</span>
+                                                                <span className="text-xs font-medium">
+                                                                    {form.enpsPrivacySettings.dataRetentionDays === -1 
+                                                                        ? 'No Auto-Delete' 
+                                                                        : `${form.enpsPrivacySettings.dataRetentionDays}d Retention`
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Admin Guidelines */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Administrator Guidelines</h4>
+                                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                                        <div className="space-y-2 text-sm text-yellow-800">
+                                                            <p><strong>✓ Do:</strong> Review team and organization-level trends</p>
+                                                            <p><strong>✓ Do:</strong> Use aggregated data for improvement initiatives</p>
+                                                            <p><strong>✓ Do:</strong> Ensure minimum response thresholds (5+ responses)</p>
+                                                            <p><strong>✗ Don't:</strong> Attempt to identify individual respondents</p>
+                                                            <p><strong>✗ Don't:</strong> Use data for performance reviews</p>
+                                                            <p><strong>✗ Don't:</strong> Share raw response data outside authorized personnel</p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/shared/Sidebar";
+import EnpsWidget from "../components/shared/EnpsWidget";
 
 const summary = [
   { label: "Projects", value: null, color: "green", icon: "📁", action: "Add Project", tooltip: "Create a new project" },
@@ -11,10 +12,30 @@ const recentActivity = null;
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [showEnpsWidget, setShowEnpsWidget] = useState(true);
+  
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  // Handle anonymous eNPS submission
+  const handleEnpsSubmission = (anonymousData) => {
+    console.log('Anonymous eNPS submission received:', {
+      score: anonymousData.score,
+      feedback: anonymousData.feedback ? '[FEEDBACK PROVIDED]' : '[NO FEEDBACK]',
+      timestamp: anonymousData.timestamp,
+      // Note: No user identification stored
+    });
+    
+    // In a real app, this would be sent to a backend that ensures anonymity
+    // The backend should NOT store any user identification with eNPS responses
+    
+    // Hide widget after submission
+    setTimeout(() => {
+      setShowEnpsWidget(false);
+    }, 3000);
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -75,6 +96,23 @@ export default function Dashboard() {
             </ul>
           )}
         </div>
+        
+        {/* eNPS Widget - Privacy-focused Employee Net Promoter Score */}
+        {showEnpsWidget && (
+          <div className="mb-8">
+            <EnpsWidget 
+              onSubmitScore={handleEnpsSubmission}
+              showResults={false}
+              privacySettings={{
+                allowAnonymousScoring: true,
+                showIndividualScores: false,
+                enableTeamReports: true,
+                enableOrgReports: true
+              }}
+            />
+          </div>
+        )}
+        
         <div className="text-center text-gray-400 text-xs">All data is for demo purposes only.</div>
       </main>
     </div>
