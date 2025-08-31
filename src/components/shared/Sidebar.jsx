@@ -186,7 +186,7 @@ export default function Sidebar({
         >
             <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
                 <div className="mb-6 flex items-center gap-2 px-2">
-                    <img src="/PM-frontend/logo.png" alt="Logo" className="w-8 h-8" />
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
                     {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
 
                     {/* mobile close button */}
