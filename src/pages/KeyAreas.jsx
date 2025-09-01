@@ -1212,6 +1212,9 @@ export default function KeyAreas() {
     const [listMenuPos, setListMenuPos] = useState({ top: 0, left: 0 }); // popup menu position
     const composerModalRef = useRef(null);
     const tabsRef = useRef(null);
+    // Mass edit UI toggle and anchor
+    const [showMassEdit, setShowMassEdit] = useState(false);
+    const tasksDisplayRef = useRef(null);
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -1285,6 +1288,11 @@ export default function KeyAreas() {
             setTaskForm((s) => ({ ...s, list_index: taskTab }));
         }
     }, [taskTab]);
+
+    // Auto-hide mass edit when selection is cleared
+    useEffect(() => {
+        if (selectedIds.size === 0 && showMassEdit) setShowMassEdit(false);
+    }, [selectedIds, showMassEdit]);
 
     useEffect(() => {
         (async () => {
@@ -1775,8 +1783,9 @@ export default function KeyAreas() {
             updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
             return Array.from(map.values());
         });
-        // Reset bulk form and selection
+        // Reset bulk form, hide bar, and clear selection to return to normal state
         setBulkForm({ assignee: "", status: "", priority: "", start_date: "", deadline: "", end_date: "" });
+        setShowMassEdit(false);
         clearSelection();
     };
 
@@ -2060,11 +2069,12 @@ export default function KeyAreas() {
                         )}
                         {selectedKA && (
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-4 md:col-span-2">
-                                        {/* Task Lists card with list buttons + Add Task inside */}
-                                        <div className="bg-white rounded-xl border border-slate-200 p-4">
-                                            <div className="flex items-center justify-between gap-2 mb-3">
+                                <div className="max-w-7xl mx-auto p-6">
+                                    <div className="rounded-xl border bg-white shadow-sm p-6 space-y-6">
+                                        {/* Top Row: Task Lists + Mass Edit */}
+                                        <div className="grid grid-cols-3 gap-4">
+                                            {/* Left: Task Lists (2/3 width) */}
+                                            <div className="col-span-3 md:col-span-2">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <div className="text-sm font-semibold whitespace-nowrap mr-1">
                                                         Task Lists
@@ -2117,10 +2127,8 @@ export default function KeyAreas() {
                                                                             <FaEllipsisV className="w-3.5 h-3.5" />
                                                                         </span>
                                                                     </button>
-
                                                                     {openListMenu === n && (
                                                                         <>
-                                                                            {/* Backdrop to behave like popup */}
                                                                             <div
                                                                                 className="fixed inset-0 z-40"
                                                                                 onClick={() => setOpenListMenu(null)}
@@ -2208,507 +2216,516 @@ export default function KeyAreas() {
                                                         )}
                                                     </div>
                                                 </div>
-
-                                                {/* Add Task moved into the three-dots menu per list */}
                                             </div>
 
-                                            {/* Render the tasks list directly below the tabs row when in List view */}
-                                            {view === "list" && (
-                                                <div className="pt-2 border-t border-slate-100">
-                                                    {selectedIds.size > 0 && (
-                                                        <form
-                                                            onSubmit={applyBulkEdit}
-                                                            className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg"
-                                                            aria-label="Mass edit selected tasks"
-                                                        >
-                                                            <div className="flex items-center flex-wrap gap-2">
-                                                                <div className="text-sm font-semibold text-amber-900 mr-2">
-                                                                    Mass edit ({selectedIds.size} selected):
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <label
-                                                                        htmlFor="bulk-assignee"
-                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
-                                                                    >
-                                                                        Assignee
-                                                                    </label>
-                                                                    <input
-                                                                        id="bulk-assignee"
-                                                                        value={bulkForm.assignee}
-                                                                        onChange={(e) =>
-                                                                            setBulkForm((s) => ({
-                                                                                ...s,
-                                                                                assignee: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="px-2 py-1 border rounded text-sm bg-white"
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <label
-                                                                        htmlFor="bulk-status"
-                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
-                                                                    >
-                                                                        Status
-                                                                    </label>
-                                                                    <select
-                                                                        id="bulk-status"
-                                                                        value={bulkForm.status}
-                                                                        onChange={(e) =>
-                                                                            setBulkForm((s) => ({
-                                                                                ...s,
-                                                                                status: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="px-2 py-1 border rounded text-sm bg-white"
-                                                                    >
-                                                                        <option value="">Status…</option>
-                                                                        <option value="open">Open</option>
-                                                                        <option value="in_progress">In Progress</option>
-                                                                        <option value="done">Done</option>
-                                                                        <option value="cancelled">Cancelled</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <label
-                                                                        htmlFor="bulk-priority"
-                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
-                                                                    >
-                                                                        Priority
-                                                                    </label>
-                                                                    <select
-                                                                        id="bulk-priority"
-                                                                        value={bulkForm.priority}
-                                                                        onChange={(e) =>
-                                                                            setBulkForm((s) => ({
-                                                                                ...s,
-                                                                                priority: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="px-2 py-1 border rounded text-sm bg-white"
-                                                                    >
-                                                                        <option value="">Priority…</option>
-                                                                        <option value="low">Low</option>
-                                                                        <option value="med">Medium</option>
-                                                                        <option value="high">High</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <label
-                                                                        htmlFor="bulk-start"
-                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
-                                                                    >
-                                                                        Start Date
-                                                                    </label>
-                                                                    <input
-                                                                        id="bulk-start"
-                                                                        type="date"
-                                                                        value={bulkForm.start_date}
-                                                                        onChange={(e) =>
-                                                                            setBulkForm((s) => ({
-                                                                                ...s,
-                                                                                start_date: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="px-2 py-1 border rounded text-sm bg-white"
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <label
-                                                                        htmlFor="bulk-deadline"
-                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
-                                                                    >
-                                                                        Deadline
-                                                                    </label>
-                                                                    <input
-                                                                        id="bulk-deadline"
-                                                                        type="date"
-                                                                        value={bulkForm.deadline}
-                                                                        onChange={(e) =>
-                                                                            setBulkForm((s) => ({
-                                                                                ...s,
-                                                                                deadline: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="px-2 py-1 border rounded text-sm bg-white"
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <label
-                                                                        htmlFor="bulk-end"
-                                                                        className="text-[11px] leading-3 text-slate-600 font-medium"
-                                                                    >
-                                                                        Planned End
-                                                                    </label>
-                                                                    <input
-                                                                        id="bulk-end"
-                                                                        type="date"
-                                                                        value={bulkForm.end_date}
-                                                                        onChange={(e) =>
-                                                                            setBulkForm((s) => ({
-                                                                                ...s,
-                                                                                end_date: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="px-2 py-1 border rounded text-sm bg-white"
-                                                                    />
-                                                                </div>
-                                                                <button className="ml-2 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm">
-                                                                    Apply
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={clearSelection}
-                                                                    className="px-2 py-1 rounded bg-white border border-slate-200 text-slate-700 text-sm hover:bg-slate-50"
-                                                                >
-                                                                    Clear
-                                                                </button>
-                                                            </div>
-                                                        </form>
-                                                    )}
-                                                    {visibleTasks.length === 0 ? (
-                                                        <EmptyState
-                                                            title={`No tasks in List ${taskTab}`}
-                                                            hint="Use the three-dots menu to add a task."
-                                                        />
-                                                    ) : (
-                                                        <div className="overflow-x-auto">
-                                                            <table className="min-w-full text-sm">
-                                                                <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                                                    <tr>
-                                                                        <th className="px-3 py-2 text-left w-8">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                aria-label="Select all visible"
-                                                                                checked={
-                                                                                    visibleTasks.length > 0 &&
-                                                                                    visibleTasks.every((t) =>
-                                                                                        selectedIds.has(t.id),
-                                                                                    )
-                                                                                }
-                                                                                onChange={selectAllVisible}
-                                                                            />
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Task
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Assignee
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Status
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Priority
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Quadrant
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Goal
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Tags
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Start Date
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Deadline
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            End date
-                                                                        </th>
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Duration
-                                                                        </th>
-                                                                        <th
-                                                                            className="px-3 py-2 text-center font-semibold w-16"
-                                                                            title="Activities"
-                                                                        >
-                                                                            {/* Hamburger as column name */}
-                                                                            <span className="inline-flex items-center justify-center w-full text-slate-700">
-                                                                                <svg
-                                                                                    xmlns="http://www.w3.org/2000/svg"
-                                                                                    width="16"
-                                                                                    height="16"
-                                                                                    viewBox="0 0 24 24"
-                                                                                    fill="none"
-                                                                                    stroke="currentColor"
-                                                                                    strokeWidth="2"
-                                                                                    strokeLinecap="round"
-                                                                                    strokeLinejoin="round"
-                                                                                >
-                                                                                    <line
-                                                                                        x1="3"
-                                                                                        y1="6"
-                                                                                        x2="21"
-                                                                                        y2="6"
-                                                                                    />
-                                                                                    <line
-                                                                                        x1="3"
-                                                                                        y1="12"
-                                                                                        x2="21"
-                                                                                        y2="12"
-                                                                                    />
-                                                                                    <line
-                                                                                        x1="3"
-                                                                                        y1="18"
-                                                                                        x2="21"
-                                                                                        y2="18"
-                                                                                    />
-                                                                                </svg>
-                                                                            </span>
-                                                                        </th>
-                                                                    </tr>
-                                                                </thead>
+                                            {/* Right: Mass Edit (1/3 width) as a button */}
+                                            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
+                                                <span className="text-sm text-gray-600" aria-live="polite">
+                                                    {selectedIds.size} selected
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    disabled={selectedIds.size === 0}
+                                                    onClick={() => {
+                                                        setShowMassEdit(true);
+                                                        // Scroll to Tasks Display area where the form appears
+                                                        setTimeout(() => {
+                                                            if (tasksDisplayRef.current) {
+                                                                tasksDisplayRef.current.scrollIntoView({
+                                                                    behavior: "smooth",
+                                                                    block: "start",
+                                                                });
+                                                            }
+                                                        }, 0);
+                                                    }}
+                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                                                    aria-label="Open mass edit"
+                                                    title={
+                                                        selectedIds.size === 0
+                                                            ? "Select tasks to enable mass edit"
+                                                            : `Mass edit (${selectedIds.size})`
+                                                    }
+                                                >
+                                                    Mass Edit
+                                                </button>
+                                            </div>
+                                        </div>
 
-                                                                <tbody className="bg-white">
-                                                                    {visibleTasks.map((t) => {
-                                                                        const q =
-                                                                            t.eisenhower_quadrant ||
-                                                                            computeEisenhowerQuadrant({
-                                                                                deadline: t.deadline,
-                                                                                end_date: t.end_date,
-                                                                                priority: t.priority,
-                                                                            });
-                                                                        return (
-                                                                            <React.Fragment key={t.id}>
-                                                                                <tr
-                                                                                    className="border-t border-slate-200 hover:bg-slate-50"
-                                                                                    onMouseEnter={() => {
+                                        {/* Bottom Row: Tasks Display (full width) */}
+                                        <div ref={tasksDisplayRef}>
+                                            {showMassEdit && selectedIds.size > 0 && (
+                                                <form
+                                                    onSubmit={applyBulkEdit}
+                                                    aria-label="Mass edit selected tasks"
+                                                    className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg"
+                                                >
+                                                    <div className="text-sm text-blue-900 font-medium mb-3">
+                                                        Mass edit {selectedIds.size} task
+                                                        {selectedIds.size > 1 ? "s" : ""}
+                                                    </div>
+                                                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs text-blue-900">
+                                                                Assignee
+                                                            </label>
+                                                            <input
+                                                                value={bulkForm.assignee}
+                                                                onChange={(e) =>
+                                                                    setBulkForm((s) => ({
+                                                                        ...s,
+                                                                        assignee: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 bg-white"
+                                                                placeholder="Name"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-blue-900">
+                                                                Status
+                                                            </label>
+                                                            <select
+                                                                value={bulkForm.status}
+                                                                onChange={(e) =>
+                                                                    setBulkForm((s) => ({
+                                                                        ...s,
+                                                                        status: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 bg-white"
+                                                            >
+                                                                <option value="">(leave as is)</option>
+                                                                <option value="open">Open</option>
+                                                                <option value="in_progress">In Progress</option>
+                                                                <option value="done">Done</option>
+                                                                <option value="cancelled">Cancelled</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-blue-900">
+                                                                Priority
+                                                            </label>
+                                                            <select
+                                                                value={bulkForm.priority}
+                                                                onChange={(e) =>
+                                                                    setBulkForm((s) => ({
+                                                                        ...s,
+                                                                        priority: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 bg-white"
+                                                            >
+                                                                <option value="">(leave as is)</option>
+                                                                <option value="low">Low</option>
+                                                                <option value="med">Medium</option>
+                                                                <option value="high">High</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-blue-900">
+                                                                Start Date
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={bulkForm.start_date}
+                                                                onChange={(e) =>
+                                                                    setBulkForm((s) => ({
+                                                                        ...s,
+                                                                        start_date: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 bg-white"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-blue-900">
+                                                                Deadline
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={bulkForm.deadline}
+                                                                onChange={(e) =>
+                                                                    setBulkForm((s) => ({
+                                                                        ...s,
+                                                                        deadline: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 bg-white"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-blue-900">
+                                                                Planned End
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={bulkForm.end_date}
+                                                                onChange={(e) =>
+                                                                    setBulkForm((s) => ({
+                                                                        ...s,
+                                                                        end_date: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 bg-white"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setBulkForm({
+                                                                    assignee: "",
+                                                                    status: "",
+                                                                    priority: "",
+                                                                    start_date: "",
+                                                                    deadline: "",
+                                                                    end_date: "",
+                                                                })
+                                                            }
+                                                            className="px-3 py-1.5 bg-slate-200 text-slate-900 rounded-md hover:bg-slate-300"
+                                                        >
+                                                            Clear all
+                                                        </button>
+                                                        <button
+                                                            type="submit"
+                                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                                        >
+                                                            Apply
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowMassEdit(false)}
+                                                            className="px-3 py-1.5 text-blue-700 hover:underline"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            )}
+                                            {view === "list" ? (
+                                                visibleTasks.length === 0 ? (
+                                                    <EmptyState
+                                                        title={`No tasks in List ${taskTab}`}
+                                                        hint="Use the three-dots menu to add a task."
+                                                    />
+                                                ) : (
+                                                    <div className="overflow-x-auto">
+                                                        <table className="min-w-full text-sm">
+                                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                                <tr>
+                                                                    <th className="px-3 py-2 text-left w-8">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            aria-label="Select all visible"
+                                                                            checked={
+                                                                                visibleTasks.length > 0 &&
+                                                                                visibleTasks.every((t) =>
+                                                                                    selectedIds.has(t.id),
+                                                                                )
+                                                                            }
+                                                                            onChange={selectAllVisible}
+                                                                        />
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Task
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Assignee
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Status
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Priority
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Quadrant
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Goal
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Tags
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Start Date
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Deadline
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        End date
+                                                                    </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Duration
+                                                                    </th>
+                                                                    <th
+                                                                        className="px-3 py-2 text-center font-semibold w-16"
+                                                                        title="Activities"
+                                                                    >
+                                                                        <span className="inline-flex items-center justify-center w-full text-slate-700">
+                                                                            <svg
+                                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                                width="16"
+                                                                                height="16"
+                                                                                viewBox="0 0 24 24"
+                                                                                fill="none"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth="2"
+                                                                                strokeLinecap="round"
+                                                                                strokeLinejoin="round"
+                                                                            >
+                                                                                <line x1="3" y1="6" x2="21" y2="6" />
+                                                                                <line x1="3" y1="12" x2="21" y2="12" />
+                                                                                <line x1="3" y1="18" x2="21" y2="18" />
+                                                                            </svg>
+                                                                        </span>
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="bg-white">
+                                                                {visibleTasks.map((t) => {
+                                                                    const q =
+                                                                        t.eisenhower_quadrant ||
+                                                                        computeEisenhowerQuadrant({
+                                                                            deadline: t.deadline,
+                                                                            end_date: t.end_date,
+                                                                            priority: t.priority,
+                                                                        });
+                                                                    return (
+                                                                        <React.Fragment key={t.id}>
+                                                                            <tr
+                                                                                className="border-t border-slate-200 hover:bg-slate-50"
+                                                                                onMouseEnter={() => {
+                                                                                    if (
+                                                                                        expandedActivityRows &&
+                                                                                        expandedActivityRows.size > 0
+                                                                                    ) {
                                                                                         if (
-                                                                                            expandedActivityRows &&
-                                                                                            expandedActivityRows.size >
-                                                                                                0
-                                                                                        ) {
-                                                                                            // If hovering a different task than the one expanded, close all expanded activities
-                                                                                            if (
-                                                                                                !(
-                                                                                                    expandedActivityRows.size ===
-                                                                                                        1 &&
-                                                                                                    expandedActivityRows.has(
-                                                                                                        t.id,
-                                                                                                    )
-                                                                                                )
-                                                                                            ) {
-                                                                                                setExpandedActivityRows(
-                                                                                                    new Set(),
-                                                                                                );
-                                                                                            }
-                                                                                        }
-                                                                                    }}
-                                                                                >
-                                                                                    <td className="px-3 py-2 align-top">
-                                                                                        <input
-                                                                                            type="checkbox"
-                                                                                            aria-label={`Select ${t.title}`}
-                                                                                            checked={isSelected(t.id)}
-                                                                                            onChange={() =>
-                                                                                                toggleSelect(t.id)
-                                                                                            }
-                                                                                        />
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top">
-                                                                                        <div className="flex items-start gap-2">
-                                                                                            <span
-                                                                                                className={`mt-0.5 inline-block text-sm font-bold ${
-                                                                                                    (t.priority ||
-                                                                                                        "med") ===
-                                                                                                    "high"
-                                                                                                        ? "text-red-600"
-                                                                                                        : (t.priority ||
-                                                                                                                "med") ===
-                                                                                                            "low"
-                                                                                                          ? "text-emerald-600"
-                                                                                                          : "text-amber-600"
-                                                                                                }`}
-                                                                                                title={`Priority: ${t.priority || "med"}`}
-                                                                                            >
-                                                                                                !
-                                                                                            </span>
-                                                                                            <button
-                                                                                                className="text-blue-700 hover:underline font-semibold"
-                                                                                                title="Click to open task"
-                                                                                                onClick={() => {
-                                                                                                    // Open full-page detail view instead of popup
-                                                                                                    setSelectedTaskFull(
-                                                                                                        t,
-                                                                                                    );
-                                                                                                    setTaskFullInitialTab(
-                                                                                                        "activities",
-                                                                                                    );
-                                                                                                }}
-                                                                                            >
-                                                                                                {t.title}
-                                                                                            </button>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                                                        {t.assignee || "—"}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <StatusIndicator
-                                                                                                status={
-                                                                                                    t.status || "open"
-                                                                                                }
-                                                                                            />
-                                                                                            <span className="capitalize text-slate-800">
-                                                                                                {String(
-                                                                                                    t.status || "open",
-                                                                                                ).replace("_", " ")}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top">
-                                                                                        <PriorityBadge
-                                                                                            priority={
-                                                                                                t.priority || "med"
-                                                                                            }
-                                                                                        />
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top">
-                                                                                        <QuadrantBadge q={q} />
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                                                        {t.goal_id ? (
-                                                                                            `#${t.goal_id}`
-                                                                                        ) : (
-                                                                                            <span className="text-slate-500">
-                                                                                                Trap
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top max-w-[240px]">
-                                                                                        <span className="block truncate text-slate-800">
-                                                                                            {(t.tags || "")
-                                                                                                .split(",")
-                                                                                                .filter(Boolean)
-                                                                                                .slice(0, 4)
-                                                                                                .join(", ") || "—"}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                                                        {toDateOnly(t.start_date) ||
-                                                                                            "—"}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                                                        {toDateOnly(t.deadline) || "—"}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                                                        {toDateOnly(t.end_date) || "—"}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                                                        {formatDuration(
-                                                                                            t.start_date || t.deadline,
-                                                                                            t.end_date,
-                                                                                        )}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 align-top text-center w-16">
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            title="Show activities inline"
-                                                                                            onClick={() =>
-                                                                                                toggleActivitiesRow(
-                                                                                                    t.id,
-                                                                                                )
-                                                                                            }
-                                                                                            className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-semibold min-w-[1.5rem] border ${
+                                                                                            !(
+                                                                                                expandedActivityRows.size ===
+                                                                                                    1 &&
                                                                                                 expandedActivityRows.has(
                                                                                                     t.id,
                                                                                                 )
-                                                                                                    ? "bg-blue-100 text-blue-700 border-blue-200"
-                                                                                                    : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                                                                            )
+                                                                                        ) {
+                                                                                            setExpandedActivityRows(
+                                                                                                new Set(),
+                                                                                            );
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        aria-label={`Select ${t.title}`}
+                                                                                        checked={isSelected(t.id)}
+                                                                                        onChange={() =>
+                                                                                            toggleSelect(t.id)
+                                                                                        }
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <div className="flex items-start gap-2">
+                                                                                        <span
+                                                                                            className={`mt-0.5 inline-block text-sm font-bold ${
+                                                                                                (t.priority ||
+                                                                                                    "med") === "high"
+                                                                                                    ? "text-red-600"
+                                                                                                    : (t.priority ||
+                                                                                                            "med") ===
+                                                                                                        "low"
+                                                                                                      ? "text-emerald-600"
+                                                                                                      : "text-amber-600"
                                                                                             }`}
+                                                                                            title={`Priority: ${t.priority || "med"}`}
                                                                                         >
+                                                                                            !
+                                                                                        </span>
+                                                                                        <button
+                                                                                            className="text-blue-700 hover:underline font-semibold"
+                                                                                            title="Click to open task"
+                                                                                            onClick={() => {
+                                                                                                setSelectedTaskFull(t);
+                                                                                                setTaskFullInitialTab(
+                                                                                                    "activities",
+                                                                                                );
+                                                                                            }}
+                                                                                        >
+                                                                                            {t.title}
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.assignee || "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <StatusIndicator
+                                                                                            status={t.status || "open"}
+                                                                                        />
+                                                                                        <span className="capitalize text-slate-800">
+                                                                                            {String(
+                                                                                                t.status || "open",
+                                                                                            ).replace("_", " ")}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <PriorityBadge
+                                                                                        priority={t.priority || "med"}
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top">
+                                                                                    <QuadrantBadge q={q} />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.goal_id ? (
+                                                                                        `#${t.goal_id}`
+                                                                                    ) : (
+                                                                                        <span className="text-slate-500">
+                                                                                            Trap
+                                                                                        </span>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top max-w-[240px]">
+                                                                                    <span className="block truncate text-slate-800">
+                                                                                        {(t.tags || "")
+                                                                                            .split(",")
+                                                                                            .filter(Boolean)
+                                                                                            .slice(0, 4)
+                                                                                            .join(", ") || "—"}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {toDateOnly(t.start_date) || "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {toDateOnly(t.deadline) || "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {toDateOnly(t.end_date) || "—"}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {formatDuration(
+                                                                                        t.start_date || t.deadline,
+                                                                                        t.end_date,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 align-top text-center w-16">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        title="Show activities inline"
+                                                                                        onClick={() =>
+                                                                                            toggleActivitiesRow(t.id)
+                                                                                        }
+                                                                                        className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-semibold min-w-[1.5rem] border ${
+                                                                                            expandedActivityRows.has(
+                                                                                                t.id,
+                                                                                            )
+                                                                                                ? "bg-blue-100 text-blue-700 border-blue-200"
+                                                                                                : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                                                                        }`}
+                                                                                    >
+                                                                                        {(() => {
+                                                                                            const c = (
+                                                                                                activitiesByTask[
+                                                                                                    String(t.id)
+                                                                                                ] || []
+                                                                                            ).length;
+                                                                                            return c || 0;
+                                                                                        })()}
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                            {expandedActivityRows.has(t.id) && (
+                                                                                <tr className="bg-slate-50">
+                                                                                    <td className="px-3 py-2" />
+                                                                                    <td
+                                                                                        colSpan={12}
+                                                                                        className="px-0 py-2"
+                                                                                    >
+                                                                                        <div className="ml-6 pl-10 border-l-2 border-slate-200">
+                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+                                                                                                Activities
+                                                                                            </div>
                                                                                             {(() => {
-                                                                                                const c = (
+                                                                                                const list =
                                                                                                     activitiesByTask[
                                                                                                         String(t.id)
-                                                                                                    ] || []
-                                                                                                ).length;
-                                                                                                return c || 0;
+                                                                                                    ] || [];
+                                                                                                if (!list.length)
+                                                                                                    return (
+                                                                                                        <div className="text-sm text-slate-500">
+                                                                                                            No
+                                                                                                            activities
+                                                                                                            yet.
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                return (
+                                                                                                    <ul className="space-y-1">
+                                                                                                        {list.map(
+                                                                                                            (a) => (
+                                                                                                                <li
+                                                                                                                    key={
+                                                                                                                        a.id
+                                                                                                                    }
+                                                                                                                    className="text-sm text-slate-800 flex items-start gap-2"
+                                                                                                                >
+                                                                                                                    <span className="mt-1 inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                                                                                    <div>
+                                                                                                                        <div className="leading-5">
+                                                                                                                            {
+                                                                                                                                a.text
+                                                                                                                            }
+                                                                                                                        </div>
+                                                                                                                        {a.createdAt ? (
+                                                                                                                            <div className="text-[11px] text-slate-500">
+                                                                                                                                {new Date(
+                                                                                                                                    a.createdAt,
+                                                                                                                                ).toLocaleString()}
+                                                                                                                            </div>
+                                                                                                                        ) : null}
+                                                                                                                    </div>
+                                                                                                                </li>
+                                                                                                            ),
+                                                                                                        )}
+                                                                                                    </ul>
+                                                                                                );
                                                                                             })()}
-                                                                                        </button>
+                                                                                        </div>
                                                                                     </td>
                                                                                 </tr>
-                                                                                {expandedActivityRows.has(t.id) && (
-                                                                                    <tr className="bg-slate-50">
-                                                                                        {/* Empty cell to align under checkbox column */}
-                                                                                        <td className="px-3 py-2" />
-                                                                                        {/* Content spans remaining columns, aligning under Task and indented */}
-                                                                                        <td
-                                                                                            colSpan={12}
-                                                                                            className="px-0 py-2"
-                                                                                        >
-                                                                                            <div className="ml-6 pl-10 border-l-2 border-slate-200">
-                                                                                                <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
-                                                                                                    Activities
-                                                                                                </div>
-                                                                                                {(() => {
-                                                                                                    const list =
-                                                                                                        activitiesByTask[
-                                                                                                            String(t.id)
-                                                                                                        ] || [];
-                                                                                                    if (!list.length)
-                                                                                                        return (
-                                                                                                            <div className="text-sm text-slate-500">
-                                                                                                                No
-                                                                                                                activities
-                                                                                                                yet.
-                                                                                                            </div>
-                                                                                                        );
-                                                                                                    return (
-                                                                                                        <ul className="space-y-1">
-                                                                                                            {list.map(
-                                                                                                                (a) => (
-                                                                                                                    <li
-                                                                                                                        key={
-                                                                                                                            a.id
-                                                                                                                        }
-                                                                                                                        className="text-sm text-slate-800 flex items-start gap-2"
-                                                                                                                    >
-                                                                                                                        <span className="mt-1 inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                                                                                                        <div>
-                                                                                                                            <div className="leading-5">
-                                                                                                                                {
-                                                                                                                                    a.text
-                                                                                                                                }
-                                                                                                                            </div>
-                                                                                                                            {a.createdAt ? (
-                                                                                                                                <div className="text-[11px] text-slate-500">
-                                                                                                                                    {new Date(
-                                                                                                                                        a.createdAt,
-                                                                                                                                    ).toLocaleString()}
-                                                                                                                                </div>
-                                                                                                                            ) : null}
-                                                                                                                        </div>
-                                                                                                                    </li>
-                                                                                                                ),
-                                                                                                            )}
-                                                                                                        </ul>
-                                                                                                    );
-                                                                                                })()}
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                )}
-                                                                            </React.Fragment>
-                                                                        );
-                                                                    })}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                                            )}
+                                                                        </React.Fragment>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )
+                                            ) : view === "kanban" ? (
+                                                <KanbanView
+                                                    tasks={visibleTasks}
+                                                    onSelect={(t) => {
+                                                        setSelectedTaskFull(t);
+                                                        setTaskFullInitialTab("activities");
+                                                    }}
+                                                />
+                                            ) : (
+                                                <CalendarView
+                                                    tasks={visibleTasks}
+                                                    onSelect={(t) => {
+                                                        setSelectedTaskFull(t);
+                                                        setTaskFullInitialTab("activities");
+                                                    }}
+                                                />
                                             )}
                                         </div>
-
-                                        {/* Your activities card removed per request (now only inside the task slide-over > Activities tab) */}
                                     </div>
-
-                                    {/* Summary card removed per request */}
                                 </div>
                             </div>
                         )}
