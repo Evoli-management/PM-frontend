@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
+import TaskActivityModal from "../components/calendar/TaskActivityModal";
 import {
     FaPlus,
     FaLock,
@@ -15,63 +16,90 @@ import {
     FaTrash,
     FaListUl,
     FaExclamationCircle,
+    FaRegCircle,
+    FaCheckCircle,
+    FaAlignJustify,
+    FaTag,
+    FaAngleDoubleLeft,
+    FaChevronDown,
+    FaChevronUp,
 } from "react-icons/fa";
 
-/* ------------------------------ Helpers/UI ------------------------------ */
-const Chip = ({ children }) => (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
-        {children}
-    </span>
-);
-
-function StatusIndicator({ status }) {
-    const color =
-        status === "done"
-            ? "bg-green-500"
-            : status === "in_progress"
-              ? "bg-amber-500"
-              : status === "cancelled"
-                ? "bg-red-500"
-                : "bg-slate-400";
-    return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} title={`Status: ${status}`} />;
+function InlineAddActivity({ onAdd }) {
+    const [value, setValue] = useState("");
+    const submit = () => {
+        const t = (value || "").trim();
+        if (!t) return;
+        onAdd && onAdd(t);
+        setValue("");
+    };
+    return (
+        <div className="flex items-center gap-2">
+            <input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") submit();
+                }}
+                placeholder="Activity name"
+                className="flex-1 p-2 border rounded text-sm"
+            />
+            <button type="button" onClick={submit} className="px-3 py-2 bg-slate-100 rounded text-sm text-slate-700">
+                Add activity
+            </button>
+        </div>
+    );
 }
 
-const PriorityBadge = ({ priority = "med" }) => {
-    const map = {
-        low: "bg-emerald-100 text-emerald-700",
-        med: "bg-amber-100 text-amber-700",
-        high: "bg-red-100 text-red-700",
-    };
-    return (
-        <span
-            className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[priority] || "bg-slate-100 text-slate-700"}`}
-        >
-            {priority}
-        </span>
-    );
-};
-
-const QuadrantBadge = ({ q }) => {
-    const label = q ? `Q${q}` : "—";
-    const map = {
-        1: "bg-red-100 text-red-700",
-        2: "bg-green-100 text-green-700",
-        3: "bg-yellow-100 text-yellow-700",
-        4: "bg-slate-100 text-slate-700",
-    };
-    return (
-        <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${map[q] || "bg-slate-100 text-slate-700"}`}>
-            {label}
-        </span>
-    );
-};
-
-const EmptyState = ({ title = "Nothing here", hint = "" }) => (
-    <div className="text-sm text-slate-600 py-8 text-center">
-        <div className="font-semibold text-slate-800">{title}</div>
-        {hint ? <div className="text-slate-500 mt-1">{hint}</div> : null}
+// Small UI helpers for table chips/indicators
+const EmptyState = ({ title = "List is empty.", hint = "" }) => (
+    <div className="p-4 border border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-600">
+        <div className="text-sm font-medium">{title}</div>
+        {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
     </div>
 );
+
+const StatusIndicator = ({ status = "open" }) => {
+    const s = String(status).toLowerCase();
+    const color =
+        s === "done" || s === "closed"
+            ? "bg-emerald-500"
+            : s === "in_progress"
+              ? "bg-blue-500"
+              : s === "blocked"
+                ? "bg-red-500"
+                : "bg-slate-400"; // open/other
+    return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} aria-hidden="true" />;
+};
+
+const PriorityBadge = ({ priority = "med" }) => {
+    const p = String(priority).toLowerCase();
+    const map = {
+        high: { cls: "text-red-700 bg-red-50 border-red-200", label: "High" },
+        med: { cls: "text-amber-700 bg-amber-50 border-amber-200", label: "Normal" },
+        low: { cls: "text-emerald-700 bg-emerald-50 border-emerald-200", label: "Low" },
+    };
+    const m = map[p] || map.med;
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${m.cls}`}>{m.label}</span>
+    );
+};
+
+const QuadrantBadge = ({ q = 4 }) => {
+    const n = Number(q) || 4;
+    const map = {
+        1: { cls: "text-white bg-red-600", label: "Q1" },
+        2: { cls: "text-white bg-amber-600", label: "Q2" },
+        3: { cls: "text-white bg-blue-600", label: "Q3" },
+        4: { cls: "text-white bg-emerald-600", label: "Q4" },
+    };
+    const m = map[n] || map[4];
+    return (
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${m.cls}`}>
+            {m.label}
+        </span>
+    );
+};
 
 // normalize a date value (ISO string or YYYY-MM-DD) to YYYY-MM-DD
 const toDateOnly = (val) => {
@@ -90,6 +118,48 @@ const formatDuration = (startIso, endIso) => {
     if (isNaN(start) || isNaN(end)) return "—";
     const days = Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24)));
     return `${days}d`;
+};
+
+// Priority normalization: accepts string ("low"|"med"|"high") or number/number-string (1|2|3)
+const getPriorityLevel = (val) => {
+    if (val === undefined || val === null || val === "") return 2;
+    if (typeof val === "number") return [1, 2, 3].includes(val) ? val : 2;
+    const v = String(val).toLowerCase();
+    if (v === "1" || v === "low") return 1;
+    if (v === "3" || v === "high") return 3;
+    return 2; // med or default
+};
+
+// Activity helpers
+const activityDefaults = {
+    id: 0,
+    activity_name: "",
+    completed: 0,
+    priority: 2, // 1 low, 2 normal, 3 high
+    date_start: "",
+    date_end: "",
+    deadline: "",
+    duration: "",
+    task_id: "",
+    goal_id: "",
+    responsible: "",
+    notes: "",
+    // createdAt removed
+};
+
+const loadActivitiesMap = () => {
+    try {
+        const raw = localStorage.getItem("pm:kaActivities");
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+const saveActivitiesMap = (map) => {
+    try {
+        localStorage.setItem("pm:kaActivities", JSON.stringify(map || {}));
+    } catch {}
 };
 
 // very small heuristic for quadrant based on priority and time
@@ -346,7 +416,7 @@ function TaskSlideOver({
     const addActivity = () => {
         const text = (newActivity || "").trim();
         if (!text) return;
-        const item = { id: Date.now(), text, createdAt: new Date().toISOString() };
+        const item = { id: Date.now(), text };
         persistActivities([...(taskActivities || []), item]);
         setNewActivity("");
     };
@@ -632,12 +702,21 @@ function TaskSlideOver({
                                         <option value="new">New (unattached)</option>
                                     </select>
 
-                                    <input
-                                        value={newActivity}
-                                        onChange={(e) => setNewActivity(e.target.value)}
-                                        placeholder="Activity name..."
-                                        className="flex-1 p-2 border rounded text-sm"
-                                    />
+                                    <div className="flex-1 flex items-stretch">
+                                        <label
+                                            htmlFor="slideover-add-activity"
+                                            className="inline-flex items-center justify-center w-20 px-2 text-xs font-semibold bg-blue-600 text-white border border-blue-600 rounded-l"
+                                        >
+                                            New
+                                        </label>
+                                        <input
+                                            id="slideover-add-activity"
+                                            value={newActivity}
+                                            onChange={(e) => setNewActivity(e.target.value)}
+                                            placeholder="Activity name..."
+                                            className="flex-1 p-2 border border-l-0 rounded-r text-sm"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -671,7 +750,7 @@ function TaskSlideOver({
                                                     <div className="flex-1">
                                                         <div className="text-sm text-slate-800">{a.text}</div>
                                                         <div className="text-xs text-slate-500 mt-1">
-                                                            {a.createdAt ? new Date(a.createdAt).toLocaleString() : ""}
+                                                            {/* createdAt removed */}
                                                         </div>
                                                     </div>
                                                     <div className="ml-3 flex items-start">
@@ -729,6 +808,8 @@ function TaskFullView({
     const menuRef = useRef(null);
     const [newActivity, setNewActivity] = useState("");
     const [showDetailsPopup, setShowDetailsPopup] = useState(false);
+    const [openActivityRows, setOpenActivityRows] = useState(new Set());
+    const [activityModal, setActivityModal] = useState({ open: false, item: null });
 
     useEffect(() => {
         setTab(initialTab || "activities");
@@ -757,161 +838,465 @@ function TaskFullView({
 
     const list = activitiesByTask[String(task.id)] || [];
 
+    const setList = (next) => {
+        const payload = typeof next === "function" ? next(list) : next;
+        onUpdateActivities && onUpdateActivities(String(task.id), payload);
+    };
+
     const addActivity = (text) => {
         const t = (text || "").trim();
         if (!t) return;
-        const item = { id: Date.now(), text: t, createdAt: new Date().toISOString() };
-        const next = [...list, item];
-        onUpdateActivities && onUpdateActivities(String(task.id), next);
+        const rich = {
+            ...activityDefaults,
+            id: Date.now(),
+            activity_name: t,
+        };
+        setList([...(list || []), rich]);
     };
     const removeActivity = (id) => {
-        const next = list.filter((a) => a.id !== id);
-        onUpdateActivities && onUpdateActivities(String(task.id), next);
+        setList(list.filter((a) => a.id !== id));
+        setOpenActivityRows((prev) => {
+            const copy = new Set(prev);
+            copy.delete(id);
+            return copy;
+        });
+    };
+    const toggleCompleted = (id) => {
+        setList(list.map((a) => (a.id === id ? { ...a, completed: a.completed ? 0 : 1 } : a)));
+    };
+    const setPriorityValue = (id, value) => {
+        // set priority explicitly via icon click; icons stay visible regardless of value
+        setList(list.map((a) => (a.id === id ? { ...a, priority: value } : a)));
+    };
+    const createTaskFromActivity = (item) => {
+        // lightweight hook for future integration
+        try {
+            window.dispatchEvent(
+                new CustomEvent("ka-create-task-from-activity", { detail: { taskId: task.id, activity: item } }),
+            );
+        } catch {}
+    };
+    const toggleRow = (id) => {
+        setOpenActivityRows((prev) => {
+            // If clicking the already open row, close it
+            if (prev.has(id)) return new Set();
+            // If switching to a different row, "save" current list and open only this one
+            if (prev.size > 0 && !prev.has(id)) {
+                onUpdateActivities && onUpdateActivities(String(task.id), list);
+            }
+            return new Set([id]);
+        });
+    };
+
+    // When hovering another activity, close any open one (and save), but don't open the hovered.
+    const closeOnHoverDifferent = (id) => {
+        setOpenActivityRows((prev) => {
+            if (prev.size > 0 && !prev.has(id)) {
+                onUpdateActivities && onUpdateActivities(String(task.id), list);
+                return new Set();
+            }
+            return prev;
+        });
+    };
+    const updateField = (id, field, value) => {
+        setList(list.map((a) => (a.id === id ? { ...a, [field]: value } : a)));
     };
     const clearActivities = () => {
         if (!confirm("Clear all activities for this task?")) return;
         onUpdateActivities && onUpdateActivities(String(task.id), []);
     };
 
+    // Save handler for details tab
     const save = async () => {
-        if (readOnly) return;
-        const payload = {
-            ...form,
-            start_date: form.start_date ? toDateOnly(form.start_date) : null,
-            deadline: form.deadline ? toDateOnly(form.deadline) : null,
-            end_date: form.end_date ? toDateOnly(form.end_date) : null,
-        };
-        onSave && (await onSave(payload));
+        if (onSave) {
+            await onSave(form);
+        }
         setIsEditing(false);
-    };
-
-    const markDone = async () => {
-        if (!task) return;
-        const upd = { ...task, status: "done" };
-        onSave && (await onSave(upd));
     };
 
     return (
         <div className="bg-white rounded-xl border border-slate-200">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 p-4 border-b border-slate-200">
-                <div className="flex items-center gap-2 min-w-0">
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        aria-label="Back to list"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        onClick={onBack}
-                    >
-                        <FaChevronLeft />
-                    </button>
-                    <div className="relative ml-1 flex-shrink-0" ref={menuRef}>
+            {/* Header: row 1 (back + title + actions), row 2 (Key Area pill fully left-aligned) */}
+            <div className="p-2 border-b border-slate-200">
+                <div className="flex items-start gap-2">
+                    {onBack && (
                         <button
-                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50"
-                            aria-haspopup="menu"
-                            aria-expanded={menuOpen ? "true" : "false"}
-                            onClick={() => setMenuOpen((s) => !s)}
-                            title="Task menu"
+                            type="button"
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            aria-label="Back"
+                            onClick={onBack}
+                            style={{ minWidth: 36, minHeight: 36 }}
                         >
-                            <FaEllipsisV />
+                            <FaChevronLeft />
                         </button>
-                        {menuOpen && (
-                            <div
-                                role="menu"
-                                className="absolute left-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-xl"
-                                style={{ zIndex: 9999 }}
-                            >
-                                <div className="py-1">
-                                    <button
-                                        role="menuitem"
-                                        className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                        onClick={() => {
-                                            setIsEditing(false);
-                                            setMenuOpen(false);
-                                            setShowDetailsPopup(true);
-                                        }}
-                                    >
-                                        Edit task details
-                                    </button>
-                                </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 min-w-0">
+                            <div className="truncate font-bold text-slate-900 text-base md:text-lg">
+                                {form?.title || task?.title || "Untitled task"}
                             </div>
-                        )}
-                    </div>
-                    <div className="min-w-0">
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate" title={task.title}>
-                            {task.title}
-                        </h1>
+                            {/* Ellipsis menu next to the title */}
+                            <div className="relative shrink-0" ref={menuRef}>
+                                <button
+                                    type="button"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuOpen ? "true" : "false"}
+                                    className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600"
+                                    onClick={() => setMenuOpen((s) => !s)}
+                                    title="More actions"
+                                >
+                                    <FaEllipsisV />
+                                </button>
+                                {menuOpen && (
+                                    <div
+                                        role="menu"
+                                        className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-10"
+                                    >
+                                        <button
+                                            role="menuitem"
+                                            className="block w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                                            onClick={() => {
+                                                setMenuOpen(false);
+                                                setTab("details");
+                                                setIsEditing(true);
+                                            }}
+                                        >
+                                            Edit details
+                                        </button>
+                                        {!readOnly && (
+                                            <button
+                                                role="menuitem"
+                                                className="block w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+                                                onClick={() => {
+                                                    setMenuOpen(false);
+                                                    if (!confirm("Delete this task?")) return;
+                                                    onDelete && onDelete(task);
+                                                }}
+                                            >
+                                                Delete task
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Context chip: show only Key Area name */}
-            <div className="px-4 pt-2 bg-white">
-                {kaTitle ? (
-                    <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
-                        <FaListUl className="opacity-70" />
-                        <span className="font-medium" title={kaTitle}>
-                            {kaTitle}
-                        </span>
+                {/* Key Area tracking pill below, fully left-aligned with its icon */}
+                {kaTitle && (
+                    <div className="pt-2">
+                        <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
+                            <FaListUl className="opacity-70" />
+                            <span className="font-medium truncate max-w-full" title={kaTitle}>
+                                {kaTitle}
+                            </span>
+                        </div>
                     </div>
-                ) : null}
+                )}
             </div>
-
-            {/* Label row: show current tab label outside the menu */}
-            <div className="px-4 pt-3 border-b border-slate-200 bg-white">
-                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg px-3 py-1">
-                    <span className="text-sm font-semibold text-slate-800 select-none">
-                        {tab === "details" ? "Details" : "Activities"}
-                    </span>
+            {/* Local tabs for Activities / Details */}
+            <div className="px-2 pt-2 border-b border-slate-200 bg-white">
+                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                    <button
+                        type="button"
+                        className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === "activities" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
+                        onClick={() => setTab("activities")}
+                    >
+                        Activities
+                    </button>
                 </div>
             </div>
-
-            {/* Body */}
             {tab === "activities" ? (
                 <div className="p-4">
                     {list.length === 0 ? (
-                        <div className="text-sm text-slate-500">No activities yet.</div>
+                        <EmptyState title="No activities for this task yet." hint="Add a new activity below." />
                     ) : (
                         <ul className="space-y-2">
-                            {list.map((a) => (
-                                <li
-                                    key={a.id}
-                                    className="text-sm text-slate-800 flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2"
-                                >
-                                    <span className="mt-1 inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                    <div className="flex-1">
-                                        <div className="leading-5">{a.text}</div>
-                                        {a.createdAt ? (
-                                            <div className="text-[11px] text-slate-500">
-                                                {new Date(a.createdAt).toLocaleString()}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                    <button
-                                        className="text-xs text-slate-600 hover:underline"
-                                        onClick={() => removeActivity(a.id)}
+                            {list.map((a) => {
+                                const title = a.activity_name || a.text || "";
+                                const isOpen = openActivityRows.has(a.id);
+                                return (
+                                    <li
+                                        key={a.id}
+                                        className="bg-slate-50 border border-slate-200 rounded-lg p-2"
+                                        onMouseEnter={() => closeOnHoverDifferent(a.id)}
                                     >
-                                        Remove
-                                    </button>
-                                </li>
-                            ))}
+                                        <div
+                                            className="text-sm text-slate-800 flex items-start gap-2 cursor-pointer select-none"
+                                            onClick={() => toggleRow(a.id)}
+                                            role="button"
+                                            aria-expanded={isOpen ? "true" : "false"}
+                                            title={isOpen ? "Hide details" : "Show details"}
+                                        >
+                                            {/* Complete toggle */}
+                                            <button
+                                                type="button"
+                                                className="mt-0.5 text-slate-500 hover:text-blue-600"
+                                                title={a.completed ? "Mark incomplete" : "Mark completed"}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleCompleted(a.id);
+                                                }}
+                                            >
+                                                {a.completed ? (
+                                                    <FaCheckCircle className="w-4 h-4" />
+                                                ) : (
+                                                    <FaRegCircle className="w-4 h-4" />
+                                                )}
+                                            </button>
+
+                                            {/* Reorder handle (visual) */}
+                                            <span className="mt-0.5 text-slate-500" title="Drag to reorder">
+                                                <FaAlignJustify className="w-4 h-4" />
+                                            </span>
+                                            <div className="flex-1">
+                                                <input
+                                                    className="w-full bg-transparent outline-none font-medium"
+                                                    value={title}
+                                                    onChange={(e) =>
+                                                        updateField(
+                                                            a.id,
+                                                            a.activity_name != null ? "activity_name" : "text",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Activity name"
+                                                />
+                                                {/* createdAt removed */}
+                                            </div>
+                                            {/* Tag icon (placeholder) */}
+                                            <button
+                                                type="button"
+                                                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                title="Tag"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // placeholder for tag picker
+                                                }}
+                                            >
+                                                <FaTag className="w-4 h-4" />
+                                            </button>
+                                            {/* Priority indicator (single icon like task) */}
+                                            {(() => {
+                                                const eff =
+                                                    a.priority !== undefined && a.priority !== null && a.priority !== ""
+                                                        ? a.priority
+                                                        : task?.priority;
+                                                const lvl = getPriorityLevel(eff);
+                                                if (lvl === 2) return null; // hide when normal/medium
+                                                const color = lvl === 3 ? "text-red-600" : "text-emerald-600";
+                                                const label = lvl === 3 ? "high" : "low";
+                                                return (
+                                                    <span
+                                                        className={`mt-0.5 inline-block text-sm font-bold ${color}`}
+                                                        title={`Priority: ${label}`}
+                                                    >
+                                                        !
+                                                    </span>
+                                                );
+                                            })()}
+                                            {/* Delete */}
+                                            <button
+                                                type="button"
+                                                className="p-1 rounded hover:bg-slate-100 text-red-600"
+                                                title="Delete activity"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeActivity(a.id);
+                                                }}
+                                            >
+                                                <FaTrash className="w-4 h-4" />
+                                            </button>
+                                            {/* Create as task (disabled if already created) */}
+                                            <button
+                                                type="button"
+                                                className={`p-1 rounded hover:bg-slate-100 ${
+                                                    a.created_task_id
+                                                        ? "text-slate-300 cursor-not-allowed"
+                                                        : "text-slate-700"
+                                                }`}
+                                                title={
+                                                    a.created_task_id
+                                                        ? "Already created a task from this activity"
+                                                        : "Create as task"
+                                                }
+                                                disabled={!!a.created_task_id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (a.created_task_id) return;
+                                                    createTaskFromActivity(a);
+                                                }}
+                                            >
+                                                <FaAngleDoubleLeft className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        {isOpen && (
+                                            <div className="mt-3 border-t border-slate-200 pt-3">
+                                                <div className="grid grid-cols-12 gap-3 text-sm">
+                                                    <div className="col-span-12 md:col-span-3 space-y-3">
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Start Date
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={toDateOnly(a.date_start) || ""}
+                                                                onChange={(e) =>
+                                                                    updateField(a.id, "date_start", e.target.value)
+                                                                }
+                                                                className="w-full border rounded px-2 py-1"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                End Date
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={toDateOnly(a.date_end) || ""}
+                                                                onChange={(e) =>
+                                                                    updateField(a.id, "date_end", e.target.value)
+                                                                }
+                                                                className="w-full border rounded px-2 py-1"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Deadline
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={toDateOnly(a.deadline) || ""}
+                                                                onChange={(e) =>
+                                                                    updateField(a.id, "deadline", e.target.value)
+                                                                }
+                                                                className="w-full border rounded px-2 py-1"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Duration
+                                                            </label>
+                                                            <input
+                                                                type="time"
+                                                                value={a.duration || ""}
+                                                                onChange={(e) =>
+                                                                    updateField(a.id, "duration", e.target.value)
+                                                                }
+                                                                className="w-full border rounded px-2 py-1"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-12 md:col-span-9 space-y-3">
+                                                        <div className="grid md:grid-cols-2 gap-3">
+                                                            <div>
+                                                                <label className="block text-[11px] text-slate-600">
+                                                                    Task
+                                                                </label>
+                                                                <input
+                                                                    value={a.task_id || ""}
+                                                                    onChange={(e) =>
+                                                                        updateField(a.id, "task_id", e.target.value)
+                                                                    }
+                                                                    placeholder="Task"
+                                                                    className="w-full border rounded px-2 py-1"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[11px] text-slate-600">
+                                                                    Goal
+                                                                </label>
+                                                                <input
+                                                                    value={a.goal_id || ""}
+                                                                    onChange={(e) =>
+                                                                        updateField(a.id, "goal_id", e.target.value)
+                                                                    }
+                                                                    placeholder="Goal"
+                                                                    className="w-full border rounded px-2 py-1"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid md:grid-cols-2 gap-3">
+                                                            <div>
+                                                                <label className="block text-[11px] text-slate-600">
+                                                                    Priority
+                                                                </label>
+                                                                <select
+                                                                    value={a.priority || 2}
+                                                                    onChange={(e) =>
+                                                                        updateField(
+                                                                            a.id,
+                                                                            "priority",
+                                                                            Number(e.target.value),
+                                                                        )
+                                                                    }
+                                                                    className="w-full border rounded px-2 py-1"
+                                                                >
+                                                                    <option value={3}>High</option>
+                                                                    <option value={2}>Normal</option>
+                                                                    <option value={1}>Low</option>
+                                                                </select>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[11px] text-slate-600">
+                                                                    Responsible
+                                                                </label>
+                                                                <input
+                                                                    value={a.responsible || ""}
+                                                                    onChange={(e) =>
+                                                                        updateField(a.id, "responsible", e.target.value)
+                                                                    }
+                                                                    placeholder="Responsible"
+                                                                    className="w-full border rounded px-2 py-1"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Notes
+                                                            </label>
+                                                            <textarea
+                                                                value={a.notes || ""}
+                                                                onChange={(e) =>
+                                                                    updateField(a.id, "notes", e.target.value)
+                                                                }
+                                                                className="w-full border rounded px-2 py-1 min-h-[88px]"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                     <div className="mt-3 flex items-center gap-2">
-                        <input
-                            className="flex-1 px-3 py-2 border rounded-lg bg-white"
-                            placeholder="Add activity"
-                            value={newActivity}
-                            onChange={(e) => setNewActivity(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    const t = (newActivity || "").trim();
-                                    if (!t) return;
-                                    addActivity(t);
-                                    setNewActivity("");
-                                }
-                            }}
-                        />
+                        <div className="flex-1 flex items-stretch">
+                            <label
+                                htmlFor="taskfull-add-activity"
+                                className="inline-flex items-center justify-center w-20 px-2 text-xs font-semibold bg-blue-600 text-white border border-blue-600 rounded-l-lg"
+                            >
+                                New
+                            </label>
+                            <input
+                                id="taskfull-add-activity"
+                                className="flex-1 px-3 py-2 border border-l-0 rounded-r-lg bg-white"
+                                placeholder="Add activity"
+                                value={newActivity}
+                                onChange={(e) => setNewActivity(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        const t = (newActivity || "").trim();
+                                        if (!t) return;
+                                        addActivity(t);
+                                        setNewActivity("");
+                                    }
+                                }}
+                            />
+                        </div>
                         <button
                             className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
                             onClick={() => {
@@ -1162,6 +1547,7 @@ function TaskFullView({
                     }}
                 />
             )}
+            {/* no popup modal for activities in TaskFullView; inline expansion used */}
         </div>
     );
 }
@@ -1236,6 +1622,8 @@ export default function KeyAreas() {
 
     // Expanded inline activities (tree mode) per task id
     const [expandedActivityRows, setExpandedActivityRows] = useState(new Set());
+    const [editingActivity, setEditingActivity] = useState(null); // { taskId, id }
+    const [openActivityDetails, setOpenActivityDetails] = useState(new Set()); // Set of activity ids for a given task row render
     const toggleActivitiesRow = (id) => {
         setExpandedActivityRows((prev) => {
             const next = new Set(prev);
@@ -1245,23 +1633,18 @@ export default function KeyAreas() {
         });
     };
 
-    // Activities associated to tasks: { [taskIdOrNew]: [{ id, text, createdAt }] }
+    // Activities associated to tasks: { [taskIdOrNew]: [{ id, text }] }
     const [activitiesByTask, setActivitiesByTask] = useState({});
     const [activityTaskId, setActivityTaskId] = useState("new");
     const [activityName, setActivityName] = useState("");
 
     // load persisted activities
     useEffect(() => {
-        try {
-            const raw = localStorage.getItem("pm:kaActivities");
-            if (raw) setActivitiesByTask(JSON.parse(raw));
-        } catch (e) {}
+        setActivitiesByTask(loadActivitiesMap());
     }, []);
 
     useEffect(() => {
-        try {
-            localStorage.setItem("pm:kaActivities", JSON.stringify(activitiesByTask));
-        } catch (e) {}
+        saveActivitiesMap(activitiesByTask);
     }, [activitiesByTask]);
 
     // keep in-memory activities in sync if slide-over updates them
@@ -1273,6 +1656,84 @@ export default function KeyAreas() {
         window.addEventListener("ka-activities-updated", handler);
         return () => window.removeEventListener("ka-activities-updated", handler);
     }, []);
+
+    // Create task from activity / Convert activity to task
+    useEffect(() => {
+        const handler = async (e) => {
+            const detail = e?.detail || {};
+            const taskId = detail.taskId;
+            const activity = detail.activity;
+            if (!taskId || !activity) return;
+
+            // Find parent task to inherit fields
+            const parent = allTasks.find((t) => String(t.id) === String(taskId));
+            if (!parent) return;
+            const kaId = parent.key_area_id || selectedKA?.id;
+            if (!kaId) return;
+
+            // Use latest activity state to prevent duplicates
+            const key = String(taskId);
+            const currentArr = (activitiesByTask[key] || []).slice();
+            const currentItem = currentArr.find((a) => String(a.id) === String(activity.id));
+            if (currentItem && currentItem.created_task_id) {
+                // Already converted/created => no-op
+                return;
+            }
+
+            // Priority: normalize numeric/string to task schema ("low"|"med"|"high")
+            const lvl = getPriorityLevel(activity.priority ?? parent.priority ?? "med");
+            const prio = lvl === 3 ? "high" : lvl === 1 ? "low" : "med";
+
+            // Map activity fields into a new task
+            const payload = {
+                key_area_id: kaId,
+                title: (activity.activity_name || "").trim() || "Untitled activity",
+                description: (activity.notes || "").trim() || `Created from activity in task "${parent.title || ""}"`,
+                status: "open",
+                priority: prio,
+                category: parent.category || "Key Areas",
+                goal_id: parent.goal_id || "",
+                list_index: parent.list_index || 1,
+                start_date: toDateOnly(activity.date_start) || parent.start_date || "",
+                deadline: toDateOnly(activity.deadline) || parent.deadline || "",
+                end_date: toDateOnly(activity.date_end) || "",
+                tags: parent.tags || "",
+                recurrence: "",
+                attachments: "",
+                assignee: activity.responsible || parent.assignee || "",
+            };
+
+            try {
+                const created = await api.createTask(payload);
+                setAllTasks((prev) => [...prev, created]);
+
+                // Mark activity as already used to create a task
+                setActivitiesByTask((prev) => {
+                    const arr = (prev[key] || []).map((a) =>
+                        String(a.id) === String(activity.id)
+                            ? { ...a, created_task_id: created.id, created_task_at: Date.now() }
+                            : a,
+                    );
+                    return { ...prev, [key]: arr };
+                });
+
+                // Ask whether to convert (remove the activity) or just copy
+                const shouldRemove = window.confirm(
+                    "Task created. Do you want to remove the original activity (convert)?",
+                );
+                if (shouldRemove) {
+                    setActivitiesByTask((prev) => {
+                        const arr = (prev[key] || []).filter((a) => String(a.id) !== String(activity.id));
+                        return { ...prev, [key]: arr };
+                    });
+                }
+            } catch (err) {
+                console.error("Failed creating task from activity", err);
+            }
+        };
+        window.addEventListener("ka-create-task-from-activity", handler);
+        return () => window.removeEventListener("ka-create-task-from-activity", handler);
+    }, [allTasks, selectedKA, activitiesByTask]);
 
     // When the composer opens, ensure the visible tab matches the composer list_index
     useEffect(() => {
@@ -1647,6 +2108,9 @@ export default function KeyAreas() {
         setQuadrant("all");
         setView("list");
         setShowTaskComposer(false);
+        setExpandedActivityRows(new Set());
+        setOpenActivityDetails(new Set());
+        setEditingActivity(null);
     };
 
     const tabNumbers = useMemo(() => {
@@ -2406,7 +2870,7 @@ export default function KeyAreas() {
                                             {view === "list" ? (
                                                 visibleTasks.length === 0 ? (
                                                     <EmptyState
-                                                        title={`No tasks in List ${taskTab}`}
+                                                        title="List is empty."
                                                         hint="Use the three-dots menu to add a task."
                                                     />
                                                 ) : (
@@ -2648,52 +3112,657 @@ export default function KeyAreas() {
                                                                                         colSpan={12}
                                                                                         className="px-0 py-2"
                                                                                     >
-                                                                                        <div className="ml-6 pl-10 border-l-2 border-slate-200">
-                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+                                                                                        <div className="ml-6 pl-6 border-l-2 border-slate-200">
+                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                                                                                                 Activities
                                                                                             </div>
                                                                                             {(() => {
-                                                                                                const list =
+                                                                                                const taskKey = String(
+                                                                                                    t.id,
+                                                                                                );
+                                                                                                const list = (
                                                                                                     activitiesByTask[
-                                                                                                        String(t.id)
-                                                                                                    ] || [];
-                                                                                                if (!list.length)
-                                                                                                    return (
-                                                                                                        <div className="text-sm text-slate-500">
-                                                                                                            No
-                                                                                                            activities
-                                                                                                            yet.
-                                                                                                        </div>
+                                                                                                        taskKey
+                                                                                                    ] || []
+                                                                                                ).slice();
+                                                                                                const setList = (
+                                                                                                    updater,
+                                                                                                ) => {
+                                                                                                    const nextList =
+                                                                                                        typeof updater ===
+                                                                                                        "function"
+                                                                                                            ? updater(
+                                                                                                                  list,
+                                                                                                              )
+                                                                                                            : updater;
+                                                                                                    setActivitiesByTask(
+                                                                                                        (prev) => ({
+                                                                                                            ...prev,
+                                                                                                            [taskKey]:
+                                                                                                                nextList,
+                                                                                                        }),
                                                                                                     );
+                                                                                                };
+
+                                                                                                const toggleComplete = (
+                                                                                                    id,
+                                                                                                ) => {
+                                                                                                    setList(
+                                                                                                        list.map((a) =>
+                                                                                                            a.id === id
+                                                                                                                ? {
+                                                                                                                      ...a,
+                                                                                                                      completed:
+                                                                                                                          a.completed
+                                                                                                                              ? 0
+                                                                                                                              : 1,
+                                                                                                                  }
+                                                                                                                : a,
+                                                                                                        ),
+                                                                                                    );
+                                                                                                };
+                                                                                                const remove = (id) =>
+                                                                                                    setList(
+                                                                                                        list.filter(
+                                                                                                            (a) =>
+                                                                                                                a.id !==
+                                                                                                                id,
+                                                                                                        ),
+                                                                                                    );
+                                                                                                const move = (
+                                                                                                    id,
+                                                                                                    dir,
+                                                                                                ) => {
+                                                                                                    const idx =
+                                                                                                        list.findIndex(
+                                                                                                            (a) =>
+                                                                                                                a.id ===
+                                                                                                                id,
+                                                                                                        );
+                                                                                                    if (idx < 0) return;
+                                                                                                    const swapIdx =
+                                                                                                        dir === "up"
+                                                                                                            ? idx - 1
+                                                                                                            : idx + 1;
+                                                                                                    if (
+                                                                                                        swapIdx < 0 ||
+                                                                                                        swapIdx >=
+                                                                                                            list.length
+                                                                                                    )
+                                                                                                        return;
+                                                                                                    const copy =
+                                                                                                        list.slice();
+                                                                                                    const tmp =
+                                                                                                        copy[idx];
+                                                                                                    copy[idx] =
+                                                                                                        copy[swapIdx];
+                                                                                                    copy[swapIdx] = tmp;
+                                                                                                    setList(copy);
+                                                                                                };
+                                                                                                const updateField = (
+                                                                                                    id,
+                                                                                                    field,
+                                                                                                    value,
+                                                                                                ) => {
+                                                                                                    setList(
+                                                                                                        list.map((a) =>
+                                                                                                            a.id === id
+                                                                                                                ? {
+                                                                                                                      ...a,
+                                                                                                                      [field]:
+                                                                                                                          value,
+                                                                                                                  }
+                                                                                                                : a,
+                                                                                                        ),
+                                                                                                    );
+                                                                                                };
+
+                                                                                                const toggleDetails = (
+                                                                                                    id,
+                                                                                                ) => {
+                                                                                                    setOpenActivityDetails(
+                                                                                                        (prev) => {
+                                                                                                            const next =
+                                                                                                                new Set(
+                                                                                                                    prev,
+                                                                                                                );
+                                                                                                            if (
+                                                                                                                next.has(
+                                                                                                                    id,
+                                                                                                                )
+                                                                                                            )
+                                                                                                                next.delete(
+                                                                                                                    id,
+                                                                                                                );
+                                                                                                            else
+                                                                                                                next.add(
+                                                                                                                    id,
+                                                                                                                );
+                                                                                                            return next;
+                                                                                                        },
+                                                                                                    );
+                                                                                                };
+
+                                                                                                const addNew = (
+                                                                                                    name,
+                                                                                                ) => {
+                                                                                                    const text = (
+                                                                                                        name || ""
+                                                                                                    ).trim();
+                                                                                                    if (!text) return;
+                                                                                                    const item = {
+                                                                                                        ...activityDefaults,
+                                                                                                        id: Date.now(),
+                                                                                                        activity_name:
+                                                                                                            text,
+                                                                                                    };
+                                                                                                    setList([
+                                                                                                        ...list,
+                                                                                                        item,
+                                                                                                    ]);
+                                                                                                };
+
                                                                                                 return (
-                                                                                                    <ul className="space-y-1">
-                                                                                                        {list.map(
-                                                                                                            (a) => (
-                                                                                                                <li
-                                                                                                                    key={
-                                                                                                                        a.id
-                                                                                                                    }
-                                                                                                                    className="text-sm text-slate-800 flex items-start gap-2"
-                                                                                                                >
-                                                                                                                    <span className="mt-1 inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                                                                                                    <div>
-                                                                                                                        <div className="leading-5">
-                                                                                                                            {
-                                                                                                                                a.text
+                                                                                                    <div className="space-y-2">
+                                                                                                        {/* Activities rows */}
+                                                                                                        {list.length ===
+                                                                                                        0 ? (
+                                                                                                            <EmptyState
+                                                                                                                title="No activities for this task yet."
+                                                                                                                hint="Add a new activity below."
+                                                                                                            />
+                                                                                                        ) : (
+                                                                                                            <div>
+                                                                                                                {list.map(
+                                                                                                                    (
+                                                                                                                        a,
+                                                                                                                        index,
+                                                                                                                    ) => (
+                                                                                                                        <div
+                                                                                                                            key={
+                                                                                                                                a.id
                                                                                                                             }
-                                                                                                                        </div>
-                                                                                                                        {a.createdAt ? (
-                                                                                                                            <div className="text-[11px] text-slate-500">
-                                                                                                                                {new Date(
-                                                                                                                                    a.createdAt,
-                                                                                                                                ).toLocaleString()}
+                                                                                                                            className="bg-white rounded border border-slate-200 p-2 mb-2"
+                                                                                                                        >
+                                                                                                                            {/* Basic row */}
+                                                                                                                            <div className="flex items-center">
+                                                                                                                                <button
+                                                                                                                                    type="button"
+                                                                                                                                    className="mr-2 text-blue-700"
+                                                                                                                                    title={
+                                                                                                                                        a.completed
+                                                                                                                                            ? "Unmark"
+                                                                                                                                            : "Mark completed"
+                                                                                                                                    }
+                                                                                                                                    onClick={() =>
+                                                                                                                                        toggleComplete(
+                                                                                                                                            a.id,
+                                                                                                                                        )
+                                                                                                                                    }
+                                                                                                                                >
+                                                                                                                                    {a.completed ? (
+                                                                                                                                        <FaCheckCircle />
+                                                                                                                                    ) : (
+                                                                                                                                        <FaRegCircle />
+                                                                                                                                    )}
+                                                                                                                                </button>
+                                                                                                                                <span
+                                                                                                                                    className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-slate-600"
+                                                                                                                                    title="Drag handle"
+                                                                                                                                >
+                                                                                                                                    <FaAlignJustify />
+                                                                                                                                </span>
+                                                                                                                                <div className="relative flex-1">
+                                                                                                                                    <input
+                                                                                                                                        value={
+                                                                                                                                            a.activity_name ||
+                                                                                                                                            ""
+                                                                                                                                        }
+                                                                                                                                        onChange={(
+                                                                                                                                            e,
+                                                                                                                                        ) =>
+                                                                                                                                            updateField(
+                                                                                                                                                a.id,
+                                                                                                                                                "activity_name",
+                                                                                                                                                e
+                                                                                                                                                    .target
+                                                                                                                                                    .value,
+                                                                                                                                            )
+                                                                                                                                        }
+                                                                                                                                        placeholder="Activity name"
+                                                                                                                                        className={`w-full border rounded px-2 py-1 pr-16 ${
+                                                                                                                                            a.completed
+                                                                                                                                                ? "line-through text-slate-500"
+                                                                                                                                                : ""
+                                                                                                                                        }`}
+                                                                                                                                    />
+                                                                                                                                    <button
+                                                                                                                                        type="button"
+                                                                                                                                        className="absolute right-14 top-1.5 text-slate-500"
+                                                                                                                                        title="Tag"
+                                                                                                                                    >
+                                                                                                                                        <FaTag />
+                                                                                                                                    </button>
+                                                                                                                                </div>
+                                                                                                                                <div className="ml-2 flex items-center gap-2 text-slate-600">
+                                                                                                                                    {/* Priority indicator (single icon like task); hide for medium */}
+                                                                                                                                    {(() => {
+                                                                                                                                        const eff =
+                                                                                                                                            a.priority ??
+                                                                                                                                            t.priority ??
+                                                                                                                                            2;
+                                                                                                                                        const lvl =
+                                                                                                                                            getPriorityLevel(
+                                                                                                                                                eff,
+                                                                                                                                            );
+                                                                                                                                        if (
+                                                                                                                                            lvl ===
+                                                                                                                                            2
+                                                                                                                                        )
+                                                                                                                                            return null; // hide on medium/normal
+                                                                                                                                        const cls =
+                                                                                                                                            lvl ===
+                                                                                                                                            3
+                                                                                                                                                ? "text-red-600"
+                                                                                                                                                : "text-emerald-600";
+                                                                                                                                        const label =
+                                                                                                                                            lvl ===
+                                                                                                                                            3
+                                                                                                                                                ? "high"
+                                                                                                                                                : "low";
+                                                                                                                                        return (
+                                                                                                                                            <span
+                                                                                                                                                className={`inline-block text-sm font-bold ${cls}`}
+                                                                                                                                                title={`Priority: ${label}`}
+                                                                                                                                            >
+                                                                                                                                                !
+                                                                                                                                            </span>
+                                                                                                                                        );
+                                                                                                                                    })()}
+                                                                                                                                    <button
+                                                                                                                                        type="button"
+                                                                                                                                        className="text-red-600"
+                                                                                                                                        title="Delete activity"
+                                                                                                                                        onClick={() =>
+                                                                                                                                            remove(
+                                                                                                                                                a.id,
+                                                                                                                                            )
+                                                                                                                                        }
+                                                                                                                                    >
+                                                                                                                                        <FaTrash />
+                                                                                                                                    </button>
+                                                                                                                                    <button
+                                                                                                                                        type="button"
+                                                                                                                                        className={
+                                                                                                                                            a.created_task_id
+                                                                                                                                                ? "text-slate-300 cursor-not-allowed"
+                                                                                                                                                : "text-slate-700"
+                                                                                                                                        }
+                                                                                                                                        title={
+                                                                                                                                            a.created_task_id
+                                                                                                                                                ? "Already created a task from this activity"
+                                                                                                                                                : "Create as task"
+                                                                                                                                        }
+                                                                                                                                        disabled={
+                                                                                                                                            !!a.created_task_id
+                                                                                                                                        }
+                                                                                                                                        onClick={() => {
+                                                                                                                                            if (
+                                                                                                                                                a.created_task_id
+                                                                                                                                            )
+                                                                                                                                                return;
+                                                                                                                                            try {
+                                                                                                                                                window.dispatchEvent(
+                                                                                                                                                    new CustomEvent(
+                                                                                                                                                        "ka-create-task-from-activity",
+                                                                                                                                                        {
+                                                                                                                                                            detail: {
+                                                                                                                                                                taskId: t.id,
+                                                                                                                                                                activity:
+                                                                                                                                                                    a,
+                                                                                                                                                            },
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                );
+                                                                                                                                            } catch {}
+                                                                                                                                        }}
+                                                                                                                                    >
+                                                                                                                                        <FaAngleDoubleLeft />
+                                                                                                                                    </button>
+                                                                                                                                    <div className="flex flex-col ml-1">
+                                                                                                                                        <button
+                                                                                                                                            type="button"
+                                                                                                                                            className="text-slate-500 disabled:opacity-40"
+                                                                                                                                            title="Move up"
+                                                                                                                                            onClick={() =>
+                                                                                                                                                move(
+                                                                                                                                                    a.id,
+                                                                                                                                                    "up",
+                                                                                                                                                )
+                                                                                                                                            }
+                                                                                                                                            disabled={
+                                                                                                                                                index ===
+                                                                                                                                                0
+                                                                                                                                            }
+                                                                                                                                        >
+                                                                                                                                            <FaChevronUp />
+                                                                                                                                        </button>
+                                                                                                                                        <button
+                                                                                                                                            type="button"
+                                                                                                                                            className="text-slate-500 disabled:opacity-40"
+                                                                                                                                            title="Move down"
+                                                                                                                                            onClick={() =>
+                                                                                                                                                move(
+                                                                                                                                                    a.id,
+                                                                                                                                                    "down",
+                                                                                                                                                )
+                                                                                                                                            }
+                                                                                                                                            disabled={
+                                                                                                                                                index ===
+                                                                                                                                                list.length -
+                                                                                                                                                    1
+                                                                                                                                            }
+                                                                                                                                        >
+                                                                                                                                            <FaChevronDown />
+                                                                                                                                        </button>
+                                                                                                                                    </div>
+                                                                                                                                </div>
                                                                                                                             </div>
-                                                                                                                        ) : null}
-                                                                                                                    </div>
-                                                                                                                </li>
-                                                                                                            ),
+                                                                                                                            {/* Message row */}
+                                                                                                                            <div
+                                                                                                                                className="mt-1 text-xs text-amber-700"
+                                                                                                                                id={`activity-message-${a.id}`}
+                                                                                                                            ></div>
+                                                                                                                            {/* Details */}
+                                                                                                                            <div className="mt-2">
+                                                                                                                                <button
+                                                                                                                                    type="button"
+                                                                                                                                    className="text-xs text-blue-700 hover:underline"
+                                                                                                                                    onClick={() =>
+                                                                                                                                        toggleDetails(
+                                                                                                                                            a.id,
+                                                                                                                                        )
+                                                                                                                                    }
+                                                                                                                                >
+                                                                                                                                    {openActivityDetails.has(
+                                                                                                                                        a.id,
+                                                                                                                                    )
+                                                                                                                                        ? "Hide details"
+                                                                                                                                        : "Show details"}
+                                                                                                                                </button>
+                                                                                                                                {openActivityDetails.has(
+                                                                                                                                    a.id,
+                                                                                                                                ) && (
+                                                                                                                                    <div className="mt-2 grid grid-cols-12 gap-3">
+                                                                                                                                        <div className="col-span-12 md:col-span-3 space-y-3">
+                                                                                                                                            <div>
+                                                                                                                                                <label className="block text-xs text-slate-700">
+                                                                                                                                                    Start
+                                                                                                                                                    Date
+                                                                                                                                                </label>
+                                                                                                                                                <input
+                                                                                                                                                    type="date"
+                                                                                                                                                    value={
+                                                                                                                                                        toDateOnly(
+                                                                                                                                                            a.date_start,
+                                                                                                                                                        ) ||
+                                                                                                                                                        ""
+                                                                                                                                                    }
+                                                                                                                                                    onChange={(
+                                                                                                                                                        e,
+                                                                                                                                                    ) =>
+                                                                                                                                                        updateField(
+                                                                                                                                                            a.id,
+                                                                                                                                                            "date_start",
+                                                                                                                                                            e
+                                                                                                                                                                .target
+                                                                                                                                                                .value,
+                                                                                                                                                        )
+                                                                                                                                                    }
+                                                                                                                                                    className="w-full border rounded px-2 py-1"
+                                                                                                                                                />
+                                                                                                                                            </div>
+                                                                                                                                            <div>
+                                                                                                                                                <label className="block text-xs text-slate-700">
+                                                                                                                                                    End
+                                                                                                                                                    Date
+                                                                                                                                                </label>
+                                                                                                                                                <input
+                                                                                                                                                    type="date"
+                                                                                                                                                    value={
+                                                                                                                                                        toDateOnly(
+                                                                                                                                                            a.date_end,
+                                                                                                                                                        ) ||
+                                                                                                                                                        ""
+                                                                                                                                                    }
+                                                                                                                                                    onChange={(
+                                                                                                                                                        e,
+                                                                                                                                                    ) =>
+                                                                                                                                                        updateField(
+                                                                                                                                                            a.id,
+                                                                                                                                                            "date_end",
+                                                                                                                                                            e
+                                                                                                                                                                .target
+                                                                                                                                                                .value,
+                                                                                                                                                        )
+                                                                                                                                                    }
+                                                                                                                                                    className="w-full border rounded px-2 py-1"
+                                                                                                                                                />
+                                                                                                                                            </div>
+                                                                                                                                            <div>
+                                                                                                                                                <label className="block text-xs text-slate-700">
+                                                                                                                                                    Deadline
+                                                                                                                                                </label>
+                                                                                                                                                <input
+                                                                                                                                                    type="date"
+                                                                                                                                                    value={
+                                                                                                                                                        toDateOnly(
+                                                                                                                                                            a.deadline,
+                                                                                                                                                        ) ||
+                                                                                                                                                        ""
+                                                                                                                                                    }
+                                                                                                                                                    onChange={(
+                                                                                                                                                        e,
+                                                                                                                                                    ) =>
+                                                                                                                                                        updateField(
+                                                                                                                                                            a.id,
+                                                                                                                                                            "deadline",
+                                                                                                                                                            e
+                                                                                                                                                                .target
+                                                                                                                                                                .value,
+                                                                                                                                                        )
+                                                                                                                                                    }
+                                                                                                                                                    className="w-full border rounded px-2 py-1"
+                                                                                                                                                />
+                                                                                                                                            </div>
+                                                                                                                                            <div>
+                                                                                                                                                <label className="block text-xs text-slate-700">
+                                                                                                                                                    Duration
+                                                                                                                                                </label>
+                                                                                                                                                <input
+                                                                                                                                                    type="time"
+                                                                                                                                                    value={
+                                                                                                                                                        a.duration ||
+                                                                                                                                                        ""
+                                                                                                                                                    }
+                                                                                                                                                    onChange={(
+                                                                                                                                                        e,
+                                                                                                                                                    ) =>
+                                                                                                                                                        updateField(
+                                                                                                                                                            a.id,
+                                                                                                                                                            "duration",
+                                                                                                                                                            e
+                                                                                                                                                                .target
+                                                                                                                                                                .value,
+                                                                                                                                                        )
+                                                                                                                                                    }
+                                                                                                                                                    className="w-full border rounded px-2 py-1"
+                                                                                                                                                />
+                                                                                                                                            </div>
+                                                                                                                                        </div>
+                                                                                                                                        <div className="col-span-12 md:col-span-9 space-y-3">
+                                                                                                                                            <div className="grid md:grid-cols-2 gap-3">
+                                                                                                                                                <div>
+                                                                                                                                                    <label className="block text-xs text-slate-700">
+                                                                                                                                                        Task
+                                                                                                                                                    </label>
+                                                                                                                                                    <input
+                                                                                                                                                        value={
+                                                                                                                                                            a.task_id ||
+                                                                                                                                                            ""
+                                                                                                                                                        }
+                                                                                                                                                        onChange={(
+                                                                                                                                                            e,
+                                                                                                                                                        ) =>
+                                                                                                                                                            updateField(
+                                                                                                                                                                a.id,
+                                                                                                                                                                "task_id",
+                                                                                                                                                                e
+                                                                                                                                                                    .target
+                                                                                                                                                                    .value,
+                                                                                                                                                            )
+                                                                                                                                                        }
+                                                                                                                                                        placeholder="Task"
+                                                                                                                                                        className="w-full border rounded px-2 py-1"
+                                                                                                                                                    />
+                                                                                                                                                </div>
+                                                                                                                                                <div>
+                                                                                                                                                    <label className="block text-xs text-slate-700">
+                                                                                                                                                        Goal
+                                                                                                                                                    </label>
+                                                                                                                                                    <input
+                                                                                                                                                        value={
+                                                                                                                                                            a.goal_id ||
+                                                                                                                                                            ""
+                                                                                                                                                        }
+                                                                                                                                                        onChange={(
+                                                                                                                                                            e,
+                                                                                                                                                        ) =>
+                                                                                                                                                            updateField(
+                                                                                                                                                                a.id,
+                                                                                                                                                                "goal_id",
+                                                                                                                                                                e
+                                                                                                                                                                    .target
+                                                                                                                                                                    .value,
+                                                                                                                                                            )
+                                                                                                                                                        }
+                                                                                                                                                        placeholder="Goal"
+                                                                                                                                                        className="w-full border rounded px-2 py-1"
+                                                                                                                                                    />
+                                                                                                                                                </div>
+                                                                                                                                            </div>
+                                                                                                                                            <div className="grid md:grid-cols-2 gap-3">
+                                                                                                                                                <div>
+                                                                                                                                                    <label className="block text-xs text-slate-700">
+                                                                                                                                                        Priority
+                                                                                                                                                    </label>
+                                                                                                                                                    <select
+                                                                                                                                                        value={
+                                                                                                                                                            a.priority ||
+                                                                                                                                                            2
+                                                                                                                                                        }
+                                                                                                                                                        onChange={(
+                                                                                                                                                            e,
+                                                                                                                                                        ) =>
+                                                                                                                                                            updateField(
+                                                                                                                                                                a.id,
+                                                                                                                                                                "priority",
+                                                                                                                                                                Number(
+                                                                                                                                                                    e
+                                                                                                                                                                        .target
+                                                                                                                                                                        .value,
+                                                                                                                                                                ),
+                                                                                                                                                            )
+                                                                                                                                                        }
+                                                                                                                                                        className="w-full border rounded px-2 py-1"
+                                                                                                                                                    >
+                                                                                                                                                        <option
+                                                                                                                                                            value={
+                                                                                                                                                                3
+                                                                                                                                                            }
+                                                                                                                                                        >
+                                                                                                                                                            High
+                                                                                                                                                        </option>
+                                                                                                                                                        <option
+                                                                                                                                                            value={
+                                                                                                                                                                2
+                                                                                                                                                            }
+                                                                                                                                                        >
+                                                                                                                                                            Normal
+                                                                                                                                                        </option>
+                                                                                                                                                        <option
+                                                                                                                                                            value={
+                                                                                                                                                                1
+                                                                                                                                                            }
+                                                                                                                                                        >
+                                                                                                                                                            Low
+                                                                                                                                                        </option>
+                                                                                                                                                    </select>
+                                                                                                                                                </div>
+                                                                                                                                                <div>
+                                                                                                                                                    <label className="block text-xs text-slate-700">
+                                                                                                                                                        Responsible
+                                                                                                                                                    </label>
+                                                                                                                                                    <input
+                                                                                                                                                        value={
+                                                                                                                                                            a.responsible ||
+                                                                                                                                                            ""
+                                                                                                                                                        }
+                                                                                                                                                        onChange={(
+                                                                                                                                                            e,
+                                                                                                                                                        ) =>
+                                                                                                                                                            updateField(
+                                                                                                                                                                a.id,
+                                                                                                                                                                "responsible",
+                                                                                                                                                                e
+                                                                                                                                                                    .target
+                                                                                                                                                                    .value,
+                                                                                                                                                            )
+                                                                                                                                                        }
+                                                                                                                                                        placeholder="Responsible"
+                                                                                                                                                        className="w-full border rounded px-2 py-1"
+                                                                                                                                                    />
+                                                                                                                                                </div>
+                                                                                                                                            </div>
+                                                                                                                                            <div>
+                                                                                                                                                <label className="block text-xs text-slate-700">
+                                                                                                                                                    Notes
+                                                                                                                                                </label>
+                                                                                                                                                <textarea
+                                                                                                                                                    value={
+                                                                                                                                                        a.notes ||
+                                                                                                                                                        ""
+                                                                                                                                                    }
+                                                                                                                                                    onChange={(
+                                                                                                                                                        e,
+                                                                                                                                                    ) =>
+                                                                                                                                                        updateField(
+                                                                                                                                                            a.id,
+                                                                                                                                                            "notes",
+                                                                                                                                                            e
+                                                                                                                                                                .target
+                                                                                                                                                                .value,
+                                                                                                                                                        )
+                                                                                                                                                    }
+                                                                                                                                                    className="w-full border rounded px-2 py-1 min-h-[88px]"
+                                                                                                                                                />
+                                                                                                                                            </div>
+                                                                                                                                        </div>
+                                                                                                                                    </div>
+                                                                                                                                )}
+                                                                                                                            </div>
+                                                                                                                        </div>
+                                                                                                                    ),
+                                                                                                                )}
+                                                                                                            </div>
                                                                                                         )}
-                                                                                                    </ul>
+                                                                                                        {/* Add new */}
+                                                                                                        <InlineAddActivity
+                                                                                                            onAdd={
+                                                                                                                addNew
+                                                                                                            }
+                                                                                                        />
+                                                                                                    </div>
                                                                                                 );
                                                                                             })()}
                                                                                         </div>
@@ -2747,8 +3816,8 @@ export default function KeyAreas() {
                                             const list = activitiesByTask[String(openActivitiesMenu)] || [];
                                             if (!list.length)
                                                 return (
-                                                    <div className="px-3 py-3 text-sm text-slate-500">
-                                                        No activities yet.
+                                                    <div className="px-3 py-3">
+                                                        <EmptyState title="No activities for this task yet." />
                                                     </div>
                                                 );
                                             return (
@@ -2759,11 +3828,7 @@ export default function KeyAreas() {
                                                             className="px-3 py-2 text-sm text-slate-800 border-b last:border-b-0"
                                                         >
                                                             <div className="truncate">{a.text}</div>
-                                                            {a.createdAt ? (
-                                                                <div className="text-xs text-slate-500 mt-0.5">
-                                                                    {new Date(a.createdAt).toLocaleString()}
-                                                                </div>
-                                                            ) : null}
+                                                            {/* createdAt removed */}
                                                         </li>
                                                     ))}
                                                 </ul>
