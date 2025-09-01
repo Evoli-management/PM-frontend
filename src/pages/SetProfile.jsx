@@ -13,7 +13,7 @@ import Sidebar from "../components/shared/Sidebar";
  * - Enhanced components with validation and better UX
  */
 
-export default function ProfileSetting() {
+verexport default function ProfileSetting() {
     const [activeTab, setActiveTab] = useState("Account");
     const [showPw, setShowPw] = useState({ old: false, new1: false, new2: false });
     const [avatarPreview, setAvatarPreview] = useState(null);
@@ -31,6 +31,39 @@ export default function ProfileSetting() {
     const twoFAInputsRef = useRef([]);
     const [twoFADisableMode, setTwoFADisableMode] = useState(false);
     const [twoFADisableCode, setTwoFADisableCode] = useState("");
+    const [codeDigits, setCodeDigits] = useState(Array(6).fill(""));
+    const [twoFADisableError, setTwoFADisableError] = useState(null);
+    const [twoFADisableDigits, setTwoFADisableDigits] = useState(Array(6).fill(""));
+    const twoFADisableInputsRef = useRef([]);
+
+    // Focus helper that avoids scrolling the page when moving between inputs
+    const focusNoScroll = (el) => {
+        if (!el) return;
+        try {
+            // Modern browsers
+            el.focus({ preventScroll: true });
+            return;
+        } catch (_) {
+            // Fallback path below
+        }
+        const winX = window.scrollX;
+        const winY = window.scrollY;
+        const containers = [];
+        let p = el.parentElement;
+        while (p) {
+            if (p.scrollHeight > p.clientHeight || p.scrollWidth > p.clientWidth) {
+                containers.push({ el: p, top: p.scrollTop, left: p.scrollLeft });
+            }
+            p = p.parentElement;
+        }
+        el.focus();
+        // Restore scroll positions
+        window.scrollTo(winX, winY);
+        containers.forEach((c) => {
+            c.el.scrollTop = c.top;
+            c.el.scrollLeft = c.left;
+        });
+    };
 
     const generateMockSecret = () => {
         // simple mocked secret
@@ -252,11 +285,13 @@ export default function ProfileSetting() {
     // Test-mode verify: accept any non-empty 6-digit code. Keep this while testing locally.
     const verifyTwoFACode = () => {
         const code = twoFACodeInput.replace(/\s+/g, "");
-        if (!code) return false;
+        if (!code || code.length !== 6) return false;
         if (ALLOW_ANY_CODE_FOR_TEST) {
             setTwoFAEnabled(true);
             setTwoFASetupMode("done");
             generateBackupCodes();
+            setCodeDigits(Array(6).fill(""));
+            setTwoFACodeInput("");
             return true;
         }
         // If not using test mode, you should replace this with a server-side verification.
@@ -323,26 +358,27 @@ export default function ProfileSetting() {
     // Verify a code entered to disable 2FA. In test mode this will accept any code.
     // IMPORTANT: do not enable ALLOW_ANY_CODE_FOR_TEST in production.
     const verifyDisableCode = () => {
-        const code = twoFADisableCode.replace(/\s+/g, "");
-        if (!code) return false;
+        const code = twoFADisableCode.replace(/\D/g, "");
+        if (code.length !== 6) return false;
         if (ALLOW_ANY_CODE_FOR_TEST) return true;
-        // Accept if matches last 6 of secret
+        // Accept if matches last 6 of secret in non-test mode
         if (twoFASecret && code === twoFASecret.slice(-6)) return true;
-        // Or matches one of the backup codes
-        if (backupCodes.includes(code)) {
-            // consume the backup code (remove it)
-            setBackupCodes((prev) => prev.filter((c) => c !== code));
-            return true;
-        }
         return false;
     };
 
     // autofocus first digit input when verify panel opens
     useEffect(() => {
         if (twoFASetupMode === "verify") {
-            twoFAInputsRef.current[0]?.focus();
+            focusNoScroll(twoFAInputsRef.current[0]);
         }
     }, [twoFASetupMode]);
+
+    // autofocus first disable digit input when disable panel opens
+    useEffect(() => {
+        if (twoFADisableMode) {
+            focusNoScroll(twoFADisableInputsRef.current[0]);
+        }
+    }, [twoFADisableMode]);
 
     const timezones = useMemo(
         () => [
@@ -359,6 +395,11 @@ export default function ProfileSetting() {
         { code: "fr", label: "French" },
         { code: "es", label: "Spanish" },
         { code: "de", label: "German" },
+        { code: "pt", label: "Portuguese" },
+        { code: "ar", label: "Arabic" },
+        { code: "zh", label: "Chinese (Simplified)" },
+        { code: "ja", label: "Japanese" },
+        { code: "ko", label: "Korean" },
     ];
 
     const [form, setForm] = useState({
@@ -394,6 +435,29 @@ export default function ProfileSetting() {
             enableOrgReports: true,
             dataRetentionDays: 365,
         },
+        // Enhanced Privacy Controls
+        strokesVisibility: "team-only", // "public", "team-only", "private"
+        showInActivityFeed: true,
+        // Team Management
+        teams: {
+            mainTeam: {
+                name: "Product Development",
+                members: 8,
+                role: "Lead Developer"
+            },
+            otherTeams: [
+                { name: "Marketing", role: "Contributor", members: 5 },
+                { name: "Design System", role: "Reviewer", members: 3 }
+            ],
+            canCreateTeams: true,
+            canJoinTeams: true,
+        },
+        // Security Settings
+        security: {
+            loginHistory: [],
+            sessionsToLogOut: false,
+            twoFactorStatus: twoFAEnabled ? "enabled" : "disabled",
+        },
     });    const upd = (k) => (e) => {
         const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
         setForm((s) => ({ ...s, [k]: value }));
@@ -423,6 +487,72 @@ export default function ProfileSetting() {
                 [settingKey]: checked,
             },
         }));
+    };
+
+    // Helper function for updating team settings
+    const updateTeamSetting = (settingKey) => (value) => {
+        setForm((s) => ({
+            ...s,
+            teams: {
+                ...s.teams,
+                [settingKey]: value,
+            },
+        }));
+    };
+
+    // Helper function for updating security settings
+    const updateSecuritySetting = (settingKey) => (value) => {
+        setForm((s) => ({
+            ...s,
+            security: {
+                ...s.security,
+                [settingKey]: value,
+            },
+        }));
+    };
+
+    // Keep the form's security.twoFactorStatus in sync with UI state
+    useEffect(() => {
+        setForm((s) => ({
+            ...s,
+            security: {
+                ...s.security,
+                twoFactorStatus: twoFAEnabled ? 'enabled' : (twoFASetupMode === 'verify' ? 'pending' : 'disabled'),
+            },
+        }));
+    }, [twoFAEnabled, twoFASetupMode]);
+
+    // Mock login history data
+    const mockLoginHistory = [
+        { id: 1, device: "Windows PC - Chrome", location: "New York, US", ip: "192.168.1.100", loginTime: "2024-12-01 09:15:23", current: true },
+        { id: 2, device: "iPhone - Safari", location: "New York, US", ip: "192.168.1.101", loginTime: "2024-11-30 18:45:12", current: false },
+        { id: 3, device: "MacBook - Safari", location: "Chicago, US", ip: "10.0.1.50", loginTime: "2024-11-29 14:22:35", current: false },
+        { id: 4, device: "Android - Chrome", location: "Los Angeles, US", ip: "172.16.0.25", loginTime: "2024-11-28 11:33:47", current: false },
+    ];
+
+    // State for login history and logout modal
+    const [loginHistory, setLoginHistory] = useState(mockLoginHistory);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+    const revokeSession = (id) => {
+        setLoginHistory((list) => list.filter((s) => s.id !== id || s.current));
+    };
+
+    // Function to handle logging out of all sessions (triggered by modal confirm)
+    const handleLogoutAllSessions = async () => {
+        setIsLoading(true);
+        try {
+            // Simulate API call
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            updateSecuritySetting("sessionsToLogOut")(true);
+            // Optionally keep only the current session in history
+            setLoginHistory((list) => list.filter((s) => s.current));
+        } catch (error) {
+            console.error("Failed to logout all sessions:", error);
+        } finally {
+            setIsLoading(false);
+            setShowLogoutModal(false);
+        }
     };
 
     const validateForm = () => {
@@ -488,7 +618,7 @@ export default function ProfileSetting() {
             aria-pressed={checked}
             className={
                 "relative inline-flex h-5 w-10 items-center rounded-full transition-colors " +
-                (checked ? "bg-blue-600" : "bg-gray-300")
+                (checked ? "bg-green-600" : "bg-gray-300")
             }
         >
             <span
@@ -578,7 +708,7 @@ export default function ProfileSetting() {
                             {/* Left tabs - horizontal on mobile, vertical on desktop */}
                             <nav className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
                                 <div className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-1 lg:gap-0">
-                                    {["Account", "Preferences", "Two Factor Auth (2FA)", "Synchronization"].map((t) => (
+                                    {["Account", "Security", "Preferences", "Integrations", "Privacy", "Teams & Members"].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => setActiveTab(t)}
@@ -923,10 +1053,27 @@ export default function ProfileSetting() {
                                         <Section title="Display Settings">
                                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                                 <Field label="Theme">
-                                                    <select className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9">
+                                                    <select 
+                                                        value={form.dashboardTheme}
+                                                        onChange={upd("dashboardTheme")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
                                                         <option value="light">Light</option>
                                                         <option value="dark">Dark</option>
                                                         <option value="auto">Auto</option>
+                                                    </select>
+                                                </Field>
+                                                <Field label="Language">
+                                                    <select 
+                                                        value={form.lang}
+                                                        onChange={upd("lang")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        {languages.map((lang) => (
+                                                            <option key={lang.code} value={lang.code}>
+                                                                {lang.label}
+                                                            </option>
+                                                        ))}
                                                     </select>
                                                 </Field>
                                                 <Field label="Date Format">
@@ -936,6 +1083,51 @@ export default function ProfileSetting() {
                                                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                                                     </select>
                                                 </Field>
+                                            </div>
+                                            
+                                            {/* Language Implementation Notice */}
+                                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="text-2xl">🌐</div>
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-blue-800 mb-2">Multi-Language Support</h4>
+                                                        <p className="text-sm text-blue-700 mb-2">
+                                                            Language selection will be implemented soon with a comprehensive translation system.
+                                                        </p>
+                                                        <p className="text-sm text-blue-700">
+                                                            <strong>Backend Implementation:</strong> A language table will govern field translations across the entire platform.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Live Theme Preview */}
+                                            <div className="mt-4 border-t pt-4">
+                                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Theme Preview</h4>
+                                                <div className="rounded-lg border border-gray-200 p-4" 
+                                                     style={{
+                                                         backgroundColor: form.dashboardTheme === 'dark' ? '#1f2937' : 
+                                                                          form.dashboardTheme === 'light' ? '#ffffff' : '#f3f4f6',
+                                                         color: form.dashboardTheme === 'dark' ? '#f9fafb' : '#111827'
+                                                     }}>
+                                                    <div className="text-xs mb-2 opacity-75">Live Preview:</div>
+                                                    <div className="space-y-2">
+                                                        <div className="text-sm font-semibold">Sample Dashboard Element</div>
+                                                        <div className="text-xs opacity-75">This is how your selected theme will look</div>
+                                                        <div className="flex gap-2 mt-2">
+                                                            <div className="px-2 py-1 text-xs rounded" 
+                                                                 style={{
+                                                                     backgroundColor: form.dashboardTheme === 'dark' ? '#374151' : '#e5e7eb',
+                                                                     color: form.dashboardTheme === 'dark' ? '#f9fafb' : '#374151'
+                                                                 }}>
+                                                                Button
+                                                            </div>
+                                                            <div className="px-2 py-1 text-xs rounded bg-blue-500 text-white">
+                                                                Primary Action
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </Section>
 
@@ -1104,6 +1296,38 @@ export default function ProfileSetting() {
 
                                         <Section title="Privacy Controls">
                                             <div className="space-y-6">
+                                                {/* Strokes Visibility */}
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Activity Visibility</h4>
+                                                    <div className="space-y-4">
+                                                        <Field label="Strokes Visibility">
+                                                            <select 
+                                                                value={form.strokesVisibility}
+                                                                onChange={(e) => setForm(s => ({ ...s, strokesVisibility: e.target.value }))}
+                                                                className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                            >
+                                                                <option value="public">Public - Visible to everyone</option>
+                                                                <option value="team-only">Team Only - Visible to team members</option>
+                                                                <option value="private">Private - Only visible to you</option>
+                                                            </select>
+                                                        </Field>
+                                                        <p className="text-xs text-gray-500">
+                                                            Control who can see your activity strokes and work patterns.
+                                                        </p>
+                                                        
+                                                        <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                                                            <div>
+                                                                <span className="text-sm font-medium text-gray-700">Show in Activity Feed</span>
+                                                                <p className="text-xs text-gray-500 mt-1">Allow your activities to appear in the "What's New" feed</p>
+                                                            </div>
+                                                            <Toggle
+                                                                checked={form.showInActivityFeed}
+                                                                onChange={(checked) => setForm(s => ({ ...s, showInActivityFeed: checked }))}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 {/* eNPS Privacy Notice */}
                                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                                     <div className="flex items-start gap-3">
@@ -1116,6 +1340,25 @@ export default function ProfileSetting() {
                                                             <p className="text-sm text-blue-700">
                                                                 Even admin reports only show cumulative scores for each team and the organization but not for individuals.
                                                             </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* eNPS Anonymity Notice */}
+                                                <div className="border-t pt-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">eNPS Anonymity Settings</h4>
+                                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="text-2xl">✅</div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-green-800 mb-2">Always Anonymous</h4>
+                                                                <p className="text-sm text-green-700 mb-2">
+                                                                    <strong>System Design:</strong> eNPS responses are only collected anonymously.
+                                                                </p>
+                                                                <p className="text-sm text-green-700">
+                                                                    No user preferences needed - anonymity is built into the system architecture.
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1277,278 +1520,38 @@ export default function ProfileSetting() {
                                     </div>
                                 )}
 
-                                {activeTab === "Two Factor Auth (2FA)" && (
+                                {activeTab === "Integrations" && (
                                     <div className="space-y-4">
                                         <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                            SECURITY SETTINGS
+                                            SYNCHRONIZATION SETTINGS
                                         </div>
 
-                                        <Section title="Two-Factor Authentication">
-                                            <div className="space-y-4">
-                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                    <div className="flex-1">
-                                                        <span className="text-sm font-medium text-gray-700">
-                                                            Enable 2FA
-                                                        </span>
-                                                        <p className="text-xs text-gray-600 mt-1">
-                                                            Add an extra layer of security to your account
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex justify-end sm:justify-start">
-                                                        <Toggle
-                                                            checked={twoFAEnabled}
-                                                            onChange={(v) => {
-                                                                if (v) {
-                                                                    // start setup
-                                                                    startTwoFASetup();
-                                                                } else {
-                                                                    // open disable confirmation panel
-                                                                    setTwoFADisableMode(true);
-                                                                }
-                                                            }}
-                                                        />
+                                        <Section title="Calendar Integration">
+                                            <div className="space-y-3 sm:space-y-4">
+                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
+                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 bg-[#4285F4] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                                                                G
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <h3 className="text-sm font-semibold text-gray-800">
+                                                                    Google Calendar
+                                                                </h3>
+                                                                <p className="text-xs text-gray-600">
+                                                                    Sync your tasks and events with Google Calendar
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        {/* Existing Google integration UI continues below in file */}
                                                     </div>
                                                 </div>
-
-                                                {/* Setup / Verify / Done panels */}
-                                                {twoFASetupMode === "verify" && (
-                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                        <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                                            Scan QR & Verify
-                                                        </h3>
-                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                                                            <div className="flex-shrink-0">
-                                                                {/* Mock QR placeholder */}
-                                                                <div className="h-28 w-28 rounded bg-gray-100 flex items-center justify-center border">
-                                                                    <span className="text-xs text-gray-500">QR</span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="flex-1">
-                                                                <p className="text-xs text-gray-600 mb-2">
-                                                                    Open your authenticator app and scan the QR code, or
-                                                                    enter the secret below.
-                                                                </p>
-                                                                <div className="mb-2 rounded bg-gray-50 p-2 text-sm font-mono">
-                                                                    {twoFASecret}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {/* Six single-digit inputs */}
-                                                                    <div className="flex gap-2">
-                                                                        {Array.from({ length: 6 }).map((_, i) => (
-                                                                            <input
-                                                                                key={i}
-                                                                                ref={(el) =>
-                                                                                    (twoFAInputsRef.current[i] = el)
-                                                                                }
-                                                                                type="text"
-                                                                                inputMode="numeric"
-                                                                                maxLength={1}
-                                                                                value={twoFACodeInput[i] || ""}
-                                                                                onChange={(e) => {
-                                                                                    const ch = e.target.value.replace(
-                                                                                        /[^0-9]/g,
-                                                                                        "",
-                                                                                    );
-                                                                                    const arr =
-                                                                                        twoFACodeInput.split("");
-                                                                                    arr[i] = ch ? ch[0] : "";
-                                                                                    const next = arr.join("");
-                                                                                    setTwoFACodeInput(next);
-                                                                                    if (ch && i < 5) {
-                                                                                        twoFAInputsRef.current[
-                                                                                            i + 1
-                                                                                        ]?.focus();
-                                                                                    }
-                                                                                }}
-                                                                                onKeyDown={(e) => {
-                                                                                    if (e.key === "Backspace") {
-                                                                                        e.preventDefault();
-                                                                                        const arr = (
-                                                                                            twoFACodeInput || ""
-                                                                                        ).split("");
-                                                                                        if (arr[i]) {
-                                                                                            arr[i] = "";
-                                                                                            setTwoFACodeInput(
-                                                                                                arr.join(""),
-                                                                                            );
-                                                                                            twoFAInputsRef.current[
-                                                                                                Math.max(0, i - 1)
-                                                                                            ]?.focus();
-                                                                                        } else {
-                                                                                            const prev =
-                                                                                                twoFAInputsRef.current[
-                                                                                                    i - 1
-                                                                                                ];
-                                                                                            if (prev) {
-                                                                                                prev.focus();
-                                                                                                const j = i - 1;
-                                                                                                const parr = (
-                                                                                                    twoFACodeInput || ""
-                                                                                                ).split("");
-                                                                                                parr[j] = "";
-                                                                                                setTwoFACodeInput(
-                                                                                                    parr.join(""),
-                                                                                                );
-                                                                                            }
-                                                                                        }
-                                                                                    } else if (e.key === "ArrowLeft") {
-                                                                                        twoFAInputsRef.current[
-                                                                                            i - 1
-                                                                                        ]?.focus();
-                                                                                    } else if (e.key === "ArrowRight") {
-                                                                                        twoFAInputsRef.current[
-                                                                                            i + 1
-                                                                                        ]?.focus();
-                                                                                    }
-                                                                                }}
-                                                                                id={`tfacode-${i}`}
-                                                                                className="h-10 w-10 text-center rounded border px-2 text-sm outline-none"
-                                                                            />
-                                                                        ))}
-                                                                    </div>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            const ok = verifyTwoFACode();
-                                                                            if (!ok) alert("Invalid code, try again.");
-                                                                        }}
-                                                                        className="rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:brightness-95"
-                                                                    >
-                                                                        Verify
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {twoFASetupMode === "done" && (
-                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                        <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                                            2FA Enabled
-                                                        </h3>
-                                                        <p className="text-xs text-gray-600 mb-3">
-                                                            Two-factor authentication is now enabled on your account.
-                                                            Keep these backup codes in a safe place — each can be used
-                                                            once.
-                                                        </p>
-                                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                                            {backupCodes.map((c) => (
-                                                                <div
-                                                                    key={c}
-                                                                    className="rounded bg-gray-50 p-2 text-sm font-mono"
-                                                                >
-                                                                    {c}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <div className="mt-3 flex gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    navigator.clipboard?.writeText(
-                                                                        backupCodes.join("\n"),
-                                                                    )
-                                                                }
-                                                                className="rounded border px-3 py-2 text-xs font-semibold"
-                                                            >
-                                                                Copy Codes
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={downloadBackupCodes}
-                                                                className="rounded border px-3 py-2 text-xs font-semibold"
-                                                            >
-                                                                Download Codes
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setTwoFASetupMode(null)}
-                                                                className="rounded bg-gray-200 px-3 py-2 text-xs font-semibold"
-                                                            >
-                                                                Done
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Disable confirmation panel */}
-                                                {twoFADisableMode && (
-                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                        <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                                            Disable 2FA
-                                                        </h3>
-                                                        <p className="text-xs text-gray-600 mb-2">
-                                                            Enter a current authenticator code or one of your backup
-                                                            codes to disable two-factor authentication.
-                                                        </p>
-                                                        <div className="flex items-center gap-2">
-                                                            {ALLOW_ANY_CODE_FOR_TEST && (
-                                                                <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
-                                                                    Test mode: any code will be accepted for
-                                                                    verification
-                                                                </div>
-                                                            )}
-                                                            <input
-                                                                type="text"
-                                                                value={twoFADisableCode}
-                                                                onChange={(e) => setTwoFADisableCode(e.target.value)}
-                                                                placeholder="Enter 6-digit code"
-                                                                className="h-10 rounded border px-3 text-sm outline-none"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const ok = verifyDisableCode();
-                                                                    if (ok) {
-                                                                        disableTwoFA();
-                                                                        setTwoFADisableMode(false);
-                                                                        setTwoFADisableCode("");
-                                                                    } else {
-                                                                        alert("Invalid code. Unable to disable 2FA.");
-                                                                    }
-                                                                }}
-                                                                className="rounded bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:brightness-95"
-                                                            >
-                                                                Disable
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setTwoFADisableMode(false);
-                                                                    setTwoFADisableCode("");
-                                                                }}
-                                                                className="rounded bg-gray-200 px-3 py-2 text-xs font-semibold"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {!twoFASetupMode && !twoFAEnabled && (
-                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                        <h3 className="text-sm font-semibold text-gray-800 mb-2">
-                                                            Setup Instructions
-                                                        </h3>
-                                                        <ol className="text-xs text-gray-600 space-y-1.5 sm:space-y-1">
-                                                            <li>
-                                                                1. Download an authenticator app (Google Authenticator,
-                                                                Authy)
-                                                            </li>
-                                                            <li>2. Click the toggle to start setup</li>
-                                                            <li>3. Scan the QR code and verify the 6-digit code</li>
-                                                        </ol>
-                                                    </div>
-                                                )}
                                             </div>
                                         </Section>
                                     </div>
                                 )}
 
-                                {activeTab === "Synchronization" && (
+                                {activeTab === "Integrations" && (
                                     <div className="space-y-4">
                                         <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
                                             SYNCHRONIZATION SETTINGS
@@ -1836,6 +1839,625 @@ export default function ProfileSetting() {
                                     </div>
                                 )}
 
+                                {activeTab === "Teams & Members" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            TEAM MANAGEMENT
+                                        </div>
+
+                                        <Section title="My Teams">
+                                            <div className="space-y-4">
+                                                {/* Main Team */}
+                                                <div className="border-b pb-4">
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Main Team</h4>
+                                                    {form.teams.mainTeam ? (
+                                                        <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                                                                    {form.teams.mainTeam.name.charAt(0)}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-sm font-semibold text-gray-800">{form.teams.mainTeam.name}</div>
+                                                                    <div className="text-xs text-gray-600">{form.teams.mainTeam.members} members</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">
+                                                                    Edit
+                                                                </button>
+                                                                <button className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">
+                                                                    Leave
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center py-6 text-gray-500">
+                                                            <div className="text-4xl mb-2">👥</div>
+                                                            <p className="text-sm">No main team assigned</p>
+                                                            <button className="mt-3 px-4 py-2 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
+                                                                Create Team
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Other Teams */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <h4 className="text-sm font-semibold text-gray-800">Other Teams</h4>
+                                                        <button className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
+                                                            Join Team
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {form.teams.otherTeams.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {form.teams.otherTeams.map((team, index) => (
+                                                                <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
+                                                                            {team.name.charAt(0)}
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="text-sm font-medium text-gray-800">{team.name}</div>
+                                                                            <div className="text-xs text-gray-600">{team.role} • {team.members} members</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">
+                                                                        View
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center py-4 text-gray-500 border border-gray-200 rounded-lg">
+                                                            <p className="text-sm">No additional teams</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Team Actions">
+                                            <div className="space-y-4">
+                                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-2xl">➕</div>
+                                                        <div className="flex-1">
+                                                            <h4 className="text-sm font-semibold text-green-800 mb-2">Create New Team</h4>
+                                                            <p className="text-sm text-green-700 mb-3">
+                                                                You can create a new team and invite other members to join.
+                                                            </p>
+                                                            <button className="px-4 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600">
+                                                                Create Team
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-2xl">🔍</div>
+                                                        <div className="flex-1">
+                                                            <h4 className="text-sm font-semibold text-blue-800 mb-2">Search & Join Teams</h4>
+                                                            <p className="text-sm text-blue-700 mb-3">
+                                                                Search for teams within your organization and request to join.
+                                                            </p>
+                                                            <div className="flex gap-2">
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="Search teams..." 
+                                                                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                                                                />
+                                                                <button className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                                                    Search
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+                                    </div>
+                                )}
+
+                                {activeTab === "Security" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            SECURITY & SESSIONS
+                                        </div>
+
+                                        <Section title="Login History">
+                                            <div className="overflow-x-auto border rounded-lg">
+                                                <table className="min-w-full divide-y divide-gray-200">
+                                                    <thead className="bg-gray-50">
+                                                        <tr>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Device</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Location</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">IP Address</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Last Login</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Status</th>
+                                                            <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100 bg-white">
+                                                        {loginHistory.map((session) => (
+                                                            <tr key={session.id} className={session.current ? 'bg-green-50' : ''}>
+                                                                <td className="px-4 py-2 text-sm text-gray-800">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-lg">
+                                                                            {session.device.includes('Windows') ? '💻' : 
+                                                                             session.device.includes('iPhone') ? '📱' : 
+                                                                             session.device.includes('MacBook') ? '💻' : 
+                                                                             session.device.includes('Android') ? '📱' : '🖥️'}
+                                                                        </span>
+                                                                        <span className="truncate max-w-[200px]" title={session.device}>{session.device}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-2 text-sm text-gray-700">{session.location}</td>
+                                                                <td className="px-4 py-2 text-sm font-mono text-gray-700">{session.ip}</td>
+                                                                <td className="px-4 py-2 text-sm text-gray-600">{session.loginTime}</td>
+                                                                <td className="px-4 py-2 text-sm">
+                                                                    {session.current ? (
+                                                                        <span className="px-2 py-0.5 rounded-full text-xs bg-green-600 text-white">Current</span>
+                                                                    ) : (
+                                                                        <span className="px-2 py-0.5 rounded-full text-xs bg-gray-200 text-gray-700">Active</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-2 text-sm text-right">
+                                                                    {!session.current && (
+                                                                        <button onClick={() => revokeSession(session.id)} className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">
+                                                                            Revoke
+                                                                        </button>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Session Management">
+                                            <div className="space-y-4">
+                                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-2xl">⚠️</div>
+                                                        <div className="flex-1">
+                                                            <h4 className="text-sm font-semibold text-orange-800 mb-2">Security Action</h4>
+                                                            <p className="text-sm text-orange-700 mb-3">
+                                                                Log out of all sessions on all devices. You will need to log in again everywhere.
+                                                            </p>
+                                                            <button 
+                                                                onClick={() => setShowLogoutModal(true)}
+                                                                disabled={isLoading}
+                                                                className={`px-4 py-2 text-sm rounded transition-colors ${
+                                                                    isLoading 
+                                                                        ? 'bg-gray-400 cursor-not-allowed text-white' 
+                                                                        : 'bg-red-500 hover:bg-red-600 text-white'
+                                                                }`}
+                                                            >
+                                                                {isLoading ? 'Logging Out...' : 'Log Out All Sessions'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Password Management">
+                                            <div className="border rounded-lg p-4 bg-white">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-2xl">🔒</div>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-sm font-semibold text-gray-800 mb-1">Change Password</h4>
+                                                        <p className="text-xs text-gray-600 mb-2">Update your password (current, new, and confirm).</p>
+                                                        <button
+                                                            onClick={() => { setActiveTab('Account'); setChangeMode('password'); }}
+                                                            className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                                                        >
+                                                            Open Change Password
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Two-Factor Authentication Status">
+                                            <div className="space-y-4">
+                                                {(() => {
+                                                    const pending = twoFASetupMode === 'verify' && !twoFAEnabled;
+                                                    const wrapper = twoFAEnabled
+                                                        ? 'bg-green-50 border-green-200'
+                                                        : pending
+                                                            ? 'bg-yellow-50 border-yellow-200'
+                                                            : 'bg-red-50 border-red-200';
+                                                    const titleColor = twoFAEnabled
+                                                        ? 'text-green-800'
+                                                        : pending
+                                                            ? 'text-yellow-800'
+                                                            : 'text-red-800';
+                                                    const textColor = twoFAEnabled
+                                                        ? 'text-green-700'
+                                                        : pending
+                                                            ? 'text-yellow-700'
+                                                            : 'text-red-700';
+                                                    const badge = twoFAEnabled
+                                                        ? { text: '2FA Enabled', cls: 'bg-green-600 text-white' }
+                                                        : pending
+                                                            ? { text: '2FA Pending', cls: 'bg-yellow-600 text-white' }
+                                                            : { text: '2FA Disabled', cls: 'bg-red-600 text-white' };
+                                                    const pill = twoFAEnabled
+                                                        ? { text: 'SECURE', cls: 'bg-green-600 text-white' }
+                                                        : pending
+                                                            ? { text: 'PENDING SETUP', cls: 'bg-yellow-600 text-white' }
+                                                            : { text: 'AT RISK', cls: 'bg-red-600 text-white' };
+                                                    return (
+                                                        <div className={`border rounded-lg p-4 ${wrapper}`}>
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="text-2xl">
+                                                                    {twoFAEnabled ? '🔐' : pending ? '⏳' : '⚠️'}
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <h4 className={`text-sm font-semibold mb-2 ${titleColor}`}>
+                                                                        Two-Factor Authentication: {twoFAEnabled ? 'ENABLED' : pending ? 'PENDING' : 'DISABLED'}
+                                                                    </h4>
+                                                                    <p className={`text-sm mb-3 ${textColor}`}>
+                                                                        {twoFAEnabled
+                                                                            ? 'Your account is protected with two-factor authentication.'
+                                                                            : pending
+                                                                                ? 'Complete the verification step to finish enabling 2FA.'
+                                                                                : 'Enable 2FA to add an extra layer of security to your account.'}
+                                                                    </p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${badge.cls}`}>
+                                                                            {badge.text}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className={`px-3 py-1 text-xs rounded-full font-semibold ${pill.cls}`}>{pill.text}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Two-Factor Authentication">
+                                            <div className="space-y-4">
+                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div className="flex-1">
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            Enable 2FA
+                                                        </span>
+                                                        <p className="text-xs text-gray-600 mt-1">
+                                                            Add an extra layer of security to your account
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex justify-end sm:justify-start">
+                                                        <Toggle
+                                                            checked={twoFAEnabled || twoFASetupMode === 'verify'}
+                                                            onChange={(v) => {
+                                                                if (v) {
+                                                                    if (!twoFAEnabled && twoFASetupMode !== 'verify') {
+                                                                        startTwoFASetup();
+                                                                    }
+                                                                } else {
+                                                                    if (twoFAEnabled) {
+                                                                        setTwoFADisableMode(true);
+                                                                    } else if (twoFASetupMode === 'verify') {
+                                                                        // cancel setup
+                                                                        setTwoFASetupMode(null);
+                                                                        setTwoFASecret(null);
+                                                                        setCodeDigits(Array(6).fill(""));
+                                                                        setTwoFACodeInput("");
+                                                                    }
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* 2FA Setup Panel */}
+                                                {twoFASetupMode === "verify" && (
+                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
+                                                        <h3 className="text-sm font-semibold text-gray-800 mb-2">
+                                                            Scan QR & Verify
+                                                        </h3>
+                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                                                            <div className="flex-shrink-0">
+                                                                <div className="h-28 w-28 rounded bg-gray-100 flex items-center justify-center border">
+                                                                    <span className="text-xs text-gray-500">QR Code</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="text-xs text-gray-600 mb-2">
+                                                                    Scan the QR code with your authenticator app or enter the secret key manually.
+                                                                </p>
+                                                                <div className="mb-2 rounded bg-gray-50 p-2 text-sm font-mono">
+                                                                    {twoFASecret}
+                                                                </div>
+                                                                <div className="flex gap-2 mb-3" style={{ overflowAnchor: 'none' }}>
+                                                                    {Array.from({ length: 6 }).map((_, i) => (
+                                                                        <input
+                                                                            key={i}
+                                                                            type="text"
+                                                                            inputMode="numeric"
+                                                                            pattern="\\d*"
+                                                                            maxLength={1}
+                                                                            className="h-10 w-10 text-center rounded border text-sm"
+                                                                            style={{ fontSize: 16 }}
+                                                                            placeholder="0"
+                                                                            autoComplete="one-time-code"
+                                                                            value={codeDigits[i]}
+                                                                            ref={(el) => (twoFAInputsRef.current[i] = el)}
+                                                                            onPaste={(e) => {
+                                                                                const text = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                                                                                if (text.length) {
+                                                                                    e.preventDefault();
+                                                                                    const next = Array(6).fill('');
+                                                                                    for (let j = 0; j < text.length; j++) next[j] = text[j];
+                                                                                    setCodeDigits(next);
+                                                                                    setTwoFACodeInput(next.join(''));
+                                                                                    twoFAInputsRef.current[Math.min(text.length, 5)]?.focus();
+                                                                                }
+                                                                            }}
+                                                                            onChange={(e) => {
+                                                                                const v = e.target.value.replace(/\D/g, '').slice(0, 1);
+                                                                                setCodeDigits((prev) => {
+                                                                                    const next = [...prev];
+                                                                                    next[i] = v;
+                                                                                    const joined = next.join("");
+                                                                                    setTwoFACodeInput(joined);
+                                                                                    return next;
+                                                                                });
+                                                                                if (e.target.value && i < 5) {
+                                                                                    focusNoScroll(twoFAInputsRef.current[i + 1]);
+                                                                                }
+                                                                            }}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Backspace' && !codeDigits[i] && i > 0) {
+                                                                                    focusNoScroll(twoFAInputsRef.current[i - 1]);
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                                <button
+                                                                    onClick={verifyTwoFACode}
+                                                                    disabled={twoFACodeInput.replace(/\s+/g, '').length !== 6}
+                                                                    className={`px-4 py-2 text-white text-sm rounded ${twoFACodeInput.replace(/\s+/g, '').length === 6 ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 cursor-not-allowed'}`}
+                                                                >
+                                                                    Verify & Enable
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Disable 2FA Panel */}
+                                                {twoFADisableMode && twoFAEnabled && (
+                                                    <div className="rounded border border-red-200 bg-red-50 p-3 sm:p-4">
+                                                        <h3 className="text-sm font-semibold text-red-800 mb-2">
+                                                            Disable Two-Factor Authentication
+                                                        </h3>
+                                                        <p className="text-xs text-red-700 mb-3">
+                                                            Enter the 6-digit code from your authenticator app to disable 2FA.
+                                                        </p>
+                                                        <div className="space-y-3">
+                                                            <div className="flex gap-2" style={{ overflowAnchor: 'none' }}>
+                                                                {Array.from({ length: 6 }).map((_, i) => (
+                                                                        <input
+                                                                        key={i}
+                                                                        type="text"
+                                                                        inputMode="numeric"
+                                                                        pattern="\\d*"
+                                                                        maxLength={1}
+                                                                            className={`h-10 w-10 text-center rounded border text-sm ${twoFADisableError ? 'border-red-500 bg-red-100' : 'border-red-300 bg-white'}`}
+                                                                            style={{ fontSize: 16 }}
+                                                                        placeholder="0"
+                                                                        autoComplete="one-time-code"
+                                                                        value={twoFADisableDigits[i]}
+                                                                        ref={(el) => (twoFADisableInputsRef.current[i] = el)}
+                                                                        onPaste={(e) => {
+                                                                            const text = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                                                                            if (text.length) {
+                                                                                e.preventDefault();
+                                                                                const next = Array(6).fill('');
+                                                                                for (let j = 0; j < text.length; j++) next[j] = text[j];
+                                                                                setTwoFADisableDigits(next);
+                                                                                const joined = next.join('');
+                                                                                setTwoFADisableCode(joined);
+                                                                                twoFADisableInputsRef.current[Math.min(text.length, 5)]?.focus();
+                                                                                if (twoFADisableError) setTwoFADisableError(null);
+                                                                            }
+                                                                        }}
+                                                                        onChange={(e) => {
+                                                                            const v = e.target.value.replace(/\D/g, '').slice(0, 1);
+                                                                            setTwoFADisableDigits((prev) => {
+                                                                                const next = [...prev];
+                                                                                next[i] = v;
+                                                                                const joined = next.join('');
+                                                                                setTwoFADisableCode(joined);
+                                                                                return next;
+                                                                            });
+                                                                            if (e.target.value && i < 5) {
+                                                                                focusNoScroll(twoFADisableInputsRef.current[i + 1]);
+                                                                            }
+                                                                            if (twoFADisableError) setTwoFADisableError(null);
+                                                                        }}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Backspace' && !twoFADisableDigits[i] && i > 0) {
+                                                                                focusNoScroll(twoFADisableInputsRef.current[i - 1]);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                            <div className="flex gap-2 sm:justify-end">
+                                                                <button
+                                                                    type="button"
+                                                                    className="px-3 py-1.5 text-sm rounded bg-gray-200 hover:bg-gray-300"
+                                                                    onClick={() => {
+                                                                        setTwoFADisableMode(false);
+                                                                        setTwoFADisableCode("");
+                                                                        setTwoFADisableError(null);
+                                                                        setTwoFADisableDigits(Array(6).fill(""));
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={twoFADisableCode.replace(/\D/g, '').length !== 6}
+                                                                    className={`px-3 py-1.5 text-sm rounded text-white ${twoFADisableCode.replace(/\D/g, '').length === 6 ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                                                                    onClick={() => {
+                                                                        const ok = verifyDisableCode();
+                                                                        if (!ok) {
+                                                                            setTwoFADisableError('Invalid code. Please try again.');
+                                                                            return;
+                                                                        }
+                                                                        disableTwoFA();
+                                                                        setTwoFADisableMode(false);
+                                                                        setTwoFADisableCode("");
+                                                                        setTwoFADisableError(null);
+                                                                        setTwoFADisableDigits(Array(6).fill(""));
+                                                                    }}
+                                                                >
+                                                                    Disable 2FA
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        {twoFADisableError && (
+                                                            <p className="mt-2 text-xs text-red-700">{twoFADisableError}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Backup Codes */}
+                                                {twoFAEnabled && backupCodes.length > 0 && (
+                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
+                                                        <h3 className="text-sm font-semibold text-gray-800 mb-2">
+                                                            Backup Codes
+                                                        </h3>
+                                                        <p className="text-xs text-gray-600 mb-3">
+                                                            Save these backup codes in a safe place. You can use them to access your account if you lose your device.
+                                                        </p>
+                                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                                            {backupCodes.map((code, i) => (
+                                                                <div key={i} className="font-mono text-sm bg-gray-50 p-2 rounded">
+                                                                    {code}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <button
+                                                            onClick={downloadBackupCodes}
+                                                            className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                                                        >
+                                                            Download Codes
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </Section>
+                                    </div>
+                                )}
+
+                                {activeTab === "Privacy" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            PRIVACY SETTINGS
+                                        </div>
+
+                                        <Section title="Data Visibility">
+                                            <div className="space-y-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-sm font-medium text-gray-700">Strokes Visibility</label>
+                                                    <select className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                                                        <option value="public">Public - Visible to everyone in organization</option>
+                                                        <option value="team">Team Only - Visible only to my team members</option>
+                                                        <option value="private">Private - Only visible to me</option>
+                                                    </select>
+                                                    <p className="text-xs text-gray-600">
+                                                        Control who can see your strokes and activity data.
+                                                    </p>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <label className="text-sm font-medium text-gray-700">Activity Feed Visibility</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            defaultChecked={true}
+                                                        />
+                                                        <span className="text-sm text-gray-700">Show my activities in "What's New" feed</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-600">
+                                                        When enabled, your goal updates and achievements will appear in the organization's activity feed.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Survey Responses">
+                                            <div className="space-y-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-sm font-medium text-gray-700">eNPS Response Anonymity</label>
+                                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="text-yellow-600">⚠️</div>
+                                                            <span className="text-sm font-medium text-yellow-800">Anonymous Only</span>
+                                                        </div>
+                                                        <p className="text-xs text-yellow-700 mt-1">
+                                                            All eNPS survey responses are automatically anonymous to ensure honest feedback.
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <label className="text-sm font-medium text-gray-700">Survey Participation</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            defaultChecked={true}
+                                                        />
+                                                        <span className="text-sm text-gray-700">Receive survey notifications</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-600">
+                                                        Get notified when new surveys are available.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Data Control">
+                                            <div className="space-y-4">
+                                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                                    <h4 className="text-sm font-medium text-gray-800 mb-2">Data Export</h4>
+                                                    <p className="text-xs text-gray-600 mb-3">
+                                                        Download all your personal data including goals, activities, and survey responses.
+                                                    </p>
+                                                    <button className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
+                                                        Request Data Export
+                                                    </button>
+                                                </div>
+
+                                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                                    <h4 className="text-sm font-medium text-red-800 mb-2">Account Deletion</h4>
+                                                    <p className="text-xs text-red-600 mb-3">
+                                                        Permanently delete your account and all associated data. This action cannot be undone.
+                                                    </p>
+                                                    <button className="px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                                                        Delete Account
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </Section>
+                                    </div>
+                                )}
+
                                 {/* Bottom strip - responsive */}
                                 <div className="mt-6 grid grid-cols-1 gap-3 rounded-lg border-t border-gray-200 pt-4 sm:mt-8 sm:grid-cols-3 sm:pt-5">
                                     <div className="rounded bg-[#F5F5F5] p-3 text-center">
@@ -1868,6 +2490,37 @@ export default function ProfileSetting() {
                     </div>
                 </main>
             </div>
+            {showLogoutModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                        <div className="flex items-start gap-3">
+                            <div className="text-2xl">🔒</div>
+                            <div className="flex-1">
+                                <h3 className="text-base font-semibold text-gray-800 mb-1">Log out of all sessions?</h3>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    You will be signed out on all devices and will need to log in again everywhere.
+                                </p>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        className="px-4 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300"
+                                        onClick={() => setShowLogoutModal(false)}
+                                        disabled={isLoading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className={`px-4 py-2 text-sm rounded text-white ${isLoading ? 'bg-gray-400' : 'bg-red-600 hover:bg-red-700'}`}
+                                        onClick={handleLogoutAllSessions}
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? 'Logging Out...' : 'Log Out All Sessions'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
