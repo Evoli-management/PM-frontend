@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
 
 export default function Registration() {
@@ -256,7 +256,7 @@ export default function Registration() {
 
                 <div className="text-center mt-4">
                   <div className="flex items-center justify-center">
-                    <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">Already have an account? <span className="font-semibold">Sign in here</span></a>
+                    <Link to="/login" className="text-blue-600 hover:text-blue-800 underline transition-colors">Already have an account? <span className="font-semibold">Sign in here</span></Link>
                   </div>
                 </div>
               </form>
