@@ -680,6 +680,28 @@ export default function ProfileSetting() {
         }));
     }, [twoFAEnabled, twoFASetupMode]);
 
+    // Enforce eNPS anonymity policy (anonymous-only)
+    useEffect(() => {
+        setForm((s) => {
+            const allowAnon = true;
+            const showIndividuals = false;
+            if (
+                s.enpsPrivacySettings?.allowAnonymousScoring === allowAnon &&
+                s.enpsPrivacySettings?.showIndividualScores === showIndividuals
+            ) {
+                return s;
+            }
+            return {
+                ...s,
+                enpsPrivacySettings: {
+                    ...s.enpsPrivacySettings,
+                    allowAnonymousScoring: allowAnon,
+                    showIndividualScores: showIndividuals,
+                },
+            };
+        });
+    }, []);
+
     // Mock login history data
     const mockLoginHistory = [
         { id: 1, device: "Windows PC - Chrome", location: "New York, US", ip: "192.168.1.100", loginTime: "2024-12-01 09:15:23", current: true },
@@ -2769,63 +2791,70 @@ export default function ProfileSetting() {
 
                                         <Section title="Data Visibility">
                                             <div className="space-y-4">
-                                                <div className="space-y-3">
-                                                    <label className="text-sm font-medium text-gray-700">Strokes Visibility</label>
-                                                    <select className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-sm font-medium text-gray-700">Strokes Visibility</label>
+                                                        <span
+                                                            className="text-[11px] text-blue-700 cursor-help"
+                                                            title="Who can see your strokes (activity traces). Public: everyone; Team-only: your teams; Private: only you."
+                                                        >What does this mean?</span>
+                                                    </div>
+                                                    <select
+                                                        value={form.strokesVisibility}
+                                                        onChange={(e) => setForm((s) => ({ ...s, strokesVisibility: e.target.value }))}
+                                                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                                    >
                                                         <option value="public">Public - Visible to everyone in organization</option>
-                                                        <option value="team">Team Only - Visible only to my team members</option>
+                                                        <option value="team-only">Team Only - Visible only to my team members</option>
                                                         <option value="private">Private - Only visible to me</option>
                                                     </select>
-                                                    <p className="text-xs text-gray-600">
-                                                        Control who can see your strokes and activity data.
-                                                    </p>
+                                                    <p className="text-xs text-gray-600">Control who can see your strokes and activity data.</p>
                                                 </div>
 
-                                                <div className="space-y-3">
-                                                    <label className="text-sm font-medium text-gray-700">Activity Feed Visibility</label>
+                                                <div className="space-y-2">
                                                     <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            defaultChecked={true}
-                                                        />
-                                                        <span className="text-sm text-gray-700">Show my activities in "What's New" feed</span>
+                                                        <label className="text-sm font-medium text-gray-700">Activity Feed Visibility</label>
+                                                        <span
+                                                            className="text-[11px] text-blue-700 cursor-help"
+                                                            title="Toggle whether your actions appear in the organization's 'What's New' feed."
+                                                        >What does this mean?</span>
                                                     </div>
-                                                    <p className="text-xs text-gray-600">
-                                                        When enabled, your goal updates and achievements will appear in the organization's activity feed.
-                                                    </p>
+                                                    <div className="flex items-center justify-between rounded border bg-white px-3 py-2">
+                                                        <span className="text-sm text-gray-700">Show my activities in "What's New" feed</span>
+                                                        <Toggle
+                                                            checked={form.showInActivityFeed}
+                                                            onChange={(checked) => setForm((s) => ({ ...s, showInActivityFeed: checked }))}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </Section>
 
                                         <Section title="Survey Responses">
                                             <div className="space-y-4">
-                                                <div className="space-y-3">
-                                                    <label className="text-sm font-medium text-gray-700">eNPS Response Anonymity</label>
-                                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="text-yellow-600">⚠️</div>
-                                                            <span className="text-sm font-medium text-yellow-800">Anonymous Only</span>
-                                                        </div>
-                                                        <p className="text-xs text-yellow-700 mt-1">
-                                                            All eNPS survey responses are automatically anonymous to ensure honest feedback.
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    <label className="text-sm font-medium text-gray-700">Survey Participation</label>
+                                                <div className="space-y-2">
                                                     <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            defaultChecked={true}
-                                                        />
-                                                        <span className="text-sm text-gray-700">Receive survey notifications</span>
+                                                        <label className="text-sm font-medium text-gray-700">eNPS Response Anonymity</label>
+                                                        <span
+                                                            className="text-[11px] text-blue-700 cursor-help"
+                                                            title="By policy, all eNPS responses are anonymous. Identifiable options are disabled to protect privacy."
+                                                        >What does this mean?</span>
                                                     </div>
-                                                    <p className="text-xs text-gray-600">
-                                                        Get notified when new surveys are available.
-                                                    </p>
+                                                    <div className="rounded border bg-white p-3 space-y-2">
+                                                        <label className="flex items-center gap-2 text-sm">
+                                                            <input type="radio" name="enpsAnon" checked readOnly />
+                                                            <span>Anonymous only (recommended)</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm opacity-60" title="Disabled by privacy policy">
+                                                            <input type="radio" name="enpsAnon" disabled />
+                                                            <span>Optionally identifiable (disabled)</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm opacity-60" title="Disabled by privacy policy">
+                                                            <input type="radio" name="enpsAnon" disabled />
+                                                            <span>Fully identifiable (disabled)</span>
+                                                        </label>
+                                                        <p className="text-xs text-gray-500">All eNPS survey responses are stored without user identity.</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </Section>
