@@ -2593,16 +2593,40 @@ export default function ProfileSetting() {
                                                             title="Who can see your strokes (activity traces). Public: everyone; Team-only: your teams; Private: only you."
                                                         >What does this mean?</span>
                                                     </div>
-                                                    <select
-                                                        value={form.strokesVisibility}
-                                                        onChange={(e) => setForm((s) => ({ ...s, strokesVisibility: e.target.value }))}
-                                                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                                    >
-                                                        <option value="public">Public - Visible to everyone in organization</option>
-                                                        <option value="team-only">Team Only - Visible only to my team members</option>
-                                                        <option value="private">Private - Only visible to me</option>
-                                                    </select>
-                                                    <p className="text-xs text-gray-600">Control who can see your strokes and activity data.</p>
+                                                    <div role="radiogroup" aria-label="Strokes visibility" className="inline-flex w-full overflow-hidden rounded border border-gray-300 bg-white">
+                                                        {[
+                                                            { v: 'public', label: 'Public' },
+                                                            { v: 'team-only', label: 'Team-only' },
+                                                            { v: 'private', label: 'Private' },
+                                                        ].map((opt, idx, arr) => {
+                                                            const active = form.strokesVisibility === opt.v;
+                                                            const base = 'flex-1 px-3 py-2 text-sm text-center cursor-pointer select-none transition-colors';
+                                                            return (
+                                                                <label
+                                                                    key={opt.v}
+                                                                    className={
+                                                                        base +
+                                                                        ' ' +
+                                                                        (active
+                                                                            ? 'bg-blue-600 text-white'
+                                                                            : 'bg-white text-gray-700 hover:bg-gray-50') +
+                                                                        (idx > 0 ? ' border-l border-gray-300' : '')
+                                                                    }
+                                                                >
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="strokesVisibility"
+                                                                        value={opt.v}
+                                                                        checked={active}
+                                                                        onChange={() => setForm((s) => ({ ...s, strokesVisibility: opt.v }))}
+                                                                        className="sr-only"
+                                                                    />
+                                                                    {opt.label}
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <p className="text-xs text-gray-600 mt-2">Control who can see your strokes and activity data.</p>
                                                 </div>
 
                                                 <div className="space-y-2">
