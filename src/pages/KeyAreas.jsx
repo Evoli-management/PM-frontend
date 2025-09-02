@@ -23,6 +23,7 @@ import {
     FaAngleDoubleLeft,
     FaChevronDown,
     FaChevronUp,
+    FaStop,
 } from "react-icons/fa";
 
 function InlineAddActivity({ onAdd }) {
@@ -177,6 +178,16 @@ const computeEisenhowerQuadrant = ({ deadline, end_date, priority = "med" }) => 
     return 4;
 };
 
+// Pick a decorative image for a Key Area title from public assets
+const kaImageFor = (title = "") => {
+    const t = String(title).toLowerCase();
+    if (t.includes("marketing")) return "/key-area.png";
+    if (t.includes("sales")) return "/team.png";
+    if (t.includes("product")) return "/goals.png";
+    if (t.includes("idea")) return "/ideas.png";
+    return "/key-area.png"; // fallback
+};
+
 // Minimal localStorage-backed API for this page
 const api = {
     async listKeyAreas() {
@@ -297,40 +308,151 @@ const api = {
 };
 
 // Minimal placeholders to keep non-list views functional
-const KanbanView = ({ tasks = [], onSelect }) => (
-    <div className="p-4 border border-dashed rounded-lg text-sm text-slate-600">
-        Kanban view (placeholder). {tasks.length} tasks. Clicks will open details.
-        <div className="mt-2 flex flex-wrap gap-2">
-            {tasks.map((t) => (
-                <button
-                    key={t.id}
-                    onClick={() => onSelect && onSelect(t)}
-                    className="px-2 py-1 bg-white border rounded shadow-sm"
-                >
-                    {t.title}
-                </button>
-            ))}
-        </div>
-    </div>
-);
+const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {} }) => {
+    const cols = [
+        { key: "open", label: "Open" },
+        { key: "in_progress", label: "In progress" },
+        { key: "blocked", label: "Blocked" },
+        { key: "done", label: "Done" },
+    ];
+    const groups = cols.map((c) => ({
+        ...c,
+        items: tasks.filter((t) => String(t.status || "open").toLowerCase() === c.key),
+    }));
+    const leftovers = tasks.filter((t) => !cols.some((c) => String(t.status || "open").toLowerCase() === c.key));
+    if (leftovers.length) groups.push({ key: "other", label: "Other", items: leftovers });
 
-const CalendarView = ({ tasks = [], onSelect }) => (
-    <div className="p-4 border border-dashed rounded-lg text-sm text-slate-600">
-        Calendar view (placeholder). {tasks.length} tasks.
-        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {tasks.map((t) => (
-                <button
-                    key={t.id}
-                    onClick={() => onSelect && onSelect(t)}
-                    className="px-2 py-1 bg-white border rounded shadow-sm text-left"
-                >
-                    <div className="font-semibold truncate">{t.title}</div>
-                    <div className="text-xs text-slate-500">{toDateOnly(t.deadline) || "—"}</div>
-                </button>
+    const priorityBadge = (p) => {
+        const lvl = getPriorityLevel(p);
+        if (lvl === 2) return null;
+        const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
+        const label = lvl === 3 ? "High" : "Low";
+        return (
+            <span className={`inline-block text-xs font-bold ${cls}`} title={`Priority: ${label}`} aria-hidden>
+                !
+            </span>
+        );
+    };
+
+    return (
+        <div className="p-2 overflow-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-full">
+                {groups.map((col) => (
+                    <div key={col.key} className="bg-slate-50 border border-slate-200 rounded-lg">
+                        <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-700 flex items-center justify-between">
+                            <span>{col.label}</span>
+                            <span className="text-slate-500">{col.items.length}</span>
+                        </div>
+                        <div className="p-2 space-y-2 max-h-[48vh] overflow-auto">
+                            {col.items.length === 0 ? (
+                                <div className="text-xs text-slate-500">Empty</div>
+                            ) : (
+                                col.items.map((t) => (
+                                    <div
+                                        key={t.id}
+                                        className="w-full bg-white border border-slate-200 rounded-md shadow-sm hover:shadow px-2 py-2"
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <input
+                                                type="checkbox"
+                                                aria-label={`Select ${t.title}`}
+                                                className="mt-0.5"
+                                                checked={selectedIds.has(t.id)}
+                                                onChange={() => toggleSelect(t.id)}
+                                            />
+                                            {priorityBadge(t.priority)}
+                                            <button
+                                                type="button"
+                                                onClick={() => onSelect && onSelect(t)}
+                                                className="flex-1 text-left"
+                                                title={t.title}
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="font-medium truncate text-slate-900">{t.title}</div>
+                                                    {t.assignee ? (
+                                                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                                            {t.assignee}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {} }) => {
+    // Group by deadline date (YYYY-MM-DD); undated last
+    const byDate = tasks.reduce((acc, t) => {
+        const key = toDateOnly(t.deadline) || "No date";
+        acc[key] = acc[key] || [];
+        acc[key].push(t);
+        return acc;
+    }, {});
+    const keys = Object.keys(byDate).sort((a, b) => {
+        if (a === "No date") return 1;
+        if (b === "No date") return -1;
+        return a.localeCompare(b);
+    });
+
+    const fmt = (d) => {
+        if (d === "No date") return d;
+        try {
+            const dd = new Date(d + "T00:00:00");
+            return dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        } catch {
+            return d;
+        }
+    };
+
+    return (
+        <div className="p-2 space-y-3">
+            {keys.map((k) => (
+                <div key={k} className="bg-white border border-slate-200 rounded-lg">
+                    <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-700">
+                        {fmt(k)}
+                    </div>
+                    <div className="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {byDate[k].map((t) => (
+                            <div
+                                key={t.id}
+                                className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100"
+                                title={t.title}
+                            >
+                                <div className="flex items-start gap-2">
+                                    <input
+                                        type="checkbox"
+                                        aria-label={`Select ${t.title}`}
+                                        className="mt-0.5"
+                                        checked={selectedIds.has(t.id)}
+                                        onChange={() => toggleSelect(t.id)}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelect && onSelect(t)}
+                                        className="flex-1 text-left"
+                                    >
+                                        <div className="font-medium truncate text-slate-900">{t.title}</div>
+                                        <div className="text-[11px] text-slate-500 mt-0.5 truncate capitalize">
+                                            {String(t.status || "open").replace("_", " ")}
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             ))}
         </div>
-    </div>
-);
+    );
+};
 
 /* --------------------------- Slide Over (Edit) --------------------------- */
 function TaskSlideOver({
@@ -931,9 +1053,28 @@ function TaskFullView({
                         </button>
                     )}
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 min-w-0">
-                            <div className="truncate font-bold text-slate-900 text-base md:text-lg">
-                                {form?.title || task?.title || "Untitled task"}
+                        <div className="flex items-center gap-2 min-w-0">
+                            {(() => {
+                                const lvl = getPriorityLevel(form?.priority ?? task?.priority);
+                                if (lvl === 2) return null; // hide for medium
+                                const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
+                                const label = lvl === 3 ? "High" : "Low";
+                                return (
+                                    <span
+                                        className={`mt-0.5 inline-block text-sm font-bold ${cls}`}
+                                        title={`Priority: ${label}`}
+                                    >
+                                        !
+                                    </span>
+                                );
+                            })()}
+                            <div className="relative truncate font-bold text-slate-900 text-base md:text-lg pl-6">
+                                {/* subtle stop icon behind the task name, with left padding to avoid overlap */}
+                                <FaStop
+                                    className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px] text-[#4DC3D8]"
+                                    aria-hidden="true"
+                                />
+                                <span className="relative z-10">{form?.title || task?.title || "Untitled task"}</span>
                             </div>
                             {/* Ellipsis menu next to the title */}
                             <div className="relative shrink-0" ref={menuRef}>
@@ -986,7 +1127,14 @@ function TaskFullView({
                 {kaTitle && (
                     <div className="pt-2">
                         <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
-                            <FaListUl className="opacity-70" />
+                            <img
+                                alt="Key Areas"
+                                className="w-4 h-4 object-contain opacity-70"
+                                src={`${import.meta.env.BASE_URL}key-area.png`}
+                                onError={(e) => {
+                                    if (e?.currentTarget) e.currentTarget.src = "/key-area.png";
+                                }}
+                            />
                             <span className="font-medium truncate max-w-full" title={kaTitle}>
                                 {kaTitle}
                             </span>
@@ -1002,7 +1150,19 @@ function TaskFullView({
                         className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === "activities" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
                         onClick={() => setTab("activities")}
                     >
-                        Activities
+                        <span className="inline-flex items-center gap-1">
+                            <svg
+                                className={`w-4 h-4 ${tab === "activities" ? "text-[#4DC3D8]" : ""}`}
+                                viewBox="0 0 448 512"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                                focusable="false"
+                                fill="currentColor"
+                            >
+                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
+                            </svg>
+                            Activities
+                        </span>
                     </button>
                 </div>
             </div>
@@ -1046,7 +1206,7 @@ function TaskFullView({
                                             </button>
 
                                             {/* Reorder handle (visual) */}
-                                            <span className="mt-0.5 text-slate-500" title="Drag to reorder">
+                                            <span className="mt-0.5 text-[#4DC3D8]" title="Drag to reorder">
                                                 <FaAlignJustify className="w-4 h-4" />
                                             </span>
                                             <div className="flex-1">
@@ -1067,7 +1227,7 @@ function TaskFullView({
                                             {/* Tag icon (placeholder) */}
                                             <button
                                                 type="button"
-                                                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                className="p-1 rounded hover:bg-slate-100 text-[#4DC3D8]"
                                                 title="Tag"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -2100,6 +2260,8 @@ export default function KeyAreas() {
     }, [location.search, keyAreas]);
 
     const openKA = async (ka) => {
+        // Close any open task full view when switching Key Areas
+        setSelectedTaskFull(null);
         setSelectedKA(ka);
         const t = await api.listTasks(ka.id);
         setAllTasks(t);
@@ -2418,11 +2580,21 @@ export default function KeyAreas() {
                                         <FaChevronLeft />
                                     </button>
 
-                                    {/* Show selected KA title inline next to Back */}
+                                    {/* Show selected KA icon then title inline */}
                                     {selectedKA && (
-                                        <span className="text-base md:text-lg font-bold text-slate-900 truncate">
-                                            {selectedKA.title}
-                                        </span>
+                                        <div className="inline-flex items-center gap-1">
+                                            <img
+                                                alt="Key Areas"
+                                                className="w-7 h-7 md:w-8 md:h-8 object-contain"
+                                                src={`${import.meta.env.BASE_URL}key-area.png`}
+                                                onError={(e) => {
+                                                    if (e?.currentTarget) e.currentTarget.src = "/key-area.png";
+                                                }}
+                                            />
+                                            <span className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1">
+                                                {selectedKA.title}
+                                            </span>
+                                        </div>
                                     )}
 
                                     <div className="ml-auto flex items-center gap-2">
@@ -2994,21 +3166,29 @@ export default function KeyAreas() {
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top">
                                                                                     <div className="flex items-start gap-2">
-                                                                                        <span
-                                                                                            className={`mt-0.5 inline-block text-sm font-bold ${
-                                                                                                (t.priority ||
-                                                                                                    "med") === "high"
+                                                                                        {(() => {
+                                                                                            const lvl =
+                                                                                                getPriorityLevel(
+                                                                                                    t.priority,
+                                                                                                );
+                                                                                            if (lvl === 2) return null; // hide for medium
+                                                                                            const cls =
+                                                                                                lvl === 3
                                                                                                     ? "text-red-600"
-                                                                                                    : (t.priority ||
-                                                                                                            "med") ===
-                                                                                                        "low"
-                                                                                                      ? "text-emerald-600"
-                                                                                                      : "text-amber-600"
-                                                                                            }`}
-                                                                                            title={`Priority: ${t.priority || "med"}`}
-                                                                                        >
-                                                                                            !
-                                                                                        </span>
+                                                                                                    : "text-emerald-600";
+                                                                                            const label =
+                                                                                                lvl === 3
+                                                                                                    ? "High"
+                                                                                                    : "Low";
+                                                                                            return (
+                                                                                                <span
+                                                                                                    className={`mt-0.5 inline-block text-sm font-bold ${cls}`}
+                                                                                                    title={`Priority: ${label}`}
+                                                                                                >
+                                                                                                    !
+                                                                                                </span>
+                                                                                            );
+                                                                                        })()}
                                                                                         <button
                                                                                             className="text-blue-700 hover:underline font-semibold"
                                                                                             title="Click to open task"
@@ -3307,7 +3487,7 @@ export default function KeyAreas() {
                                                                                                                                     )}
                                                                                                                                 </button>
                                                                                                                                 <span
-                                                                                                                                    className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-slate-600"
+                                                                                                                                    className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]"
                                                                                                                                     title="Drag handle"
                                                                                                                                 >
                                                                                                                                     <FaAlignJustify />
@@ -3338,7 +3518,7 @@ export default function KeyAreas() {
                                                                                                                                     />
                                                                                                                                     <button
                                                                                                                                         type="button"
-                                                                                                                                        className="absolute right-14 top-1.5 text-slate-500"
+                                                                                                                                        className="absolute right-14 top-1.5 text-[#4DC3D8]"
                                                                                                                                         title="Tag"
                                                                                                                                     >
                                                                                                                                         <FaTag />
@@ -3779,6 +3959,8 @@ export default function KeyAreas() {
                                             ) : view === "kanban" ? (
                                                 <KanbanView
                                                     tasks={visibleTasks}
+                                                    selectedIds={selectedIds}
+                                                    toggleSelect={toggleSelect}
                                                     onSelect={(t) => {
                                                         setSelectedTaskFull(t);
                                                         setTaskFullInitialTab("activities");
@@ -3787,6 +3969,8 @@ export default function KeyAreas() {
                                             ) : (
                                                 <CalendarView
                                                     tasks={visibleTasks}
+                                                    selectedIds={selectedIds}
+                                                    toggleSelect={toggleSelect}
                                                     onSelect={(t) => {
                                                         setSelectedTaskFull(t);
                                                         setTaskFullInitialTab("activities");
@@ -4374,24 +4558,7 @@ export default function KeyAreas() {
 
                                 {/* Tasks list rendering moved inside the Task Lists card above */}
 
-                                {view === "kanban" && (
-                                    <KanbanView
-                                        tasks={visibleTasks}
-                                        onSelect={(t) => {
-                                            setSelectedTaskFull(t);
-                                            setTaskFullInitialTab("activities");
-                                        }}
-                                    />
-                                )}
-                                {view === "calendar" && (
-                                    <CalendarView
-                                        tasks={visibleTasks}
-                                        onSelect={(t) => {
-                                            setSelectedTaskFull(t);
-                                            setTaskFullInitialTab("activities");
-                                        }}
-                                    />
-                                )}
+                                {/* Kanban/Calendar already rendered above based on view */}
                             </div>
                         )}
                         {/* Create/Edit KA Modal */}
