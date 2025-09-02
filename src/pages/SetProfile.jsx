@@ -249,21 +249,19 @@ export default function ProfileSetting() {
             return raw
                 ? JSON.parse(raw)
                 : {
+                      // Calendars
                       google: { connected: false, account: null },
                       outlook: { connected: false, account: null },
                       apple: { connected: false, account: null },
-                      slack: { connected: false, account: null },
-                      discord: { connected: false, account: null },
-                      email: { connected: false, account: null },
+                      // CRM/Storage (future-ready)
+                      zoho: { connected: false, account: null },
                   };
         } catch (e) {
             return {
                 google: { connected: false, account: null },
                 outlook: { connected: false, account: null },
                 apple: { connected: false, account: null },
-                slack: { connected: false, account: null },
-                discord: { connected: false, account: null },
-                email: { connected: false, account: null },
+                zoho: { connected: false, account: null },
             };
         }
     });
@@ -954,9 +952,7 @@ export default function ProfileSetting() {
                                                         placeholder="Name"
                                                         autoComplete="off"
                                                         className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                            errors.name
-                                                                ? "border-red-500 bg-red-50"
-                                                                : "border-gray-400 bg-white"
+                                                            errors.name ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
                                                         }`}
                                                     />
                                                 </Field>
@@ -968,9 +964,7 @@ export default function ProfileSetting() {
                                                         placeholder="Email"
                                                         autoComplete="off"
                                                         className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                            errors.email
-                                                                ? "border-red-500 bg-red-50"
-                                                                : "border-gray-400 bg-white"
+                                                            errors.email ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
                                                         }`}
                                                     />
                                                 </Field>
@@ -982,287 +976,11 @@ export default function ProfileSetting() {
                                                         placeholder="Phone Number"
                                                         autoComplete="off"
                                                         className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                            errors.phone
-                                                                ? "border-red-500 bg-red-50"
-                                                                : "border-gray-400 bg-white"
+                                                            errors.phone ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
                                                         }`}
                                                     />
                                                 </Field>
                                             </div>
-                                        </div>
-
-                                        {/* Dynamic Change Section */}
-                                        <Section title="Security & Account Changes">
-                                            {!changeMode ? (
-                                                // Selection buttons when no mode is active
-                                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setChangeMode("password")}
-                                                        className="flex items-center justify-center gap-2 rounded border-2 border-gray-300 bg-white py-3 px-4 text-sm font-medium text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
-                                                    >
-                                                        <svg
-                                                            className="h-4 w-4"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth="2"
-                                                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                                                            />
-                                                        </svg>
-                                                        Change Password
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setChangeMode("email")}
-                                                        className="flex items-center justify-center gap-2 rounded border-2 border-gray-300 bg-white py-3 px-4 text-sm font-medium text-gray-700 transition-all hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
-                                                    >
-                                                        <svg
-                                                            className="h-4 w-4"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth="2"
-                                                                d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"
-                                                            />
-                                                        </svg>
-                                                        Change Email
-                                                    </button>
-                                                </div>
-                                            ) : changeMode === "password" ? (
-                                                // Password change form
-                                                <div>
-                                                    <div className="mb-4 flex items-center justify-between">
-                                                        <h3 className="text-sm font-semibold text-gray-800">
-                                                            Change Password
-                                                        </h3>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setChangeMode(null)}
-                                                            className="text-xs text-gray-500 hover:text-gray-700"
-                                                        >
-                                                            ← Back to options
-                                                        </button>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-3 sm:gap-2">
-                                                        <Field label="Current Password" error={errors.oldPw}>
-                                                            <PasswordField
-                                                                value={form.oldPw}
-                                                                onChange={upd("oldPw")}
-                                                                placeholder="Current Password"
-                                                                open={showPw.old}
-                                                                toggle={() => setShowPw((s) => ({ ...s, old: !s.old }))}
-                                                                error={errors.oldPw}
-                                                            />
-                                                        </Field>
-                                                        <Field label="New Password" error={errors.newPw}>
-                                                            <PasswordField
-                                                                value={form.newPw}
-                                                                onChange={upd("newPw")}
-                                                                placeholder="New Password"
-                                                                open={showPw.new1}
-                                                                toggle={() =>
-                                                                    setShowPw((s) => ({ ...s, new1: !s.new1 }))
-                                                                }
-                                                                error={errors.newPw}
-                                                            />
-                                                        </Field>
-                                                        <Field label="Confirm New Password" error={errors.confirmPw}>
-                                                            <PasswordField
-                                                                value={form.confirmPw}
-                                                                onChange={upd("confirmPw")}
-                                                                placeholder="Confirm New Password"
-                                                                open={showPw.new2}
-                                                                toggle={() =>
-                                                                    setShowPw((s) => ({ ...s, new2: !s.new2 }))
-                                                                }
-                                                                error={errors.confirmPw}
-                                                            />
-                                                        </Field>
-                                                    </div>
-                                                    <button
-                                                        type="submit"
-                                                        disabled={isLoading}
-                                                        className={`mt-3 w-full rounded bg-[#00E676] py-2.5 text-[13px] font-semibold text-white transition-all sm:py-2 sm:text-[14px] ${
-                                                            isLoading
-                                                                ? "opacity-50 cursor-not-allowed"
-                                                                : "hover:brightness-95"
-                                                        }`}
-                                                    >
-                                                        {isLoading ? "Updating Password..." : "Update Password"}
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                // Email change form
-                                                <div>
-                                                    <div className="mb-4 flex items-center justify-between">
-                                                        <h3 className="text-sm font-semibold text-gray-800">
-                                                            Change Email Address
-                                                        </h3>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setChangeMode(null)}
-                                                            className="text-xs text-gray-500 hover:text-gray-700"
-                                                        >
-                                                            ← Back to options
-                                                        </button>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-3 sm:gap-2">
-                                                        <Field label="New Email Address">
-                                                            <input
-                                                                type="email"
-                                                                value={form.newEmail}
-                                                                onChange={upd("newEmail")}
-                                                                placeholder="Enter your new email address"
-                                                                autoComplete="off"
-                                                                className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                            />
-                                                        </Field>
-                                                        <div className="rounded bg-blue-50 p-3 text-xs text-blue-700">
-                                                            <p>
-                                                                <strong>Note:</strong> You will receive a verification
-                                                                email at your new address. Click the link in that email
-                                                                to complete the change.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        className="mt-3 w-full rounded bg-[#00E676] py-2.5 text-[13px] font-semibold text-white transition-all hover:brightness-95 sm:py-2 sm:text-[14px]"
-                                                    >
-                                                        Send Verification Email
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </Section>
-                                    </form>
-                                )}
-
-                                {activeTab === "Preferences" && (
-                                    <div className="space-y-4">
-                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                            USER PREFERENCES
-                                        </div>
-
-                                        <Section title="Regional Settings">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <Field label="Time Zone">
-                                                    <select
-                                                        value={form.tz}
-                                                        onChange={upd("tz")}
-                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                    >
-                                                        {timezones.map((tz) => (
-                                                            <option key={tz.value} value={tz.value}>
-                                                                {tz.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </Field>
-                                                <Field label="Language">
-                                                    <select
-                                                        value={form.lang}
-                                                        onChange={upd("lang")}
-                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                    >
-                                                        {languages.map((l) => (
-                                                            <option key={l.code} value={l.code}>
-                                                                {l.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </Field>
-                                            </div>
-                                        </Section>
-
-                                        <Section title="Work Schedule">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <Field label="Work Hours (Start)">
-                                                    <input
-                                                        type="time"
-                                                        value={form.start}
-                                                        onChange={upd("start")}
-                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                    />
-                                                </Field>
-                                                <Field label="Work Hours (End)">
-                                                    <input
-                                                        type="time"
-                                                        value={form.end}
-                                                        onChange={upd("end")}
-                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                    />
-                                                </Field>
-                                            </div>
-                                        </Section>
-
-                                        <Section title="Notification Settings">
-                                            <div className="space-y-4 sm:space-y-3">
-                                                <div className="flex items-center justify-between py-1">
-                                                    <span className="text-sm text-gray-700">General Notifications</span>
-                                                    <Toggle
-                                                        checked={form.notifications}
-                                                        onChange={(checked) =>
-                                                            setForm((s) => ({ ...s, notifications: checked }))
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between py-1">
-                                                    <span className="text-sm text-gray-700">Email Notifications</span>
-                                                    <Toggle checked={true} onChange={() => {}} />
-                                                </div>
-                                                <div className="flex items-center justify-between py-1">
-                                                    <span className="text-sm text-gray-700">Push Notifications</span>
-                                                    <Toggle checked={false} onChange={() => {}} />
-                                                </div>
-                                                <div className="flex items-center justify-between py-1">
-                                                    <span className="text-sm text-gray-700">Weekly Reports</span>
-                                                    <Toggle checked={true} onChange={() => {}} />
-                                                </div>
-                                            </div>
-                                        </Section>
-
-                                        <Section title="Display Settings">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <Field label="Theme">
-                                                    <select 
-                                                        value={form.dashboardTheme}
-                                                        onChange={upd("dashboardTheme")}
-                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                    >
-                                                        <option value="light">Light</option>
-                                                        <option value="dark">Dark</option>
-                                                        <option value="auto">Auto</option>
-                                                    </select>
-                                                </Field>
-                                                <Field label="Language">
-                                                    <select 
-                                                        value={form.lang}
-                                                        onChange={upd("lang")}
-                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                    >
-                                                        {languages.map((lang) => (
-                                                            <option key={lang.code} value={lang.code}>
-                                                                {lang.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </Field>
-                                                <Field label="Date Format">
-                                                    <select className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9">
-                                                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                                                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                                                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                                                    </select>
-                                                </Field>
                                             </div>
                                             
                                             {/* Language Implementation Notice */}
@@ -1309,7 +1027,6 @@ export default function ProfileSetting() {
                                                     </div>
                                                 </div>
                                             </div>
-                                        </Section>
 
                                         <Section title="Dashboard Preferences">
                                             <div className="space-y-4">
@@ -1473,329 +1190,101 @@ export default function ProfileSetting() {
                                                 </div>
                                             </div>
                                         </Section>
-
-                                        
-                                    </div>
+                                        {/* Form actions */}
+                                        <div className="mt-4 flex justify-end">
+                                            <button type="submit" className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                                                Save Changes
+                                            </button>
+                                        </div>
+                                    </form>
                                 )}
 
                                 {activeTab === "Integrations" && (
                                     <div className="space-y-4">
                                         <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                            SYNCHRONIZATION SETTINGS
+                                            INTEGRATIONS
                                         </div>
 
-                                        <Section title="Calendar Integration">
-                                            <div className="space-y-3 sm:space-y-4">
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#4285F4] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                G
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Google Calendar
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Sync your tasks and events with Google Calendar
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        {/* Existing Google integration UI continues below in file */}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Section>
-                                    </div>
-                                )}
-
-                                {activeTab === "Integrations" && (
-                                    <div className="space-y-4">
-                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                            SYNCHRONIZATION SETTINGS
-                                        </div>
-
-                                        <Section title="Calendar Integration">
-                                            <div className="space-y-3 sm:space-y-4">
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#4285F4] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                G
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Google Calendar
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Sync your tasks and events with Google Calendar
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        {integrations.google && integrations.google.connected ? (
-                                                            <div className="flex gap-3 items-center">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-xs font-semibold text-gray-700">
-                                                                        {integrations.google.account?.name}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-gray-500">
-                                                                        {integrations.google.account?.email}
-                                                                    </span>
-                                                                    {integrations.google.lastSynced && (
-                                                                        <span className="text-[11px] text-gray-400">
-                                                                            Last synced:{" "}
-                                                                            {formatDate(integrations.google.lastSynced)}
-                                                                        </span>
-                                                                    )}
+                                        {/* helper to render a provider card */}
+                                        {(() => {
+                                            const Card = ({ logo, title, color, desc, provider }) => {
+                                                const data = integrations[provider] || {};
+                                                const connected = !!data.connected;
+                                                const badgeCls = connected ? "bg-green-600 text-white" : "bg-gray-300 text-gray-800";
+                                                const btnText = connected ? "Revoke" : "Connect";
+                                                const btnAction = () => connected ? disconnectIntegration(provider) : connectIntegration(provider);
+                                                const btnStyle = connected ? "bg-gray-200 text-gray-900" : `${color} text-white`;
+                                                return (
+                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
+                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-8 h-8 rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${color}`}>
+                                                                    {logo}
                                                                 </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {integrations.google.syncing ? (
-                                                                        <span className="text-xs text-gray-600">
-                                                                            Syncing...
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${badgeCls}`}>
+                                                                            {connected ? "Connected" : "Not Connected"}
                                                                         </span>
-                                                                    ) : (
-                                                                        <button
-                                                                            className="rounded border px-2 py-1 text-xs"
-                                                                            onClick={() => syncIntegration("google")}
-                                                                        >
-                                                                            Sync now
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        className="rounded bg-gray-200 px-3 py-1.5 text-xs font-semibold"
-                                                                        onClick={() => disconnectIntegration("google")}
-                                                                    >
-                                                                        Disconnect
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ) : connectPending === "google" ? (
-                                                            <div className="inline-flex items-center gap-2">
-                                                                <span className="text-xs text-gray-600">
-                                                                    Authorizing...
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <button
-                                                                className="rounded bg-[#4285F4] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 self-start sm:self-center"
-                                                                onClick={() => connectIntegration("google")}
-                                                            >
-                                                                Connect
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#0078D4] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                O
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Outlook Calendar
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Sync with Microsoft Outlook
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        {integrations.outlook && integrations.outlook.connected ? (
-                                                            <div className="flex gap-3 items-center">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-xs font-semibold text-gray-700">
-                                                                        {integrations.outlook.account?.name}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-gray-500">
-                                                                        {integrations.outlook.account?.email}
-                                                                    </span>
-                                                                    {integrations.outlook.lastSynced && (
-                                                                        <span className="text-[11px] text-gray-400">
-                                                                            Last synced:{" "}
-                                                                            {formatDate(
-                                                                                integrations.outlook.lastSynced,
+                                                                    </div>
+                                                                    <p className="text-xs text-gray-600">{desc}</p>
+                                                                    {connected && (
+                                                                        <div className="mt-1 text-[11px] text-gray-600">
+                                                                            {data.account?.name} {data.account?.email && `• ${data.account.email}`}
+                                                                            {data.lastSynced && (
+                                                                                <span className="ml-1 text-gray-500">(Last synced: {formatDate(data.lastSynced)})</span>
                                                                             )}
-                                                                        </span>
+                                                                        </div>
                                                                     )}
                                                                 </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {integrations.outlook.syncing ? (
-                                                                        <span className="text-xs text-gray-600">
-                                                                            Syncing...
-                                                                        </span>
-                                                                    ) : (
-                                                                        <button
-                                                                            className="rounded border px-2 py-1 text-xs"
-                                                                            onClick={() => syncIntegration("outlook")}
-                                                                        >
-                                                                            Sync now
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        className="rounded bg-gray-200 px-3 py-1.5 text-xs font-semibold"
-                                                                        onClick={() => disconnectIntegration("outlook")}
-                                                                    >
-                                                                        Disconnect
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {data.syncing ? (
+                                                                    <span className="text-xs text-gray-600">Syncing...</span>
+                                                                ) : connected ? (
+                                                                    <button className="rounded border px-2 py-1 text-xs" onClick={() => syncIntegration(provider)}>
+                                                                        Sync now
                                                                     </button>
-                                                                </div>
-                                                            </div>
-                                                        ) : connectPending === "outlook" ? (
-                                                            <div className="inline-flex items-center gap-2">
-                                                                <span className="text-xs text-gray-600">
-                                                                    Authorizing...
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <button
-                                                                className="rounded bg-[#0078D4] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 self-start sm:self-center"
-                                                                onClick={() => connectIntegration("outlook")}
-                                                            >
-                                                                Connect
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#EA4335] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                📅
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Apple Calendar
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Sync with Apple iCloud Calendar
-                                                                </p>
+                                                                ) : null}
+                                                                <button className={`rounded px-3 py-1.5 text-xs font-semibold hover:brightness-95 ${btnStyle}`} onClick={btnAction}>
+                                                                    {connected && connectPending === provider ? "Revoking..." : (!connected && connectPending === provider ? "Authorizing..." : btnText)}
+                                                                </button>
                                                             </div>
                                                         </div>
-                                                        {integrations.apple && integrations.apple.connected ? (
-                                                            <div className="flex gap-3 items-center">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-xs font-semibold text-gray-700">
-                                                                        {integrations.apple.account?.name}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-gray-500">
-                                                                        {integrations.apple.account?.email}
-                                                                    </span>
-                                                                    {integrations.apple.lastSynced && (
-                                                                        <span className="text-[11px] text-gray-400">
-                                                                            Last synced:{" "}
-                                                                            {formatDate(integrations.apple.lastSynced)}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {integrations.apple.syncing ? (
-                                                                        <span className="text-xs text-gray-600">
-                                                                            Syncing...
-                                                                        </span>
-                                                                    ) : (
-                                                                        <button
-                                                                            className="rounded border px-2 py-1 text-xs"
-                                                                            onClick={() => syncIntegration("apple")}
-                                                                        >
-                                                                            Sync now
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        className="rounded bg-gray-200 px-3 py-1.5 text-xs font-semibold"
-                                                                        onClick={() => disconnectIntegration("apple")}
-                                                                    >
-                                                                        Disconnect
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ) : connectPending === "apple" ? (
-                                                            <div className="inline-flex items-center gap-2">
-                                                                <span className="text-xs text-gray-600">
-                                                                    Authorizing...
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <button
-                                                                className="rounded bg-[#EA4335] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 self-start sm:self-center"
-                                                                onClick={() => connectIntegration("apple")}
-                                                            >
-                                                                Connect
-                                                            </button>
-                                                        )}
                                                     </div>
-                                                </div>
-                                            </div>
-                                        </Section>
+                                                );
+                                            };
 
-                                        <Section title="Team Collaboration">
-                                            <div className="space-y-3 sm:space-y-4">
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#4A154B] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                S
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Slack Integration
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Get notifications in Slack
-                                                                </p>
-                                                            </div>
+                                            return (
+                                                <>
+                                                    <Section title="Calendars">
+                                                        <div className="space-y-3 sm:space-y-4">
+                                                            <Card logo="G" title="Google Calendar" color="bg-[#4285F4]" desc="Sync your tasks and events with Google Calendar" provider="google" />
+                                                            <Card logo="O" title="Outlook Calendar" color="bg-[#0078D4]" desc="Sync with Microsoft Outlook" provider="outlook" />
+                                                            <Card logo="📅" title="Apple Calendar" color="bg-[#EA4335]" desc="Sync with Apple iCloud Calendar" provider="apple" />
                                                         </div>
-                                                        <button className="rounded bg-[#4A154B] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 self-start sm:self-center">
-                                                            Connect
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                    </Section>
 
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#5865F2] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                D
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Discord Integration
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Connect with your Discord server
-                                                                </p>
-                                                            </div>
+                                                    <Section title="Collaboration">
+                                                        <div className="space-y-3 sm:space-y-4">
+                                                            <Card logo="S" title="Slack" color="bg-[#4A154B]" desc="Get notifications in Slack" provider="slack" />
+                                                            <Card logo="D" title="Discord" color="bg-[#5865F2]" desc="Connect with your Discord server" provider="discord" />
                                                         </div>
-                                                        <button className="rounded bg-[#5865F2] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 self-start sm:self-center">
-                                                            Connect
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                    </Section>
 
-                                                <div className="rounded border border-gray-300 p-3 sm:p-4">
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-[#0177B5] rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                                                                📧
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <h3 className="text-sm font-semibold text-gray-800">
-                                                                    Email Integration
-                                                                </h3>
-                                                                <p className="text-xs text-gray-600">
-                                                                    Sync with Gmail, Outlook, or other email
-                                                                </p>
-                                                            </div>
+                                                    <Section title="CRM / Storage">
+                                                        <div className="space-y-3 sm:space-y-4">
+                                                            <Card logo="Z" title="Zoho (future-ready)" color="bg-[#FF4F1F]" desc="Prepare for CRM syncing with Zoho" provider="zoho" />
                                                         </div>
-                                                        <button className="rounded bg-[#0177B5] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 self-start sm:self-center">
-                                                            Connect
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Section>
+                                                    </Section>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 )}
+
+                                
 
                                 {activeTab === "Teams & Members" && (
                                     <div className="space-y-4">
@@ -2539,165 +2028,25 @@ export default function ProfileSetting() {
                                                             Backup Codes
                                                         </h3>
                                                         <p className="text-xs text-gray-600 mb-3">
-                                                            Save these backup codes in a safe place. You can use them to access your account if you lose your device.
+                                                            Save these one-time codes in a safe place. Each code can be used once if you lose device access.
                                                         </p>
-                                                        <div className="grid grid-cols-2 gap-2 mb-3">
-                                                            {backupCodes.map((code, i) => (
-                                                                <div key={i} className="font-mono text-sm bg-gray-50 p-2 rounded">
-                                                                    {code}
-                                                                </div>
+                                                        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                            {backupCodes.map((c, i) => (
+                                                                <li key={i} className="text-xs font-mono rounded border bg-white px-2 py-1 text-gray-800">
+                                                                    {c}
+                                                                </li>
                                                             ))}
+                                                        </ul>
+                                                        <div className="mt-3 flex gap-2">
+                                                            <button type="button" className="px-3 py-1.5 text-xs rounded bg-gray-200 hover:bg-gray-300" onClick={downloadBackupCodes}>
+                                                                Download Codes
+                                                            </button>
+                                                            <button type="button" className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700" onClick={generateBackupCodes}>
+                                                                Regenerate Codes
+                                                            </button>
                                                         </div>
-                                                        <button
-                                                            onClick={downloadBackupCodes}
-                                                            className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                                                        >
-                                                            Download Codes
-                                                        </button>
                                                     </div>
                                                 )}
-                                            </div>
-                                        </Section>
-                                    </div>
-                                )}
-
-                                {activeTab === "Privacy" && (
-                                    <div className="space-y-4">
-                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                            PRIVACY SETTINGS
-                                        </div>
-
-                                        {/* Privacy Overview */}
-                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                            <div className="flex items-start gap-3">
-                                                <div className="text-2xl">🛡️</div>
-                                                <div className="flex-1">
-                                                    <h4 className="text-sm font-semibold text-gray-800 mb-1">Your Privacy at a Glance</h4>
-                                                    <ul className="text-xs text-gray-700 list-disc pl-4 space-y-1">
-                                                        <li>Strokes visibility: <strong>{form.strokesVisibility === 'public' ? 'Public' : form.strokesVisibility === 'team-only' ? 'Team-only' : 'Private'}</strong></li>
-                                                        <li>Activity feed: <strong>{form.showInActivityFeed ? 'Shown' : 'Hidden'}</strong> in "What’s New"</li>
-                                                        <li>eNPS responses: <strong>Anonymous only</strong> (policy enforced)</li>
-                                                    </ul>
-                                                    <p className="text-[11px] text-gray-500 mt-2">Adjust visibility below. Hover the blue help text for details.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <Section title="Data Visibility">
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <label className="text-sm font-medium text-gray-700">Strokes Visibility</label>
-                                                        <span
-                                                            className="text-[11px] text-blue-700 cursor-help"
-                                                            title="Who can see your strokes (activity traces). Public: everyone; Team-only: your teams; Private: only you."
-                                                        >What does this mean?</span>
-                                                    </div>
-                                                    <div role="radiogroup" aria-label="Strokes visibility" className="inline-flex w-full overflow-hidden rounded border border-gray-300 bg-white">
-                                                        {[
-                                                            { v: 'public', label: 'Public' },
-                                                            { v: 'team-only', label: 'Team-only' },
-                                                            { v: 'private', label: 'Private' },
-                                                        ].map((opt, idx, arr) => {
-                                                            const active = form.strokesVisibility === opt.v;
-                                                            const base = 'flex-1 px-3 py-2 text-sm text-center cursor-pointer select-none transition-colors';
-                                                            return (
-                                                                <label
-                                                                    key={opt.v}
-                                                                    className={
-                                                                        base +
-                                                                        ' ' +
-                                                                        (active
-                                                                            ? 'bg-blue-600 text-white'
-                                                                            : 'bg-white text-gray-700 hover:bg-gray-50') +
-                                                                        (idx > 0 ? ' border-l border-gray-300' : '')
-                                                                    }
-                                                                >
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="strokesVisibility"
-                                                                        value={opt.v}
-                                                                        checked={active}
-                                                                        onChange={() => setForm((s) => ({ ...s, strokesVisibility: opt.v }))}
-                                                                        className="sr-only"
-                                                                    />
-                                                                    {opt.label}
-                                                                </label>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                    <p className="text-xs text-gray-600 mt-2">Control who can see your strokes and activity data.</p>
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <label className="text-sm font-medium text-gray-700">Activity Feed Visibility</label>
-                                                        <span
-                                                            className="text-[11px] text-blue-700 cursor-help"
-                                                            title="Toggle whether your actions appear in the organization's 'What's New' feed."
-                                                        >What does this mean?</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between rounded border bg-white px-3 py-2">
-                                                        <span className="text-sm text-gray-700">Show my activities in "What's New" feed</span>
-                                                        <Toggle
-                                                            checked={form.showInActivityFeed}
-                                                            onChange={(checked) => setForm((s) => ({ ...s, showInActivityFeed: checked }))}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Section>
-
-                                        <Section title="Survey Responses">
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <label className="text-sm font-medium text-gray-700">eNPS Response Anonymity</label>
-                                                        <span
-                                                            className="text-[11px] text-blue-700 cursor-help"
-                                                            title="By policy, all eNPS responses are anonymous. Identifiable options are disabled to protect privacy."
-                                                        >What does this mean?</span>
-                                                    </div>
-                                                    <div className="rounded border bg-white p-3 space-y-2">
-                                                        <label className="flex items-center gap-2 text-sm">
-                                                            <input type="radio" name="enpsAnon" checked readOnly />
-                                                            <span>Anonymous only (recommended)</span>
-                                                        </label>
-                                                        <label className="flex items-center gap-2 text-sm opacity-60" title="Disabled by privacy policy">
-                                                            <input type="radio" name="enpsAnon" disabled />
-                                                            <span>Optionally identifiable (disabled)</span>
-                                                        </label>
-                                                        <label className="flex items-center gap-2 text-sm opacity-60" title="Disabled by privacy policy">
-                                                            <input type="radio" name="enpsAnon" disabled />
-                                                            <span>Fully identifiable (disabled)</span>
-                                                        </label>
-                                                        <p className="text-xs text-gray-500">All eNPS survey responses are stored without user identity.</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Section>
-
-                                        <Section title="Data Control">
-                                            <div className="space-y-4">
-                                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                                    <h4 className="text-sm font-medium text-gray-800 mb-2">Data Export</h4>
-                                                    <p className="text-xs text-gray-600 mb-3">
-                                                        Download all your personal data including goals, activities, and survey responses.
-                                                    </p>
-                                                    <button className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
-                                                        Request Data Export
-                                                    </button>
-                                                </div>
-
-                                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                                                    <h4 className="text-sm font-medium text-red-800 mb-2">Account Deletion</h4>
-                                                    <p className="text-xs text-red-600 mb-3">
-                                                        Permanently delete your account and all associated data. This action cannot be undone.
-                                                    </p>
-                                                    <button className="px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                                                        Delete Account
-                                                    </button>
-                                                </div>
                                             </div>
                                         </Section>
                                     </div>
@@ -2724,10 +2073,15 @@ export default function ProfileSetting() {
                                     </div>
 
                                     <div className="rounded bg-[#F5F5F5] p-3 text-center">
-                                        <h4 className="text-[11px] font-semibold text-gray-800 sm:text-[12px]">
-                                            GOOGLE CONNECT
-                                        </h4>
-                                        <p className="text-[10px] text-gray-600 sm:text-[11px]">Not Connected</p>
+                                        <h4 className="text-[11px] font-semibold text-gray-800 sm:text-[12px]">INTEGRATIONS</h4>
+                                        {(() => {
+                                            const anyCal = integrations.google?.connected || integrations.outlook?.connected || integrations.apple?.connected;
+                                            const crm = integrations.zoho?.connected;
+                                            if (anyCal && crm) return <p className="text-[10px] text-gray-600 sm:text-[11px]">Calendars & CRM connected</p>;
+                                            if (anyCal) return <p className="text-[10px] text-gray-600 sm:text-[11px]">Calendars connected</p>;
+                                            if (crm) return <p className="text-[10px] text-gray-600 sm:text-[11px]">CRM connected</p>;
+                                            return <p className="text-[10px] text-gray-600 sm:text-[11px]">Not Connected</p>;
+                                        })()}
                                     </div>
                                 </div>
                             </div>
