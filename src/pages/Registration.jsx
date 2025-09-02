@@ -110,7 +110,7 @@ export default function Registration() {
                       placeholder="First name"
                       value={formData.firstName}
                       onChange={handleInputChange}
-                      className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-gray-50 ${
+                      className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
                         formErrors.firstName ? "border-red-500" : "border-gray-200"
                       }`}
                     />
@@ -127,7 +127,7 @@ export default function Registration() {
                       placeholder="Last name"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-gray-50 ${
+                      className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
                         formErrors.lastName ? "border-red-500" : "border-gray-200"
                       }`}
                     />
@@ -143,7 +143,7 @@ export default function Registration() {
                     placeholder="Enter your email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-gray-50 ${
+                    className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
                       formErrors.email ? "border-red-500" : "border-gray-200"
                     }`}
                   />
@@ -160,7 +160,7 @@ export default function Registration() {
                       value={formData.password}
                       onChange={handleInputChange}
                       autoComplete="new-password"
-                      className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-gray-50 ${
+                      className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
                         formErrors.password ? "border-red-500" : "border-gray-200"
                       }`}
                     />
@@ -178,7 +178,7 @@ export default function Registration() {
                       placeholder="Confirm password"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
-                      className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-gray-50 ${
+                      className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
                         formErrors.confirmPassword ? "border-red-500" : "border-gray-200"
                       }`}
                     />
