@@ -384,39 +384,29 @@ export default function Dashboard() {
             <Sidebar user={{ name: "Hussein" }} />
             <main className="flex-1 p-4 md:p-8 text-[CanvasText]">
                 <div className="mb-4 flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        {/* Theme toggle */}
-                        <button
-                            onClick={toggleTheme}
-                            className="px-3 py-1 bg-[Canvas] border rounded"
-                            title="Toggle theme"
-                        >
-                            {prefs.theme === "light" ? "🌞 Light" : "🌙 Dark"}
-                        </button>
-
-                        {/* Widget toggles dropdown */}
-                        <div className="relative">
-                            <details ref={widgetsDetailsRef} className="relative">
-                                <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText]">
-                                    Widgets
-                                </summary>
-                                <div className="absolute right-0 mt-2 w-64 bg-[Canvas] border rounded shadow p-3 z-40 max-h-80 overflow-auto text-[CanvasText]">
-                                    {Object.keys(prefs.widgets).map((k) => (
-                                        <label
-                                            key={k}
-                                            className="flex items-center justify-between gap-2 mb-2 text-sm text-[CanvasText] opacity-90"
-                                        >
-                                            <span className="capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={prefs.widgets[k]}
-                                                onChange={() => toggleWidget(k)}
-                                            />
-                                        </label>
-                                    ))}
-                                </div>
-                            </details>
-                        </div>
+                    <div></div>
+                    {/* Widget toggles dropdown on the right */}
+                    <div className="relative ml-auto">
+                        <details ref={widgetsDetailsRef} className="relative">
+                            <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText]">
+                                Widgets
+                            </summary>
+                            <div className="absolute right-0 mt-2 w-64 bg-[Canvas] border rounded shadow p-3 z-40 max-h-80 overflow-auto text-[CanvasText]">
+                                {Object.keys(prefs.widgets).map((k) => (
+                                    <label
+                                        key={k}
+                                        className="flex items-center justify-between gap-2 mb-2 text-sm text-[CanvasText] opacity-90"
+                                    >
+                                        <span className="capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={prefs.widgets[k]}
+                                            onChange={() => toggleWidget(k)}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                        </details>
                     </div>
                 </div>
 
