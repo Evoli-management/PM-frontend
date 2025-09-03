@@ -80,11 +80,11 @@ export default function Registration() {
         <div className="w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl overflow-hidden bg-white">
           {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
           <div className="flex w-full md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
-            <div className="w-full overflow-hidden">
-              <img src={`${import.meta.env.BASE_URL}image.png`} alt="Illustration" className="w-full h-40 sm:h-56 md:h-64 object-cover" />
+            <div className="w-full overflow-hidden px-4 sm:px-6">
+              <img src={`${import.meta.env.BASE_URL}image.png`} alt="Illustration" className="w-full h-40 sm:h-56 md:h-64 object-cover mx-auto" />
             </div>
             <div className="px-3 pt-2 pb-3 text-center w-full">
-              <p className="mt-1 mb-0 text-base leading-5 text-gray-700">Simplify your workflow and accomplish more with <span className="font-semibold">Practical Manager</span>. Your data is safe with us.</p>
+              <p className="mt-1 mb-0 text-base leading-5 text-gray-700"><span className="font-semibold">Simplify your workflow and accomplish more with Practical Manager.</span> <span>Your data is safe with us.</span></p>
             </div>
           </div>
 
