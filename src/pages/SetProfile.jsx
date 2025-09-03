@@ -5,9 +5,16 @@ export default function ProfileSetting() {
     const [activeTab, setActiveTab] = useState("Account");
     const [showPw, setShowPw] = useState({ old: false, new1: false, new2: false });
     const [avatarPreview, setAvatarPreview] = useState(null);
+    const [avatarOriginal, setAvatarOriginal] = useState(null);
+    const [showCropper, setShowCropper] = useState(false);
+    const [cropZoom, setCropZoom] = useState(1);
+    const cropImgRef = useRef(null);
     const [errors, setErrors] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [prefSaved, setPrefSaved] = useState(false);
+    const [accountSaved, setAccountSaved] = useState(false);
+    const [emailSaved, setEmailSaved] = useState(false);
+    const [passwordSaved, setPasswordSaved] = useState(false);
     const [changeMode, setChangeMode] = useState(null); // 'password' | 'email' | null
     const fileRef = useRef(null);
 
@@ -584,6 +591,11 @@ export default function ProfileSetting() {
         name: "",
         email: "",
         phone: "",
+    jobTitle: "",
+    department: "",
+    manager: "",
+    bio: "",
+    skills: [],
         tz: "America/Los_Angeles",
         lang: "en",
         start: "09:00",
@@ -647,6 +659,7 @@ export default function ProfileSetting() {
             twoFactorStatus: twoFAEnabled ? "enabled" : "disabled",
         },
     });
+    const [skillsInput, setSkillsInput] = useState("");
 
     // Load preferences from localStorage (if available)
     useEffect(() => {
@@ -862,7 +875,8 @@ export default function ProfileSetting() {
             // Simulate API call
             await new Promise((resolve) => setTimeout(resolve, 1000));
             console.log("Profile updated:", form);
-            // Show success message
+            setAccountSaved(true);
+            setTimeout(() => setAccountSaved(false), 2000);
         } catch (error) {
             console.error("Update failed:", error);
         } finally {
@@ -880,9 +894,39 @@ export default function ProfileSetting() {
             }
 
             const reader = new FileReader();
-            reader.onload = (e) => setAvatarPreview(e.target.result);
+            reader.onload = (e) => {
+                setAvatarOriginal(e.target.result);
+                setAvatarPreview(e.target.result);
+                setShowCropper(true);
+            };
             reader.readAsDataURL(file);
             setErrors((prev) => ({ ...prev, avatar: null }));
+        }
+    };
+
+    // Simple center-square crop with zoom
+    const applyCrop = () => {
+        try {
+            const img = cropImgRef.current;
+            if (!img) return setShowCropper(false);
+            const canvas = document.createElement('canvas');
+            const target = 256;
+            canvas.width = target;
+            canvas.height = target;
+            const ctx = canvas.getContext('2d');
+            const w = img.naturalWidth;
+            const h = img.naturalHeight;
+            const base = Math.min(w, h);
+            const zoom = Math.max(1, Math.min(4, Number(cropZoom) || 1));
+            const cropSize = base / zoom;
+            const sx = (w - cropSize) / 2;
+            const sy = (h - cropSize) / 2;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, target, target);
+            const dataUrl = canvas.toDataURL('image/png');
+            setAvatarPreview(dataUrl);
+        } finally {
+            setShowCropper(false);
         }
     };
 
@@ -1027,6 +1071,15 @@ export default function ProfileSetting() {
                                                 >
                                                     ↓ Upload
                                                 </button>
+                                                {avatarOriginal && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowCropper(true)}
+                                                        className="mt-2 w-20 rounded border border-blue-500 text-blue-700 bg-white py-1 text-[11px] hover:bg-blue-50 sm:w-[88px] sm:text-[12px]"
+                                                    >
+                                                        ✂ Crop
+                                                    </button>
+                                                )}
                                                 <input
                                                     ref={fileRef}
                                                     type="file"
@@ -1041,51 +1094,223 @@ export default function ProfileSetting() {
                                                 )}
                                             </div>
 
-                                            {/* Name / Email / Phone */}
+                                            {/* Name / Email / Phone with icons */}
+                                            </div>
                                             <div className="grid grid-cols-1 gap-3 sm:gap-2">
                                                 <Field label="Name" error={errors.name}>
-                                                    <input
-                                                        value={form.name}
-                                                        onChange={upd("name")}
-                                                        placeholder="Name"
-                                                        autoComplete="off"
-                                                        className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                            errors.name ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
-                                                        }`}
-                                                    />
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">👤</span>
+                                                        <input
+                                                            value={form.name}
+                                                            onChange={upd("name")}
+                                                            placeholder="Name"
+                                                            autoComplete="off"
+                                                            className={`h-10 w-full rounded border pl-7 pr-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
+                                                                errors.name ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
+                                                            }`}
+                                                        />
+                                                    </div>
                                                 </Field>
                                                 <Field label="Email" error={errors.email}>
-                                                    <input
-                                                        type="email"
-                                                        value={form.email}
-                                                        onChange={upd("email")}
-                                                        placeholder="Email"
-                                                        autoComplete="off"
-                                                        className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                            errors.email ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
-                                                        }`}
-                                                    />
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">✉️</span>
+                                                        <input
+                                                            type="email"
+                                                            value={form.email}
+                                                            onChange={upd("email")}
+                                                            placeholder="Email"
+                                                            autoComplete="off"
+                                                            className={`h-10 w-full rounded border pl-7 pr-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
+                                                                errors.email ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
+                                                            }`}
+                                                        />
+                                                    </div>
                                                 </Field>
                                                 <Field label="Phone Number" error={errors.phone}>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">📞</span>
+                                                        <input
+                                                            type="tel"
+                                                            value={form.phone}
+                                                            onChange={upd("phone")}
+                                                            placeholder="Phone Number"
+                                                            autoComplete="off"
+                                                            className={`h-10 w-full rounded border pl-7 pr-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
+                                                                errors.phone ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
+                                                            }`}
+                                                        />
+                                                    </div>
+                                                </Field>
+                                            </div>
+                                            {/* End core fields */}
+
+                                        {/* Professional Details */}
+                                        <Section title="Professional Details">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                                <Field label="Job Title">
+                                                    <input value={form.jobTitle} onChange={upd("jobTitle")} placeholder="e.g., Product Manager" className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
+                                                </Field>
+                                                <Field label="Department">
+                                                    <input value={form.department} onChange={upd("department")} placeholder="e.g., Growth" className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
+                                                </Field>
+                                                <Field label="Manager">
+                                                    <input value={form.manager} onChange={upd("manager")} placeholder="Manager name" className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
+                                                </Field>
+                                            </div>
+                                        </Section>
+
+                                        {/* About Me / Skills */}
+                                        <Section title="About Me & Skills">
+                                            <div className="space-y-3">
+                                                <Field label="About Me / Bio">
+                                                    <textarea value={form.bio} onChange={upd("bio")} placeholder="Tell us a bit about yourself..." rows={4} className="w-full rounded border border-gray-400 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                                                </Field>
+                                                <Field label="Skills (comma or Enter to add)">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {form.skills.map((s, idx) => (
+                                                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">
+                                                                {s}
+                                                                <button type="button" className="text-blue-700" onClick={() => setForm((st) => ({ ...st, skills: st.skills.filter((_, i) => i !== idx) }))}>×</button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                     <input
-                                                        type="tel"
-                                                        value={form.phone}
-                                                        onChange={upd("phone")}
-                                                        placeholder="Phone Number"
-                                                        autoComplete="off"
-                                                        className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                            errors.phone ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
-                                                        }`}
+                                                        value={skillsInput}
+                                                        onChange={(e) => setSkillsInput(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' || e.key === ',') {
+                                                                e.preventDefault();
+                                                                const val = skillsInput.trim().replace(/,$/, '');
+                                                                if (!val) return;
+                                                                setForm((st) => ({ ...st, skills: Array.from(new Set([...(st.skills || []), val])) }));
+                                                                setSkillsInput("");
+                                                            }
+                                                        }}
+                                                        placeholder="Type a skill and press Enter"
+                                                        className="mt-2 h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
                                                     />
                                                 </Field>
                                             </div>
+                                        </Section>
+
+                                        {/* Team Assignment (quick edit) */}
+                                        <Section title="Team Assignment">
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <Field label="Main Team">
+                                                        <input
+                                                            value={form.teams?.mainTeam?.name || ''}
+                                                            onChange={(e) => setForm((s) => ({
+                                                                ...s,
+                                                                teams: { ...s.teams, mainTeam: { ...(s.teams?.mainTeam || {}), name: e.target.value } }
+                                                            }))}
+                                                            placeholder="Your primary team"
+                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                        />
+                                                    </Field>
+                                                    <Field label="Add Other Team">
+                                                        <div className="flex gap-2">
+                                                            <input id="addOtherTeam" placeholder="Team name" className="flex-1 h-10 rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
+                                                            <button type="button" className="px-3 rounded bg-green-600 text-white text-sm" onClick={() => {
+                                                                const el = document.getElementById('addOtherTeam');
+                                                                const name = el?.value?.trim();
+                                                                if (!name) return;
+                                                                setForm((s) => ({
+                                                                    ...s,
+                                                                    teams: { ...s.teams, otherTeams: [...(s.teams?.otherTeams || []), { name, role: 'Contributor', members: 0 }] }
+                                                                }));
+                                                                if (el) el.value = '';
+                                                            }}>Add</button>
+                                                        </div>
+                                                    </Field>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-600 mb-1">Other Teams</div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {(form.teams?.otherTeams || []).map((t, idx) => (
+                                                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border">
+                                                                {t.name}
+                                                                <button type="button" className="text-gray-600" onClick={() => setForm((s) => ({
+                                                                    ...s,
+                                                                    teams: { ...s.teams, otherTeams: (s.teams?.otherTeams || []).filter((_, i) => i !== idx) }
+                                                                }))}>×</button>
+                                                            </span>
+                                                        ))}
+                                                        {!(form.teams?.otherTeams || []).length && (
+                                                            <span className="text-xs text-gray-500">No other teams yet.</span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        {/* Form actions */}
-                                        <div className="mt-4 flex justify-end">
-                                            <button type="submit" className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
-                                                Save Changes
+                                        </Section>
+
+                                        {/* Change Password */}
+                                        <Section title="Change Password">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                                <Field label="Current Password" error={errors.oldPw}>
+                                                    <PasswordField value={form.oldPw} onChange={upd('oldPw')} placeholder="Current password" open={showPw.old} toggle={() => setShowPw((s) => ({ ...s, old: !s.old }))} error={errors.oldPw} />
+                                                </Field>
+                                                <Field label="New Password" error={errors.newPw}>
+                                                    <PasswordField value={form.newPw} onChange={upd('newPw')} placeholder="New password" open={showPw.new1} toggle={() => setShowPw((s) => ({ ...s, new1: !s.new1 }))} error={errors.newPw} />
+                                                </Field>
+                                                <Field label="Confirm Password" error={errors.confirmPw}>
+                                                    <PasswordField value={form.confirmPw} onChange={upd('confirmPw')} placeholder="Confirm password" open={showPw.new2} toggle={() => setShowPw((s) => ({ ...s, new2: !s.new2 }))} error={errors.confirmPw} />
+                                                </Field>
+                                            </div>
+                                            <div className="flex justify-end mt-3">
+                                                <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white text-sm" onClick={async () => {
+                                                    const errs = {};
+                                                    if (!form.oldPw) errs.oldPw = 'Current password is required';
+                                                    if (!form.newPw || form.newPw.length < 8) errs.newPw = 'Minimum 8 characters';
+                                                    if (form.newPw !== form.confirmPw) errs.confirmPw = 'Passwords do not match';
+                                                    setErrors((e) => ({ ...e, ...errs }));
+                                                    if (Object.keys(errs).length) return;
+                                                    setIsLoading(true);
+                                                    await new Promise(r => setTimeout(r, 800));
+                                                    setIsLoading(false);
+                                                    setPasswordSaved(true);
+                                                    setTimeout(() => setPasswordSaved(false), 2000);
+                                                }}>Update Password</button>
+                                            </div>
+                                            {passwordSaved && <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Password updated.</div>}
+                                        </Section>
+
+                                        {/* Change Email */}
+                                        <Section title="Change Email">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <Field label="Current Email" error={errors.oldEmail}>
+                                                    <input type="email" value={form.oldEmail} onChange={upd("oldEmail")} placeholder="Current email" className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${errors.oldEmail ? 'border-red-500 bg-red-50' : 'border-gray-400 bg-white'}`} />
+                                                </Field>
+                                                <Field label="New Email" error={errors.newEmail}>
+                                                    <input type="email" value={form.newEmail} onChange={upd("newEmail")} placeholder="New email" className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${errors.newEmail ? 'border-red-500 bg-red-50' : 'border-gray-400 bg-white'}`} />
+                                                </Field>
+                                            </div>
+                                            <div className="flex justify-end mt-3">
+                                                <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white text-sm" onClick={async () => {
+                                                    const errs = {};
+                                                    if (!form.oldEmail) errs.oldEmail = 'Current email is required';
+                                                    if (!form.newEmail) errs.newEmail = 'New email is required';
+                                                    else if (!/\S+@\S+\.\S+/.test(form.newEmail)) errs.newEmail = 'Email is invalid';
+                                                    setErrors((e) => ({ ...e, ...errs }));
+                                                    if (Object.keys(errs).length) return;
+                                                    setIsLoading(true);
+                                                    await new Promise(r => setTimeout(r, 800));
+                                                    setIsLoading(false);
+                                                    setEmailSaved(true);
+                                                    setTimeout(() => setEmailSaved(false), 2000);
+                                                }}>Update Email</button>
+                                            </div>
+                                            {emailSaved && <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Email updated.</div>}
+                                        </Section>
+
+                                        <div className="flex justify-end mt-4">
+                                            <button type="submit" className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700" disabled={isLoading}>
+                                                {isLoading ? 'Saving...' : 'Save Changes'}
                                             </button>
                                         </div>
+                                        {accountSaved && (
+                                            <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Account details saved.</div>
+                                        )}
                                     </form>
                                 )}
 
@@ -1094,25 +1319,17 @@ export default function ProfileSetting() {
                                         <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
                                             PREFERENCES
                                         </div>
-                                        {prefSaved && (
-                                            <div className="rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">
-                                                Preferences saved.
-                                            </div>
-                                        )}
 
-                                        {/* Regional Settings */}
                                         <Section title="Regional Settings">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                                 <Field label="Time Zone">
                                                     <select
                                                         value={form.tz}
                                                         onChange={upd("tz")}
                                                         className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
                                                     >
-                                                        {timezones.map((tz) => (
-                                                            <option key={tz.value} value={tz.value}>
-                                                                {tz.label}
-                                                            </option>
+                                                        {timezones.map((t) => (
+                                                            <option key={t.value} value={t.value}>{t.label}</option>
                                                         ))}
                                                     </select>
                                                 </Field>
@@ -1123,9 +1340,7 @@ export default function ProfileSetting() {
                                                         className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
                                                     >
                                                         {languages.map((lang) => (
-                                                            <option key={lang.code} value={lang.code}>
-                                                                {lang.label}
-                                                            </option>
+                                                            <option key={lang.code} value={lang.code}>{lang.label}</option>
                                                         ))}
                                                     </select>
                                                 </Field>
