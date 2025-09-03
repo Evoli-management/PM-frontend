@@ -72,7 +72,6 @@ const GoalDetailsModal = ({ goal, onClose, onEdit }) => {
     };
 
     const formatMilestoneDate = (milestone) => {
-        // Handle different possible date field names
         const dateField = milestone.dueDate || milestone.targetDate;
         return dateField ? new Date(dateField).toLocaleDateString() : null;
     };
@@ -209,7 +208,7 @@ const GoalDetailsModal = ({ goal, onClose, onEdit }) => {
                                             const milestoneStatus = getMilestoneStatus(milestone);
                                             const milestoneDate = formatMilestoneDate(milestone);
                                             const dateStatus = getDateStatus(milestone.dueDate || milestone.targetDate);
-                                            
+
                                             return (
                                                 <div
                                                     key={milestone.id}
@@ -256,22 +255,23 @@ const GoalDetailsModal = ({ goal, onClose, onEdit }) => {
                                                                         <span className="text-xs text-slate-600">
                                                                             {milestoneDate}
                                                                         </span>
-                                                                        {dateStatus && milestoneStatus !== "completed" && (
-                                                                            <span
-                                                                                className={`text-xs px-2 py-0.5 rounded-full ${dateStatus.class}`}
-                                                                            >
-                                                                                {dateStatus.text}
-                                                                            </span>
-                                                                        )}
+                                                                        {dateStatus &&
+                                                                            milestoneStatus !== "completed" && (
+                                                                                <span
+                                                                                    className={`text-xs px-2 py-0.5 rounded-full ${dateStatus.class}`}
+                                                                                >
+                                                                                    {dateStatus.text}
+                                                                                </span>
+                                                                            )}
                                                                     </div>
                                                                 )}
-                                                                
+
                                                                 {milestone.weight && (
                                                                     <span className="text-xs text-slate-500">
                                                                         Weight: {milestone.weight}
                                                                     </span>
                                                                 )}
-                                                                
+
                                                                 <span
                                                                     className={`text-xs px-2 py-0.5 rounded-full ${
                                                                         milestoneStatus === "completed"
@@ -328,17 +328,15 @@ const GoalDetailsModal = ({ goal, onClose, onEdit }) => {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-600">Target:</span>
-                                        <span
-                                            className={`font-semibold ${
-                                                goal.targetDate &&
-                                                new Date(goal.targetDate) < new Date() &&
-                                                goal.status === "active"
-                                                    ? "text-red-600"
-                                                    : ""
-                                            }`}
-                                        >
-                                            {goal.targetDate ? new Date(goal.targetDate).toLocaleDateString() : "—"}
-                                        </span>
+                                        {(() => {
+                                            const d = goal.dueDate || goal.targetDate;
+                                            const overdue = d && new Date(d) < new Date() && goal.status === "active";
+                                            return (
+                                                <span className={`font-semibold ${overdue ? "text-red-600" : ""}`}>
+                                                    {d ? new Date(d).toLocaleDateString() : "—"}
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                     {goal.completedAt && (
                                         <div className="flex justify-between">

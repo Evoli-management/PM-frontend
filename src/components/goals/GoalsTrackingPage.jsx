@@ -121,29 +121,8 @@ const GoalsTrackingPage = () => {
             if (editingGoal?.id) {
                 savedGoal = await goalService.updateGoal(editingGoal.id, goalData);
             } else {
-                // Create the goal first
+                // Create the goal (milestones are included in the create payload)
                 savedGoal = await goalService.createGoal(goalData);
-
-                // If milestones were provided, create them
-                if (goalData.milestones && goalData.milestones.length > 0) {
-                    const milestonesToCreate = goalData.milestones.map((milestone) => ({
-                        title: milestone.title,
-                        description: milestone.description || "",
-                        dueDate: milestone.dueDate || null,
-                        weight: milestone.weight || 1.0,
-                        sortOrder: milestone.sortOrder || 0,
-                    }));
-
-                    try {
-                        await milestoneService.createMultipleMilestones(savedGoal.id, milestonesToCreate);
-                        // Refresh the goal data to get updated milestone counts
-                        savedGoal = await goalService.getGoalById(savedGoal.id);
-                    } catch (milestoneError) {
-                        console.error("Error creating milestones:", milestoneError);
-                        // Goal was created successfully, but milestones failed
-                        // We'll show the goal anyway and let user add milestones later
-                    }
-                }
             }
 
             setGoals((prev) => {

@@ -188,13 +188,25 @@ const kaImageFor = (title = "") => {
     return "/key-area.png"; // fallback
 };
 
-// Minimal localStorage-backed API for this page
+// Backend service for Key Areas with localStorage fallback
+import keyAreaService from "../services/keyAreaService";
+
 const api = {
     async listKeyAreas() {
         try {
-            const raw = localStorage.getItem("pm:keyareas");
-            const cached = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(cached) && cached.length) return cached;
+            const items = await keyAreaService.list({ includeTaskCount: true });
+            // cache last good list to speed up sidebar
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(items));
+            } catch {}
+            return items;
+        } catch (e) {
+            // fallback to cache/seed
+            try {
+                const raw = localStorage.getItem("pm:keyareas");
+                const cached = raw ? JSON.parse(raw) : [];
+                if (Array.isArray(cached) && cached.length) return cached;
+            } catch {}
             const seed = [
                 { id: 1, title: "Marketing", description: "Grow brand and leads", position: 1 },
                 { id: 2, title: "Sales", description: "Close deals", position: 2 },
@@ -203,32 +215,67 @@ const api = {
             ];
             try {
                 localStorage.setItem("pm:keyareas", JSON.stringify(seed));
-            } catch (e) {}
+            } catch {}
             return seed;
-        } catch {
-            return [];
         }
     },
     async listGoals() {
         return [];
     },
     async updateKeyArea(id, data) {
-        const raw = (await this.listKeyAreas()) || [];
-        const next = raw.map((k) => (String(k.id) === String(id) ? { ...k, ...data } : k));
-        localStorage.setItem("pm:keyareas", JSON.stringify(next));
-        return next.find((k) => String(k.id) === String(id)) || data;
+        try {
+            const updated = await keyAreaService.update(id, data);
+            const raw = JSON.parse(localStorage.getItem("pm:keyareas") || "[]");
+            const next = (Array.isArray(raw) ? raw : []).map((k) =>
+                String(k.id) === String(id) ? { ...k, ...updated } : k,
+            );
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(next));
+            } catch {}
+            return updated;
+        } catch (e) {
+            // local optimistic fallback
+            const raw = JSON.parse(localStorage.getItem("pm:keyareas") || "[]");
+            const next = (Array.isArray(raw) ? raw : []).map((k) =>
+                String(k.id) === String(id) ? { ...k, ...data } : k,
+            );
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(next));
+            } catch {}
+            return next.find((k) => String(k.id) === String(id)) || data;
+        }
     },
     async createKeyArea(data) {
-        const raw = (await this.listKeyAreas()) || [];
-        const item = { id: data.id || Date.now(), ...data };
-        const next = [...raw, item];
-        localStorage.setItem("pm:keyareas", JSON.stringify(next));
-        return item;
+        try {
+            const created = await keyAreaService.create(data);
+            const raw = JSON.parse(localStorage.getItem("pm:keyareas") || "[]");
+            const next = [...(Array.isArray(raw) ? raw : []), created];
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(next));
+            } catch {}
+            return created;
+        } catch (e) {
+            // local fallback id
+            const raw = JSON.parse(localStorage.getItem("pm:keyareas") || "[]");
+            const item = { id: data.id || Date.now(), ...data };
+            const next = [...(Array.isArray(raw) ? raw : []), item];
+            try {
+                localStorage.setItem("pm:keyareas", JSON.stringify(next));
+            } catch {}
+            return item;
+        }
     },
     async deleteKeyArea(id) {
-        const raw = (await this.listKeyAreas()) || [];
-        const next = raw.filter((k) => String(k.id) !== String(id));
-        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        try {
+            await keyAreaService.remove(id);
+        } catch (e) {
+            // ignore network failure and still remove locally for UX
+        }
+        const raw = JSON.parse(localStorage.getItem("pm:keyareas") || "[]");
+        const next = (Array.isArray(raw) ? raw : []).filter((k) => String(k.id) !== String(id));
+        try {
+            localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        } catch {}
         return true;
     },
     async listTasks(keyAreaId) {
@@ -1977,9 +2024,7 @@ export default function KeyAreas() {
         if (!keyAreas || keyAreas.length === 0) return;
         // Prefer first non-Ideas KA; fallback to absolute first by position
         const sorted = [...keyAreas].sort((a, b) => (a.position || 0) - (b.position || 0));
-        const firstNonIdeas = sorted.find(
-            (k) => !((k.title || "").toLowerCase() === "ideas" || k.is_default || k.position === 10),
-        );
+        const firstNonIdeas = sorted.find((k) => !((k.title || "").toLowerCase() === "ideas" || k.is_default));
         const first = firstNonIdeas || sorted[0];
         if (!first?.id) return;
         const next = new URLSearchParams(location.search || "");
@@ -2103,7 +2148,7 @@ export default function KeyAreas() {
 
         const selectIdeas = async () => {
             if (loading) return;
-            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.position === 10);
+            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.is_default);
             // do NOT open the Ideas area; instead show it in the main list and make it read-only
             if (found) {
                 setSelectedKA(null);
@@ -2114,7 +2159,7 @@ export default function KeyAreas() {
                     id: "ideas-synth",
                     title: "Ideas",
                     description: "Locked ideas slot",
-                    position: 10,
+                    position: 99,
                     is_default: true,
                 };
                 setKeyAreas((prev) => {
@@ -2153,11 +2198,11 @@ export default function KeyAreas() {
 
         // If the URL explicitly requests Ideas, show only Ideas
         if (explicitSelect === "ideas") {
-            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.position === 10);
+            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.is_default);
         }
 
         // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
-        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && k.position !== 10);
+        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default);
         if (!q) return base;
         return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
@@ -2165,11 +2210,11 @@ export default function KeyAreas() {
     const paramsForRender = new URLSearchParams(location.search);
     const showOnlyIdeas = paramsForRender.get("select") === "ideas";
     const ideaForShow = keyAreas.find((k) => (k.title || "").toLowerCase() === "ideas") ||
-        keyAreas.find((k) => k.position === 10) || {
+        keyAreas.find((k) => k.is_default) || {
             id: "ideas-synth",
             title: "Ideas",
             description: "Locked ideas slot",
-            position: 10,
+            position: 99,
             is_default: true,
         };
 

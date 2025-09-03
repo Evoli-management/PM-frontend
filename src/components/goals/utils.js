@@ -61,15 +61,16 @@ export const getStatusColor = (status) => {
  * Check if a goal is overdue
  */
 export const isGoalOverdue = (goal) => {
-    return goal.targetDate && new Date(goal.targetDate) < new Date() && goal.status === "active";
+    const date = goal.dueDate || goal.targetDate;
+    return date && new Date(date) < new Date() && goal.status === "active";
 };
 
 /**
  * Calculate days until due date
  */
-export const getDaysUntilDue = (targetDate) => {
-    if (!targetDate) return null;
-    return Math.ceil((new Date(targetDate) - new Date()) / (1000 * 60 * 60 * 24));
+export const getDaysUntilDue = (date) => {
+    if (!date) return null;
+    return Math.ceil((new Date(date) - new Date()) / (1000 * 60 * 60 * 24));
 };
 
 /**
@@ -126,10 +127,12 @@ export const sortGoals = (goals, sortBy = "created") => {
             return [...goals].sort((a, b) => (b.progressPercentage || 0) - (a.progressPercentage || 0));
         case "dueDate":
             return [...goals].sort((a, b) => {
-                if (!a.targetDate && !b.targetDate) return 0;
-                if (!a.targetDate) return 1;
-                if (!b.targetDate) return -1;
-                return new Date(a.targetDate) - new Date(b.targetDate);
+                const ad = a.dueDate || a.targetDate;
+                const bd = b.dueDate || b.targetDate;
+                if (!ad && !bd) return 0;
+                if (!ad) return 1;
+                if (!bd) return -1;
+                return new Date(ad) - new Date(bd);
             });
         case "created":
         default:

@@ -19,10 +19,9 @@ import ProgressBar from "./ProgressBar.jsx";
 const GoalCard = ({ goal, onOpen, onEdit, onDelete }) => {
     const statusTone = getStatusColor(goal.status);
 
-    const isOverdue = goal.targetDate && new Date(goal.targetDate) < new Date() && goal.status === "active";
-    const daysUntilDue = goal.targetDate
-        ? Math.ceil((new Date(goal.targetDate) - new Date()) / (1000 * 60 * 60 * 24))
-        : null;
+    const displayDate = goal.dueDate || goal.targetDate;
+    const isOverdue = displayDate && new Date(displayDate) < new Date() && goal.status === "active";
+    const daysUntilDue = displayDate ? Math.ceil((new Date(displayDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
 
     // Milestone progress calculations
     const completedMilestones = goal.completedMilestoneCount || 0;
@@ -116,7 +115,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onDelete }) => {
             )}
 
             <div className="text-xs text-slate-600 flex items-center gap-4 flex-wrap mb-3">
-                {goal.targetDate && (
+                {displayDate && (
                     <span className={`inline-flex items-center gap-1 ${isOverdue ? "text-red-600 font-semibold" : ""}`}>
                         <FaClock />
                         {isOverdue ? "Overdue" : daysUntilDue > 0 ? `${daysUntilDue}d left` : "Due today"}

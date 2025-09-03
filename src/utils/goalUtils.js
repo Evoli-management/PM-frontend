@@ -46,12 +46,14 @@ export const getStatusColor = (status) => {
 };
 
 export const isGoalOverdue = (goal) => {
-    return goal.targetDate && new Date(goal.targetDate) < new Date() && goal.status === "active";
+    const date = goal.dueDate || goal.targetDate;
+    return date && new Date(date) < new Date() && goal.status === "active";
 };
 
-export const getDaysUntilDue = (targetDate) => {
-    if (!targetDate) return null;
-    return Math.ceil((new Date(targetDate) - new Date()) / (1000 * 60 * 60 * 24));
+export const getDaysUntilDue = (date) => {
+    const d = date;
+    if (!d) return null;
+    return Math.ceil((new Date(d) - new Date()) / (1000 * 60 * 60 * 24));
 };
 
 export const formatDate = (dateString) => {
@@ -102,11 +104,14 @@ export const sortGoals = (goals, sortBy = "created") => {
         case "progress":
             return [...goals].sort((a, b) => (b.progressPercentage || 0) - (a.progressPercentage || 0));
         case "dueDate":
+            // Note: backend uses `dueDate`; some components still use `targetDate` field name.
             return [...goals].sort((a, b) => {
-                if (!a.targetDate && !b.targetDate) return 0;
-                if (!a.targetDate) return 1;
-                if (!b.targetDate) return -1;
-                return new Date(a.targetDate) - new Date(b.targetDate);
+                const aDate = a.dueDate || a.targetDate;
+                const bDate = b.dueDate || b.targetDate;
+                if (!aDate && !bDate) return 0;
+                if (!aDate) return 1;
+                if (!bDate) return -1;
+                return new Date(aDate) - new Date(bDate);
             });
         case "created":
         default:

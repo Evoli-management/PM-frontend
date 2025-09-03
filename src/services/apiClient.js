@@ -12,6 +12,10 @@ apiClient.interceptors.request.use(
         const token = localStorage.getItem("access_token");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        } else if (import.meta.env.DEV) {
+            // Provide a temp dev token compatible with TempAuthGuard
+            const tempPayload = btoa(JSON.stringify({ email: "dev.user@example.com" }));
+            config.headers.Authorization = `Bearer temp_${tempPayload}`;
         }
         return config;
     },

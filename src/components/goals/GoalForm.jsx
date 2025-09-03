@@ -14,7 +14,9 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
         initial.startDate ? new Date(initial.startDate).toISOString().split("T")[0] : "",
     );
     const [targetDate, setTargetDate] = useState(
-        initial.targetDate ? new Date(initial.targetDate).toISOString().split("T")[0] : "",
+        initial.targetDate || initial.dueDate
+            ? new Date(initial.targetDate || initial.dueDate).toISOString().split("T")[0]
+            : "",
     );
     const [progressPercentage, setProgressPercentage] = useState(initial.progressPercentage || 0);
     const [keyAreas, setKeyAreas] = useState([]);
@@ -144,8 +146,16 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
             return;
         }
 
-        if (startDate && targetDate && new Date(startDate) >= new Date(targetDate)) {
-            alert("Start date must be before target date");
+        // Backend requires dueDate; enforce it in the UI
+        if (!targetDate) {
+            alert("Target date is required");
+            return;
+        }
+
+        // Compare ISO date strings directly (YYYY-MM-DD) to avoid timezone issues.
+        // Allow same-day start/target; only block when start is after target.
+        if (startDate && targetDate && startDate > targetDate) {
+            alert("Start date cannot be after target date");
             return;
         }
 
@@ -156,12 +166,16 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
         setLoading(true);
 
         try {
+            // Prepare milestones mapped to backend fields
+            const validMilestones = milestones.filter((m) => m.title.trim());
+
             const goalData = {
                 title: title.trim(),
                 description: description.trim() || undefined,
                 keyAreaId: keyAreaId || undefined,
                 startDate: startDate || undefined,
-                targetDate: targetDate || undefined,
+                // Backend expects `dueDate`; map UI `targetDate` to it
+                dueDate: targetDate || undefined,
                 visibility,
                 progressPercentage,
             };
@@ -170,56 +184,23 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
                 goalData.status = status;
             }
 
+            // For new goals, include milestones in the create payload so they're created transactionally
+            if (!initial.id && validMilestones.length > 0) {
+                goalData.milestones = validMilestones.map((m) => ({
+                    title: m.title.trim(),
+                    dueDate: m.targetDate || undefined,
+                    weight: m.weight || 1,
+                }));
+            }
+
             // Save the goal first
             const savedGoal = await onSave(goalData);
             const goalId = savedGoal?.id || initial.id;
-
-            // Handle milestones ONLY for NEW goals (not when editing)
-            if (goalId && !initial.id) {
-                console.log("Processing milestones for new goal:", goalId);
-                console.log("Current milestones:", milestones);
-
-                const validMilestones = milestones.filter((m) => m.title.trim());
-                console.log("Valid milestones:", validMilestones);
-
-                // Create milestones and collect any errors
-                const milestoneErrors = [];
-
-                console.log("Goal created, now creating milestones...");
-                console.log("Milestones to create:", validMilestones);
-
-                for (const milestone of validMilestones) {
-                    try {
-                        const milestoneToCreate = {
-                            title: milestone.title.trim(),
-                            description: milestone.description?.trim() || "",
-                            dueDate: milestone.targetDate || null, // Fix: use dueDate instead of targetDate
-                            weight: milestone.weight || 1,
-                        };
-
-                        console.log("Creating milestone:", milestoneToCreate);
-                        const createdMilestone = await milestoneService.createMilestone(goalId, milestoneToCreate);
-                        console.log("Milestone created:", createdMilestone);
-                    } catch (error) {
-                        console.error("Error creating milestone:", milestone.title, error);
-                        const errorMsg = error.response?.data?.message || error.message || "Unknown error";
-                        milestoneErrors.push(`Failed to create milestone "${milestone.title}": ${errorMsg}`);
-                    }
-                }
-
-                // If there were milestone creation errors, show them to the user
-                if (milestoneErrors.length > 0) {
-                    alert(
-                        `Goal created successfully, but there were issues creating milestones:\n\n${milestoneErrors.join("\n")}\n\nYou can add milestones later by editing the goal.`,
-                    );
-                }
-            }
 
             // Handle milestones for EXISTING goals (when editing)
             if (goalId && initial.id) {
                 console.log("Processing milestones for existing goal:", goalId);
 
-                const validMilestones = milestones.filter((m) => m.title.trim());
                 const milestoneErrors = [];
 
                 // Create new milestones
@@ -233,7 +214,7 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
                         const milestoneToCreate = {
                             title: milestone.title.trim(),
                             description: milestone.description?.trim() || "",
-                            dueDate: milestone.targetDate || null, // Fix: use dueDate
+                            dueDate: milestone.targetDate || null,
                             weight: milestone.weight || 1,
                         };
 
@@ -248,9 +229,9 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
                 }
 
                 // Update existing milestones
-                console.log("Goal created, now creating milestones...");
+                console.log("Updating existing milestones if needed...");
                 console.log(
-                    "Milestones to create:",
+                    "Milestones to update:",
                     validMilestones.filter((m) => !m.isNew),
                 );
                 for (const milestone of validMilestones.filter((m) => !m.isNew)) {
@@ -259,7 +240,7 @@ const GoalForm = ({ initial = {}, onCancel, onSave }) => {
                             const milestoneToUpdate = {
                                 title: milestone.title.trim(),
                                 description: milestone.description?.trim() || "",
-                                dueDate: milestone.targetDate || null, // Fix: use dueDate
+                                dueDate: milestone.targetDate || null,
                                 weight: milestone.weight || 1,
                             };
 

@@ -4,102 +4,99 @@ import apiClient from "./apiClient";
 class MilestoneService {
     async getMilestonesByGoal(goalId) {
         try {
-            console.log('Fetching milestones for goal:', goalId);
-            const response = await apiClient.get(`/milestones/goals/${goalId}`);
-            console.log('Milestones fetched successfully:', response.data);
-            return response.data;
+            console.log("Fetching milestones for goal:", goalId);
+            // Backend returns milestones via GET /goals/:id
+            const response = await apiClient.get(`/goals/${goalId}`);
+            const milestones = Array.isArray(response.data?.milestones) ? response.data.milestones : [];
+            console.log("Milestones fetched successfully:", milestones);
+            return milestones;
         } catch (error) {
-            console.error('Error fetching milestones:', error.response?.data || error.message);
+            console.error("Error fetching milestones:", error.response?.data || error.message);
             throw error;
         }
     }
 
     async createMilestone(goalId, milestoneData) {
         try {
-            console.log('Creating milestone for goal:', goalId, 'Data:', milestoneData);
-            
+            console.log("Creating milestone for goal:", goalId, "Data:", milestoneData);
+
             // Transform the data to match backend expectations exactly
             const backendData = {
                 title: milestoneData.title?.trim(),
-                description: milestoneData.description?.trim() || undefined,
-                dueDate: milestoneData.dueDate || milestoneData.targetDate || undefined, // Handle both field names
+                dueDate: milestoneData.dueDate || milestoneData.targetDate || undefined,
                 weight: Number(milestoneData.weight) || 1.0,
-                sortOrder: Number(milestoneData.sortOrder) || 0
             };
-            
+
             // Remove undefined values
-            Object.keys(backendData).forEach(key => {
+            Object.keys(backendData).forEach((key) => {
                 if (backendData[key] === undefined) {
                     delete backendData[key];
                 }
             });
-            
-            console.log('Sending transformed data to backend:', backendData);
-            
-            const response = await apiClient.post(`/milestones/goals/${goalId}`, backendData);
-            console.log('Milestone created successfully:', response.data);
+
+            console.log("Sending transformed data to backend:", backendData);
+
+            // Backend route: POST /goals/:id/milestones
+            const response = await apiClient.post(`/goals/${goalId}/milestones`, backendData);
+            console.log("Milestone created successfully:", response.data);
             return response.data;
         } catch (error) {
-            console.error('Error creating milestone:', error.response?.data || error.message);
+            console.error("Error creating milestone:", error.response?.data || error.message);
             throw error;
         }
     }
 
     async updateMilestone(milestoneId, milestoneData) {
         try {
-            console.log('Updating milestone:', milestoneId, 'Data:', milestoneData);
-            
+            console.log("Updating milestone:", milestoneId, "Data:", milestoneData);
+
             // Transform the data to match backend expectations
             const backendData = {
                 title: milestoneData.title?.trim(),
-                description: milestoneData.description?.trim() || undefined,
                 dueDate: milestoneData.dueDate || milestoneData.targetDate || undefined,
                 weight: Number(milestoneData.weight) || 1.0,
-                done: milestoneData.status === 'completed' || milestoneData.done || false,
-                sortOrder: Number(milestoneData.sortOrder) || 0
+                done: milestoneData.status === "completed" || milestoneData.done || false,
             };
-            
+
             // Remove undefined values
-            Object.keys(backendData).forEach(key => {
+            Object.keys(backendData).forEach((key) => {
                 if (backendData[key] === undefined) {
                     delete backendData[key];
                 }
             });
-            
-            console.log('Sending transformed update data:', backendData);
-            
+
+            console.log("Sending transformed update data:", backendData);
+
             const response = await apiClient.put(`/milestones/${milestoneId}`, backendData);
-            console.log('Milestone updated successfully:', response.data);
+            console.log("Milestone updated successfully:", response.data);
             return response.data;
         } catch (error) {
-            console.error('Error updating milestone:', error.response?.data || error.message);
+            console.error("Error updating milestone:", error.response?.data || error.message);
             throw error;
         }
     }
 
     async deleteMilestone(milestoneId) {
         try {
-            console.log('Deleting milestone:', milestoneId);
+            console.log("Deleting milestone:", milestoneId);
             const response = await apiClient.delete(`/milestones/${milestoneId}`);
-            console.log('Milestone deleted successfully');
+            console.log("Milestone deleted successfully");
             return response.data;
         } catch (error) {
-            console.error('Error deleting milestone:', milestoneId, error.response?.data || error.message);
+            console.error("Error deleting milestone:", milestoneId, error.response?.data || error.message);
             throw error;
         }
     }
 
     async toggleMilestone(milestoneId, done) {
         try {
-            console.log('Toggling milestone:', milestoneId, 'Done:', done);
-            const response = await apiClient.put(`/milestones/${milestoneId}`, { 
-                done,
-                score: done ? 1.0 : 0.0 // Set score based on completion status
-            });
-            console.log('Milestone toggled successfully:', response.data);
+            console.log("Toggling milestone:", milestoneId, "Done:", done);
+            // Backend forbids setting both done and score simultaneously; send only done.
+            const response = await apiClient.put(`/milestones/${milestoneId}`, { done });
+            console.log("Milestone toggled successfully:", response.data);
             return response.data;
         } catch (error) {
-            console.error('Error toggling milestone:', milestoneId, error.response?.data || error.message);
+            console.error("Error toggling milestone:", milestoneId, error.response?.data || error.message);
             throw error;
         }
     }
@@ -107,11 +104,11 @@ class MilestoneService {
     // Batch operations for better performance
     async createMultipleMilestones(goalId, milestonesData) {
         try {
-            console.log('Creating multiple milestones for goal:', goalId, 'Count:', milestonesData.length);
-            
+            console.log("Creating multiple milestones for goal:", goalId, "Count:", milestonesData.length);
+
             const createdMilestones = [];
             const errors = [];
-            
+
             for (const milestoneData of milestonesData) {
                 try {
                     const milestone = await this.createMilestone(goalId, milestoneData);
@@ -119,23 +116,23 @@ class MilestoneService {
                 } catch (error) {
                     errors.push({
                         milestone: milestoneData.title,
-                        error: error.response?.data?.message || error.message
+                        error: error.response?.data?.message || error.message,
                     });
                 }
             }
-            
+
             if (errors.length > 0) {
-                console.warn('Some milestones failed to create:', errors);
+                console.warn("Some milestones failed to create:", errors);
             }
-            
+
             return {
                 created: createdMilestones,
                 errors: errors,
                 success: createdMilestones.length,
-                failed: errors.length
+                failed: errors.length,
             };
         } catch (error) {
-            console.error('Error in batch milestone creation:', error);
+            console.error("Error in batch milestone creation:", error);
             throw error;
         }
     }

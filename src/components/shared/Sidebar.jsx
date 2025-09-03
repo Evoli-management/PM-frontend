@@ -312,7 +312,7 @@ export default function Sidebar({
                                                                 const itemClasses = isActive
                                                                     ? "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-blue-700 font-semibold bg-white shadow-inner text-left w-full"
                                                                     : "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-gray-800 hover:bg-white text-left w-full";
-                                                                const isLocked = ka.is_default || ka.position === 10;
+                                                                const isLocked = !!ka.is_default;
                                                                 const isIdeas = /idea/i.test(ka.title || "");
                                                                 return (
                                                                     <Link

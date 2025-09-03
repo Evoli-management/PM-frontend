@@ -1,5 +1,6 @@
 // src/services/goalService.js
 import apiClient from "./apiClient";
+import keyAreaService from "./keyAreaService";
 
 class GoalService {
     async getGoals(filters) {
@@ -22,12 +23,36 @@ class GoalService {
     }
 
     async createGoal(goalData) {
-        const response = await apiClient.post("/goals", goalData);
+        // Map FE -> BE fields as needed: parentId -> parentGoalId, areaId -> keyAreaId
+        const payload = {
+            title: goalData.title,
+            description: goalData.description,
+            keyAreaId: goalData.keyAreaId || goalData.areaId,
+            parentGoalId: goalData.parentGoalId || goalData.parentId || undefined,
+            startDate: goalData.startDate,
+            dueDate: goalData.dueDate,
+            visibility: goalData.visibility || "public",
+            milestones:
+                Array.isArray(goalData.milestones) && goalData.milestones.length > 0
+                    ? goalData.milestones.map((m) => ({ title: m.title, dueDate: m.dueDate, weight: m.weight }))
+                    : [{ title: "Milestone 1", weight: 1.0 }],
+        };
+        const response = await apiClient.post("/goals", payload);
         return response.data;
     }
 
     async updateGoal(id, goalData) {
-        const response = await apiClient.put(`/goals/${id}`, goalData);
+        const payload = {
+            title: goalData.title,
+            description: goalData.description,
+            keyAreaId: goalData.keyAreaId || goalData.areaId,
+            parentGoalId: goalData.parentGoalId || goalData.parentId || undefined,
+            startDate: goalData.startDate,
+            dueDate: goalData.dueDate,
+            visibility: goalData.visibility,
+            status: goalData.status,
+        };
+        const response = await apiClient.put(`/goals/${id}`, payload);
         return response.data;
     }
 
@@ -42,8 +67,8 @@ class GoalService {
     }
 
     async getKeyAreas() {
-        const response = await apiClient.get("/key-areas");
-        return response.data;
+        // Use unified Key Areas service (returns FE-mapped shape)
+        return keyAreaService.list({ includeTaskCount: false });
     }
 }
 
