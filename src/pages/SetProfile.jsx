@@ -12,6 +12,7 @@ export default function ProfileSetting() {
     const [errors, setErrors] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [prefSaved, setPrefSaved] = useState(false);
+    const [privacySaved, setPrivacySaved] = useState(false);
     const [accountSaved, setAccountSaved] = useState(false);
     const [emailSaved, setEmailSaved] = useState(false);
     const [passwordSaved, setPasswordSaved] = useState(false);
@@ -680,6 +681,13 @@ export default function ProfileSetting() {
                 dashboardLayout: saved.dashboardLayout ?? s.dashboardLayout,
                 widgetPreferences: { ...s.widgetPreferences, ...(saved.widgetPreferences || {}) },
                 dashboardRefreshRate: saved.dashboardRefreshRate ?? s.dashboardRefreshRate,
+                // Privacy related loads if present
+                strokesVisibility: saved.strokesVisibility ?? s.strokesVisibility,
+                showInActivityFeed: saved.showInActivityFeed ?? s.showInActivityFeed,
+                enpsPrivacySettings: {
+                    ...s.enpsPrivacySettings,
+                    ...(saved.enpsPrivacySettings || {}),
+                },
             }));
         } catch (_) {
             // ignore malformed storage
@@ -700,10 +708,32 @@ export default function ProfileSetting() {
                 dashboardLayout: form.dashboardLayout,
                 widgetPreferences: form.widgetPreferences,
                 dashboardRefreshRate: form.dashboardRefreshRate,
+                // also persist privacy so both tabs share the same bucket
+                strokesVisibility: form.strokesVisibility,
+                showInActivityFeed: form.showInActivityFeed,
+                enpsPrivacySettings: form.enpsPrivacySettings,
             };
             localStorage.setItem("pm:preferences", JSON.stringify(toStore));
             setPrefSaved(true);
             setTimeout(() => setPrefSaved(false), 2000);
+        } catch (_) {
+            // ignore
+        }
+    };
+
+    const savePrivacy = () => {
+        try {
+            const raw = localStorage.getItem("pm:preferences");
+            const base = raw ? JSON.parse(raw) : {};
+            const toStore = {
+                ...base,
+                strokesVisibility: form.strokesVisibility,
+                showInActivityFeed: form.showInActivityFeed,
+                enpsPrivacySettings: form.enpsPrivacySettings,
+            };
+            localStorage.setItem("pm:preferences", JSON.stringify(toStore));
+            setPrivacySaved(true);
+            setTimeout(() => setPrivacySaved(false), 2000);
         } catch (_) {
             // ignore
         }
@@ -1662,7 +1692,92 @@ export default function ProfileSetting() {
                                     </div>
                                 )}
 
-                                
+                                {activeTab === "Privacy" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            PRIVACY
+                                        </div>
+                                        <Section title="Strokes Visibility">
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-gray-600">Control who can see the strokes you give or receive. <span title="Public: anyone in your org can see; Team-only: only members of your teams; Private: only you and admins." className="underline decoration-dotted cursor-help">What does this mean?</span></p>
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    {[
+                                                        { value: 'public', label: 'Public' },
+                                                        { value: 'team-only', label: 'Team-only' },
+                                                        { value: 'private', label: 'Private' },
+                                                    ].map(opt => (
+                                                        <label key={opt.value} className="inline-flex items-center gap-2 text-sm">
+                                                            <input
+                                                                type="radio"
+                                                                name="strokesVisibility"
+                                                                value={opt.value}
+                                                                checked={form.strokesVisibility === opt.value}
+                                                                onChange={(e) => setForm(s => ({ ...s, strokesVisibility: e.target.value }))}
+                                                            />
+                                                            <span>{opt.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="eNPS Survey Anonymity">
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-gray-600">Choose how your eNPS survey responses are handled. <span title="Anonymous: your identity isn’t attached; Aggregated team/org reports may still include your response." className="underline decoration-dotted cursor-help">What does this mean?</span></p>
+                                                <div className="flex flex-col gap-2">
+                                                    <label className="inline-flex items-center gap-2 text-sm">
+                                                        <input
+                                                            type="radio"
+                                                            name="enpsAnon"
+                                                            checked={form.enpsPrivacySettings.allowAnonymousScoring && !form.enpsPrivacySettings.showIndividualScores}
+                                                            onChange={() => setForm(s => ({
+                                                                ...s,
+                                                                enpsPrivacySettings: {
+                                                                    ...s.enpsPrivacySettings,
+                                                                    allowAnonymousScoring: true,
+                                                                    showIndividualScores: false,
+                                                                },
+                                                            }))}
+                                                        />
+                                                        <span>Anonymous (recommended)</span>
+                                                    </label>
+                                                    <label className="inline-flex items-center gap-2 text-sm">
+                                                        <input
+                                                            type="radio"
+                                                            name="enpsAnon"
+                                                            checked={!form.enpsPrivacySettings.allowAnonymousScoring}
+                                                            onChange={() => setForm(s => ({
+                                                                ...s,
+                                                                enpsPrivacySettings: {
+                                                                    ...s.enpsPrivacySettings,
+                                                                    allowAnonymousScoring: false,
+                                                                },
+                                                            }))}
+                                                        />
+                                                        <span>Identified (not anonymous)</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Activity Feed Visibility">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-700">Show my activity in “What’s New”</div>
+                                                    <div className="text-xs text-gray-500">If off, your actions won’t appear in the org-wide activity feed.</div>
+                                                </div>
+                                                <Toggle checked={form.showInActivityFeed} onChange={(v) => setForm(s => ({ ...s, showInActivityFeed: v }))} />
+                                            </div>
+                                        </Section>
+
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={savePrivacy} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save Privacy Settings</button>
+                                        </div>
+                                        {privacySaved && (
+                                            <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Privacy settings saved.</div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {activeTab === "Teams & Members" && (
                                     <div className="space-y-4">
