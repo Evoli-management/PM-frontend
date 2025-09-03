@@ -76,8 +76,9 @@ export default function Registration() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans p-4 bg-gray-50">
-      <div className="flex flex-1 items-center justify-center">
-        <div className="w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl overflow-hidden bg-white">
+    <div className="flex flex-1 items-center justify-center">
+    <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
+      <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
           {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
           <div className="flex w-full md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
             <div className="w-full overflow-hidden px-4 sm:px-6">

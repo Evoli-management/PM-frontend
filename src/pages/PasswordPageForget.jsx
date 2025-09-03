@@ -39,7 +39,8 @@ const ForgotPasswordPage = () => {
     };
     return (
         <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
-            <div className="w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl overflow-hidden bg-white">
+            <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
+                <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
                     {/* Left: form pane */}
                     <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
                         <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">Forgot password?</h2>
