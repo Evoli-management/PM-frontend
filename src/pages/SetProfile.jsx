@@ -1266,12 +1266,7 @@ export default function ProfileSetting() {
                                                         </div>
                                                     </Section>
 
-                                                    <Section title="Collaboration">
-                                                        <div className="space-y-3 sm:space-y-4">
-                                                            <Card logo="S" title="Slack" color="bg-[#4A154B]" desc="Get notifications in Slack" provider="slack" />
-                                                            <Card logo="D" title="Discord" color="bg-[#5865F2]" desc="Connect with your Discord server" provider="discord" />
-                                                        </div>
-                                                    </Section>
+                                                    {/* Collaboration integrations removed in this version */}
 
                                                     <Section title="CRM / Storage">
                                                         <div className="space-y-3 sm:space-y-4">
