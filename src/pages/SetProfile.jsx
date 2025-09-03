@@ -7,8 +7,37 @@ export default function ProfileSetting() {
     const [avatarPreview, setAvatarPreview] = useState(null);
     const [errors, setErrors] = useState({});
     const [isLoading, setIsLoading] = useState(false);
+    const [prefSaved, setPrefSaved] = useState(false);
     const [changeMode, setChangeMode] = useState(null); // 'password' | 'email' | null
     const fileRef = useRef(null);
+
+    // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
+    useEffect(() => {
+        const applyFromHash = () => {
+            try {
+                const hash = window.location.hash || "";
+                const queryIndex = hash.indexOf("?");
+                if (queryIndex === -1) return;
+                const qs = new URLSearchParams(hash.substring(queryIndex + 1));
+                const tab = (qs.get("tab") || "").toLowerCase();
+                const map = {
+                    account: "Account",
+                    security: "Security",
+                    preferences: "Preferences",
+                    integrations: "Integrations",
+                    privacy: "Privacy",
+                    teams: "Teams & Members",
+                    "teams-members": "Teams & Members",
+                };
+                if (map[tab]) setActiveTab(map[tab]);
+            } catch (_) {
+                // ignore
+            }
+        };
+        applyFromHash();
+        window.addEventListener("hashchange", applyFromHash);
+        return () => window.removeEventListener("hashchange", applyFromHash);
+    }, []);
 
     // 2FA state (mocked local flow)
     const [twoFAEnabled, setTwoFAEnabled] = useState(false);
@@ -559,7 +588,17 @@ export default function ProfileSetting() {
         lang: "en",
         start: "09:00",
         end: "17:00",
-        notifications: true,
+        // Regional formats
+        dateFormat: "MM/DD/YYYY",
+        timeFormat: "12h",
+        // Notification settings
+        notifications: {
+            inApp: true,
+            email: true,
+            push: false,
+            weeklyReports: true,
+            dailyReports: false,
+        },
         oldEmail: "",
         newEmail: "",
         oldPw: "",
@@ -609,6 +648,54 @@ export default function ProfileSetting() {
         },
     });
 
+    // Load preferences from localStorage (if available)
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:preferences");
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            setForm((s) => ({
+                ...s,
+                tz: saved.tz ?? s.tz,
+                lang: saved.lang ?? s.lang,
+                dateFormat: saved.dateFormat ?? s.dateFormat,
+                timeFormat: saved.timeFormat ?? s.timeFormat,
+                start: saved.start ?? s.start,
+                end: saved.end ?? s.end,
+                notifications: { ...s.notifications, ...(saved.notifications || {}) },
+                dashboardTheme: saved.dashboardTheme ?? s.dashboardTheme,
+                dashboardLayout: saved.dashboardLayout ?? s.dashboardLayout,
+                widgetPreferences: { ...s.widgetPreferences, ...(saved.widgetPreferences || {}) },
+                dashboardRefreshRate: saved.dashboardRefreshRate ?? s.dashboardRefreshRate,
+            }));
+        } catch (_) {
+            // ignore malformed storage
+        }
+    }, []);
+
+    const savePreferences = () => {
+        try {
+            const toStore = {
+                tz: form.tz,
+                lang: form.lang,
+                dateFormat: form.dateFormat,
+                timeFormat: form.timeFormat,
+                start: form.start,
+                end: form.end,
+                notifications: form.notifications,
+                dashboardTheme: form.dashboardTheme,
+                dashboardLayout: form.dashboardLayout,
+                widgetPreferences: form.widgetPreferences,
+                dashboardRefreshRate: form.dashboardRefreshRate,
+            };
+            localStorage.setItem("pm:preferences", JSON.stringify(toStore));
+            setPrefSaved(true);
+            setTimeout(() => setPrefSaved(false), 2000);
+        } catch (_) {
+            // ignore
+        }
+    };
+
     // Derived team permissions (scoped to this component)
     const canCreateTeams = form?.teams?.canCreateTeams ?? true;
     const canJoinTeams = form?.teams?.canJoinTeams ?? true;
@@ -630,6 +717,17 @@ export default function ProfileSetting() {
             widgetPreferences: {
                 ...s.widgetPreferences,
                 [widgetKey]: checked,
+            },
+        }));
+    };
+
+    // Helper function for updating notification settings
+    const updateNotificationSetting = (key) => (checked) => {
+        setForm((s) => ({
+            ...s,
+            notifications: {
+                ...s.notifications,
+                [key]: checked,
             },
         }));
     };
@@ -982,84 +1080,170 @@ export default function ProfileSetting() {
                                                 </Field>
                                             </div>
                                             </div>
-                                            
-                                            {/* Language Implementation Notice */}
-                                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="text-2xl">🌐</div>
+                                        {/* Form actions */}
+                                        <div className="mt-4 flex justify-end">
+                                            <button type="submit" className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                                                Save Changes
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {activeTab === "Preferences" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            PREFERENCES
+                                        </div>
+                                        {prefSaved && (
+                                            <div className="rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">
+                                                Preferences saved.
+                                            </div>
+                                        )}
+
+                                        {/* Regional Settings */}
+                                        <Section title="Regional Settings">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <Field label="Time Zone">
+                                                    <select
+                                                        value={form.tz}
+                                                        onChange={upd("tz")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        {timezones.map((tz) => (
+                                                            <option key={tz.value} value={tz.value}>
+                                                                {tz.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+                                                <Field label="Language">
+                                                    <select
+                                                        value={form.lang}
+                                                        onChange={upd("lang")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        {languages.map((lang) => (
+                                                            <option key={lang.code} value={lang.code}>
+                                                                {lang.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+                                                <Field label="Date Format">
+                                                    <select
+                                                        value={form.dateFormat}
+                                                        onChange={upd("dateFormat")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                                    </select>
+                                                </Field>
+                                                <Field label="Time Format">
+                                                    <select
+                                                        value={form.timeFormat}
+                                                        onChange={upd("timeFormat")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        <option value="12h">12-hour</option>
+                                                        <option value="24h">24-hour</option>
+                                                    </select>
+                                                </Field>
+                                            </div>
+                                        </Section>
+
+                                        {/* Work Schedule */}
+                                        <Section title="Work Schedule">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <Field label="Start Time">
+                                                    <input
+                                                        type="time"
+                                                        value={form.start}
+                                                        onChange={upd("start")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    />
+                                                </Field>
+                                                <Field label="End Time">
+                                                    <input
+                                                        type="time"
+                                                        value={form.end}
+                                                        onChange={upd("end")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    />
+                                                </Field>
+                                            </div>
+                                        </Section>
+
+                                        {/* Notification Settings */}
+                                        <Section title="Notification Settings">
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between py-1">
                                                     <div>
-                                                        <h4 className="text-sm font-semibold text-blue-800 mb-2">Multi-Language Support</h4>
-                                                        <p className="text-sm text-blue-700 mb-2">
-                                                            Language selection will be implemented soon with a comprehensive translation system.
-                                                        </p>
-                                                        <p className="text-sm text-blue-700">
-                                                            <strong>Backend Implementation:</strong> A language table will govern field translations across the entire platform.
-                                                        </p>
+                                                        <div className="text-sm font-medium text-gray-700">In-app notifications</div>
+                                                        <div className="text-xs text-gray-500">Show alerts inside the app</div>
                                                     </div>
+                                                    <Toggle checked={form.notifications.inApp} onChange={updateNotificationSetting("inApp")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Email notifications</div>
+                                                        <div className="text-xs text-gray-500">Receive updates via email</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.email} onChange={updateNotificationSetting("email")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Push notifications</div>
+                                                        <div className="text-xs text-gray-500">Mobile and desktop push alerts</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.push} onChange={updateNotificationSetting("push")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Weekly reports</div>
+                                                        <div className="text-xs text-gray-500">Summary reports every week</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.weeklyReports} onChange={updateNotificationSetting("weeklyReports")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Daily reports</div>
+                                                        <div className="text-xs text-gray-500">Summary reports every day</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.dailyReports} onChange={updateNotificationSetting("dailyReports")} />
                                                 </div>
                                             </div>
+                                        </Section>
 
-                                            {/* Live Theme Preview */}
-                                            <div className="mt-4 border-t pt-4">
-                                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Theme Preview</h4>
-                                                <div className="rounded-lg border border-gray-200 p-4" 
-                                                     style={{
-                                                         backgroundColor: form.dashboardTheme === 'dark' ? '#1f2937' : 
-                                                                          form.dashboardTheme === 'light' ? '#ffffff' : '#f3f4f6',
-                                                         color: form.dashboardTheme === 'dark' ? '#f9fafb' : '#111827'
-                                                     }}>
-                                                    <div className="text-xs mb-2 opacity-75">Live Preview:</div>
-                                                    <div className="space-y-2">
-                                                        <div className="text-sm font-semibold">Sample Dashboard Element</div>
-                                                        <div className="text-xs opacity-75">This is how your selected theme will look</div>
-                                                        <div className="flex gap-2 mt-2">
-                                                            <div className="px-2 py-1 text-xs rounded" 
-                                                                 style={{
-                                                                     backgroundColor: form.dashboardTheme === 'dark' ? '#374151' : '#e5e7eb',
-                                                                     color: form.dashboardTheme === 'dark' ? '#f9fafb' : '#374151'
-                                                                 }}>
-                                                                Button
-                                                            </div>
-                                                            <div className="px-2 py-1 text-xs rounded bg-blue-500 text-white">
-                                                                Primary Action
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
+                                        {/* Dashboard Preferences */}
                                         <Section title="Dashboard Preferences">
                                             <div className="space-y-4">
-                                                {/* Dashboard Theme & Layout */}
                                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                    <Field label="Dashboard Theme">
-                                                        <select 
+                                                    <Field label="Theme">
+                                                        <select
                                                             value={form.dashboardTheme}
                                                             onChange={upd("dashboardTheme")}
                                                             className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
                                                         >
-                                                            <option value="light">Light Theme</option>
-                                                            <option value="dark">Dark Theme</option>
-                                                            <option value="blue">Blue Theme</option>
-                                                            <option value="green">Green Theme</option>
-                                                            <option value="purple">Purple Theme</option>
+                                                            <option value="light">Light</option>
+                                                            <option value="dark">Dark</option>
                                                         </select>
                                                     </Field>
-                                                    <Field label="Dashboard Layout">
-                                                        <select 
+                                                    <Field label="Layout">
+                                                        <select
                                                             value={form.dashboardLayout}
                                                             onChange={upd("dashboardLayout")}
                                                             className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
                                                         >
-                                                            <option value="default">Default Layout</option>
-                                                            <option value="compact">Compact Layout</option>
-                                                            <option value="expanded">Expanded Layout</option>
-                                                            <option value="minimalist">Minimalist Layout</option>
+                                                            <option value="default">Default</option>
+                                                            <option value="compact">Compact</option>
+                                                            <option value="expanded">Expanded</option>
+                                                            <option value="minimalist">Minimalist</option>
                                                         </select>
                                                     </Field>
                                                 </div>
 
-                                                {/* Widget Visibility Settings */}
                                                 <div className="border-t pt-4">
                                                     <h4 className="text-sm font-semibold text-gray-800 mb-3">Widget Visibility</h4>
                                                     <div className="space-y-3">
@@ -1071,10 +1255,7 @@ export default function ProfileSetting() {
                                                                     <p className="text-xs text-gray-500">Show projects overview and quick actions</p>
                                                                 </div>
                                                             </div>
-                                                            <Toggle
-                                                                checked={form.widgetPreferences.showProjects}
-                                                                onChange={updateWidgetPreference("showProjects")}
-                                                            />
+                                                            <Toggle checked={form.widgetPreferences.showProjects} onChange={updateWidgetPreference("showProjects")} />
                                                         </div>
                                                         <div className="flex items-center justify-between py-1">
                                                             <div className="flex items-center gap-2">
@@ -1084,10 +1265,7 @@ export default function ProfileSetting() {
                                                                     <p className="text-xs text-gray-500">Display task summary and assignment options</p>
                                                                 </div>
                                                             </div>
-                                                            <Toggle
-                                                                checked={form.widgetPreferences.showTasks}
-                                                                onChange={updateWidgetPreference("showTasks")}
-                                                            />
+                                                            <Toggle checked={form.widgetPreferences.showTasks} onChange={updateWidgetPreference("showTasks")} />
                                                         </div>
                                                         <div className="flex items-center justify-between py-1">
                                                             <div className="flex items-center gap-2">
@@ -1097,10 +1275,7 @@ export default function ProfileSetting() {
                                                                     <p className="text-xs text-gray-500">Show team overview and member management</p>
                                                                 </div>
                                                             </div>
-                                                            <Toggle
-                                                                checked={form.widgetPreferences.showTeam}
-                                                                onChange={updateWidgetPreference("showTeam")}
-                                                            />
+                                                            <Toggle checked={form.widgetPreferences.showTeam} onChange={updateWidgetPreference("showTeam")} />
                                                         </div>
                                                         <div className="flex items-center justify-between py-1">
                                                             <div className="flex items-center gap-2">
@@ -1110,10 +1285,7 @@ export default function ProfileSetting() {
                                                                     <p className="text-xs text-gray-500">Display recent activity and updates</p>
                                                                 </div>
                                                             </div>
-                                                            <Toggle
-                                                                checked={form.widgetPreferences.showRecentActivity}
-                                                                onChange={updateWidgetPreference("showRecentActivity")}
-                                                            />
+                                                            <Toggle checked={form.widgetPreferences.showRecentActivity} onChange={updateWidgetPreference("showRecentActivity")} />
                                                         </div>
                                                         <div className="flex items-center justify-between py-1">
                                                             <div className="flex items-center gap-2">
@@ -1123,80 +1295,76 @@ export default function ProfileSetting() {
                                                                     <p className="text-xs text-gray-500">Show quick action buttons for common tasks</p>
                                                                 </div>
                                                             </div>
-                                                            <Toggle
-                                                                checked={form.widgetPreferences.showQuickActions}
-                                                                onChange={updateWidgetPreference("showQuickActions")}
-                                                            />
+                                                            <Toggle checked={form.widgetPreferences.showQuickActions} onChange={updateWidgetPreference("showQuickActions")} />
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Refresh Rate */}
+                                                {/* Live Theme Preview */}
                                                 <div className="border-t pt-4">
-                                                    <Field label="Dashboard Refresh Rate">
-                                                        <select 
-                                                            value={form.dashboardRefreshRate}
-                                                            onChange={upd("dashboardRefreshRate")}
-                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                        >
-                                                            <option value="auto">Auto Refresh</option>
-                                                            <option value="30s">Every 30 seconds</option>
-                                                            <option value="1m">Every minute</option>
-                                                            <option value="5m">Every 5 minutes</option>
-                                                            <option value="15m">Every 15 minutes</option>
-                                                            <option value="manual">Manual only</option>
-                                                        </select>
-                                                    </Field>
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Live Theme Preview</h4>
+                                                    <div
+                                                        className="rounded-lg border border-gray-200 p-4"
+                                                        style={{
+                                                            backgroundColor: form.dashboardTheme === "dark" ? "#1f2937" : "#ffffff",
+                                                            color: form.dashboardTheme === "dark" ? "#f9fafb" : "#111827",
+                                                        }}
+                                                    >
+                                                        <div className="text-xs mb-2 opacity-75">Live Preview:</div>
+                                                        <div className="space-y-2">
+                                                            <div className="text-sm font-semibold">Sample Dashboard Element</div>
+                                                            <div className="text-xs opacity-75">This is how your selected theme will look</div>
+                                                            <div className="flex gap-2 mt-2">
+                                                                <div
+                                                                    className="px-2 py-1 text-xs rounded"
+                                                                    style={{
+                                                                        backgroundColor: form.dashboardTheme === "dark" ? "#374151" : "#e5e7eb",
+                                                                        color: form.dashboardTheme === "dark" ? "#f9fafb" : "#374151",
+                                                                    }}
+                                                                >
+                                                                    Button
+                                                                </div>
+                                                                <div className="px-2 py-1 text-xs rounded bg-blue-500 text-white">Primary Action</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
-                                                {/* Preview Card */}
+                                                {/* Optional: Small dashboard preview grid */}
                                                 <div className="border-t pt-4">
                                                     <h4 className="text-sm font-semibold text-gray-800 mb-3">Dashboard Preview</h4>
                                                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                                                         <div className="text-xs text-gray-600 mb-2">Preview of your customized dashboard:</div>
                                                         <div className="grid grid-cols-3 gap-2">
                                                             {form.widgetPreferences.showProjects && (
-                                                                <div className="h-16 rounded bg-green-100 border border-green-200 flex items-center justify-center text-xs text-green-700 font-semibold">
-                                                                    📁 Projects
-                                                                </div>
+                                                                <div className="h-16 rounded bg-green-100 border border-green-200 flex items-center justify-center text-xs text-green-700 font-semibold">📁 Projects</div>
                                                             )}
                                                             {form.widgetPreferences.showTasks && (
-                                                                <div className="h-16 rounded bg-blue-100 border border-blue-200 flex items-center justify-center text-xs text-blue-700 font-semibold">
-                                                                    ✅ Tasks
-                                                                </div>
+                                                                <div className="h-16 rounded bg-blue-100 border border-blue-200 flex items-center justify-center text-xs text-blue-700 font-semibold">✅ Tasks</div>
                                                             )}
                                                             {form.widgetPreferences.showTeam && (
-                                                                <div className="h-16 rounded bg-purple-100 border border-purple-200 flex items-center justify-center text-xs text-purple-700 font-semibold">
-                                                                    👥 Team
-                                                                </div>
+                                                                <div className="h-16 rounded bg-purple-100 border border-purple-200 flex items-center justify-center text-xs text-purple-700 font-semibold">👥 Team</div>
                                                             )}
                                                             {form.widgetPreferences.showRecentActivity && (
-                                                                <div className="h-16 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-700 font-semibold col-span-2">
-                                                                    📈 Recent Activity
-                                                                </div>
+                                                                <div className="h-16 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-700 font-semibold col-span-2">📈 Recent Activity</div>
                                                             )}
                                                             {form.widgetPreferences.showQuickActions && (
-                                                                <div className="h-16 rounded bg-yellow-100 border border-yellow-200 flex items-center justify-center text-xs text-yellow-700 font-semibold">
-                                                                    ⚡ Quick Actions
-                                                                </div>
+                                                                <div className="h-16 rounded bg-yellow-100 border border-yellow-200 flex items-center justify-center text-xs text-yellow-700 font-semibold">⚡ Quick Actions</div>
                                                             )}
                                                         </div>
                                                         {!Object.values(form.widgetPreferences).some(Boolean) && (
-                                                            <div className="text-center text-gray-400 text-xs py-4">
-                                                                No widgets selected - please enable at least one widget above
-                                                            </div>
+                                                            <div className="text-center text-gray-400 text-xs py-4">No widgets selected - please enable at least one widget above</div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
                                         </Section>
-                                        {/* Form actions */}
-                                        <div className="mt-4 flex justify-end">
-                                            <button type="submit" className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
-                                                Save Changes
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={savePreferences} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                                                Save Preferences
                                             </button>
                                         </div>
-                                    </form>
+                                    </div>
                                 )}
 
                                 {activeTab === "Integrations" && (
