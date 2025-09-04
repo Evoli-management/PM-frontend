@@ -1,303 +1,270 @@
-
-import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { FaUser, FaEnvelope, FaLock, FaRegEye, FaRegEyeSlash, FaInfoCircle } from "react-icons/fa";
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
 
 export default function Registration() {
-    const [form, setForm] = useState({
-        firstName: "",
-        lastName: "",
-        email: "",
-        password: "",
-        confirm: "",
-        agree: true,
-    });
-    const [showPwd, setShowPwd] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [errors, setErrors] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState("");
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    agreedToTerms: false,
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const navigate = useNavigate();
 
-    const onChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setForm((f) => ({ ...f, [name]: type === "checkbox" ? checked : value }));
-        setErrors({});
-        setSuccess("");
-    };
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+  };
 
-    // --- Password rules & strength (Weak / Moderate / Strong) ---
-    const pwdRules = useMemo(() => {
-        const p = form.password || "";
-        return {
-            length: p.length >= 6,
-            upper: /[A-Z]/.test(p),
-            lower: /[a-z]/.test(p),
-            digit: /\d/.test(p),
-        };
-    }, [form.password]);
+  const validateForm = () => {
+    const errors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.firstName.trim()) errors.firstName = "First name is required.";
+    if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
+    if (!formData.email.trim()) {
+      errors.email = "Email is required.";
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (!formData.password) {
+      errors.password = "Password is required.";
+    } else if (formData.password.length < 6) {
+      errors.password = "Password must be at least 6 characters.";
+    }
+    if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = "Passwords do not match.";
+    }
+    if (!formData.agreedToTerms) {
+      errors.agreedToTerms = "You must agree to the terms.";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-    const strength = useMemo(() => {
-        const passed = Object.values(pwdRules).filter(Boolean).length;
-        if (!form.password) return { label: "", pct: 0 };
-        if (passed <= 2) return { label: "Weak", pct: 33 };
-        if (passed === 3) return { label: "Moderate", pct: 66 };
-        return { label: "Strong", pct: 100 };
-    }, [pwdRules, form.password]);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (validateForm()) {
+      setIsSubmitted(true);
+      console.log("Form submitted:", formData);
+  // show success briefly then redirect to login
+  setTimeout(() => navigate('/login'), 700);
+    } else {
+      setIsSubmitted(false);
+    }
+  };
 
-    const validate = () => {
-        const e = {};
-        if (!form.firstName.trim()) e.firstName = "First name is required";
-        if (!form.lastName.trim()) e.lastName = "Last name is required";
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Invalid email address";
-        if (!form.password || form.password.length < 6) e.password = "Password must be at least 6 characters";
-        if (form.confirm !== form.password) e.confirm = "Passwords do not match";
-        if (!form.agree) e.agree = "Please accept Terms & Privacy Policy";
-        setErrors(e);
-        return Object.keys(e).length === 0;
-    };
+  // Password strength helper
+  const password = formData.password || "";
+  const getPasswordStrength = (pw) => {
+    if (!pw) return "";
+    let score = 0;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    if (pw.length >= 8) score++;
+    if (score >= 4) return "Strong";
+    if (score >= 3) return "Medium";
+    return "Weak";
+  };
+  const strength = getPasswordStrength(password);
 
-    const onSubmit = (e) => {
-        e.preventDefault();
-        setSuccess("");
-        if (!validate()) return;
-        setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
-            setSuccess("Registered successfully! Please check your email to verify your account.");
-        }, 1200);
-    };
-
-    return (
-        <div className="min-h-screen bg-white">
-            <div className="mx-auto max-w-6xl px-4 py-10">
-                <h1 className="text-center text-2xl font-extrabold tracking-wide text-gray-900">REGISTRATION</h1>
-                <div className="mt-8 grid gap-10 md:grid-cols-2">
-                    {/* LEFT: FORM */}
-                    <form
-                        onSubmit={onSubmit}
-                        className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"
-                        aria-label="Registration form"
-                    >
-                        {/* First Name */}
-                        <div>
-                            <div className="flex items-center gap-3 rounded-lg bg-slate-100/70 px-4">
-                                <FaUser className="text-gray-500" />
-                                <input
-                                    name="firstName"
-                                    placeholder="Enter first name"
-                                    value={form.firstName}
-                                    onChange={onChange}
-                                    autoComplete="off"
-                                    className="h-12 w-full bg-transparent outline-none placeholder:text-gray-500"
-                                    aria-label="First name"
-                                />
-                            </div>
-                            {errors.firstName && <p className="mt-1 text-sm text-red-600" role="alert">{errors.firstName}</p>}
-                        </div>
-                        {/* Last Name */}
-                        <div>
-                            <div className="flex items-center gap-3 rounded-lg bg-slate-100/70 px-4">
-                                <FaUser className="text-gray-500" />
-                                <input
-                                    name="lastName"
-                                    placeholder="Enter last name"
-                                    value={form.lastName}
-                                    onChange={onChange}
-                                    autoComplete="off"
-                                    className="h-12 w-full bg-transparent outline-none placeholder:text-gray-500"
-                                    aria-label="Last name"
-                                />
-                            </div>
-                            {errors.lastName && <p className="mt-1 text-sm text-red-600" role="alert">{errors.lastName}</p>}
-                        </div>
-                        {/* Email */}
-                        <div>
-                            <div className="flex items-center gap-3 rounded-lg bg-slate-100/70 px-4">
-                                <FaEnvelope className="text-gray-500" />
-                                <input
-                                    type="email"
-                                    name="email"
-                                    placeholder="Enter your email"
-                                    value={form.email}
-                                    onChange={onChange}
-                                    autoComplete="off"
-                                    className="h-12 w-full bg-transparent outline-none placeholder:text-gray-500"
-                                    aria-label="Email"
-                                />
-                            </div>
-                            {errors.email && <p className="mt-1 text-sm text-red-600" role="alert">{errors.email}</p>}
-                        </div>
-                        {/* Password */}
-                        <div>
-                            <div className="flex items-center gap-3 rounded-lg bg-slate-100/70 px-4">
-                                <FaLock className="text-gray-500" />
-                                <input
-                                    type={showPwd ? "text" : "password"}
-                                    name="password"
-                                    placeholder="Enter password"
-                                    value={form.password}
-                                    onChange={onChange}
-                                    autoComplete="off"
-                                    className="h-12 w-full bg-transparent outline-none placeholder:text-gray-500"
-                                    aria-label="Password"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPwd((s) => !s)}
-                                    className="p-2"
-                                    aria-label={showPwd ? "Hide password" : "Show password"}
-                                >
-                                    {showPwd ? <FaRegEyeSlash /> : <FaRegEye />}
-                                </button>
-                                <span className="text-gray-400 ml-2" title="Password must be at least 6 characters">
-                                    <FaInfoCircle />
-                                </span>
-                            </div>
-                            {/* Strength meter */}
-                            {form.password && (
-                                <div className="mt-2">
-                                    <div className="h-2 w-full rounded bg-gray-200">
-                                        <div
-                                            className={`h-2 rounded ${strength.pct < 50 ? "bg-red-500" : strength.pct < 100 ? "bg-yellow-500" : "bg-green-500"}`}
-                                            style={{ width: `${strength.pct}%` }}
-                                        />
-                                    </div>
-                                    <div className="mt-1 text-sm text-gray-600">
-                                        Strength: <span className="font-medium">{strength.label}</span>
-                                    </div>
-                                    <ul className="mt-1 space-y-1 text-xs text-gray-600">
-                                        <li className={pwdRules.length ? "text-green-600" : ""}>
-                                            • At least 6 characters
-                                        </li>
-                                        <li className={pwdRules.upper ? "text-green-600" : ""}>
-                                            • Contains uppercase letter
-                                        </li>
-                                        <li className={pwdRules.lower ? "text-green-600" : ""}>
-                                            • Contains lowercase letter
-                                        </li>
-                                        <li className={pwdRules.digit ? "text-green-600" : ""}>• Contains a number</li>
-                                    </ul>
-                                </div>
-                            )}
-                            {errors.password && <p className="mt-1 text-sm text-red-600" role="alert">{errors.password}</p>}
-                        </div>
-                        {/* Confirm password */}
-                        <div>
-                            <div className="flex items-center gap-3 rounded-lg bg-slate-100/70 px-4">
-                                <FaLock className="text-gray-500" />
-                                <input
-                                    type={showConfirm ? "text" : "password"}
-                                    name="confirm"
-                                    placeholder="Confirm password"
-                                    value={form.confirm}
-                                    onChange={onChange}
-                                    autoComplete="off"
-                                    className="h-12 w-full bg-transparent outline-none placeholder:text-gray-500"
-                                    aria-label="Confirm password"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirm((s) => !s)}
-                                    className="p-2"
-                                    aria-label={showConfirm ? "Hide password" : "Show password"}
-                                >
-                                    {showConfirm ? <FaRegEyeSlash /> : <FaRegEye />}
-                                </button>
-                            </div>
-                            {errors.confirm && <p className="mt-1 text-sm text-red-600" role="alert">{errors.confirm}</p>}
-                        </div>
-                        {/* Terms checkbox */}
-                        <div className="flex items-start gap-2">
-                            <input
-                                id="agree"
-                                type="checkbox"
-                                name="agree"
-                                checked={form.agree}
-                                onChange={onChange}
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
-                                aria-label="Agree to terms"
-                            />
-                            <label htmlFor="agree" className="text-sm text-gray-700">
-                                I agree to the{" "}
-                                <a className="text-blue-600 underline" href="#">
-                                    Terms of Service
-                                </a>{" "}
-                                and{" "}
-                                <a className="text-blue-600 underline" href="#">
-                                    privacy policy
-                                </a>
-                            </label>
-                        </div>
-                        {errors.agree && <p className="mt-1 text-sm text-red-600" role="alert">{errors.agree}</p>}
-                        {success && <div className="w-full text-green-600 text-sm font-semibold text-center mt-2" role="status">{success}</div>}
-                        <div className="space-y-3 pt-2">
-                            <button
-                                type="submit"
-                                className={`h-12 w-full rounded-lg bg-green-500 font-semibold text-white transition hover:bg-green-600 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                disabled={loading}
-                                aria-busy={loading}
-                            >
-                                {loading ? "Registering..." : "Register"}
-                            </button>
-                            <button
-                                type="button"
-                                className="h-12 w-full rounded-lg bg-blue-600 font-semibold text-white transition hover:bg-blue-700"
-                                aria-label="Sign up for free"
-                            >
-                                SIGN UP FOR FREE
-                            </button>
-                        </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <button
-                                type="button"
-                                className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white font-medium hover:bg-gray-50"
-                                aria-label="Continue with Google"
-                                disabled={loading}
-                            >
-                                <img src="/PM-frontend/google.svg" alt="Google" loading="lazy" className="w-5 h-5" /> Continue with
-                                Google
-                            </button>
-                            <button
-                                type="button"
-                                className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white font-medium hover:bg-gray-50"
-                                aria-label="Continue with Microsoft"
-                                disabled={loading}
-                            >
-                                <img src="/PM-frontend/microsoft.svg" alt="Microsoft" loading="lazy" className="w-5 h-5" /> Continue
-                                with Microsoft
-                            </button>
-                        </div>
-                        <p className="text-sm text-center mt-4 text-black font-semibold">
-                            Already have an account?{" "}
-                            <Link to="/login" className="text-blue-600 hover:text-blue-800 underline">
-                                Sign in here
-                            </Link>
-                        </p>
-                    </form>
-                    <div className="flex flex-col items-center justify-center">
-                        <div className="relative w-full max-w-md">
-                            <img
-                                src="/PM-frontend/image.png"
-                                alt="2FA Illustration"
-                                loading="lazy"
-                                className="w-full h-auto rounded-2xl"
-                                style={{ maxWidth: "400px", height: "auto" }}
-                            />
-                        </div>
-                        <div className="mt-6 max-w-md text-sm leading-6 text-gray-700">
-                            <p className="mb-2">
-                                Welcome! Simplify your workflow and accomplish more with{" "}
-                                <span className="font-semibold">Practical Manager</span>. Your data is safe with us.
-                            </p>
-                            <p className="text-center font-semibold">
-                                This account is protected with <br />
-                                Two factor authentication 2FA
-                            </p>
-                        </div>
-                    </div>
-                </div>
+  return (
+    <div className="min-h-screen flex flex-col font-sans p-4 bg-gray-50">
+    <div className="flex flex-1 items-center justify-center">
+    <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
+      <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
+          {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
+          <div className="flex w-full md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
+            <div className="w-full overflow-hidden px-4 sm:px-6">
+              <img src={`${import.meta.env.BASE_URL}register.png`} alt="Illustration" className="w-full h-40 sm:h-56 md:h-64 object-cover mx-auto" />
             </div>
+            <div className="px-3 pt-2 pb-3 text-center w-full">
+              <p className="mt-1 mb-0 text-base leading-5 text-gray-700"><span className="font-semibold">Simplify your workflow and accomplish more with Practical Manager.</span> <span>Your data is safe with us.</span></p>
+            </div>
+          </div>
+
+          {/* Right Form Section */}
+          <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center bg-white">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">Sign Up</h2>
+            {isSubmitted ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center bg-green-50 rounded-lg shadow-inner">
+                <CheckCircle2 size={48} className="text-green-500 mb-4" />
+                <h3 className="text-2xl font-bold text-green-700">Registration Successful!</h3>
+                <p className="mt-2 text-gray-600">Your account has been created. You can now sign in.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="relative">
+                    <span className="sr-only">First name</span>
+                    <div className="absolute left-3 top-3 text-slate-400"><User size={16} /></div>
+                    <input
+                      id="firstName"
+                      type="text"
+                      name="firstName"
+                      placeholder="First name"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                        formErrors.firstName ? "border-red-500" : "border-gray-200"
+                      }`}
+                    />
+                    {formErrors.firstName && <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>}
+                  </label>
+
+                  <label className="relative">
+                    <span className="sr-only">Last name</span>
+                    <div className="absolute left-3 top-3 text-slate-400"><User size={16} /></div>
+                    <input
+                      id="lastName"
+                      type="text"
+                      name="lastName"
+                      placeholder="Last name"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                        formErrors.lastName ? "border-red-500" : "border-gray-200"
+                      }`}
+                    />
+                    {formErrors.lastName && <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>}
+                  </label>
+                </div>
+
+                <label className="relative block">
+                  <div className="absolute left-3 top-3 text-slate-400"><Mail size={16} /></div>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                      formErrors.email ? "border-red-500" : "border-gray-200"
+                    }`}
+                  />
+                  {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="relative mb-0">
+                    <div className="absolute left-3 top-3 text-slate-400"><Lock size={16} /></div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      placeholder="Enter password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      autoComplete="new-password"
+                      className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                        formErrors.password ? "border-red-500" : "border-gray-200"
+                      }`}
+                    />
+                    <button type="button" onClick={() => setShowPassword((s) => !s)} className="absolute right-3 top-3 text-slate-500">
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    {formErrors.password && <p className="text-red-500 text-sm mt-1">{formErrors.password}</p>}
+                  </label>
+
+                  <label className="relative">
+                    <div className="absolute left-3 top-3 text-slate-400"><Lock size={16} /></div>
+                    <input
+                      type={showConfirm ? 'text' : 'password'}
+                      name="confirmPassword"
+                      placeholder="Confirm password"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                        formErrors.confirmPassword ? "border-red-500" : "border-gray-200"
+                      }`}
+                    />
+                    <button type="button" onClick={() => setShowConfirm((s) => !s)} className="absolute right-3 top-3 text-slate-500">
+                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    {formErrors.confirmPassword && <p className="text-red-500 text-sm mt-1">{formErrors.confirmPassword}</p>}
+                  </label>
+                </div>
+
+                {password && (
+                  <div className="mb-4">
+                    <p
+                      className={`text-sm font-semibold ${
+                        strength === "Strong" ? "text-green-400" : "text-yellow-400"
+                      }`}
+                    >
+                      Password Strength: {strength}
+                    </p>
+                    {strength === "Weak" && (
+                      <div className="text-xs text-gray-400 mt-1 space-y-1">
+                        <p className={/[A-Z]/.test(password) ? "text-green-400" : ""}>
+                          • At least one uppercase letter
+                        </p>
+                        <p className={/[0-9]/.test(password) ? "text-green-400" : ""}>
+                          • At least one number
+                        </p>
+                        <p className={/[^A-Za-z0-9]/.test(password) ? "text-green-400" : ""}>
+                          • At least one special character
+                        </p>
+                        <p className={password.length >= 6 ? "text-green-400" : ""}>
+                          • Minimum 6 characters
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    name="agreedToTerms"
+                    checked={formData.agreedToTerms}
+                    onChange={handleInputChange}
+                    className="cursor-pointer mt-1 rounded-sm text-green-600 focus:ring-green-500"
+                  />
+                  <label htmlFor="terms" className="text-gray-600 leading-tight">
+                    I agree to the <a href="#" className="text-blue-600 underline">Terms of Service</a> and <a href="#" className="text-blue-600 underline">privacy policy</a>
+                  </label>
+                </div>
+                {formErrors.agreedToTerms && <p className="text-red-500 text-sm mt-1">{formErrors.agreedToTerms}</p>}
+
+                <button
+                  type="submit"
+                  className="w-full bg-green-500 hover:bg-green-600 text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                >
+                  Register
+                </button>
+
+                <button type="button" onClick={() => setFormData((f)=>({ ...f}))} className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center">
+                  SIGN UP FOR FREE
+                </button>
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button aria-label="Continue with Google" className="w-full inline-flex items-center justify-center gap-3 border rounded h-10 sm:h-12 bg-gray-100 hover:bg-gray-200">
+                    <img src={`${import.meta.env.BASE_URL}google.svg`} alt="Google" width={20} height={20} loading="eager" className="object-contain" onError={(e)=>{e.currentTarget.style.display='none'}} />
+                    <span className="text-sm">Continue with Google</span>
+                  </button>
+                  <button aria-label="Continue with Microsoft" className="w-full inline-flex items-center justify-center gap-3 border rounded h-10 sm:h-12 bg-gray-100 hover:bg-gray-200">
+                    <img src={`${import.meta.env.BASE_URL}microsoft.svg`} alt="Microsoft" width={20} height={20} loading="eager" className="object-contain" onError={(e)=>{e.currentTarget.style.display='none'}} />
+                    <span className="text-sm">Continue with Microsoft</span>
+                  </button>
+                </div>
+
+                <div className="text-center mt-4">
+                  <div className="flex items-center justify-center">
+                    <Link to="/login" className="text-blue-600 hover:text-blue-800 underline transition-colors">Already have an account? <span className="font-semibold">Sign in here</span></Link>
+                  </div>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
-    );
+      </div>
+    </div>
+  );
 }
