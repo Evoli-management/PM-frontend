@@ -3,12 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
     FaHome,
     FaCalendarAlt,
-    FaBullseye,
-    FaKey,
     FaLock,
-    FaHeart,
-    FaLightbulb,
-    FaUsers,
     FaChevronDown,
     FaCog,
     FaSignOutAlt,
@@ -22,30 +17,66 @@ const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
     // Tasks & Activities removed per request
     { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
-    { label: "Goals & Tracking", icon: <FaBullseye />, to: "/goals", section: "Main", badge: 2 },
+    // Quick access for tasks not tied to Key Areas ("Activity Trap")
+    {
+        label: "Don't Forget",
+        icon: (
+            <img
+                src={`${import.meta.env.BASE_URL}dont-forget.png`}
+                alt="Don't forget"
+                className="w-6 h-6 object-contain"
+            />
+        ),
+        to: { pathname: "/tasks", search: "?dontforget=1" },
+        section: "Main",
+    },
+    {
+        label: "Goals & Tracking",
+        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
+        to: "/goals",
+        section: "Main",
+        badge: 2,
+    },
     {
         label: "Key Areas",
-        icon: <FaKey />,
+        icon: (
+            <img src={`${import.meta.env.BASE_URL}key-area.png`} alt="Key Areas" className="w-6 h-6 object-contain" />
+        ),
         to: "/key-areas",
         section: "Main",
         children: [
             {
                 label: "Ideas",
-                icon: <FaLightbulb />,
+                icon: (
+                    <img src={`${import.meta.env.BASE_URL}ideas.png`} alt="Ideas" className="w-6 h-6 object-contain" />
+                ),
                 to: { pathname: "/key-areas", search: "?select=ideas" },
             },
         ],
     },
     { label: "Time Tracking", icon: <FaClock />, to: "/time-tracking", section: "Main" },
-    { label: "Team", icon: <FaUsers />, to: "/teams", section: "Main" },
+    {
+        label: "Team",
+        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
+        to: "/teams",
+        section: "Main",
+    },
     { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
     { label: "Settings", icon: <FaCog />, to: "/settings", section: "Main" },
 ];
 
 const quickActions = [
     { label: "New Task", icon: <FaPlus />, to: "/tasks" },
-    { label: "Set Goal", icon: <FaBullseye />, to: "/goals" },
-    { label: "Invite Team", icon: <FaUsers />, to: "/teams" },
+    {
+        label: "Set Goal",
+        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
+        to: "/goals",
+    },
+    {
+        label: "Invite Team",
+        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
+        to: "/teams",
+    },
 ];
 
 export default function Sidebar({
@@ -67,6 +98,19 @@ export default function Sidebar({
     // no navigation for Key Areas toggle; we only open/close
 
     const navigate = useNavigate();
+
+    // Prime from cached key areas so dropdown isn't empty before events arrive
+    React.useEffect(() => {
+        try {
+            const raw = localStorage.getItem("pm:keyareas");
+            const cached = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(cached) && cached.length) {
+                setKeyAreasList(cached);
+            }
+        } catch (e) {}
+    }, []);
+
+    // No backend dependency here; cache + page event provide the data
 
     const handleKeyAreasClick = (e, item) => {
         e.preventDefault();
@@ -160,7 +204,7 @@ export default function Sidebar({
         >
             <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
                 <div className="mb-6 flex items-center gap-2 px-2">
-                    <img src="/PM-frontend/logo.png" alt="Logo" className="w-8 h-8" />
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
                     {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
 
                     {/* mobile close button */}
@@ -258,76 +302,56 @@ export default function Sidebar({
                                                 {!collapsed && keyAreasOpen && (
                                                     <div className="ml-6 mt-2 space-y-1">
                                                         {/* dynamically render key areas received from KeyAreas page */}
-                                                        {keyAreasList && keyAreasList.length > 0
-                                                            ? keyAreasList.map((ka) => {
-                                                                  const isActive =
-                                                                      location.pathname.startsWith("/key-areas") &&
-                                                                      new URLSearchParams(location.search).get("ka") ===
-                                                                          String(ka.id);
-                                                                  const itemClasses = isActive
-                                                                      ? "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-blue-700 font-semibold bg-white shadow-inner text-left w-full"
-                                                                      : "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-gray-800 hover:bg-white text-left w-full";
-                                                                  return (
-                                                                      <Link
-                                                                          key={ka.id}
-                                                                          to={{
-                                                                              pathname: "/key-areas",
-                                                                              search: `?ka=${ka.id}`,
-                                                                          }}
-                                                                          onClick={(e) => {
-                                                                              // keep dropdown open; just dispatch event
-                                                                              try {
-                                                                                  window.dispatchEvent(
-                                                                                      new CustomEvent(
-                                                                                          "sidebar-open-ka",
-                                                                                          {
-                                                                                              detail: { id: ka.id },
-                                                                                          },
-                                                                                      ),
-                                                                                  );
-                                                                              } catch (err) {}
-                                                                          }}
-                                                                          className={itemClasses}
-                                                                      >
-                                                                          <span className="text-sm flex items-center gap-2">
-                                                                              {ka.title}
-                                                                              {(ka.is_default ||
-                                                                                  ka.position === 10) && (
-                                                                                  <span className="text-xs text-slate-500 ml-2 inline-flex items-center">
-                                                                                      <FaLock />
-                                                                                  </span>
-                                                                              )}
-                                                                          </span>
-                                                                      </Link>
-                                                                  );
-                                                              })
-                                                            : item.children &&
-                                                              item.children.map((child) => (
-                                                                  <Link
-                                                                      key={child.label}
-                                                                      to={child.to}
-                                                                      className={`flex items-center gap-2 px-3 py-2 rounded mb-2 transition ${
-                                                                          location.pathname ===
-                                                                              (child.to && child.to.pathname
-                                                                                  ? child.to.pathname
-                                                                                  : child.to) &&
-                                                                          new URLSearchParams(location.search).get(
-                                                                              "select",
-                                                                          ) === "ideas"
-                                                                              ? "bg-white text-blue-700 font-semibold shadow-inner"
-                                                                              : "text-gray-800 hover:bg-white"
-                                                                      }`}
-                                                                      tabIndex={0}
-                                                                      aria-label={child.label}
-                                                                  >
-                                                                      <span className="text-lg" title={child.label}>
-                                                                          {child.icon}
-                                                                      </span>
-                                                                      <span>{child.label}</span>
-                                                                  </Link>
-                                                              ))}
-
-                                                        {/* Bright Idea link removed per request */}
+                                                        {keyAreasList &&
+                                                            keyAreasList.length > 0 &&
+                                                            keyAreasList.map((ka) => {
+                                                                const isActive =
+                                                                    location.pathname.startsWith("/key-areas") &&
+                                                                    new URLSearchParams(location.search).get("ka") ===
+                                                                        String(ka.id);
+                                                                const itemClasses = isActive
+                                                                    ? "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-blue-700 font-semibold bg-white shadow-inner text-left w-full"
+                                                                    : "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-gray-800 hover:bg-white text-left w-full";
+                                                                const isLocked = ka.is_default || ka.position === 10;
+                                                                const isIdeas = /idea/i.test(ka.title || "");
+                                                                return (
+                                                                    <Link
+                                                                        key={ka.id}
+                                                                        to={{
+                                                                            pathname: "/key-areas",
+                                                                            search: `?ka=${ka.id}`,
+                                                                        }}
+                                                                        onClick={(e) => {
+                                                                            // keep dropdown open; just dispatch event
+                                                                            try {
+                                                                                window.dispatchEvent(
+                                                                                    new CustomEvent("sidebar-open-ka", {
+                                                                                        detail: { id: ka.id },
+                                                                                    }),
+                                                                                );
+                                                                            } catch (err) {}
+                                                                        }}
+                                                                        className={itemClasses}
+                                                                    >
+                                                                        <span className="text-sm flex items-center gap-2">
+                                                                            {ka.title}
+                                                                            {isLocked && (
+                                                                                <span className="ml-2 inline-flex items-center">
+                                                                                    {isIdeas ? (
+                                                                                        <img
+                                                                                            src={`${import.meta.env.BASE_URL}ideas.png`}
+                                                                                            alt="Ideas"
+                                                                                            className="w-4 h-4 object-contain"
+                                                                                        />
+                                                                                    ) : (
+                                                                                        <FaLock className="text-slate-500 text-xs" />
+                                                                                    )}
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                    </Link>
+                                                                );
+                                                            })}
                                                     </div>
                                                 )}
                                             </div>

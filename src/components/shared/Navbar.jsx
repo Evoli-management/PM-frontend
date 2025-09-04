@@ -33,14 +33,22 @@ export default function Navbar() {
                         </svg>
                     </button>
                     {open && (
-                        <div className="absolute right-0 mt-2 w-44 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                        <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
                             <Link
                                 to="/profile"
                                 className="block px-3 py-2 text-sm hover:bg-slate-50"
                                 onClick={() => setOpen(false)}
                             >
-                                Profile & Settings
+                                👤 Profile & Settings
                             </Link>
+                            <Link
+                                to="/admin-settings"
+                                className="block px-3 py-2 text-sm hover:bg-slate-50"
+                                onClick={() => setOpen(false)}
+                            >
+                                ⚙️ Admin Settings
+                            </Link>
+                            <div className="border-t border-gray-200 my-1"></div>
                             <button
                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                 onClick={() => {
