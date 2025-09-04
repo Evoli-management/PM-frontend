@@ -116,6 +116,38 @@ export default function ProfileSetting() {
         URL.revokeObjectURL(url);
     };
 
+    // Copy backup codes to the clipboard (fallback if Clipboard API unavailable)
+    const copyBackupCodes = async () => {
+        if (!backupCodes || backupCodes.length === 0) return;
+        const text = backupCodes.join("\n");
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (_) {
+            // fall through to legacy path
+        }
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+        } finally {
+            document.body.removeChild(ta);
+        }
+        return true;
+    };
+
+    // Hide backup codes from the UI after user is done (security hygiene)
+    const doneWithBackupCodes = () => {
+        setBackupCodes([]);
+    };
+
     // Integration / Synchronization state (persisted locally for demo)
     const [integrations, setIntegrations] = useState(() => {
         try {
@@ -381,11 +413,11 @@ export default function ProfileSetting() {
     // Verify a code entered to disable 2FA. In test mode this will accept any code.
     // IMPORTANT: do not enable ALLOW_ANY_CODE_FOR_TEST in production.
     const verifyDisableCode = () => {
-        const code = twoFADisableCode.replace(/\D/g, "");
+        const code = twoFADisableCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
         if (code.length !== 6) return false;
         if (ALLOW_ANY_CODE_FOR_TEST) return true;
         // Accept if matches last 6 of secret in non-test mode
-        if (twoFASecret && code === twoFASecret.slice(-6)) return true;
+        if (twoFASecret && code === twoFASecret.slice(-6).toUpperCase()) return true;
         return false;
     };
 
@@ -1692,8 +1724,8 @@ export default function ProfileSetting() {
                                                                         <input
                                                                             key={i}
                                                                             type="text"
-                                                                            inputMode="numeric"
-                                                                            pattern="\\d*"
+                                                                            inputMode="text"
+                                                                            pattern="[A-Za-z0-9]*"
                                                                             maxLength={1}
                                                                             className="h-10 w-10 text-center rounded border text-sm"
                                                                             style={{ fontSize: 16 }}
@@ -1701,8 +1733,12 @@ export default function ProfileSetting() {
                                                                             autoComplete="one-time-code"
                                                                             value={codeDigits[i]}
                                                                             ref={(el) => (twoFAInputsRef.current[i] = el)}
+                                                                            onFocus={(e) => {
+                                                                                // Select to make overwriting easy when clicking/tapping
+                                                                                e.target.select?.();
+                                                                            }}
                                                                             onPaste={(e) => {
-                                                                                const text = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                                                                                const text = (e.clipboardData?.getData('text') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
                                                                                 if (text.length) {
                                                                                     e.preventDefault();
                                                                                     const next = Array(6).fill('');
@@ -1713,7 +1749,7 @@ export default function ProfileSetting() {
                                                                                 }
                                                                             }}
                                                                             onChange={(e) => {
-                                                                                const v = e.target.value.replace(/\D/g, '').slice(0, 1);
+                                                                                const v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 1);
                                                                                 setCodeDigits((prev) => {
                                                                                     const next = [...prev];
                                                                                     next[i] = v;
@@ -1721,13 +1757,43 @@ export default function ProfileSetting() {
                                                                                     setTwoFACodeInput(joined);
                                                                                     return next;
                                                                                 });
-                                                                                if (e.target.value && i < 5) {
+                                                                                if (v && i < 5) {
                                                                                     focusNoScroll(twoFAInputsRef.current[i + 1]);
                                                                                 }
                                                                             }}
                                                                             onKeyDown={(e) => {
-                                                                                if (e.key === 'Backspace' && !codeDigits[i] && i > 0) {
+                                                                                // Handle alphanumeric keys directly (supports numpad digits too)
+                                                                                const isAlnumKey = (e.key?.length === 1 && /[0-9a-zA-Z]/.test(e.key)) || (e.code && /^Numpad[0-9]$/.test(e.code));
+                                                                                if (isAlnumKey) {
+                                                                                    e.preventDefault();
+                                                                                    const ch = e.key?.length === 1 && /[0-9a-zA-Z]/.test(e.key)
+                                                                                        ? e.key
+                                                                                        : (e.code?.replace(/\D/g, '') || '').slice(-1);
+                                                                                    setCodeDigits((prev) => {
+                                                                                        const next = [...prev];
+                                                                                        next[i] = (ch || '').toUpperCase();
+                                                                                        setTwoFACodeInput(next.join(''));
+                                                                                        return next;
+                                                                                    });
+                                                                                    if (i < 5) focusNoScroll(twoFAInputsRef.current[i + 1]);
+                                                                                    return;
+                                                                                }
+                                                                                if (e.key === 'Backspace') {
+                                                                                    if (!codeDigits[i] && i > 0) {
+                                                                                        e.preventDefault();
+                                                                                        focusNoScroll(twoFAInputsRef.current[i - 1]);
+                                                                                    }
+                                                                                    return; // allow normal deletion if value exists
+                                                                                }
+                                                                                if (e.key === 'ArrowLeft' && i > 0) {
+                                                                                    e.preventDefault();
                                                                                     focusNoScroll(twoFAInputsRef.current[i - 1]);
+                                                                                } else if (e.key === 'ArrowRight' && i < 5) {
+                                                                                    e.preventDefault();
+                                                                                    focusNoScroll(twoFAInputsRef.current[i + 1]);
+                                                                                } else if (e.key && e.key.length === 1 && /[^0-9a-zA-Z]/.test(e.key)) {
+                                                                                    // Block non-digit printable characters
+                                                                                    e.preventDefault();
                                                                                 }
                                                                             }}
                                                                         />
@@ -1760,8 +1826,8 @@ export default function ProfileSetting() {
                                                                         <input
                                                                         key={i}
                                                                         type="text"
-                                                                        inputMode="numeric"
-                                                                        pattern="\\d*"
+                                                                        inputMode="text"
+                                                                        pattern="[A-Za-z0-9]*"
                                                                         maxLength={1}
                                                                             className={`h-10 w-10 text-center rounded border text-sm ${twoFADisableError ? 'border-red-500 bg-red-100' : 'border-red-300 bg-white'}`}
                                                                             style={{ fontSize: 16 }}
@@ -1769,8 +1835,11 @@ export default function ProfileSetting() {
                                                                         autoComplete="one-time-code"
                                                                         value={twoFADisableDigits[i]}
                                                                         ref={(el) => (twoFADisableInputsRef.current[i] = el)}
+                                                                        onFocus={(e) => {
+                                                                            e.target.select?.();
+                                                                        }}
                                                                         onPaste={(e) => {
-                                                                            const text = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                                                                            const text = (e.clipboardData?.getData('text') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
                                                                             if (text.length) {
                                                                                 e.preventDefault();
                                                                                 const next = Array(6).fill('');
@@ -1783,7 +1852,7 @@ export default function ProfileSetting() {
                                                                             }
                                                                         }}
                                                                         onChange={(e) => {
-                                                                            const v = e.target.value.replace(/\D/g, '').slice(0, 1);
+                                                                            const v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 1);
                                                                             setTwoFADisableDigits((prev) => {
                                                                                 const next = [...prev];
                                                                                 next[i] = v;
@@ -1791,14 +1860,43 @@ export default function ProfileSetting() {
                                                                                 setTwoFADisableCode(joined);
                                                                                 return next;
                                                                             });
-                                                                            if (e.target.value && i < 5) {
+                                                                            if (v && i < 5) {
                                                                                 focusNoScroll(twoFADisableInputsRef.current[i + 1]);
                                                                             }
                                                                             if (twoFADisableError) setTwoFADisableError(null);
                                                                         }}
                                                                         onKeyDown={(e) => {
-                                                                            if (e.key === 'Backspace' && !twoFADisableDigits[i] && i > 0) {
+                                                                            const isAlnumKey = (e.key?.length === 1 && /[0-9a-zA-Z]/.test(e.key)) || (e.code && /^Numpad[0-9]$/.test(e.code));
+                                                                            if (isAlnumKey) {
+                                                                                e.preventDefault();
+                                                                                const ch = e.key?.length === 1 && /[0-9a-zA-Z]/.test(e.key)
+                                                                                    ? e.key
+                                                                                    : (e.code?.replace(/\D/g, '') || '').slice(-1);
+                                                                                setTwoFADisableDigits((prev) => {
+                                                                                    const next = [...prev];
+                                                                                    next[i] = (ch || '').toUpperCase();
+                                                                                    setTwoFADisableCode(next.join(''));
+                                                                                    return next;
+                                                                                });
+                                                                                if (i < 5) focusNoScroll(twoFADisableInputsRef.current[i + 1]);
+                                                                                if (twoFADisableError) setTwoFADisableError(null);
+                                                                                return;
+                                                                            }
+                                                                            if (e.key === 'Backspace') {
+                                                                                if (!twoFADisableDigits[i] && i > 0) {
+                                                                                    e.preventDefault();
+                                                                                    focusNoScroll(twoFADisableInputsRef.current[i - 1]);
+                                                                                }
+                                                                                return;
+                                                                            }
+                                                                            if (e.key === 'ArrowLeft' && i > 0) {
+                                                                                e.preventDefault();
                                                                                 focusNoScroll(twoFADisableInputsRef.current[i - 1]);
+                                                                            } else if (e.key === 'ArrowRight' && i < 5) {
+                                                                                e.preventDefault();
+                                                                                focusNoScroll(twoFADisableInputsRef.current[i + 1]);
+                                                                            } else if (e.key && e.key.length === 1 && /[^0-9a-zA-Z]/.test(e.key)) {
+                                                                                e.preventDefault();
                                                                             }
                                                                         }}
                                                                     />
@@ -1819,8 +1917,8 @@ export default function ProfileSetting() {
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    disabled={twoFADisableCode.replace(/\D/g, '').length !== 6}
-                                                                    className={`px-3 py-1.5 text-sm rounded text-white ${twoFADisableCode.replace(/\D/g, '').length === 6 ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                                                                    disabled={twoFADisableCode.replace(/[^A-Za-z0-9]/g, '').length !== 6}
+                                                                    className={`px-3 py-1.5 text-sm rounded text-white ${twoFADisableCode.replace(/[^A-Za-z0-9]/g, '').length === 6 ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-400 cursor-not-allowed'}`}
                                                                     onClick={() => {
                                                                         const ok = verifyDisableCode();
                                                                         if (!ok) {
@@ -1860,12 +1958,18 @@ export default function ProfileSetting() {
                                                                 </li>
                                                             ))}
                                                         </ul>
-                                                        <div className="mt-3 flex gap-2">
+                                                        <div className="mt-3 flex flex-wrap gap-2">
                                                             <button type="button" className="px-3 py-1.5 text-xs rounded bg-gray-200 hover:bg-gray-300" onClick={downloadBackupCodes}>
                                                                 Download Codes
                                                             </button>
+                                                            <button type="button" className="px-3 py-1.5 text-xs rounded bg-gray-200 hover:bg-gray-300" onClick={copyBackupCodes}>
+                                                                Copy Codes
+                                                            </button>
                                                             <button type="button" className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700" onClick={generateBackupCodes}>
                                                                 Regenerate Codes
+                                                            </button>
+                                                            <button type="button" className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700" onClick={doneWithBackupCodes}>
+                                                                Done
                                                             </button>
                                                         </div>
                                                     </div>
