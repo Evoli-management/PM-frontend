@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Polished, original SVG illustration for hero (free to use).
+  Designed to be modern, minimal, and thematic for team/productivity.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="800" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#0B1220" flood-opacity="0.12" />
+    </filter>
+    <clipPath id="roundedCard">
+      <rect x="0" y="0" width="880" height="560" rx="28" />
+    </clipPath>
+  </defs>
+
+  <!-- background -->
+  <rect width="100%" height="100%" fill="#FFFFFF" />
+
+  <!-- framed card for the attached image -->
+  <g transform="translate(160,120)" filter="url(#softShadow)">
+    <!-- white frame -->
+    <rect x="-12" y="-12" width="904" height="584" rx="34" fill="#FFFFFF" />
+    <!-- subtle border -->
+    <rect x="-12" y="-12" width="904" height="584" rx="34" fill="none" stroke="#E6E9EE" stroke-width="1" />
+
+    <!-- place attached raster image here: save attachment to public/hero-attachment.png -->
+    <!-- the image is clipped to rounded corners and gets a gentle contrast/brightness filter to appear very clear -->
+    <g clip-path="url(#roundedCard)">
+      <image xlink:href="hero-attachment.png" x="0" y="0" width="880" height="560" preserveAspectRatio="xMidYMid slice" style="filter: contrast(1.06) brightness(1.03);" />
+      <!-- slight overlay gradient to ensure text legibility when overlaid in layout -->
+      <rect x="0" y="0" width="880" height="560" fill="url(#overlay)" opacity="0.0" />
+    </g>
+  </g>
+
+  <!-- small decorative elements to the right for balance -->
+  <g transform="translate(980,160)">
+    <circle cx="0" cy="0" r="28" fill="#F59E0B" opacity="0.08" />
+    <circle cx="48" cy="80" r="38" fill="#60A5FA" opacity="0.06" />
+  </g>
+
+</svg>
