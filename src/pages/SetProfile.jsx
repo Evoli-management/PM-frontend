@@ -1257,6 +1257,13 @@ export default function ProfileSetting() {
                                             </div>
                                         </Section>
 
+                                        {/* Save button moved here under Work Schedule */}
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={savePreferences} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                                                Save Preferences
+                                            </button>
+                                        </div>
+
                                         {/* Notification Settings */}
                                         <Section title="Notification Settings">
                                             <div className="space-y-3">
@@ -1299,11 +1306,6 @@ export default function ProfileSetting() {
                                         </Section>
 
                                         {/* Dashboard Preferences removed */}
-                                        <div className="flex justify-end">
-                                            <button type="button" onClick={savePreferences} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
-                                                Save Preferences
-                                            </button>
-                                        </div>
                                     </div>
                                 )}
 
