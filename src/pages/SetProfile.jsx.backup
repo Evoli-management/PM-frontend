@@ -476,20 +476,6 @@ export default function ProfileSetting() {
         // Enhanced Privacy Controls
         strokesVisibility: "team-only", // "public", "team-only", "private"
         showInActivityFeed: true,
-        // Team Management
-        teams: {
-            mainTeam: {
-                name: "Product Development",
-                members: 8,
-                role: "Lead Developer"
-            },
-            otherTeams: [
-                { name: "Marketing", role: "Contributor", members: 5 },
-                { name: "Design System", role: "Reviewer", members: 3 }
-            ],
-            canCreateTeams: true,
-            canJoinTeams: true,
-        },
         // Security Settings
         security: {
             loginHistory: [],
@@ -576,11 +562,6 @@ export default function ProfileSetting() {
         }
     };
 
-    // Derived team permissions (scoped to this component)
-    const canCreateTeams = form?.teams?.canCreateTeams ?? true;
-    const canJoinTeams = form?.teams?.canJoinTeams ?? true;
-    const canManageTeams = canCreateTeams; // simple gate for demo
-
     const upd = (k) => (e) => {
         const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
         setForm((s) => ({ ...s, [k]: value }));
@@ -619,17 +600,6 @@ export default function ProfileSetting() {
             enpsPrivacySettings: {
                 ...s.enpsPrivacySettings,
                 [settingKey]: checked,
-            },
-        }));
-    };
-
-    // Helper function for updating team settings
-    const updateTeamSetting = (settingKey) => (value) => {
-        setForm((s) => ({
-            ...s,
-            teams: {
-                ...s.teams,
-                [settingKey]: value,
             },
         }));
     };
@@ -962,6 +932,7 @@ export default function ProfileSetting() {
                                             </div>
 
                                             {/* Name / Email / Phone with icons */}
+                                            </div>
                                             <div className="grid grid-cols-1 gap-3 sm:gap-2">
                                                 <Field label="Name" error={errors.name}>
                                                     <div className="relative">
@@ -1007,7 +978,6 @@ export default function ProfileSetting() {
                                                         />
                                                     </div>
                                                 </Field>
-                                            </div>
                                             </div>
                                             {/* End core fields */}
 
@@ -1557,6 +1527,17 @@ export default function ProfileSetting() {
                                                 </div>
                                             </div>
                                         </Section>
+
+
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-gray-600"> <span title="Anonymous: your identity isn’t attached; Aggregated team/org reports may still include your response." className="underline decoration-dotted cursor-help">What does this mean?</span></p>
+                                                <div className="flex flex-col gap-2">
+
+
+                                                </div>
+                                            </div>
+                                        </Section>
+
                                         <Section title="Activity Feed Visibility">
                                             <div className="flex items-center justify-between">
                                                 <div>
