@@ -1,20 +1,31 @@
+// components/goals/StatCard.jsx
 import React from "react";
 
-const StatCard = ({ label, value, tone = "default", icon }) => {
-    const toneMap = {
-        success: "bg-green-50 text-green-800 border-green-200",
-        warn: "bg-amber-50 text-amber-800 border-amber-200",
-        danger: "bg-red-50 text-red-800 border-red-200",
-        default: "bg-blue-50 text-blue-800 border-blue-200",
+const StatCard = ({ label, value, icon, tone = "default" }) => {
+    const getToneClasses = (tone) => {
+        switch (tone) {
+            case 'success':
+                return 'bg-green-50 text-green-700 border-green-200';
+            case 'danger':
+                return 'bg-red-50 text-red-700 border-red-200';
+            case 'warning':
+                return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+            default:
+                return 'bg-blue-50 text-blue-700 border-blue-200';
+        }
     };
 
     return (
-        <div className={`rounded-2xl border p-4 ${toneMap[tone] || toneMap.default}`}>
-            <div className="flex items-center gap-2 mb-1">
-                {icon}
-                <div className="text-sm font-semibold">{label}</div>
+        <div className={`rounded-xl border p-4 ${getToneClasses(tone)}`}>
+            <div className="flex items-center justify-between">
+                <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-600 mb-1">{label}</p>
+                    <p className="text-2xl font-bold">{value}</p>
+                </div>
+                <div className="text-2xl opacity-75">
+                    {icon}
+                </div>
             </div>
-            <div className="text-2xl font-extrabold">{value}</div>
         </div>
     );
 };

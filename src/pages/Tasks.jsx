@@ -1,6 +1,5 @@
 import Sidebar from "../components/shared/Sidebar.jsx";
 import React, { useState } from "react";
-import { getGoalTitles } from "../utils/goalsData.js";
 import {
     FiPlus,
     FiSearch,
