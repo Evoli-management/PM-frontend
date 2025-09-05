@@ -26,31 +26,7 @@ import {
     FaStop,
 } from "react-icons/fa";
 
-function InlineAddActivity({ onAdd }) {
-    const [value, setValue] = useState("");
-    const submit = () => {
-        const t = (value || "").trim();
-        if (!t) return;
-        onAdd && onAdd(t);
-        setValue("");
-    };
-    return (
-        <div className="flex items-center gap-2">
-            <input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") submit();
-                }}
-                placeholder="Activity name"
-                className="flex-1 p-2 border rounded text-sm"
-            />
-            <button type="button" onClick={submit} className="px-3 py-2 bg-slate-100 rounded text-sm text-slate-700">
-                Add activity
-            </button>
-        </div>
-    );
-}
+// InlineAddActivity removed per UI simplification
 
 // Small UI helpers for table chips/indicators
 const EmptyState = ({ title = "List is empty.", hint = "" }) => (
@@ -109,6 +85,22 @@ const toDateOnly = (val) => {
     const d = new Date(val);
     if (isNaN(d.getTime())) return "";
     return d.toISOString().slice(0, 10);
+};
+
+// Normalize a UI date value to ISO date-time at midnight UTC expected by BE (@IsDateString date-time)
+const toIsoMidnightOrNull = (val, allowUndefined = false) => {
+    if (val === undefined) return allowUndefined ? undefined : null;
+    if (val === null || val === "") return null;
+    const dOnly = toDateOnly(val);
+    return dOnly ? `${dOnly}T00:00:00.000Z` : null;
+};
+
+// Coerce empty string to null for optional strings; optionally allow undefined passthrough
+const nullableString = (val, allowUndefined = false) => {
+    if (val === undefined) return allowUndefined ? undefined : null;
+    if (val === null) return null;
+    const s = String(val);
+    return s.trim() === "" ? null : s;
 };
 
 // format duration between two ISO timestamps (start, end)
@@ -208,7 +200,13 @@ const api = {
             return (Array.isArray(rows) ? rows : []).map((t) => ({
                 ...t,
                 status: mapStatusToUi(t.status),
+                // normalize for UI naming
                 due_date: t.dueDate || t.due_date || null,
+                deadline: t.dueDate || t.due_date || null,
+                start_date: t.startDate || t.start_date || null,
+                end_date: t.endDate || t.end_date || null,
+                assignee: t.assignee ?? null,
+                duration: t.duration ?? null,
                 key_area_id: t.keyAreaId || t.key_area_id || keyAreaId,
             }));
         } catch (e) {
@@ -221,12 +219,15 @@ const api = {
         const payload = {
             keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
             title: task.title,
-            description: task.description ?? null,
-            dueDate: task.due_date || task.dueDate || null,
+            description: nullableString(task.description),
+            assignee: nullableString(task.assignee),
+            startDate: toIsoMidnightOrNull(task.start_date ?? task.startDate),
+            dueDate: toIsoMidnightOrNull(task.deadline ?? task.due_date ?? task.dueDate),
+            endDate: toIsoMidnightOrNull(task.end_date ?? task.endDate),
             status: (() => {
                 const s = String(task.status || "todo").toLowerCase();
                 if (s === "open") return "todo";
-                if (s === "blocked") return "in_progress";
+                if (s === "blocked") return "cancelled";
                 if (s === "done" || s === "closed" || s === "completed") return "completed";
                 if (s === "cancelled" || s === "canceled") return "cancelled";
                 if (s === "in_progress") return "in_progress";
@@ -244,6 +245,11 @@ const api = {
             ...created,
             status: "open",
             due_date: created.dueDate || null,
+            deadline: created.dueDate || null,
+            start_date: created.startDate || null,
+            end_date: created.endDate || null,
+            assignee: created.assignee ?? payload.assignee ?? null,
+            duration: created.duration ?? null,
             key_area_id: created.keyAreaId || payload.keyAreaId,
         };
     },
@@ -251,27 +257,41 @@ const api = {
         const payload = {
             keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
             title: task.title,
-            description: task.description,
-            dueDate: task.due_date || task.dueDate || null,
+            description: nullableString(task.description, true),
+            assignee: nullableString(task.assignee, true),
+            startDate: toIsoMidnightOrNull(task.start_date ?? task.startDate, true),
+            dueDate: toIsoMidnightOrNull(task.deadline ?? task.due_date ?? task.dueDate, true),
+            endDate: toIsoMidnightOrNull(task.end_date ?? task.endDate, true),
             status: (() => {
                 const s = String(task.status || "").toLowerCase();
                 if (!s) return undefined;
                 if (s === "open") return "todo";
-                if (s === "blocked") return "in_progress";
+                if (s === "blocked") return "cancelled";
                 if (s === "done" || s === "closed" || s === "completed") return "completed";
                 if (s === "cancelled" || s === "canceled") return "cancelled";
                 if (s === "in_progress") return "in_progress";
                 return undefined;
             })(),
             priority: (() => {
-                const p = String(task.priority || "").toLowerCase();
-                if (!p) return undefined;
-                if (p === "low" || p === "medium" || p === "high") return p;
+                const raw = task.priority;
+                if (raw === undefined || raw === null || raw === "") return undefined;
+                // numeric mapping (1|2|3)
+                const n = Number(raw);
+                if (!Number.isNaN(n)) {
+                    if (n === 1) return "low";
+                    if (n === 3) return "high";
+                    return "medium"; // 2 or others → medium
+                }
+                const p = String(raw).toLowerCase();
+                if (p === "med" || p === "medium" || p === "normal") return "medium";
+                if (p === "low") return "low";
+                if (p === "high") return "high";
                 return undefined;
             })(),
         };
         const updated = await taskService.update(id, payload);
-        return {
+        // Normalize BE response back to UI shape
+        const normalized = {
             ...updated,
             status: (() => {
                 const s = String(updated.status || "todo").toLowerCase();
@@ -282,8 +302,31 @@ const api = {
                 return "open";
             })(),
             due_date: updated.dueDate || null,
+            deadline: updated.dueDate || null,
+            start_date: updated.startDate || null,
+            end_date: updated.endDate || null,
+            assignee: updated.assignee ?? payload.assignee ?? null,
+            duration: updated.duration ?? null,
             key_area_id: updated.keyAreaId || payload.keyAreaId,
         };
+        // Carry over UI-only fields not persisted by backend so table/view keeps them
+        const uiOnly = ((t) => ({
+            tags: t.tags ?? "",
+            list_index: t.list_index ?? 1,
+            goal_id: t.goal_id ?? "",
+            recurrence: t.recurrence ?? "",
+            attachments: t.attachments ?? "",
+            attachmentsFiles: t.attachmentsFiles ?? [],
+            eisenhower_quadrant:
+                t.eisenhower_quadrant ??
+                computeEisenhowerQuadrant({
+                    deadline: normalized.due_date || normalized.deadline,
+                    end_date: normalized.end_date,
+                    priority: normalized.priority,
+                }),
+            category: t.category ?? "Key Areas",
+        }))(task || {});
+        return { ...normalized, ...uiOnly };
     },
     async deleteTask(id) {
         await taskService.remove(id);
@@ -771,7 +814,7 @@ function TaskSlideOver({
                                                 {[
                                                     { key: "start_date", label: "Start" },
                                                     { key: "deadline", label: "Deadline" },
-                                                    { key: "end_date", label: "Planned End" },
+                                                    { key: "end_date", label: "End date" },
                                                 ].map((f) => (
                                                     <div key={f.key}>
                                                         <div className="text-[11px] text-slate-600">{f.label}</div>
@@ -1045,6 +1088,8 @@ function TaskFullView({
             await onSave(form);
         }
         setIsEditing(false);
+        // Close the details card after saving
+        if (onBack) onBack();
     };
 
     return (
@@ -1096,12 +1141,12 @@ function TaskFullView({
                                     className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600"
                                     onClick={(e) => {
                                         const rect = e.currentTarget.getBoundingClientRect();
-                                        const gap = 8;
-                                        const menuWidth = 160; // w-40 (~10rem)
-                                        const top = rect.bottom + window.scrollY + gap; // a bit below
-                                        // default: place to the right of the button
+                                        const gap = 6; // slight offset below/right
+                                        const menuWidth = 160; // Tailwind w-40
+                                        // Preferred position: right and just below the dots
+                                        let top = rect.bottom + window.scrollY + gap;
                                         let left = rect.right + window.scrollX + gap;
-                                        // if overflowing viewport, place to the left of the button
+                                        // If it overflows right edge, flip to left side of the button
                                         const viewportRight = window.scrollX + window.innerWidth - gap;
                                         if (left + menuWidth > viewportRight) {
                                             left = rect.left + window.scrollX - menuWidth - gap;
@@ -1236,32 +1281,9 @@ function TaskFullView({
                                                 <FaAlignJustify className="w-4 h-4" />
                                             </span>
                                             <div className="flex-1">
-                                                <input
-                                                    className="w-full bg-transparent outline-none font-medium"
-                                                    value={title}
-                                                    onChange={(e) =>
-                                                        updateField(
-                                                            a.id,
-                                                            a.text != null ? "text" : "activity_name",
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    onBlur={async (e) => {
-                                                        const newTitle = (e.target.value || "").trim();
-                                                        if (!newTitle || newTitle === title) return;
-                                                        try {
-                                                            await activityService.update(a.id, { text: newTitle });
-                                                            window.dispatchEvent(
-                                                                new CustomEvent("ka-activities-updated", {
-                                                                    detail: { refresh: true },
-                                                                }),
-                                                            );
-                                                        } catch (err) {
-                                                            console.error("Failed to rename activity", err);
-                                                        }
-                                                    }}
-                                                    placeholder="Activity name"
-                                                />
+                                                <div className="w-full font-medium text-slate-800 truncate">
+                                                    {title || "Untitled activity"}
+                                                </div>
                                                 {/* createdAt removed */}
                                             </div>
                                             {/* Tag icon (placeholder) */}
@@ -1331,139 +1353,155 @@ function TaskFullView({
                                             </button>
                                         </div>
                                         {isOpen && (
-                                            <div className="mt-3 border-t border-slate-200 pt-3">
-                                                <div className="grid grid-cols-12 gap-3 text-sm">
-                                                    <div className="col-span-12 md:col-span-3 space-y-3">
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Start Date
-                                                            </label>
-                                                            <input
-                                                                type="date"
-                                                                value={toDateOnly(a.date_start) || ""}
-                                                                onChange={(e) =>
-                                                                    updateField(a.id, "date_start", e.target.value)
-                                                                }
-                                                                className="w-full border rounded px-2 py-1"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                End Date
-                                                            </label>
-                                                            <input
-                                                                type="date"
-                                                                value={toDateOnly(a.date_end) || ""}
-                                                                onChange={(e) =>
-                                                                    updateField(a.id, "date_end", e.target.value)
-                                                                }
-                                                                className="w-full border rounded px-2 py-1"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Deadline
-                                                            </label>
-                                                            <input
-                                                                type="date"
-                                                                value={toDateOnly(a.deadline) || ""}
-                                                                onChange={(e) =>
-                                                                    updateField(a.id, "deadline", e.target.value)
-                                                                }
-                                                                className="w-full border rounded px-2 py-1"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Duration
-                                                            </label>
-                                                            <input
-                                                                type="time"
-                                                                value={a.duration || ""}
-                                                                onChange={(e) =>
-                                                                    updateField(a.id, "duration", e.target.value)
-                                                                }
-                                                                className="w-full border rounded px-2 py-1"
-                                                            />
-                                                        </div>
+                                            <div className="mt-2 border-t border-slate-200 pt-2">
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                                                    {/* Row 1 */}
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Activity Name
+                                                        </label>
+                                                        <input
+                                                            value={a.text != null ? a.text : a.activity_name || ""}
+                                                            onChange={(e) =>
+                                                                updateField(
+                                                                    a.id,
+                                                                    a.text != null ? "text" : "activity_name",
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            placeholder="Enter activity name"
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
                                                     </div>
-                                                    <div className="col-span-12 md:col-span-9 space-y-3">
-                                                        <div className="grid md:grid-cols-2 gap-3">
-                                                            <div>
-                                                                <label className="block text-[11px] text-slate-600">
-                                                                    Task
-                                                                </label>
-                                                                <input
-                                                                    value={a.task_id || ""}
-                                                                    onChange={(e) =>
-                                                                        updateField(a.id, "task_id", e.target.value)
-                                                                    }
-                                                                    placeholder="Task"
-                                                                    className="w-full border rounded px-2 py-1"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[11px] text-slate-600">
-                                                                    Goal
-                                                                </label>
-                                                                <input
-                                                                    value={a.goal_id || ""}
-                                                                    onChange={(e) =>
-                                                                        updateField(a.id, "goal_id", e.target.value)
-                                                                    }
-                                                                    placeholder="Goal"
-                                                                    className="w-full border rounded px-2 py-1"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid md:grid-cols-2 gap-3">
-                                                            <div>
-                                                                <label className="block text-[11px] text-slate-600">
-                                                                    Priority
-                                                                </label>
-                                                                <select
-                                                                    value={a.priority || 2}
-                                                                    onChange={(e) =>
-                                                                        updateField(
-                                                                            a.id,
-                                                                            "priority",
-                                                                            Number(e.target.value),
-                                                                        )
-                                                                    }
-                                                                    className="w-full border rounded px-2 py-1"
-                                                                >
-                                                                    <option value={3}>High</option>
-                                                                    <option value={2}>Normal</option>
-                                                                    <option value={1}>Low</option>
-                                                                </select>
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[11px] text-slate-600">
-                                                                    Responsible
-                                                                </label>
-                                                                <input
-                                                                    value={a.responsible || ""}
-                                                                    onChange={(e) =>
-                                                                        updateField(a.id, "responsible", e.target.value)
-                                                                    }
-                                                                    placeholder="Responsible"
-                                                                    className="w-full border rounded px-2 py-1"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Notes
-                                                            </label>
-                                                            <textarea
-                                                                value={a.notes || ""}
-                                                                onChange={(e) =>
-                                                                    updateField(a.id, "notes", e.target.value)
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 min-h-[88px]"
-                                                            />
-                                                        </div>
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Start Date
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={toDateOnly(a.date_start) || ""}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "date_start", e.target.value)
+                                                            }
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
                                                     </div>
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            End Date
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={toDateOnly(a.date_end) || ""}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "date_end", e.target.value)
+                                                            }
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
+                                                    </div>
+                                                    {/* Row 2 */}
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Deadline
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={toDateOnly(a.deadline) || ""}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "deadline", e.target.value)
+                                                            }
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Duration
+                                                        </label>
+                                                        <input
+                                                            type="time"
+                                                            value={a.duration || ""}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "duration", e.target.value)
+                                                            }
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">Task</label>
+                                                        <input
+                                                            value={a.task_id || ""}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "task_id", e.target.value)
+                                                            }
+                                                            placeholder="Task"
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
+                                                    </div>
+                                                    {/* Row 3 */}
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Priority
+                                                        </label>
+                                                        <select
+                                                            value={a.priority || 2}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "priority", Number(e.target.value))
+                                                            }
+                                                            className="w-full border rounded px-2 py-1"
+                                                        >
+                                                            <option value={3}>High</option>
+                                                            <option value={2}>Normal</option>
+                                                            <option value={1}>Low</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Responsible
+                                                        </label>
+                                                        <input
+                                                            value={a.responsible || ""}
+                                                            onChange={(e) =>
+                                                                updateField(a.id, "responsible", e.target.value)
+                                                            }
+                                                            placeholder="Responsible"
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[11px] text-slate-600">
+                                                            Notes
+                                                        </label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={a.notes || ""}
+                                                            onChange={(e) => updateField(a.id, "notes", e.target.value)}
+                                                            className="w-full border rounded px-2 py-1"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-end gap-2 mt-2">
+                                                    <button
+                                                        type="button"
+                                                        className="px-2 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                                                        onClick={async () => {
+                                                            const newTitle = (
+                                                                (a.text != null ? a.text : a.activity_name) || ""
+                                                            ).trim();
+                                                            if (!newTitle) return;
+                                                            try {
+                                                                await activityService.update(a.id, { text: newTitle });
+                                                                window.dispatchEvent(
+                                                                    new CustomEvent("ka-activities-updated", {
+                                                                        detail: { refresh: true },
+                                                                    }),
+                                                                );
+                                                            } catch (err) {
+                                                                console.error("Failed to save activity", err);
+                                                            }
+                                                        }}
+                                                    >
+                                                        Save
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
@@ -1676,7 +1714,7 @@ function TaskFullView({
                                 {[
                                     { key: "start_date", label: "Start" },
                                     { key: "deadline", label: "Deadline" },
-                                    { key: "end_date", label: "Planned End" },
+                                    { key: "end_date", label: "End date" },
                                 ].map((f) => (
                                     <div key={f.key}>
                                         <div className="text-[11px] text-slate-600">{f.label}</div>
@@ -1700,33 +1738,7 @@ function TaskFullView({
                         {/* (Meta moved to left column) */}
                     </div>
 
-                    {/* Actions under details when not editing */}
-                    {!isEditing && (
-                        <div className="md:col-span-3 mt-1 flex items-center gap-2">
-                            {!readOnly && (
-                                <button
-                                    className="px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs"
-                                    onClick={() => {
-                                        setTab("details");
-                                        setIsEditing(true);
-                                    }}
-                                >
-                                    Edit
-                                </button>
-                            )}
-                            {!readOnly && (
-                                <button
-                                    className="px-2.5 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs"
-                                    onClick={() => {
-                                        if (!confirm("Delete this task?")) return;
-                                        onDelete && onDelete(task);
-                                    }}
-                                >
-                                    Delete
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    {/* Bottom Edit/Delete actions removed per request */}
                 </div>
             )}
             {showDetailsPopup && (
@@ -2558,7 +2570,10 @@ export default function KeyAreas() {
         const patch = {};
         if (bulkForm.assignee.trim()) patch.assignee = bulkForm.assignee.trim();
         if (bulkForm.status) patch.status = bulkForm.status;
-        if (bulkForm.priority) patch.priority = bulkForm.priority;
+        if (bulkForm.priority) {
+            const p = String(bulkForm.priority).toLowerCase();
+            patch.priority = p === "med" ? "medium" : p;
+        }
         if (bulkForm.start_date) patch.start_date = toDateOnly(bulkForm.start_date);
         if (bulkForm.deadline) patch.deadline = toDateOnly(bulkForm.deadline);
         if (bulkForm.end_date) patch.end_date = toDateOnly(bulkForm.end_date);
@@ -2602,7 +2617,12 @@ export default function KeyAreas() {
 
         const category = f.get("category").toString();
         const status = f.get("status").toString();
-        const priority = f.get("priority").toString();
+        const priority = (() => {
+            const p = String(f.get("priority").toString()).toLowerCase();
+            if (p === "med") return "medium";
+            if (p === "low" || p === "high") return p;
+            return "medium";
+        })();
         const tags = f.get("tags").toString();
         const recurrence = f.get("recurrence").toString();
         // gather attachments from device uploads and composer state (including storage picks)
@@ -2663,8 +2683,22 @@ export default function KeyAreas() {
             end_date: updated.end_date,
             priority: updated.priority,
         });
-        const payload = { ...updated, eisenhower_quadrant: q };
+        const payload = {
+            ...updated,
+            priority: (() => {
+                const raw = updated.priority;
+                if (raw === undefined || raw === null || raw === "") return undefined;
+                const n = Number(raw);
+                if (!Number.isNaN(n)) return n === 1 ? "low" : n === 3 ? "high" : "medium";
+                const p = String(raw).toLowerCase();
+                if (p === "med" || p === "normal") return "medium";
+                if (p === "low" || p === "medium" || p === "high") return p;
+                return undefined;
+            })(),
+            eisenhower_quadrant: q,
+        };
         const saved = await api.updateTask(payload.id, payload);
+        // Update UI immediately with server payload (already normalized by api.updateTask)
         setAllTasks((prev) => prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)));
         await refreshActivitiesForTask(saved.id);
         setSelectedTask(null);
@@ -2915,7 +2949,7 @@ export default function KeyAreas() {
                         {selectedKA && (
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="max-w-7xl mx-auto p-6">
-                                    <div className="rounded-xl border bg-white shadow-sm p-6 space-y-6">
+                                    <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
                                         {/* Top Row: Task Lists + Mass Edit */}
                                         <div className="grid grid-cols-3 gap-4">
                                             {/* Left: Task Lists (2/3 width) */}
@@ -3226,7 +3260,7 @@ export default function KeyAreas() {
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs text-blue-900">
-                                                                Planned End
+                                                                End date
                                                             </label>
                                                             <input
                                                                 type="date"
@@ -3770,77 +3804,20 @@ export default function KeyAreas() {
                                                                                                                                     <FaAlignJustify />
                                                                                                                                 </span>
                                                                                                                                 <div className="relative flex-1">
-                                                                                                                                    <input
-                                                                                                                                        value={
+                                                                                                                                    <div
+                                                                                                                                        className={`w-full border rounded px-2 py-1 pr-16 bg-white ${
+                                                                                                                                            a.completed
+                                                                                                                                                ? "line-through text-slate-500"
+                                                                                                                                                : "text-slate-800"
+                                                                                                                                        }`}
+                                                                                                                                    >
+                                                                                                                                        {(
                                                                                                                                             a.text ||
                                                                                                                                             a.activity_name ||
                                                                                                                                             ""
-                                                                                                                                        }
-                                                                                                                                        onChange={(
-                                                                                                                                            e,
-                                                                                                                                        ) =>
-                                                                                                                                            updateField(
-                                                                                                                                                a.id,
-                                                                                                                                                a.text !=
-                                                                                                                                                    null
-                                                                                                                                                    ? "text"
-                                                                                                                                                    : "activity_name",
-                                                                                                                                                e
-                                                                                                                                                    .target
-                                                                                                                                                    .value,
-                                                                                                                                            )
-                                                                                                                                        }
-                                                                                                                                        onBlur={async (
-                                                                                                                                            e,
-                                                                                                                                        ) => {
-                                                                                                                                            const newTitle =
-                                                                                                                                                (
-                                                                                                                                                    e
-                                                                                                                                                        .target
-                                                                                                                                                        .value ||
-                                                                                                                                                    ""
-                                                                                                                                                ).trim();
-                                                                                                                                            const prevTitle =
-                                                                                                                                                a.text ||
-                                                                                                                                                a.activity_name ||
-                                                                                                                                                "";
-                                                                                                                                            if (
-                                                                                                                                                !newTitle ||
-                                                                                                                                                newTitle ===
-                                                                                                                                                    prevTitle
-                                                                                                                                            )
-                                                                                                                                                return;
-                                                                                                                                            try {
-                                                                                                                                                await activityService.update(
-                                                                                                                                                    a.id,
-                                                                                                                                                    {
-                                                                                                                                                        text: newTitle,
-                                                                                                                                                    },
-                                                                                                                                                );
-                                                                                                                                                window.dispatchEvent(
-                                                                                                                                                    new CustomEvent(
-                                                                                                                                                        "ka-activities-updated",
-                                                                                                                                                        {
-                                                                                                                                                            detail: {
-                                                                                                                                                                refresh: true,
-                                                                                                                                                            },
-                                                                                                                                                        },
-                                                                                                                                                    ),
-                                                                                                                                                );
-                                                                                                                                            } catch (err) {
-                                                                                                                                                console.error(
-                                                                                                                                                    "Failed to rename activity",
-                                                                                                                                                    err,
-                                                                                                                                                );
-                                                                                                                                            }
-                                                                                                                                        }}
-                                                                                                                                        placeholder="Activity name"
-                                                                                                                                        className={`w-full border rounded px-2 py-1 pr-16 ${
-                                                                                                                                            a.completed
-                                                                                                                                                ? "line-through text-slate-500"
-                                                                                                                                                : ""
-                                                                                                                                        }`}
-                                                                                                                                    />
+                                                                                                                                        ).trim() ||
+                                                                                                                                            "Untitled activity"}
+                                                                                                                                    </div>
                                                                                                                                     <button
                                                                                                                                         type="button"
                                                                                                                                         className="absolute right-14 top-1.5 text-[#4DC3D8]"
@@ -3978,288 +3955,13 @@ export default function KeyAreas() {
                                                                                                                                 className="mt-1 text-xs text-amber-700"
                                                                                                                                 id={`activity-message-${a.id}`}
                                                                                                                             ></div>
-                                                                                                                            {/* Details */}
-                                                                                                                            <div className="mt-2">
-                                                                                                                                <button
-                                                                                                                                    type="button"
-                                                                                                                                    className="text-xs text-blue-700 hover:underline"
-                                                                                                                                    onClick={() =>
-                                                                                                                                        toggleDetails(
-                                                                                                                                            a.id,
-                                                                                                                                        )
-                                                                                                                                    }
-                                                                                                                                >
-                                                                                                                                    {openActivityDetails.has(
-                                                                                                                                        a.id,
-                                                                                                                                    )
-                                                                                                                                        ? "Hide details"
-                                                                                                                                        : "Show details"}
-                                                                                                                                </button>
-                                                                                                                                {openActivityDetails.has(
-                                                                                                                                    a.id,
-                                                                                                                                ) && (
-                                                                                                                                    <div className="mt-2 grid grid-cols-12 gap-3">
-                                                                                                                                        <div className="col-span-12 md:col-span-3 space-y-3">
-                                                                                                                                            <div>
-                                                                                                                                                <label className="block text-xs text-slate-700">
-                                                                                                                                                    Start
-                                                                                                                                                    Date
-                                                                                                                                                </label>
-                                                                                                                                                <input
-                                                                                                                                                    type="date"
-                                                                                                                                                    value={
-                                                                                                                                                        toDateOnly(
-                                                                                                                                                            a.date_start,
-                                                                                                                                                        ) ||
-                                                                                                                                                        ""
-                                                                                                                                                    }
-                                                                                                                                                    onChange={(
-                                                                                                                                                        e,
-                                                                                                                                                    ) =>
-                                                                                                                                                        updateField(
-                                                                                                                                                            a.id,
-                                                                                                                                                            "date_start",
-                                                                                                                                                            e
-                                                                                                                                                                .target
-                                                                                                                                                                .value,
-                                                                                                                                                        )
-                                                                                                                                                    }
-                                                                                                                                                    className="w-full border rounded px-2 py-1"
-                                                                                                                                                />
-                                                                                                                                            </div>
-                                                                                                                                            <div>
-                                                                                                                                                <label className="block text-xs text-slate-700">
-                                                                                                                                                    End
-                                                                                                                                                    Date
-                                                                                                                                                </label>
-                                                                                                                                                <input
-                                                                                                                                                    type="date"
-                                                                                                                                                    value={
-                                                                                                                                                        toDateOnly(
-                                                                                                                                                            a.date_end,
-                                                                                                                                                        ) ||
-                                                                                                                                                        ""
-                                                                                                                                                    }
-                                                                                                                                                    onChange={(
-                                                                                                                                                        e,
-                                                                                                                                                    ) =>
-                                                                                                                                                        updateField(
-                                                                                                                                                            a.id,
-                                                                                                                                                            "date_end",
-                                                                                                                                                            e
-                                                                                                                                                                .target
-                                                                                                                                                                .value,
-                                                                                                                                                        )
-                                                                                                                                                    }
-                                                                                                                                                    className="w-full border rounded px-2 py-1"
-                                                                                                                                                />
-                                                                                                                                            </div>
-                                                                                                                                            <div>
-                                                                                                                                                <label className="block text-xs text-slate-700">
-                                                                                                                                                    Deadline
-                                                                                                                                                </label>
-                                                                                                                                                <input
-                                                                                                                                                    type="date"
-                                                                                                                                                    value={
-                                                                                                                                                        toDateOnly(
-                                                                                                                                                            a.deadline,
-                                                                                                                                                        ) ||
-                                                                                                                                                        ""
-                                                                                                                                                    }
-                                                                                                                                                    onChange={(
-                                                                                                                                                        e,
-                                                                                                                                                    ) =>
-                                                                                                                                                        updateField(
-                                                                                                                                                            a.id,
-                                                                                                                                                            "deadline",
-                                                                                                                                                            e
-                                                                                                                                                                .target
-                                                                                                                                                                .value,
-                                                                                                                                                        )
-                                                                                                                                                    }
-                                                                                                                                                    className="w-full border rounded px-2 py-1"
-                                                                                                                                                />
-                                                                                                                                            </div>
-                                                                                                                                            <div>
-                                                                                                                                                <label className="block text-xs text-slate-700">
-                                                                                                                                                    Duration
-                                                                                                                                                </label>
-                                                                                                                                                <input
-                                                                                                                                                    type="time"
-                                                                                                                                                    value={
-                                                                                                                                                        a.duration ||
-                                                                                                                                                        ""
-                                                                                                                                                    }
-                                                                                                                                                    onChange={(
-                                                                                                                                                        e,
-                                                                                                                                                    ) =>
-                                                                                                                                                        updateField(
-                                                                                                                                                            a.id,
-                                                                                                                                                            "duration",
-                                                                                                                                                            e
-                                                                                                                                                                .target
-                                                                                                                                                                .value,
-                                                                                                                                                        )
-                                                                                                                                                    }
-                                                                                                                                                    className="w-full border rounded px-2 py-1"
-                                                                                                                                                />
-                                                                                                                                            </div>
-                                                                                                                                        </div>
-                                                                                                                                        <div className="col-span-12 md:col-span-9 space-y-3">
-                                                                                                                                            <div className="grid md:grid-cols-2 gap-3">
-                                                                                                                                                <div>
-                                                                                                                                                    <label className="block text-xs text-slate-700">
-                                                                                                                                                        Task
-                                                                                                                                                    </label>
-                                                                                                                                                    <input
-                                                                                                                                                        value={
-                                                                                                                                                            a.task_id ||
-                                                                                                                                                            ""
-                                                                                                                                                        }
-                                                                                                                                                        onChange={(
-                                                                                                                                                            e,
-                                                                                                                                                        ) =>
-                                                                                                                                                            updateField(
-                                                                                                                                                                a.id,
-                                                                                                                                                                "task_id",
-                                                                                                                                                                e
-                                                                                                                                                                    .target
-                                                                                                                                                                    .value,
-                                                                                                                                                            )
-                                                                                                                                                        }
-                                                                                                                                                        placeholder="Task"
-                                                                                                                                                        className="w-full border rounded px-2 py-1"
-                                                                                                                                                    />
-                                                                                                                                                </div>
-                                                                                                                                                <div>
-                                                                                                                                                    <label className="block text-xs text-slate-700">
-                                                                                                                                                        Goal
-                                                                                                                                                    </label>
-                                                                                                                                                    <input
-                                                                                                                                                        value={
-                                                                                                                                                            a.goal_id ||
-                                                                                                                                                            ""
-                                                                                                                                                        }
-                                                                                                                                                        onChange={(
-                                                                                                                                                            e,
-                                                                                                                                                        ) =>
-                                                                                                                                                            updateField(
-                                                                                                                                                                a.id,
-                                                                                                                                                                "goal_id",
-                                                                                                                                                                e
-                                                                                                                                                                    .target
-                                                                                                                                                                    .value,
-                                                                                                                                                            )
-                                                                                                                                                        }
-                                                                                                                                                        placeholder="Goal"
-                                                                                                                                                        className="w-full border rounded px-2 py-1"
-                                                                                                                                                    />
-                                                                                                                                                </div>
-                                                                                                                                            </div>
-                                                                                                                                            <div className="grid md:grid-cols-2 gap-3">
-                                                                                                                                                <div>
-                                                                                                                                                    <label className="block text-xs text-slate-700">
-                                                                                                                                                        Priority
-                                                                                                                                                    </label>
-                                                                                                                                                    <select
-                                                                                                                                                        value={
-                                                                                                                                                            a.priority ||
-                                                                                                                                                            2
-                                                                                                                                                        }
-                                                                                                                                                        onChange={(
-                                                                                                                                                            e,
-                                                                                                                                                        ) =>
-                                                                                                                                                            updateField(
-                                                                                                                                                                a.id,
-                                                                                                                                                                "priority",
-                                                                                                                                                                Number(
-                                                                                                                                                                    e
-                                                                                                                                                                        .target
-                                                                                                                                                                        .value,
-                                                                                                                                                                ),
-                                                                                                                                                            )
-                                                                                                                                                        }
-                                                                                                                                                        className="w-full border rounded px-2 py-1"
-                                                                                                                                                    >
-                                                                                                                                                        <option
-                                                                                                                                                            value={
-                                                                                                                                                                2
-                                                                                                                                                            }
-                                                                                                                                                        >
-                                                                                                                                                            Normal
-                                                                                                                                                        </option>
-                                                                                                                                                        <option
-                                                                                                                                                            value={
-                                                                                                                                                                1
-                                                                                                                                                            }
-                                                                                                                                                        >
-                                                                                                                                                            Low
-                                                                                                                                                        </option>
-                                                                                                                                                    </select>
-                                                                                                                                                </div>
-                                                                                                                                                <div>
-                                                                                                                                                    <label className="block text-xs text-slate-700">
-                                                                                                                                                        Responsible
-                                                                                                                                                    </label>
-                                                                                                                                                    <input
-                                                                                                                                                        value={
-                                                                                                                                                            a.responsible ||
-                                                                                                                                                            ""
-                                                                                                                                                        }
-                                                                                                                                                        onChange={(
-                                                                                                                                                            e,
-                                                                                                                                                        ) =>
-                                                                                                                                                            updateField(
-                                                                                                                                                                a.id,
-                                                                                                                                                                "responsible",
-                                                                                                                                                                e
-                                                                                                                                                                    .target
-                                                                                                                                                                    .value,
-                                                                                                                                                            )
-                                                                                                                                                        }
-                                                                                                                                                        placeholder="Responsible"
-                                                                                                                                                        className="w-full border rounded px-2 py-1"
-                                                                                                                                                    />
-                                                                                                                                                </div>
-                                                                                                                                            </div>
-                                                                                                                                            <div>
-                                                                                                                                                <label className="block text-xs text-slate-700">
-                                                                                                                                                    Notes
-                                                                                                                                                </label>
-                                                                                                                                                <textarea
-                                                                                                                                                    value={
-                                                                                                                                                        a.notes ||
-                                                                                                                                                        ""
-                                                                                                                                                    }
-                                                                                                                                                    onChange={(
-                                                                                                                                                        e,
-                                                                                                                                                    ) =>
-                                                                                                                                                        updateField(
-                                                                                                                                                            a.id,
-                                                                                                                                                            "notes",
-                                                                                                                                                            e
-                                                                                                                                                                .target
-                                                                                                                                                                .value,
-                                                                                                                                                        )
-                                                                                                                                                    }
-                                                                                                                                                    className="w-full border rounded px-2 py-1 min-h-[88px]"
-                                                                                                                                                />
-                                                                                                                                            </div>
-                                                                                                                                        </div>
-                                                                                                                                    </div>
-                                                                                                                                )}
-                                                                                                                            </div>
+                                                                                                                            {/* Details section removed from task list view */}
                                                                                                                         </div>
                                                                                                                     ),
                                                                                                                 )}
                                                                                                             </div>
                                                                                                         )}
-                                                                                                        {/* Add new */}
-                                                                                                        <InlineAddActivity
-                                                                                                            onAdd={
-                                                                                                                addNew
-                                                                                                            }
-                                                                                                        />
+                                                                                                        {/* Inline add activity removed */}
                                                                                                     </div>
                                                                                                 );
                                                                                             })()}
@@ -4621,7 +4323,7 @@ export default function KeyAreas() {
 
                                                             <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
                                                                 <label className="text-sm font-semibold text-slate-900">
-                                                                    Planned End
+                                                                    End date
                                                                 </label>
                                                                 <input
                                                                     name="end_date"

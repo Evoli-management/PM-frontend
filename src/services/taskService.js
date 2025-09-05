@@ -1,21 +1,39 @@
 import apiClient from "./apiClient";
 
-// Map FE legacy statuses to BE enums if needed
+// Map FE status → BE enum
+// FE uses: open | in_progress | done | cancelled (shown as "blocked")
+// BE expects: todo | in_progress | completed | cancelled
 const mapStatusToApi = (s) => {
     const v = String(s || "todo").toLowerCase();
     if (v === "open") return "todo";
-    if (v === "blocked") return "todo";
-    if (v === "in progress") return "in_progress";
-    return v; // todo|in_progress|completed|cancelled
+    if (v === "in progress" || v === "in_progress") return "in_progress";
+    if (v === "done" || v === "completed" || v === "closed") return "completed";
+    if (v === "blocked") return "cancelled";
+    if (v === "canceled") return "cancelled";
+    return v; // already one of: todo | in_progress | completed | cancelled
 };
 
-const mapStatusFromApi = (s) => s; // already in canonical form
+// Map BE enum → FE status
+const mapStatusFromApi = (s) => {
+    const v = String(s || "todo").toLowerCase();
+    if (v === "todo") return "open";
+    if (v === "in_progress") return "in_progress";
+    if (v === "completed") return "done";
+    if (v === "cancelled" || v === "canceled") return "blocked";
+    return v;
+};
 
 const base = "/tasks";
 
 const taskService = {
     async list({ keyAreaId } = {}) {
-        const res = await apiClient.get(base, { params: { keyAreaId } });
+        // In dev, bypass browser cache to avoid 304/Not Modified confusion after updates
+        const params = { keyAreaId };
+        if (import.meta.env?.DEV) params._ts = Date.now();
+        const res = await apiClient.get(base, {
+            params,
+            headers: import.meta.env?.DEV ? { "Cache-Control": "no-cache" } : undefined,
+        });
         return res.data.map((t) => ({ ...t, status: mapStatusFromApi(t.status) }));
     },
     async get(id) {
