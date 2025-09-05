@@ -1,8 +1,8 @@
-
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import authService from "../services/authService";
 
 const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
@@ -28,13 +28,22 @@ const LoginPage = () => {
         setError("");
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError("");
         setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const { email, password } = formData;
+            const res = await authService.login({ email, password });
+            // Optionally store any returned token if you switch to token auth; cookie is set server-side.
+            // localStorage.setItem("access_token", res.accessToken);
             navigate("/dashboard");
-        }, 500);
+        } catch (err) {
+            const msg = err.response?.data?.message || "Login failed";
+            setError(Array.isArray(msg) ? msg.join(", ") : msg);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSocialLogin = (provider) => {
@@ -52,12 +61,14 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
-            <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
+            <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
                 <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
                 {/* Left: form pane */}
                 <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
                     <h2 className="text-2xl font-bold text-black mb-2 text-center">LOGIN</h2>
-                    <p className="text-black font-semibold mb-4 text-base text-center">Login and Take Control of Your Workflow.</p>
+                    <p className="text-black font-semibold mb-4 text-base text-center">
+                        Login and Take Control of Your Workflow.
+                    </p>
                     <form className="space-y-4 w-full" onSubmit={handleSubmit} aria-label="Login form">
                         <div className="relative w-full">
                             <input
@@ -69,6 +80,7 @@ const LoginPage = () => {
                                 className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base bg-blue-100"
                                 required
                                 aria-label="Email"
+                                autoComplete="email"
                             />
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
                                 <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
@@ -84,6 +96,7 @@ const LoginPage = () => {
                                 className="w-full p-3 pl-10 pr-10 rounded-lg border border-gray-300 text-base bg-blue-100"
                                 required
                                 aria-label="Password"
+                                autoComplete="current-password"
                             />
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
                                 <FontAwesomeIcon icon={faLock} className="text-lg" />
@@ -95,10 +108,7 @@ const LoginPage = () => {
                                 tabIndex={0}
                                 role="button"
                             >
-                                <FontAwesomeIcon
-                                    icon={showPassword ? faEye : faEyeSlash}
-                                    className="text-lg"
-                                />
+                                <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-lg" />
                             </span>
                         </div>
                         <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-2">
@@ -121,10 +131,14 @@ const LoginPage = () => {
                                 Forget password?
                             </Link>
                         </div>
-                        {error && <div className="w-full text-red-600 text-sm font-semibold text-center" role="alert">{error}</div>}
+                        {error && (
+                            <div className="w-full text-red-600 text-sm font-semibold text-center" role="alert">
+                                {error}
+                            </div>
+                        )}
                         <button
                             type="submit"
-                            className={`w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            className={`w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                             disabled={loading}
                             aria-busy={loading}
                         >
@@ -139,7 +153,7 @@ const LoginPage = () => {
                             <button
                                 type="button"
                                 onClick={() => handleSocialLogin("Google")}
-                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                                 disabled={loading}
                                 aria-label="Login with Google"
                             >
@@ -154,7 +168,7 @@ const LoginPage = () => {
                             <button
                                 type="button"
                                 onClick={() => handleSocialLogin("Microsoft")}
-                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                                 disabled={loading}
                                 aria-label="Login with Microsoft"
                             >
