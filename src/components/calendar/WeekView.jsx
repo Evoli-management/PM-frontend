@@ -24,15 +24,19 @@ import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 const WeekView = ({
     currentDate,
     onShiftDate,
+    onSetDate,
+    onQuickCreate,
     events = [],
     todos = [],
     categories = {},
     onTaskDrop,
     onEventClick,
+    onEventMove,
     view,
     onChangeView,
     filterType,
     onChangeFilter,
+    loading = false,
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
     const [elephantTask, setElephantTask] = useState("");
@@ -56,8 +60,23 @@ const WeekView = ({
     // Navigation is handled by container; keep internal handlers unused or remove if not needed
     // Drag-and-drop handler
     const handleDrop = (e, day, slot) => {
-        const taskId = e.dataTransfer.getData("taskId");
-        // ...handle drop logic...
+        try {
+            const [h, m] = slot.split(":");
+            const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
+            const eventId = e.dataTransfer.getData("eventId");
+            if (eventId) {
+                const dur = parseInt(e.dataTransfer.getData("durationMs") || "0", 10);
+                const newEnd = dur > 0 ? new Date(date.getTime() + dur) : null;
+                onEventMove && onEventMove(eventId, date, newEnd);
+                return;
+            }
+            const taskId = e.dataTransfer.getData("taskId");
+            if (taskId) {
+                onTaskDrop && onTaskDrop(taskId, date);
+            }
+        } catch (err) {
+            console.warn("Drop failed", err);
+        }
     };
     // Range label for the week
     const endOfWeek = new Date(weekStart);
@@ -99,7 +118,7 @@ const WeekView = ({
                                 role="menu"
                                 className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                             >
-                                {["day", "week", "month", "quarter", "list"].map((v) => (
+                                {["day", "week"].map((v) => (
                                     <button
                                         key={v}
                                         role="menuitemradio"
@@ -117,8 +136,23 @@ const WeekView = ({
                         )}
                     </div>
                 </div>
-                <h2 className="text-xl font-bold">{weekLabel}</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                    {weekLabel}
+                    {loading && (
+                        <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                            Loading
+                        </span>
+                    )}
+                </h2>
                 <div className="flex items-center gap-2">
+                    <button
+                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                        style={{ minWidth: 36, minHeight: 36 }}
+                        aria-label="Today"
+                        onClick={() => onSetDate && onSetDate(new Date())}
+                    >
+                        Today
+                    </button>
                     <select
                         className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
                         style={{ minHeight: 28 }}
@@ -126,11 +160,12 @@ const WeekView = ({
                         onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
                         aria-label="Filter event types"
                     >
-                        <option value="all">All Types</option>
-                        <option value="task">Tasks</option>
-                        <option value="reminder">Reminders</option>
-                        <option value="meeting">Meetings</option>
+                        <option value="all">All</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="focus">Focus</option>
                         <option value="custom">Custom</option>
+                        <option value="green">Green</option>
+                        <option value="red">Red</option>
                     </select>
                     <button
                         className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
@@ -227,6 +262,17 @@ const WeekView = ({
                                                         }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => handleDrop(e, date, slot)}
+                                                        onDoubleClick={() => {
+                                                            const [h, m] = slot.split(":");
+                                                            const dt = new Date(
+                                                                date.getFullYear(),
+                                                                date.getMonth(),
+                                                                date.getDate(),
+                                                                Number(h),
+                                                                Number(m),
+                                                            );
+                                                            onQuickCreate && onQuickCreate(dt);
+                                                        }}
                                                     >
                                                         {slotEvents.length === 0 ? (
                                                             <span className="text-gray-300 group-hover:text-blue-300">
@@ -237,6 +283,24 @@ const WeekView = ({
                                                                 <div
                                                                     key={i}
                                                                     className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}
+                                                                    draggable
+                                                                    onDragStart={(e) => {
+                                                                        try {
+                                                                            e.dataTransfer.setData(
+                                                                                "eventId",
+                                                                                String(ev.id),
+                                                                            );
+                                                                            const dur = ev.end
+                                                                                ? new Date(ev.end).getTime() -
+                                                                                  new Date(ev.start).getTime()
+                                                                                : 60 * 60 * 1000;
+                                                                            e.dataTransfer.setData(
+                                                                                "durationMs",
+                                                                                String(Math.max(dur, 0)),
+                                                                            );
+                                                                            e.dataTransfer.effectAllowed = "move";
+                                                                        } catch {}
+                                                                    }}
                                                                     onClick={() => onEventClick(ev)}
                                                                 >
                                                                     <span>{categories[ev.kind]?.icon || ""}</span>
@@ -251,6 +315,37 @@ const WeekView = ({
                                     );
                                 }}
                             </FixedSizeList>
+                        </div>
+                    </div>
+                    {/* Dated tasks panel for drag-and-drop */}
+                    <div className="flex w-full bg-white border border-blue-100 rounded-b-lg mt-2">
+                        <div className="p-2" style={{ width: TIME_COL_PX + "px" }}>
+                            <div className="text-xs text-slate-500">Tasks</div>
+                        </div>
+                        <div className="p-2" style={{ flex: "1 1 auto" }}>
+                            <div className="flex gap-2 overflow-x-auto">
+                                {(Array.isArray(todos) ? todos : []).map((t) => (
+                                    <div
+                                        key={t.id}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            try {
+                                                e.dataTransfer.setData("taskId", String(t.id));
+                                                e.dataTransfer.effectAllowed = "copy";
+                                            } catch {}
+                                        }}
+                                        className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing min-w-[160px]"
+                                        title={t.title}
+                                    >
+                                        <div className="truncate font-medium">{t.title}</div>
+                                        <div className="text-[10px] text-slate-500">
+                                            {t.startDate || t.dueDate
+                                                ? new Date(t.startDate || t.dueDate).toLocaleString()
+                                                : ""}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                     {/* Add task/activity button at the very bottom of the container (outside the scroller) */}

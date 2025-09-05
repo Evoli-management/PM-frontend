@@ -8,6 +8,8 @@ import DayView from "./DayView";
 import ListView from "./ListView";
 import EventModal from "./EventModal";
 import AvailabilityBlock from "./AvailabilityBlock";
+import calendarService from "../../services/calendarService";
+import { useToast } from "../shared/ToastProvider.jsx";
 
 const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
@@ -16,9 +18,11 @@ const EVENT_CATEGORIES = {
     travel: { color: "bg-purple-500", icon: "✈️" },
     green: { color: "bg-green-400", icon: "✔️" },
     red: { color: "bg-red-400", icon: "⛔" },
+    custom: { color: "bg-gray-300", icon: "•" },
 };
 
 const CalendarContainer = () => {
+    const { addToast } = useToast();
     // Elephant Task state (mock)
     const [elephantTasks, setElephantTasks] = useState({}); // { '2025-08-22': '...' }
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -41,6 +45,7 @@ const CalendarContainer = () => {
     const [view, setView] = useState("day");
     const [events, setEvents] = useState([]);
     const [todos, setTodos] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -48,40 +53,153 @@ const CalendarContainer = () => {
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
 
-    // Fetch events and todos from Key Areas (mocked for now)
+    // Load persisted view/date on mount
     useEffect(() => {
-        // TODO: Replace with real API calls to Key Areas
-        // Example: fetch('/api/key-areas/tasks')
-        const keyAreaTasks = JSON.parse(localStorage.getItem("tasks")) || [];
-        // Only include tasks/events with a valid date and not deleted/archived
-        const filtered = keyAreaTasks.filter(
-            (t) => (t.dueDate || t.deadline || t.end_date) && !t.deleted && !t.archived,
-        );
-        // Map to calendar event format
-        const mapped = filtered.map((t) => ({
-            id: t.id,
-            title: t.name || t.title,
-            type: t.type || "task",
-            start: t.dueDate || t.deadline || t.start,
-            end: t.dueDate || t.end_date || t.end,
-            source: t.keyArea ? `Tab: ${t.keyArea}` : undefined,
-            desc: t.description || "",
-            allDay: false,
-        }));
-        setEvents(mapped);
-        setTodos(filtered.filter((t) => t.type === "todo"));
-    }, [view, timezone]);
+        try {
+            const savedView = localStorage.getItem("calendar:view");
+            if (savedView && ["day", "week", "month", "quarter", "list"].includes(savedView)) {
+                setView(savedView);
+            }
+            const savedDate = localStorage.getItem("calendar:date");
+            if (savedDate) {
+                const d = new Date(savedDate);
+                if (!isNaN(d.getTime())) setCurrentDate(d);
+            }
+        } catch {}
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    // Drag-and-drop logic placeholder
-    const handleTaskDrop = async (task, date) => {
-        // TODO: Implement API call to timebox task
-        setView(view);
+    // Persist view/date
+    useEffect(() => {
+        try {
+            localStorage.setItem("calendar:view", view);
+            localStorage.setItem("calendar:date", currentDate.toISOString());
+        } catch {}
+    }, [view, currentDate]);
+
+    // Fetch events/todos from backend for day/week/month/quarter/list views
+    useEffect(() => {
+        const load = async () => {
+            // Compute range based on view
+            const start = new Date(currentDate);
+            const end = new Date(currentDate);
+            if (view === "week") {
+                // start Monday
+                start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+                end.setTime(start.getTime());
+                end.setDate(start.getDate() + 6);
+            } else if (view === "month") {
+                start.setDate(1);
+                end.setMonth(start.getMonth() + 1, 0); // last day of month
+            } else if (view === "quarter") {
+                const q = Math.floor(start.getMonth() / 3);
+                start.setMonth(q * 3, 1);
+                end.setMonth(q * 3 + 3, 0); // last day of quarter
+            } else if (view === "list") {
+                // Use current month for list view range
+                start.setDate(1);
+                end.setMonth(start.getMonth() + 1, 0);
+            }
+            const fromISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0).toISOString();
+            const toISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString();
+
+            try {
+                setLoading(true);
+                const [evs, tds] = await Promise.all([
+                    calendarService.listEvents({ from: fromISO, to: toISO, view }),
+                    calendarService.listTodos({ from: fromISO, to: toISO }),
+                ]);
+                setEvents(Array.isArray(evs) ? evs : []);
+                setTodos(Array.isArray(tds) ? tds : []);
+            } catch (err) {
+                console.warn("Failed to load calendar data", err);
+                setEvents([]);
+                setTodos([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view, timezone, currentDate]);
+
+    // Drag-and-drop: create a calendar event (timebox) for a task
+    const handleTaskDrop = async (taskOrId, date) => {
+        try {
+            const defaultMinutes = 60;
+            const start = new Date(date);
+            const end = new Date(start.getTime() + defaultMinutes * 60 * 1000);
+            const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+            // Try to find a title from todos if not provided
+            let title =
+                (typeof taskOrId === "object" && taskOrId?.title) ||
+                todos.find((t) => String(t.id) === String(taskId))?.title ||
+                "Task";
+            const payload = {
+                title,
+                start: start.toISOString(),
+                end: end.toISOString(),
+                allDay: false,
+                taskId: taskId || undefined,
+                kind: "custom",
+            };
+            const created = await calendarService.createEvent(payload);
+            // Optimistic merge
+            setEvents((prev) => [...prev, created]);
+            addToast({
+                title: "Event created",
+                description: `${title} at ${start.toLocaleTimeString()}`,
+                variant: "success",
+            });
+        } catch (err) {
+            console.warn("Failed to create calendar event from drop", err);
+            addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
+        }
     };
 
     // Event modal logic
     const openModal = (event = null) => {
         setSelectedEvent(event);
         setModalOpen(true);
+    };
+
+    // Quick create event on double-click
+    const handleQuickCreate = async (date, options = {}) => {
+        try {
+            const start = new Date(date);
+            const end = new Date(start.getTime() + (options.minutes || 60) * 60 * 1000);
+            const payload = {
+                title: options.title || "New event",
+                start: start.toISOString(),
+                end: end.toISOString(),
+                allDay: false,
+                kind: options.kind || "custom",
+            };
+            const created = await calendarService.createEvent(payload);
+            setEvents((prev) => [...prev, created]);
+            addToast({ title: "Event created", description: start.toLocaleString(), variant: "success" });
+        } catch (err) {
+            console.warn("Quick create failed", err);
+            addToast({ title: "Failed to create", description: String(err?.message || err), variant: "error" });
+        }
+    };
+
+    // Move event (drag existing event into a new slot)
+    const handleEventMove = async (eventId, newStartDate, newEndDate) => {
+        try {
+            const payload = { start: newStartDate.toISOString() };
+            if (newEndDate) payload.end = newEndDate.toISOString();
+            const updated = await calendarService.updateEvent(eventId, payload);
+            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+            addToast({
+                title: "Event updated",
+                description: `Moved to ${newStartDate.toLocaleString()}`,
+                variant: "success",
+            });
+        } catch (err) {
+            console.warn("Failed to move event", err);
+            addToast({ title: "Failed to update event", description: String(err?.message || err), variant: "error" });
+        }
     };
 
     // Shift current date depending on active view
@@ -220,7 +338,7 @@ const CalendarContainer = () => {
                         onChangeView={setView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
-                        events={events.filter((e) => filterType === "all" || e.type === filterType)}
+                        events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         categories={EVENT_CATEGORIES}
                         onDayClick={openModal}
                     />
@@ -233,7 +351,7 @@ const CalendarContainer = () => {
                         onChangeView={setView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
-                        events={events.filter((e) => filterType === "all" || e.type === filterType)}
+                        events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         categories={EVENT_CATEGORIES}
                         onEventClick={openModal}
                     />
@@ -242,14 +360,18 @@ const CalendarContainer = () => {
                     <WeekView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        onSetDate={setCurrentDate}
+                        onQuickCreate={handleQuickCreate}
                         view={view}
                         onChangeView={setView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
-                        events={events.filter((e) => filterType === "all" || e.type === filterType)}
+                        events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         todos={todos}
+                        loading={loading}
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
+                        onEventMove={handleEventMove}
                         onEventClick={openModal}
                     />
                 )}
@@ -257,14 +379,18 @@ const CalendarContainer = () => {
                     <DayView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        onSetDate={setCurrentDate}
+                        onQuickCreate={handleQuickCreate}
                         view={view}
                         onChangeView={setView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
-                        events={events.filter((e) => filterType === "all" || e.type === filterType)}
+                        events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         todos={todos}
+                        loading={loading}
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
+                        onEventMove={handleEventMove}
                         onEventClick={openModal}
                         onPlanTomorrow={() => {}}
                     />
@@ -277,7 +403,7 @@ const CalendarContainer = () => {
                         onChangeView={setView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
-                        events={events.filter((e) => filterType === "all" || e.type === filterType)}
+                        events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         onEventClick={openModal}
                     />
                 )}
@@ -288,6 +414,15 @@ const CalendarContainer = () => {
                     onClose={() => setModalOpen(false)}
                     categories={EVENT_CATEGORIES}
                     timezone={timezone}
+                    onEventUpdated={(ev) => {
+                        setEvents((prev) => prev.map((e) => (e.id === ev.id ? ev : e)));
+                        if (selectedEvent && selectedEvent.id === ev.id) setSelectedEvent(ev);
+                        addToast({ title: "Event updated", variant: "success" });
+                    }}
+                    onEventDeleted={(id) => {
+                        setEvents((prev) => prev.filter((e) => e.id !== id));
+                        addToast({ title: "Event deleted", variant: "success" });
+                    }}
                 />
             )}
         </div>

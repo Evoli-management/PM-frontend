@@ -20,20 +20,34 @@ export default function DayView({
     todos,
     categories,
     onTaskDrop,
+    onEventMove,
     onEventClick,
     onPlanTomorrow,
     onShiftDate,
+    onSetDate,
+    onQuickCreate,
+    loading = false,
 }) {
     const [showViewMenu, setShowViewMenu] = React.useState(false);
     const today = currentDate || new Date();
     // Drag-and-drop handler
     const handleDrop = (e, hour) => {
-        const taskId = e.dataTransfer.getData("taskId");
-        const task = todos.find((t) => t.id === taskId);
-        if (task) {
-            const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), ...hour.split(":"));
-            onTaskDrop(task, date);
-        }
+        try {
+            const [hh, mm] = hour.split(":");
+            const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm));
+            const eventId = e.dataTransfer.getData("eventId");
+            if (eventId) {
+                const dur = parseInt(e.dataTransfer.getData("durationMs") || "0", 10);
+                const newEnd = dur > 0 ? new Date(date.getTime() + dur) : null;
+                onEventMove && onEventMove(eventId, date, newEnd);
+                return;
+            }
+            const taskId = e.dataTransfer.getData("taskId");
+            if (taskId) {
+                const task = todos.find((t) => String(t.id) === String(taskId));
+                if (task) onTaskDrop && onTaskDrop(task, date);
+            }
+        } catch {}
     };
     return (
         <div className="p-0 flex gap-4">
@@ -71,7 +85,7 @@ export default function DayView({
                                     role="menu"
                                     className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                                 >
-                                    {["day", "week", "month", "quarter", "list"].map((v) => (
+                                    {["day", "week"].map((v) => (
                                         <button
                                             key={v}
                                             role="menuitemradio"
@@ -89,15 +103,28 @@ export default function DayView({
                             )}
                         </div>
                     </div>
-                    <h2 className="text-xl font-bold">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
                         {today.toLocaleDateString(undefined, {
                             weekday: "long",
                             month: "long",
                             day: "numeric",
                             year: "numeric",
                         })}
+                        {loading && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                                Loading
+                            </span>
+                        )}
                     </h2>
                     <div className="flex items-center gap-2">
+                        <button
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Today"
+                            onClick={() => onSetDate && onSetDate(new Date())}
+                        >
+                            Today
+                        </button>
                         <select
                             className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
                             style={{ minHeight: 28 }}
@@ -105,11 +132,12 @@ export default function DayView({
                             onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
                             aria-label="Filter event types"
                         >
-                            <option value="all">All Types</option>
-                            <option value="task">Tasks</option>
-                            <option value="reminder">Reminders</option>
-                            <option value="meeting">Meetings</option>
+                            <option value="all">All</option>
+                            <option value="meeting">Meeting</option>
+                            <option value="focus">Focus</option>
                             <option value="custom">Custom</option>
+                            <option value="green">Green</option>
+                            <option value="red">Red</option>
                         </select>
                         <button
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
@@ -125,6 +153,13 @@ export default function DayView({
                     className="flex flex-col gap-1"
                     style={{ maxWidth: "100%", maxHeight: "60vh", overflowX: "auto", overflowY: "auto" }}
                 >
+                    {Array.isArray(events) && events.length === 0 && !loading && (
+                        <div className="mb-2">
+                            <span className="text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-0.5">
+                                No events for this day
+                            </span>
+                        </div>
+                    )}
                     <table
                         className="min-w-full border border-sky-100 rounded-lg"
                         style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}
@@ -150,7 +185,21 @@ export default function DayView({
                                         <td className="border px-2 py-1 text-xs w-24 align-top">
                                             <span>{h}</span>
                                         </td>
-                                        <td className="border px-2 py-1 align-top" style={{ width: "100%" }}>
+                                        <td
+                                            className="border px-2 py-1 align-top"
+                                            style={{ width: "100%" }}
+                                            onDoubleClick={() => {
+                                                const [hh, mm] = h.split(":");
+                                                const date = new Date(
+                                                    today.getFullYear(),
+                                                    today.getMonth(),
+                                                    today.getDate(),
+                                                    Number(hh),
+                                                    Number(mm),
+                                                );
+                                                onQuickCreate && onQuickCreate(date);
+                                            }}
+                                        >
                                             {slotEvents.length === 0 ? (
                                                 <span className="text-gray-400 text-xs">No events</span>
                                             ) : (
@@ -160,6 +209,21 @@ export default function DayView({
                                                         className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 ${
                                                             categories[ev.kind]?.color || "bg-gray-200"
                                                         }`}
+                                                        draggable
+                                                        onDragStart={(e) => {
+                                                            try {
+                                                                e.dataTransfer.setData("eventId", String(ev.id));
+                                                                const dur = ev.end
+                                                                    ? new Date(ev.end).getTime() -
+                                                                      new Date(ev.start).getTime()
+                                                                    : 60 * 60 * 1000;
+                                                                e.dataTransfer.setData(
+                                                                    "durationMs",
+                                                                    String(Math.max(dur, 0)),
+                                                                );
+                                                                e.dataTransfer.effectAllowed = "move";
+                                                            } catch {}
+                                                        }}
                                                         onClick={() => onEventClick(ev)}
                                                     >
                                                         <span>{categories[ev.kind]?.icon || ""}</span>
@@ -180,7 +244,7 @@ export default function DayView({
             {/* Right: Actions column */}
             <div className="w-64 md:w-72 shrink-0">
                 <div className="sticky top-2">
-                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3 mb-3">
                         <h3 className="text-sm font-semibold text-slate-700 mb-3">Quick actions</h3>
                         <div className="grid grid-cols-1 gap-2">
                             <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium">
@@ -200,6 +264,36 @@ export default function DayView({
                                 <FaPlus />
                                 <span>Add activity</span>
                             </button>
+                        </div>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+                        <h3 className="text-sm font-semibold text-slate-700 mb-2">Dated tasks (drag onto time)</h3>
+                        {(!Array.isArray(todos) || todos.length === 0) && (
+                            <div className="text-xs text-slate-500">No dated tasks for this day</div>
+                        )}
+                        <div className="flex flex-col gap-1">
+                            {Array.isArray(todos) &&
+                                todos.map((t) => (
+                                    <div
+                                        key={t.id}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            try {
+                                                e.dataTransfer.setData("taskId", String(t.id));
+                                                e.dataTransfer.effectAllowed = "copy";
+                                            } catch {}
+                                        }}
+                                        className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing"
+                                        title={t.title}
+                                    >
+                                        <div className="truncate font-medium">{t.title}</div>
+                                        <div className="text-[10px] text-slate-500">
+                                            {t.startDate || t.dueDate
+                                                ? new Date(t.startDate || t.dueDate).toLocaleString()
+                                                : ""}
+                                        </div>
+                                    </div>
+                                ))}
                         </div>
                     </div>
                 </div>
