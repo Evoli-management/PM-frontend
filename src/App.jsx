@@ -2,6 +2,7 @@ import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
 import Footer from "./components/shared/Footer.jsx";
+import { isFeatureEnabled } from "./utils/flags.js";
 
 // Core pages
 import LoginPage from "./pages/Login.jsx";
@@ -29,6 +30,7 @@ import KeyAreas from "./pages/KeyAreas.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 
 export default function App() {
+    const calendarEnabled = isFeatureEnabled("calendar");
     return (
         <Router>
             <div className="flex flex-col min-h-screen">
@@ -53,7 +55,7 @@ export default function App() {
                             <Route path="/admin-settings" element={<AdminSettings />} />
                             <Route path="/settings" element={<AdminSettings />} />
                             <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/calendar" element={<Calendar />} />
+                            {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
                             <Route path="/tasks" element={<Tasks />} />
                             <Route path="/goals" element={<Goals />} />
                             <Route path="/goals/:goalId" element={<GoalDetailPage />} />
