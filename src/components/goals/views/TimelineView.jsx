@@ -13,10 +13,14 @@ const TimelineView = ({ filtered, onOpen }) => {
                 <div className="space-y-6">
                     {filtered
                         .slice()
-                        .sort((a, b) => (a.targetDate || "9999-12-31").localeCompare(b.targetDate || "9999-12-31"))
+                        .sort((a, b) =>
+                            (a.dueDate || a.targetDate || "9999-12-31").localeCompare(
+                                b.dueDate || b.targetDate || "9999-12-31",
+                            ),
+                        )
                         .map((g, index) => {
-                            const isOverdue =
-                                g.targetDate && new Date(g.targetDate) < new Date() && g.status === "active";
+                            const d = g.dueDate || g.targetDate;
+                            const isOverdue = d && new Date(d) < new Date() && g.status === "active";
                             return (
                                 <div key={g.id} className="relative flex items-start gap-4">
                                     <div
@@ -38,9 +42,9 @@ const TimelineView = ({ filtered, onOpen }) => {
                                             <div>
                                                 <h5 className="font-semibold text-slate-900">{g.title}</h5>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    {g.targetDate && (
+                                                    {d && (
                                                         <Chip
-                                                            label={`Due ${new Date(g.targetDate).toLocaleDateString()}`}
+                                                            label={`Due ${new Date(d).toLocaleDateString()}`}
                                                             toneClass={
                                                                 isOverdue ? "bg-red-50 text-red-700 border-red-200" : ""
                                                             }

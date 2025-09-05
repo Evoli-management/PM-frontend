@@ -131,37 +131,8 @@ const getPriorityLevel = (val) => {
     return 2; // med or default
 };
 
-// Activity helpers
-const activityDefaults = {
-    id: 0,
-    activity_name: "",
-    completed: 0,
-    priority: 2, // 1 low, 2 normal, 3 high
-    date_start: "",
-    date_end: "",
-    deadline: "",
-    duration: "",
-    task_id: "",
-    goal_id: "",
-    responsible: "",
-    notes: "",
-    // createdAt removed
-};
-
-const loadActivitiesMap = () => {
-    try {
-        const raw = localStorage.getItem("pm:kaActivities");
-        const parsed = raw ? JSON.parse(raw) : {};
-        return parsed && typeof parsed === "object" ? parsed : {};
-    } catch {
-        return {};
-    }
-};
-const saveActivitiesMap = (map) => {
-    try {
-        localStorage.setItem("pm:kaActivities", JSON.stringify(map || {}));
-    } catch {}
-};
+// Activity helpers (client-only fields retained for UI but not persisted)
+// Backend shape: { id, text, taskId, createdAt, updatedAt }
 
 // very small heuristic for quadrant based on priority and time
 const computeEisenhowerQuadrant = ({ deadline, end_date, priority = "med" }) => {
@@ -188,121 +159,134 @@ const kaImageFor = (title = "") => {
     return "/key-area.png"; // fallback
 };
 
-// Minimal localStorage-backed API for this page
+// Backend service for Key Areas (no localStorage fallback)
+import keyAreaService from "../services/keyAreaService";
+import taskService from "../services/taskService";
+import activityService from "../services/activityService";
+// ...existing code...
+
 const api = {
     async listKeyAreas() {
         try {
-            const raw = localStorage.getItem("pm:keyareas");
-            const cached = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(cached) && cached.length) return cached;
-            const seed = [
-                { id: 1, title: "Marketing", description: "Grow brand and leads", position: 1 },
-                { id: 2, title: "Sales", description: "Close deals", position: 2 },
-                { id: 3, title: "Product", description: "Build and ship", position: 3 },
-                { id: 10, title: "Ideas", description: "Locked ideas slot", position: 10, is_default: true },
-            ];
-            try {
-                localStorage.setItem("pm:keyareas", JSON.stringify(seed));
-            } catch (e) {}
-            return seed;
-        } catch {
-            return [];
+            return await keyAreaService.list({ includeTaskCount: true });
+        } catch (e) {
+            // if unauthorized, let global axios handler redirect to login
+            if (e?.response?.status === 401) {
+                throw e;
+            }
+            // surface errors to caller; do not use local cache
+            throw e;
         }
     },
     async listGoals() {
         return [];
     },
     async updateKeyArea(id, data) {
-        const raw = (await this.listKeyAreas()) || [];
-        const next = raw.map((k) => (String(k.id) === String(id) ? { ...k, ...data } : k));
-        localStorage.setItem("pm:keyareas", JSON.stringify(next));
-        return next.find((k) => String(k.id) === String(id)) || data;
+        // Only update via backend; no local fallbacks
+        return await keyAreaService.update(id, data);
     },
     async createKeyArea(data) {
-        const raw = (await this.listKeyAreas()) || [];
-        const item = { id: data.id || Date.now(), ...data };
-        const next = [...raw, item];
-        localStorage.setItem("pm:keyareas", JSON.stringify(next));
-        return item;
+        // Only create via backend; no local fallbacks
+        return await keyAreaService.create(data);
     },
     async deleteKeyArea(id) {
-        const raw = (await this.listKeyAreas()) || [];
-        const next = raw.filter((k) => String(k.id) !== String(id));
-        localStorage.setItem("pm:keyareas", JSON.stringify(next));
+        await keyAreaService.remove(id);
         return true;
     },
     async listTasks(keyAreaId) {
+        // Fetch from backend and normalize for UI
         try {
-            const raw = localStorage.getItem(`pm:tasks:${keyAreaId}`);
-            const existing = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(existing) && existing.length > 0) return existing;
-            const now = Date.now();
-            const seed = [
-                {
-                    id: now,
-                    key_area_id: keyAreaId,
-                    title: `Kickoff planning (KA ${keyAreaId})`,
-                    description: "Define scope, owners, and timeline",
-                    assignee: "Alex",
-                    status: "open",
-                    priority: "med",
-                    start_date: new Date(now + 1000 * 60 * 60 * 24 * 1).toISOString(),
-                    goal_id: "",
-                    tags: "q3,planning",
-                    attachments: "",
-                    deadline: new Date(now + 1000 * 60 * 60 * 24 * 3).toISOString(),
-                    end_date: new Date(now + 1000 * 60 * 60 * 24 * 7).toISOString(),
-                    list_index: 1,
-                    recurrence: "",
-                },
-                {
-                    id: now + 1,
-                    key_area_id: keyAreaId,
-                    title: `Baseline metrics (KA ${keyAreaId})`,
-                    description: "Collect current KPIs to compare",
-                    assignee: "Jamie",
-                    status: "in_progress",
-                    priority: "high",
-                    start_date: new Date(now + 1000 * 60 * 60 * 60 * 24 * 8).toISOString(),
-                    goal_id: "",
-                    tags: "metrics,report",
-                    attachments: "",
-                    deadline: new Date(now + 1000 * 60 * 60 * 60 * 24 * 10).toISOString(),
-                    end_date: new Date(now + 1000 * 60 * 60 * 60 * 24 * 14).toISOString(),
-                    list_index: 2,
-                    recurrence: "",
-                },
-            ];
-            try {
-                localStorage.setItem(`pm:tasks:${keyAreaId}`, JSON.stringify(seed));
-            } catch (e) {}
-            return seed;
-        } catch {
+            const rows = await taskService.list({ keyAreaId });
+            const mapStatusToUi = (s) => {
+                const v = String(s || "todo").toLowerCase();
+                if (v === "todo") return "open";
+                if (v === "in_progress") return "in_progress";
+                if (v === "completed") return "done";
+                if (v === "cancelled" || v === "canceled") return "blocked";
+                return "open";
+            };
+            return (Array.isArray(rows) ? rows : []).map((t) => ({
+                ...t,
+                status: mapStatusToUi(t.status),
+                due_date: t.dueDate || t.due_date || null,
+                key_area_id: t.keyAreaId || t.key_area_id || keyAreaId,
+            }));
+        } catch (e) {
+            if (e?.response?.status === 401) throw e;
+            console.error("Failed to list tasks", e);
             return [];
         }
     },
     async createTask(task) {
-        const id = task.id || Date.now();
-        const ka = task.key_area_id;
-        const raw = await this.listTasks(ka);
-        const item = { ...task, id };
-        localStorage.setItem(`pm:tasks:${ka}`, JSON.stringify([...raw, item]));
-        return item;
+        const payload = {
+            keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
+            title: task.title,
+            description: task.description ?? null,
+            dueDate: task.due_date || task.dueDate || null,
+            status: (() => {
+                const s = String(task.status || "todo").toLowerCase();
+                if (s === "open") return "todo";
+                if (s === "blocked") return "in_progress";
+                if (s === "done" || s === "closed" || s === "completed") return "completed";
+                if (s === "cancelled" || s === "canceled") return "cancelled";
+                if (s === "in_progress") return "in_progress";
+                return "todo";
+            })(),
+            priority: (() => {
+                const p = String(task.priority || "medium").toLowerCase();
+                if (p === "low" || p === "medium" || p === "high") return p;
+                return "medium";
+            })(),
+        };
+        const created = await taskService.create(payload);
+        // normalize for UI
+        return {
+            ...created,
+            status: "open",
+            due_date: created.dueDate || null,
+            key_area_id: created.keyAreaId || payload.keyAreaId,
+        };
     },
     async updateTask(id, task) {
-        const ka = task.key_area_id || task.keyAreaId || task.key_area;
-        const raw = await this.listTasks(ka);
-        const next = raw.map((t) => (String(t.id) === String(id) ? { ...t, ...task } : t));
-        localStorage.setItem(`pm:tasks:${ka}`, JSON.stringify(next));
-        return next.find((t) => String(t.id) === String(id)) || task;
+        const payload = {
+            keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
+            title: task.title,
+            description: task.description,
+            dueDate: task.due_date || task.dueDate || null,
+            status: (() => {
+                const s = String(task.status || "").toLowerCase();
+                if (!s) return undefined;
+                if (s === "open") return "todo";
+                if (s === "blocked") return "in_progress";
+                if (s === "done" || s === "closed" || s === "completed") return "completed";
+                if (s === "cancelled" || s === "canceled") return "cancelled";
+                if (s === "in_progress") return "in_progress";
+                return undefined;
+            })(),
+            priority: (() => {
+                const p = String(task.priority || "").toLowerCase();
+                if (!p) return undefined;
+                if (p === "low" || p === "medium" || p === "high") return p;
+                return undefined;
+            })(),
+        };
+        const updated = await taskService.update(id, payload);
+        return {
+            ...updated,
+            status: (() => {
+                const s = String(updated.status || "todo").toLowerCase();
+                if (s === "todo") return "open";
+                if (s === "in_progress") return "in_progress";
+                if (s === "completed") return "done";
+                if (s === "cancelled" || s === "canceled") return "blocked";
+                return "open";
+            })(),
+            due_date: updated.dueDate || null,
+            key_area_id: updated.keyAreaId || payload.keyAreaId,
+        };
     },
     async deleteTask(id) {
-        const allKeys = Object.keys(localStorage).filter((k) => k.startsWith("pm:tasks:"));
-        for (const key of allKeys) {
-            const arr = JSON.parse(localStorage.getItem(key) || "[]");
-            const next = arr.filter((t) => String(t.id) !== String(id));
-            if (next.length !== arr.length) localStorage.setItem(key, JSON.stringify(next));
-        }
+        await taskService.remove(id);
         return true;
     },
 };
@@ -495,14 +479,15 @@ function TaskSlideOver({
         });
         // default target to this task when opening
         setActivitiesTarget(String(task.id));
-        try {
-            const raw = localStorage.getItem("pm:kaActivities");
-            const map = raw ? JSON.parse(raw) : {};
-            const list = map[String(task.id)] || [];
-            setTaskActivities(Array.isArray(list) ? list : []);
-        } catch (e) {
-            setTaskActivities([]);
-        }
+        (async () => {
+            try {
+                const list = await activityService.list({ taskId: task.id });
+                setTaskActivities(Array.isArray(list) ? list : []);
+            } catch (e) {
+                console.error("Failed to load activities", e);
+                setTaskActivities([]);
+            }
+        })();
     }, [task, initialTab, hideActivitiesTab]);
 
     // If asked to hide activities, ensure we stay on details
@@ -510,46 +495,64 @@ function TaskSlideOver({
         if (hideActivitiesTab && activeTab !== "details") setActiveTab("details");
     }, [hideActivitiesTab, activeTab]);
 
-    // When switching target (this task vs new), load that list
+    // When switching target (this task vs new), load that list from backend
     useEffect(() => {
         if (!task) return;
-        try {
-            const raw = localStorage.getItem("pm:kaActivities");
-            const map = raw ? JSON.parse(raw) : {};
-            const list = map[String(activitiesTarget)] || [];
-            setTaskActivities(Array.isArray(list) ? list : []);
-        } catch (e) {
-            setTaskActivities([]);
-        }
+        (async () => {
+            try {
+                if (activitiesTarget === "new") {
+                    const list = await activityService.list();
+                    // Unattached activities: filter those without taskId
+                    setTaskActivities((Array.isArray(list) ? list : []).filter((a) => !a.taskId));
+                } else {
+                    const list = await activityService.list({ taskId: activitiesTarget });
+                    setTaskActivities(Array.isArray(list) ? list : []);
+                }
+            } catch (e) {
+                console.error("Failed to load activities", e);
+                setTaskActivities([]);
+            }
+        })();
     }, [activitiesTarget, task]);
 
-    const persistActivities = (list) => {
-        setTaskActivities(list);
-        try {
-            const raw = localStorage.getItem("pm:kaActivities");
-            const map = raw ? JSON.parse(raw) : {};
-            map[String(activitiesTarget)] = list;
-            localStorage.setItem("pm:kaActivities", JSON.stringify(map));
-            // notify parent to refresh its in-memory cache
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { activities: map } }));
-        } catch (e) {}
-    };
-
-    const addActivity = () => {
+    const addActivity = async () => {
         const text = (newActivity || "").trim();
         if (!text) return;
-        const item = { id: Date.now(), text };
-        persistActivities([...(taskActivities || []), item]);
+        try {
+            const created = await activityService.create({
+                text,
+                taskId: activitiesTarget === "new" ? null : activitiesTarget,
+            });
+            setTaskActivities((prev) => [...prev, created]);
+            // notify parent to refresh
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+        } catch (e) {
+            console.error("Failed to add activity", e);
+        }
         setNewActivity("");
     };
 
-    const removeActivity = (id) => {
-        persistActivities((taskActivities || []).filter((a) => a.id !== id));
+    const removeActivity = async (id) => {
+        try {
+            await activityService.remove(id);
+            setTaskActivities((prev) => prev.filter((a) => a.id !== id));
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+        } catch (e) {
+            console.error("Failed to delete activity", e);
+        }
     };
 
-    const clearActivities = () => {
+    const clearActivities = async () => {
         if (!confirm("Clear all activities for this selection?")) return;
-        persistActivities([]);
+        try {
+            // delete each activity shown
+            const ids = (taskActivities || []).map((a) => a.id);
+            await Promise.all(ids.map((id) => activityService.remove(id)));
+            setTaskActivities([]);
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+        } catch (e) {
+            console.error("Failed to clear activities", e);
+        }
     };
 
     if (!task || !form) return null;
@@ -965,18 +968,25 @@ function TaskFullView({
         onUpdateActivities && onUpdateActivities(String(task.id), payload);
     };
 
-    const addActivity = (text) => {
+    const addActivity = async (text) => {
         const t = (text || "").trim();
         if (!t) return;
-        const rich = {
-            ...activityDefaults,
-            id: Date.now(),
-            activity_name: t,
-        };
-        setList([...(list || []), rich]);
+        try {
+            const created = await activityService.create({ text: t, taskId: task.id });
+            setList([...(list || []), created]);
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+        } catch (e) {
+            console.error("Failed to add activity", e);
+        }
     };
-    const removeActivity = (id) => {
-        setList(list.filter((a) => a.id !== id));
+    const removeActivity = async (id) => {
+        try {
+            await activityService.remove(id);
+            setList(list.filter((a) => a.id !== id));
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+        } catch (e) {
+            console.error("Failed to delete activity", e);
+        }
         setOpenActivityRows((prev) => {
             const copy = new Set(prev);
             copy.delete(id);
@@ -1173,7 +1183,7 @@ function TaskFullView({
                     ) : (
                         <ul className="space-y-2">
                             {list.map((a) => {
-                                const title = a.activity_name || a.text || "";
+                                const title = a.text || a.activity_name || "";
                                 const isOpen = openActivityRows.has(a.id);
                                 return (
                                     <li
@@ -1216,10 +1226,24 @@ function TaskFullView({
                                                     onChange={(e) =>
                                                         updateField(
                                                             a.id,
-                                                            a.activity_name != null ? "activity_name" : "text",
+                                                            a.text != null ? "text" : "activity_name",
                                                             e.target.value,
                                                         )
                                                     }
+                                                    onBlur={async (e) => {
+                                                        const newTitle = (e.target.value || "").trim();
+                                                        if (!newTitle || newTitle === title) return;
+                                                        try {
+                                                            await activityService.update(a.id, { text: newTitle });
+                                                            window.dispatchEvent(
+                                                                new CustomEvent("ka-activities-updated", {
+                                                                    detail: { refresh: true },
+                                                                }),
+                                                            );
+                                                        } catch (err) {
+                                                            console.error("Failed to rename activity", err);
+                                                        }
+                                                    }}
                                                     placeholder="Activity name"
                                                 />
                                                 {/* createdAt removed */}
@@ -1751,7 +1775,7 @@ export default function KeyAreas() {
     const [showTaskComposer, setShowTaskComposer] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-    const [listNames, setListNames] = useState({}); // per-key-area custom names for lists/tabs
+    const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
     const [openListMenu, setOpenListMenu] = useState(null); // list number for context menu
@@ -1793,25 +1817,50 @@ export default function KeyAreas() {
         });
     };
 
-    // Activities associated to tasks: { [taskIdOrNew]: [{ id, text }] }
+    // Activities associated to tasks: { [taskId]: Activity[] }
     const [activitiesByTask, setActivitiesByTask] = useState({});
     const [activityTaskId, setActivityTaskId] = useState("new");
     const [activityName, setActivityName] = useState("");
 
-    // load persisted activities
+    // Helper: refresh activities for a specific task id
+    const refreshActivitiesForTask = async (taskId) => {
+        try {
+            const list = await activityService.list({ taskId });
+            setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: Array.isArray(list) ? list : [] }));
+        } catch (e) {
+            console.error("Failed to refresh activities", e);
+            setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: [] }));
+        }
+    };
+    // Helper: refresh all tasks currently in state
+    const refreshAllActivities = async () => {
+        if (!Array.isArray(allTasks) || allTasks.length === 0) return;
+        try {
+            const entries = await Promise.all(
+                allTasks.map(async (t) => {
+                    try {
+                        const list = await activityService.list({ taskId: t.id });
+                        return [String(t.id), Array.isArray(list) ? list : []];
+                    } catch {
+                        return [String(t.id), []];
+                    }
+                }),
+            );
+            const grouped = Object.fromEntries(entries);
+            setActivitiesByTask(grouped);
+        } catch (e) {
+            console.error("Failed to load activities for tasks", e);
+        }
+    };
+    // On mount and when tasks change, refresh activities
     useEffect(() => {
-        setActivitiesByTask(loadActivitiesMap());
-    }, []);
-
-    useEffect(() => {
-        saveActivitiesMap(activitiesByTask);
-    }, [activitiesByTask]);
-
-    // keep in-memory activities in sync if slide-over updates them
+        refreshAllActivities();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allTasks.length]);
+    // Listen for refresh events from slide-over
     useEffect(() => {
         const handler = (e) => {
-            const map = e?.detail?.activities;
-            if (map && typeof map === "object") setActivitiesByTask(map);
+            if (e?.detail?.refresh) refreshAllActivities();
         };
         window.addEventListener("ka-activities-updated", handler);
         return () => window.removeEventListener("ka-activities-updated", handler);
@@ -1917,20 +1966,27 @@ export default function KeyAreas() {
 
     useEffect(() => {
         (async () => {
-            const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-            const sorted = (kas || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
-            setKeyAreas(sorted);
             try {
-                localStorage.setItem("pm:keyareas", JSON.stringify(sorted));
-            } catch (e) {}
-            // emit key areas so sidebar can populate its dropdown
-            try {
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+                const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
+                const sorted = (kas || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+                setKeyAreas(sorted);
+                // Do not persist key areas in localStorage; always rely on backend
+                // emit key areas so sidebar can populate its dropdown
+                try {
+                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+                } catch (e) {
+                    // ignore if window not available or dispatch fails
+                }
+                setGoals(gs || []);
+                setLoading(false);
             } catch (e) {
-                // ignore if window not available or dispatch fails
+                const status = e?.response?.status;
+                if (status === 401) {
+                    window.location.hash = "#/login";
+                    return;
+                }
+                setLoading(false);
             }
-            setGoals(gs || []);
-            setLoading(false);
         })();
     }, []);
 
@@ -1946,16 +2002,7 @@ export default function KeyAreas() {
 
     // no global listeners needed for initial tab
 
-    // Prime Sidebar with cached key areas immediately (before async load completes)
-    useEffect(() => {
-        try {
-            const raw = localStorage.getItem("pm:keyareas");
-            const cached = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(cached) && cached.length) {
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: cached } }));
-            }
-        } catch (e) {}
-    }, []);
+    // Removed: do not prime sidebar from cache; rely on backend
 
     // Re-emit to Sidebar whenever the in-memory list changes (after edits/deletes)
     useEffect(() => {
@@ -1977,9 +2024,7 @@ export default function KeyAreas() {
         if (!keyAreas || keyAreas.length === 0) return;
         // Prefer first non-Ideas KA; fallback to absolute first by position
         const sorted = [...keyAreas].sort((a, b) => (a.position || 0) - (b.position || 0));
-        const firstNonIdeas = sorted.find(
-            (k) => !((k.title || "").toLowerCase() === "ideas" || k.is_default || k.position === 10),
-        );
+        const firstNonIdeas = sorted.find((k) => !((k.title || "").toLowerCase() === "ideas" || k.is_default));
         const first = firstNonIdeas || sorted[0];
         if (!first?.id) return;
         const next = new URLSearchParams(location.search || "");
@@ -2060,24 +2105,16 @@ export default function KeyAreas() {
         return () => document.removeEventListener("keydown", onKey);
     }, [showTaskComposer]);
 
-    // load persisted list names from localStorage
+    // keep list names in state from backend
     useEffect(() => {
-        try {
-            const raw = localStorage.getItem("pm:listNames");
-            if (raw) setListNames(JSON.parse(raw));
-        } catch (e) {
-            // ignore parse errors
-        }
-    }, []);
-
-    // persist list names whenever they change
-    useEffect(() => {
-        try {
-            localStorage.setItem("pm:listNames", JSON.stringify(listNames));
-        } catch (e) {
-            // ignore
-        }
-    }, [listNames]);
+        // when key areas load, prime listNames map
+        if (!Array.isArray(keyAreas) || keyAreas.length === 0) return;
+        const m = {};
+        keyAreas.forEach((ka) => {
+            if (ka && ka.id) m[ka.id] = { ...(ka.listNames || {}) };
+        });
+        setListNames(m);
+    }, [keyAreas]);
 
     // reset activities selector when switching key areas
     useEffect(() => {
@@ -2103,28 +2140,15 @@ export default function KeyAreas() {
 
         const selectIdeas = async () => {
             if (loading) return;
-            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.position === 10);
+            const found = keyAreas.find((k) => k.title?.toLowerCase() === "ideas" || k.is_default);
             // do NOT open the Ideas area; instead show it in the main list and make it read-only
             if (found) {
                 setSelectedKA(null);
                 setAllTasks([]);
                 setFilter(found.title || "Ideas");
             } else {
-                const synth = {
-                    id: "ideas-synth",
-                    title: "Ideas",
-                    description: "Locked ideas slot",
-                    position: 10,
-                    is_default: true,
-                };
-                setKeyAreas((prev) => {
-                    if (prev.some((k) => (k.id && k.id === synth.id) || (k.title || "").toLowerCase() === "ideas"))
-                        return prev;
-                    return [...prev, synth].sort((a, b) => (a.position || 0) - (b.position || 0));
-                });
-                setSelectedKA(null);
-                setAllTasks([]);
-                setFilter("Ideas");
+                // If not found yet, avoid injecting synthetic items; wait for backend load
+                return;
             }
         };
 
@@ -2144,7 +2168,12 @@ export default function KeyAreas() {
 
     // storage picker removed
 
-    const canAdd = useMemo(() => keyAreas.length < 10, [keyAreas.length]);
+    const nonIdeasCount = useMemo(
+        () => keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default).length,
+        [keyAreas],
+    );
+    // Allow up to 9 additional key areas besides Ideas
+    const canAdd = useMemo(() => nonIdeasCount < 9, [nonIdeasCount]);
 
     const filteredKAs = useMemo(() => {
         const q = filter.trim().toLowerCase();
@@ -2153,25 +2182,18 @@ export default function KeyAreas() {
 
         // If the URL explicitly requests Ideas, show only Ideas
         if (explicitSelect === "ideas") {
-            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.position === 10);
+            return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.is_default);
         }
 
         // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
-        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && k.position !== 10);
+        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default);
         if (!q) return base;
         return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
 
     const paramsForRender = new URLSearchParams(location.search);
     const showOnlyIdeas = paramsForRender.get("select") === "ideas";
-    const ideaForShow = keyAreas.find((k) => (k.title || "").toLowerCase() === "ideas") ||
-        keyAreas.find((k) => k.position === 10) || {
-            id: "ideas-synth",
-            title: "Ideas",
-            description: "Locked ideas slot",
-            position: 10,
-            is_default: true,
-        };
+    const ideaForShow = keyAreas.find((k) => (k.title || "").toLowerCase() === "ideas") || null;
 
     const onSaveKA = async (e) => {
         e.preventDefault();
@@ -2183,37 +2205,45 @@ export default function KeyAreas() {
         if (!payload.title) return;
 
         if (editing) {
-            const updated = await api.updateKeyArea(editing.id, { ...editing, ...payload });
+            // Only update fields changed in the form (no color)
+            const updated = await api.updateKeyArea(editing.id, {
+                title: payload.title,
+                description: payload.description,
+            });
             setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
             // emit updated list
             try {
                 const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
-                try {
-                    localStorage.setItem("pm:keyareas", JSON.stringify(updatedList));
-                } catch (e) {}
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: updatedList } }));
             } catch (e) {}
         } else {
             const used = new Set(keyAreas.map((k) => k.position));
             let pos = 1;
             while (used.has(pos) && pos <= 9) pos++;
-            const created = await api.createKeyArea({ ...payload, position: pos, is_default: false });
-            setKeyAreas((prev) =>
-                [...prev.filter((k) => k.position !== pos), { ...created, position: pos }].sort(
-                    (a, b) => a.position - b.position,
-                ),
-            );
-            // emit updated list after create
             try {
-                const after = [
-                    ...(keyAreas || []).filter((k) => k.position !== pos),
-                    { ...created, position: pos },
-                ].sort((a, b) => a.position - b.position);
+                const created = await api.createKeyArea({
+                    title: payload.title,
+                    description: payload.description,
+                    position: pos,
+                    is_default: false,
+                });
+                setKeyAreas((prev) =>
+                    [...prev.filter((k) => k.position !== pos), { ...created, position: pos }].sort(
+                        (a, b) => a.position - b.position,
+                    ),
+                );
+                // emit updated list after create
                 try {
-                    localStorage.setItem("pm:keyareas", JSON.stringify(after));
+                    const after = [
+                        ...(keyAreas || []).filter((k) => k.position !== pos),
+                        { ...created, position: pos },
+                    ].sort((a, b) => a.position - b.position);
+                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: after } }));
                 } catch (e) {}
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: after } }));
-            } catch (e) {}
+            } catch (err) {
+                const msg = err?.response?.data?.message || err?.message || "Action not allowed";
+                alert(`Cannot create key area: ${msg}`);
+            }
         }
         setShowForm(false);
         setEditing(null);
@@ -2221,19 +2251,118 @@ export default function KeyAreas() {
 
     const onDeleteKA = async (ka) => {
         if (ka.is_default) return;
-        if (!confirm(`Delete "${ka.title}"? Tasks will need reassignment.`)) return;
-        await api.deleteKeyArea(ka.id);
-        const next = (keyAreas || []).filter((k) => k.id !== ka.id);
-        setKeyAreas(next);
+        // Warn if tasks exist but allow user to attempt deletion (server will enforce)
+        const isSelected = selectedKA?.id && String(selectedKA.id) === String(ka.id);
+        const loadedCount = isSelected && Array.isArray(allTasks) ? allTasks.length : 0;
+        const serverCount = typeof ka.taskCount === "number" ? ka.taskCount : 0;
+        const effectiveCount = Math.max(loadedCount, serverCount);
+
+        let proceed = true;
+        if (effectiveCount > 0) {
+            proceed = confirm(
+                `"${ka.title}" has ${effectiveCount} task(s).\n` +
+                    `You need to move or delete these tasks first.\n\n` +
+                    `Do you still want to try deleting the key area now?`,
+            );
+            if (!proceed) return;
+        } else {
+            proceed = confirm(`Delete "${ka.title}"?`);
+            if (!proceed) return;
+        }
         try {
+            await api.deleteKeyArea(ka.id);
+            const next = (keyAreas || []).filter((k) => k.id !== ka.id);
+            setKeyAreas(next);
             try {
-                localStorage.setItem("pm:keyareas", JSON.stringify(next));
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
             } catch (e) {}
-            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
-        } catch (e) {}
-        if (selectedKA?.id === ka.id) {
-            setSelectedKA(null);
-            setAllTasks([]);
+            if (selectedKA?.id === ka.id) {
+                setSelectedKA(null);
+                setAllTasks([]);
+            }
+        } catch (err) {
+            const msg =
+                err?.response?.data?.message ||
+                err?.message ||
+                "This key area has tasks and cannot be deleted until tasks are moved or removed.";
+            alert(`Cannot delete "${ka.title}": ${msg}`);
+            // Optionally refresh key areas to show latest taskCount
+            try {
+                const fresh = await api.listKeyAreas();
+                setKeyAreas(fresh);
+            } catch {}
+        }
+    };
+
+    // Drag-and-drop reorder helpers
+    const [dragKAId, setDragKAId] = useState(null);
+    const reorderByDrop = async (fromId, toId) => {
+        if (!fromId || !toId || fromId === toId) return;
+        const ordered = (keyAreas || [])
+            .filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default)
+            .sort((a, b) => (a.position || 0) - (b.position || 0));
+        const fromIdx = ordered.findIndex((k) => String(k.id) === String(fromId));
+        const toIdx = ordered.findIndex((k) => String(k.id) === String(toId));
+        if (fromIdx < 0 || toIdx < 0) return;
+        const nextOrdered = ordered.slice();
+        const [moved] = nextOrdered.splice(fromIdx, 1);
+        nextOrdered.splice(toIdx, 0, moved);
+        // Reassign positions 1..N
+        const withPos = nextOrdered.map((k, i) => ({ ...k, position: i + 1 }));
+        // Persist changes (only those that changed position)
+        const changed = withPos.filter((k, i) => ordered[i]?.id !== k.id || ordered[i]?.position !== k.position);
+        try {
+            await Promise.all(changed.map((k) => api.updateKeyArea(k.id, { ...k, position: k.position })));
+            // Update local state
+            setKeyAreas((prev) => {
+                const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
+                withPos.forEach((k) => map.set(String(k.id), { ...map.get(String(k.id)), position: k.position }));
+                const next = Array.from(map.values()).sort((a, b) => (a.position || 0) - (b.position || 0));
+                try {
+                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
+                } catch {}
+                return next;
+            });
+        } catch (err) {
+            const msg = err?.response?.data?.message || err?.message || "Could not reorder";
+            alert(msg);
+        }
+    };
+
+    // Reorder a non-Ideas key area up or down among slots 1-9
+    const reorderKA = async (ka, direction = "up") => {
+        if (!ka || ka.is_default || (ka.title || "").toLowerCase() === "ideas") return;
+        const ordered = (keyAreas || [])
+            .filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default)
+            .sort((a, b) => (a.position || 0) - (b.position || 0));
+        const idx = ordered.findIndex((k) => String(k.id) === String(ka.id));
+        if (idx < 0) return;
+        const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= ordered.length) return; // boundary
+        const a = ordered[idx];
+        const b = ordered[targetIdx];
+        try {
+            // swap positions and persist both
+            await Promise.all([
+                api.updateKeyArea(a.id, { ...a, position: b.position }),
+                api.updateKeyArea(b.id, { ...b, position: a.position }),
+            ]);
+            // update local state and emit
+            setKeyAreas((prev) => {
+                const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
+                const na = { ...map.get(String(a.id)), position: b.position };
+                const nb = { ...map.get(String(b.id)), position: a.position };
+                map.set(String(a.id), na);
+                map.set(String(b.id), nb);
+                const next = Array.from(map.values()).sort((x, y) => (x.position || 0) - (y.position || 0));
+                try {
+                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
+                } catch {}
+                return next;
+            });
+        } catch (err) {
+            const msg = err?.response?.data?.message || err?.message || "Could not reorder";
+            alert(msg);
         }
     };
 
@@ -2265,6 +2394,22 @@ export default function KeyAreas() {
         setSelectedKA(ka);
         const t = await api.listTasks(ka.id);
         setAllTasks(t);
+        // refresh activities for these tasks
+        try {
+            const entries = await Promise.all(
+                (t || []).map(async (row) => {
+                    try {
+                        const list = await activityService.list({ taskId: row.id });
+                        return [String(row.id), Array.isArray(list) ? list : []];
+                    } catch {
+                        return [String(row.id), []];
+                    }
+                }),
+            );
+            setActivitiesByTask(Object.fromEntries(entries));
+        } catch (e) {
+            // ignore activity load failures; UI will show zeroes
+        }
         setTaskTab(1);
         setSearchTerm("");
         setQuadrant("all");
@@ -2291,7 +2436,8 @@ export default function KeyAreas() {
                   .filter(Boolean)
             : [];
         const maxFromNames = nameKeys.length ? Math.max(...nameKeys) : 0;
-        return Math.max(4, maxFromTabs, maxFromNames);
+        // Allow fewer than 4 when empty; always show at least 1 list
+        return Math.max(1, maxFromTabs, maxFromNames);
     }, [selectedKA, listNames, tabNumbers]);
 
     // Helpers to manage per-key-area list names
@@ -2301,41 +2447,56 @@ export default function KeyAreas() {
         return names[n] || `List ${n}`;
     };
 
-    const renameList = (n) => {
+    const renameList = async (n) => {
         if (!selectedKA) return;
+        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") {
+            alert("Cannot rename lists for the Ideas key area.");
+            return;
+        }
         const current = getListName(selectedKA.id, n);
         const val = prompt("Rename list", current);
         if (val === null) return; // cancelled
-        setListNames((prev) => {
-            const copy = { ...(prev || {}) };
-            copy[selectedKA.id] = { ...(copy[selectedKA.id] || {}), [n]: val };
-            return copy;
-        });
+        const newMap = { ...(listNames[selectedKA.id] || {}), [n]: val };
+        setListNames((prev) => ({ ...prev, [selectedKA.id]: newMap }));
+        try {
+            await keyAreaService.update(selectedKA.id, { listNames: newMap });
+        } catch (e) {
+            console.error("Failed to persist list names", e);
+            alert("Failed to save list name. Please try again.");
+        }
     };
 
-    const deleteList = (n) => {
+    const deleteList = async (n) => {
         if (!selectedKA) return;
+        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") {
+            alert("Cannot edit lists for the Ideas key area.");
+            return;
+        }
         const kaId = selectedKA.id;
-        // do not allow deleting a list that has tasks
+        // Only allow deletion if the list has no tasks
         const hasTasks = (allTasks || []).some(
             (t) => (t.list_index || 1) === n && String(t.key_area_id) === String(kaId),
         );
         if (hasTasks) {
-            alert("Cannot delete list while it contains tasks. Move or remove tasks first.");
+            alert("This list contains tasks. Move or update those tasks to another list before deleting.");
             return;
         }
         const names = listNames[kaId] || {};
-        if (!names || !names[n]) {
-            if (!confirm(`Remove list ${n}? This will reset any custom name.`)) return;
-        }
-        setListNames((prev) => {
-            const copy = { ...(prev || {}) };
-            if (!copy[kaId]) return copy;
-            const { [n]: _rem, ...rest } = copy[kaId];
-            copy[kaId] = { ...rest };
-            return copy;
-        });
+        const hasCustomName = !!(names && names[n]);
+        const msg = hasCustomName
+            ? `Delete custom name for list ${n}? Tasks in this list will not be affected.`
+            : `Remove list ${n}? It will disappear since it has no tasks.`;
+        if (!confirm(msg)) return;
+        const { [n]: _rem, ...rest } = names;
+        const newMap = { ...rest };
+        setListNames((prev) => ({ ...prev, [kaId]: newMap }));
         if (taskTab === n) setTaskTab(1);
+        try {
+            await keyAreaService.update(kaId, { listNames: newMap });
+        } catch (e) {
+            console.error("Failed to persist list names", e);
+            alert("Failed to delete list. Please try again.");
+        }
     };
 
     const visibleTasks = useMemo(() => {
@@ -2490,12 +2651,39 @@ export default function KeyAreas() {
         const payload = { ...updated, eisenhower_quadrant: q };
         const saved = await api.updateTask(payload.id, payload);
         setAllTasks((prev) => prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)));
+        await refreshActivitiesForTask(saved.id);
         setSelectedTask(null);
     };
 
     const handleDeleteTask = async (task) => {
+        // Prevent deleting a task that still has activities
+        try {
+            let list = activitiesByTask[String(task.id)];
+            if (!Array.isArray(list)) {
+                // fetch latest to be sure
+                list = await activityService.list({ taskId: task.id });
+            }
+            const count = Array.isArray(list) ? list.length : 0;
+            if (count > 0) {
+                alert(
+                    `Cannot delete this task because it has ${count} activit${count === 1 ? "y" : "ies"}. Remove those activities first.`,
+                );
+                return;
+            }
+        } catch (e) {
+            // If activities cannot be loaded, fail-safe and do not delete
+            console.error("Failed to verify activities before delete", e);
+            alert("Unable to verify activities for this task. Please try again.");
+            return;
+        }
+
         await api.deleteTask(task.id);
         setAllTasks((prev) => prev.filter((t) => t.id !== task.id));
+        setActivitiesByTask((prev) => {
+            const copy = { ...(prev || {}) };
+            delete copy[String(task.id)];
+            return copy;
+        });
         setSelectedTask(null);
     };
 
@@ -2552,6 +2740,11 @@ export default function KeyAreas() {
                                                 }`}
                                                 onClick={() => canAdd && (setShowForm(true), setEditing(null))}
                                                 disabled={!canAdd}
+                                                title={
+                                                    canAdd
+                                                        ? undefined
+                                                        : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
+                                                }
                                             >
                                                 <FaPlus /> New Key Area
                                             </button>
@@ -2820,18 +3013,44 @@ export default function KeyAreas() {
                                                         {leftListCount < 10 && (
                                                             <div className="flex items-center">
                                                                 <button
-                                                                    onClick={() => {
+                                                                    onClick={async () => {
                                                                         if (!selectedKA) return;
+                                                                        if (
+                                                                            selectedKA.is_default ||
+                                                                            (selectedKA.title || "").toLowerCase() ===
+                                                                                "ideas"
+                                                                        ) {
+                                                                            alert(
+                                                                                "Cannot add lists for the Ideas key area.",
+                                                                            );
+                                                                            return;
+                                                                        }
                                                                         const kaId = selectedKA.id;
                                                                         const currentCount = leftListCount;
                                                                         const next = currentCount + 1;
+                                                                        const nextName = `List ${next}`;
                                                                         setListNames((prev) => {
                                                                             const copy = { ...(prev || {}) };
                                                                             copy[kaId] = { ...(copy[kaId] || {}) };
-                                                                            copy[kaId][next] = `List ${next}`;
+                                                                            copy[kaId][next] = nextName;
                                                                             return copy;
                                                                         });
                                                                         setTaskTab(next);
+                                                                        try {
+                                                                            const names = listNames[kaId] || {};
+                                                                            const newMap = {
+                                                                                ...names,
+                                                                                [next]: nextName,
+                                                                            };
+                                                                            await keyAreaService.update(kaId, {
+                                                                                listNames: newMap,
+                                                                            });
+                                                                        } catch (e) {
+                                                                            console.error(
+                                                                                "Failed to persist new list",
+                                                                                e,
+                                                                            );
+                                                                        }
                                                                     }}
                                                                     title="Add list"
                                                                     className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
@@ -3341,14 +3560,37 @@ export default function KeyAreas() {
                                                                                                         ),
                                                                                                     );
                                                                                                 };
-                                                                                                const remove = (id) =>
-                                                                                                    setList(
-                                                                                                        list.filter(
-                                                                                                            (a) =>
-                                                                                                                a.id !==
-                                                                                                                id,
-                                                                                                        ),
-                                                                                                    );
+                                                                                                const remove = async (
+                                                                                                    id,
+                                                                                                ) => {
+                                                                                                    try {
+                                                                                                        await activityService.remove(
+                                                                                                            id,
+                                                                                                        );
+                                                                                                        setList(
+                                                                                                            list.filter(
+                                                                                                                (a) =>
+                                                                                                                    a.id !==
+                                                                                                                    id,
+                                                                                                            ),
+                                                                                                        );
+                                                                                                        window.dispatchEvent(
+                                                                                                            new CustomEvent(
+                                                                                                                "ka-activities-updated",
+                                                                                                                {
+                                                                                                                    detail: {
+                                                                                                                        refresh: true,
+                                                                                                                    },
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        );
+                                                                                                    } catch (e) {
+                                                                                                        console.error(
+                                                                                                            "Failed to delete activity",
+                                                                                                            e,
+                                                                                                        );
+                                                                                                    }
+                                                                                                };
                                                                                                 const move = (
                                                                                                     id,
                                                                                                     dir,
@@ -3423,23 +3665,42 @@ export default function KeyAreas() {
                                                                                                     );
                                                                                                 };
 
-                                                                                                const addNew = (
+                                                                                                const addNew = async (
                                                                                                     name,
                                                                                                 ) => {
                                                                                                     const text = (
                                                                                                         name || ""
                                                                                                     ).trim();
                                                                                                     if (!text) return;
-                                                                                                    const item = {
-                                                                                                        ...activityDefaults,
-                                                                                                        id: Date.now(),
-                                                                                                        activity_name:
-                                                                                                            text,
-                                                                                                    };
-                                                                                                    setList([
-                                                                                                        ...list,
-                                                                                                        item,
-                                                                                                    ]);
+                                                                                                    try {
+                                                                                                        const created =
+                                                                                                            await activityService.create(
+                                                                                                                {
+                                                                                                                    text,
+                                                                                                                    taskId: t.id,
+                                                                                                                },
+                                                                                                            );
+                                                                                                        setList([
+                                                                                                            ...(list ||
+                                                                                                                []),
+                                                                                                            created,
+                                                                                                        ]);
+                                                                                                        window.dispatchEvent(
+                                                                                                            new CustomEvent(
+                                                                                                                "ka-activities-updated",
+                                                                                                                {
+                                                                                                                    detail: {
+                                                                                                                        refresh: true,
+                                                                                                                    },
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        );
+                                                                                                    } catch (e) {
+                                                                                                        console.error(
+                                                                                                            "Failed to add activity",
+                                                                                                            e,
+                                                                                                        );
+                                                                                                    }
                                                                                                 };
 
                                                                                                 return (
@@ -3495,6 +3756,7 @@ export default function KeyAreas() {
                                                                                                                                 <div className="relative flex-1">
                                                                                                                                     <input
                                                                                                                                         value={
+                                                                                                                                            a.text ||
                                                                                                                                             a.activity_name ||
                                                                                                                                             ""
                                                                                                                                         }
@@ -3503,12 +3765,59 @@ export default function KeyAreas() {
                                                                                                                                         ) =>
                                                                                                                                             updateField(
                                                                                                                                                 a.id,
-                                                                                                                                                "activity_name",
+                                                                                                                                                a.text !=
+                                                                                                                                                    null
+                                                                                                                                                    ? "text"
+                                                                                                                                                    : "activity_name",
                                                                                                                                                 e
                                                                                                                                                     .target
                                                                                                                                                     .value,
                                                                                                                                             )
                                                                                                                                         }
+                                                                                                                                        onBlur={async (
+                                                                                                                                            e,
+                                                                                                                                        ) => {
+                                                                                                                                            const newTitle =
+                                                                                                                                                (
+                                                                                                                                                    e
+                                                                                                                                                        .target
+                                                                                                                                                        .value ||
+                                                                                                                                                    ""
+                                                                                                                                                ).trim();
+                                                                                                                                            const prevTitle =
+                                                                                                                                                a.text ||
+                                                                                                                                                a.activity_name ||
+                                                                                                                                                "";
+                                                                                                                                            if (
+                                                                                                                                                !newTitle ||
+                                                                                                                                                newTitle ===
+                                                                                                                                                    prevTitle
+                                                                                                                                            )
+                                                                                                                                                return;
+                                                                                                                                            try {
+                                                                                                                                                await activityService.update(
+                                                                                                                                                    a.id,
+                                                                                                                                                    {
+                                                                                                                                                        text: newTitle,
+                                                                                                                                                    },
+                                                                                                                                                );
+                                                                                                                                                window.dispatchEvent(
+                                                                                                                                                    new CustomEvent(
+                                                                                                                                                        "ka-activities-updated",
+                                                                                                                                                        {
+                                                                                                                                                            detail: {
+                                                                                                                                                                refresh: true,
+                                                                                                                                                            },
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                );
+                                                                                                                                            } catch (err) {
+                                                                                                                                                console.error(
+                                                                                                                                                    "Failed to rename activity",
+                                                                                                                                                    err,
+                                                                                                                                                );
+                                                                                                                                            }
+                                                                                                                                        }}
                                                                                                                                         placeholder="Activity name"
                                                                                                                                         className={`w-full border rounded px-2 py-1 pr-16 ${
                                                                                                                                             a.completed
@@ -3858,13 +4167,6 @@ export default function KeyAreas() {
                                                                                                                                                     >
                                                                                                                                                         <option
                                                                                                                                                             value={
-                                                                                                                                                                3
-                                                                                                                                                            }
-                                                                                                                                                        >
-                                                                                                                                                            High
-                                                                                                                                                        </option>
-                                                                                                                                                        <option
-                                                                                                                                                            value={
                                                                                                                                                                 2
                                                                                                                                                             }
                                                                                                                                                         >
@@ -4095,6 +4397,24 @@ export default function KeyAreas() {
                                             <div
                                                 key={ka.id}
                                                 className="bg-white rounded-2xl shadow border border-slate-200 p-4 flex flex-col"
+                                                draggable={!ka.is_default}
+                                                onDragStart={(e) => {
+                                                    if (ka.is_default) return;
+                                                    setDragKAId(String(ka.id));
+                                                    e.dataTransfer.effectAllowed = "move";
+                                                }}
+                                                onDragOver={(e) => {
+                                                    if (ka.is_default) return;
+                                                    e.preventDefault();
+                                                    e.dataTransfer.dropEffect = "move";
+                                                }}
+                                                onDrop={async (e) => {
+                                                    e.preventDefault();
+                                                    if (!dragKAId || String(dragKAId) === String(ka.id)) return;
+                                                    await reorderByDrop(String(dragKAId), String(ka.id));
+                                                    setDragKAId(null);
+                                                }}
+                                                onDragEnd={() => setDragKAId(null)}
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div>
@@ -4124,6 +4444,26 @@ export default function KeyAreas() {
                                                     >
                                                         <FaListUl /> Open Lists
                                                     </button>
+                                                    {!ka.is_default && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                title="Move up"
+                                                                className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                                onClick={() => reorderKA(ka, "up")}
+                                                            >
+                                                                <FaChevronUp />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                title="Move down"
+                                                                className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
+                                                                onClick={() => reorderKA(ka, "down")}
+                                                            >
+                                                                <FaChevronDown />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                     <button
                                                         className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
                                                         onClick={() => {
@@ -4135,10 +4475,17 @@ export default function KeyAreas() {
                                                     </button>
                                                     <button
                                                         disabled={ka.is_default}
-                                                        className={`rounded-lg font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200 ${
+                                                        title={
                                                             ka.is_default
-                                                                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                                                : "bg-white border text-red-600 hover:bg-red-50"
+                                                                ? undefined
+                                                                : typeof ka.taskCount === "number" && ka.taskCount > 0
+                                                                  ? `${ka.taskCount} task(s) present`
+                                                                  : undefined
+                                                        }
+                                                        className={`rounded-lg font-semibold flex items-center gap-2 px-2 py-1 text-sm border ${
+                                                            ka.is_default
+                                                                ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
+                                                                : "bg-white text-red-600 hover:bg-red-50 border-red-200"
                                                         }`}
                                                         onClick={() => onDeleteKA(ka)}
                                                     >
@@ -4586,9 +4933,23 @@ export default function KeyAreas() {
                                                 name="title"
                                                 required
                                                 defaultValue={editing?.title || ""}
-                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
+                                                readOnly={
+                                                    Boolean(editing?.is_default) ||
+                                                    (editing?.title || "").toLowerCase() === "ideas"
+                                                }
+                                                disabled={
+                                                    Boolean(editing?.is_default) ||
+                                                    (editing?.title || "").toLowerCase() === "ideas"
+                                                }
+                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-700"
                                                 placeholder="e.g., Finance"
                                             />
+                                            {Boolean(editing?.is_default) ||
+                                            (editing?.title || "").toLowerCase() === "ideas" ? (
+                                                <p className="text-xs text-slate-600 mt-1">
+                                                    The "Ideas" key area cannot be renamed.
+                                                </p>
+                                            ) : null}
                                         </div>
                                         <div>
                                             <label className="text-sm font-semibold text-slate-900">Description</label>
@@ -4600,6 +4961,7 @@ export default function KeyAreas() {
                                                 placeholder="What belongs to this area?"
                                             />
                                         </div>
+                                        {/* Color inputs removed per request */}
                                         <div className="flex items-center gap-2">
                                             <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
                                                 <FaSave /> Save
