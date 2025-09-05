@@ -3,7 +3,7 @@ import axios from "axios";
 
 const apiBase = import.meta.env.DEV
     ? "/api" // use Vite proxy in development for same-origin cookies
-    : import.meta.env.VITE_API_URL || "/api";
+    : import.meta.env.VITE_API_BASE_URL || "/api";
 
 const apiClient = axios.create({
     baseURL: apiBase,
