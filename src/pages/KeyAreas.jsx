@@ -930,6 +930,7 @@ function TaskFullView({
     const [isEditing, setIsEditing] = useState(false);
     const [form, setForm] = useState(task || null);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
     const menuRef = useRef(null);
     const [newActivity, setNewActivity] = useState("");
     const [showDetailsPopup, setShowDetailsPopup] = useState(false);
@@ -1078,7 +1079,7 @@ function TaskFullView({
                                     </span>
                                 );
                             })()}
-                            <div className="relative truncate font-bold text-slate-900 text-base md:text-lg pl-6">
+                            <div className="relative truncate font-bold text-slate-900 text-base md:text-lg pl-6 z-10">
                                 {/* subtle stop icon behind the task name, with left padding to avoid overlap */}
                                 <FaStop
                                     className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px] text-[#4DC3D8]"
@@ -1087,13 +1088,27 @@ function TaskFullView({
                                 <span className="relative z-10">{form?.title || task?.title || "Untitled task"}</span>
                             </div>
                             {/* Ellipsis menu next to the title */}
-                            <div className="relative shrink-0" ref={menuRef}>
+                            <div className="relative shrink-0 z-50" ref={menuRef}>
                                 <button
                                     type="button"
                                     aria-haspopup="menu"
                                     aria-expanded={menuOpen ? "true" : "false"}
                                     className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600"
-                                    onClick={() => setMenuOpen((s) => !s)}
+                                    onClick={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const gap = 8;
+                                        const menuWidth = 160; // w-40 (~10rem)
+                                        const top = rect.bottom + window.scrollY + gap; // a bit below
+                                        // default: place to the right of the button
+                                        let left = rect.right + window.scrollX + gap;
+                                        // if overflowing viewport, place to the left of the button
+                                        const viewportRight = window.scrollX + window.innerWidth - gap;
+                                        if (left + menuWidth > viewportRight) {
+                                            left = rect.left + window.scrollX - menuWidth - gap;
+                                        }
+                                        setMenuPos({ top, left });
+                                        setMenuOpen((s) => !s);
+                                    }}
                                     title="More actions"
                                 >
                                     <FaEllipsisV />
@@ -1101,7 +1116,8 @@ function TaskFullView({
                                 {menuOpen && (
                                     <div
                                         role="menu"
-                                        className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-10"
+                                        className="fixed w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
+                                        style={{ top: menuPos.top, left: menuPos.left }}
                                     >
                                         <button
                                             role="menuitem"
@@ -2579,8 +2595,7 @@ export default function KeyAreas() {
     const onCreateTask = async (e) => {
         e.preventDefault();
         if (!selectedKA) return;
-        // prevent creating tasks in Ideas/locked key area
-        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") return;
+        // allow manual task creation in Ideas; still block if other system-locked areas exist in future
         const f = new FormData(e.currentTarget);
         const title = f.get("title").toString().trim();
         if (!title) return;
@@ -2838,7 +2853,7 @@ export default function KeyAreas() {
                                             {showViewMenu && (
                                                 <div
                                                     role="menu"
-                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-10"
+                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
                                                 >
                                                     {[
                                                         { key: "list", label: "List" },
@@ -2876,7 +2891,8 @@ export default function KeyAreas() {
                                     goals={goals}
                                     kaTitle={selectedKA?.title}
                                     readOnly={
-                                        selectedKA?.is_default || (selectedKA?.title || "").toLowerCase() === "ideas"
+                                        Boolean(selectedKA?.is_default) &&
+                                        (selectedKA?.title || "").toLowerCase() !== "ideas"
                                     }
                                     onBack={() => setSelectedTaskFull(null)}
                                     onSave={async (payload) => {
