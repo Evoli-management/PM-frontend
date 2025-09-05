@@ -19,6 +19,46 @@ export default function ProfileSetting() {
     const [changeMode, setChangeMode] = useState(null); // 'password' | 'email' | null
     const fileRef = useRef(null);
 
+    // Personal details edit mode + saved snapshot
+    const [savedPersonal, setSavedPersonal] = useState({
+        name: "John Doe",
+        email: "john.doe@company.com",
+        phone: "+1 555-123-4567"
+    });
+    const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+
+    // Professional details edit mode + saved snapshot
+    const [savedProfessional, setSavedProfessional] = useState({
+        jobTitle: "Lead Developer",
+        department: "Engineering",
+        manager: "Sarah Johnson"
+    });
+    const [isEditingProfessional, setIsEditingProfessional] = useState(false);
+    const [professionalSaved, setProfessionalSaved] = useState(false);
+
+    // About Me & Skills edit mode + saved snapshot
+    const [savedAbout, setSavedAbout] = useState({
+        bio: "",
+        skills: []
+    });
+    const [isEditingAbout, setIsEditingAbout] = useState(false);
+    const [aboutSaved, setAboutSaved] = useState(false);
+
+    // Team Assignment edit mode + saved snapshot
+    const [savedTeams, setSavedTeams] = useState({
+        mainTeam: {
+            name: "Product Development",
+            members: 8,
+            role: "Lead Developer",
+        },
+        otherTeams: [
+            { name: "Marketing", role: "Contributor", members: 5 },
+            { name: "Design System", role: "Reviewer", members: 3 },
+        ],
+    });
+    const [isEditingTeams, setIsEditingTeams] = useState(false);
+    const [teamsSaved, setTeamsSaved] = useState(false);
+
     // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
     useEffect(() => {
         const applyFromHash = () => {
@@ -563,6 +603,28 @@ export default function ProfileSetting() {
         }
     }, []);
 
+    // Initialize form fields from saved snapshots on mount (one-time initialization)
+    useEffect(() => {
+        setForm((prev) => ({
+            ...prev,
+            name: prev.name || savedPersonal.name,
+            email: prev.email || savedPersonal.email,
+            phone: prev.phone || savedPersonal.phone,
+            jobTitle: prev.jobTitle || savedProfessional.jobTitle,
+            department: prev.department || savedProfessional.department,
+            manager: prev.manager || savedProfessional.manager,
+            bio: typeof prev.bio === 'string' && prev.bio.length > 0 ? prev.bio : (savedAbout.bio || ""),
+            skills: Array.isArray(prev.skills) && prev.skills.length > 0 ? prev.skills : (savedAbout.skills || []),
+            teams: {
+                ...(prev.teams || {}),
+                mainTeam: prev.teams?.mainTeam || savedTeams.mainTeam,
+                otherTeams: prev.teams?.otherTeams || savedTeams.otherTeams,
+                canCreateTeams: typeof prev.teams?.canCreateTeams === 'boolean' ? prev.teams.canCreateTeams : true,
+                canJoinTeams: typeof prev.teams?.canJoinTeams === 'boolean' ? prev.teams.canJoinTeams : true,
+            },
+        }));
+    }, []); // Only run once on mount
+
     const savePreferences = () => {
         try {
             const toStore = {
@@ -947,270 +1009,860 @@ export default function ProfileSetting() {
                             {/* Main content */}
                             <div className="rounded border border-gray-300 bg-[#F7F7F7] p-3 sm:p-4">
                                 {activeTab === "Account" && (
-                                    <form onSubmit={handleSubmit}>
-                                        {/* Top: avatar + core fields - responsive layout */}
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[80px_1fr] lg:grid-cols-[64px_1fr]">
-                                            {/* Avatar */}
-                                            <div className="flex flex-col items-center justify-center sm:items-start">
-                                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-300 text-2xl text-white overflow-hidden sm:h-14 sm:w-14">
-                                                    {avatarPreview ? (
-                                                        <img
-                                                            src={avatarPreview}
-                                                            alt="Profile"
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <span>👤</span>
-                                                    )}
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => fileRef.current?.click()}
-                                                    className="mt-2 w-20 rounded border border-gray-400 bg-white py-1 text-[11px] hover:bg-gray-50 sm:w-[88px] sm:text-[12px]"
-                                                >
-                                                    ↓ Upload
-                                                </button>
-                                                {avatarOriginal && (
+                                    <div className="space-y-6">
+                                        {/* Profile Picture Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Picture</h3>
+                                            <div className="flex items-center gap-6">
+                                                {/* Avatar with upload and crop */}
+                                                <div className="relative">
+                                                    <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden border-2 border-gray-300">
+                                                        {avatarPreview ? (
+                                                            <img
+                                                                src={avatarPreview}
+                                                                alt="Profile"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-gray-500 text-2xl">
+                                                                👤
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setShowCropper(true)}
-                                                        className="mt-2 w-20 rounded border border-blue-500 text-blue-700 bg-white py-1 text-[11px] hover:bg-blue-50 sm:w-[88px] sm:text-[12px]"
+                                                        onClick={() => fileRef.current?.click()}
+                                                        className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm hover:bg-blue-700 transition-colors shadow-lg"
                                                     >
-                                                        ✂ Crop
+                                                        📷
                                                     </button>
-                                                )}
-                                                <input
-                                                    ref={fileRef}
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={handleAvatarChange}
-                                                    className="hidden"
-                                                />
-                                                {errors.avatar && (
-                                                    <p className="text-xs text-red-600 mt-1 text-center sm:text-left">
-                                                        {errors.avatar}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/* Name / Email / Phone with icons */}
-                                            <div className="grid grid-cols-1 gap-3 sm:gap-2">
-                                                <Field label="Name" error={errors.name}>
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">👤</span>
-                                                        <input
-                                                            value={form.name}
-                                                            onChange={upd("name")}
-                                                            placeholder="Name"
-                                                            autoComplete="off"
-                                                            className={`h-10 w-full rounded border pl-7 pr-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                                errors.name ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
-                                                            }`}
-                                                        />
-                                                    </div>
-                                                </Field>
-                                                <Field label="Email" error={errors.email}>
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">✉️</span>
-                                                        <input
-                                                            type="email"
-                                                            value={form.email}
-                                                            onChange={upd("email")}
-                                                            placeholder="Email"
-                                                            autoComplete="off"
-                                                            className={`h-10 w-full rounded border pl-7 pr-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                                errors.email ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
-                                                            }`}
-                                                        />
-                                                    </div>
-                                                </Field>
-                                                <Field label="Phone Number" error={errors.phone}>
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">📞</span>
-                                                        <input
-                                                            type="tel"
-                                                            value={form.phone}
-                                                            onChange={upd("phone")}
-                                                            placeholder="Phone Number"
-                                                            autoComplete="off"
-                                                            className={`h-10 w-full rounded border pl-7 pr-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${
-                                                                errors.phone ? "border-red-500 bg-red-50" : "border-gray-400 bg-white"
-                                                            }`}
-                                                        />
-                                                    </div>
-                                                </Field>
-                                            </div>
-                                            </div>
-                                            {/* End core fields */}
-
-                                        {/* Professional Details */}
-                                        <Section title="Professional Details">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                                <Field label="Job Title">
-                                                    <input value={form.jobTitle} onChange={upd("jobTitle")} placeholder="e.g., Product Manager" className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
-                                                </Field>
-                                                <Field label="Department">
-                                                    <input value={form.department} onChange={upd("department")} placeholder="e.g., Growth" className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
-                                                </Field>
-                                                <Field label="Manager">
-                                                    <input value={form.manager} onChange={upd("manager")} placeholder="Manager name" className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
-                                                </Field>
-                                            </div>
-                                        </Section>
-
-                                        {/* About Me / Skills */}
-                                        <Section title="About Me & Skills">
-                                            <div className="space-y-3">
-                                                <Field label="About Me / Bio">
-                                                    <textarea value={form.bio} onChange={upd("bio")} placeholder="Tell us a bit about yourself..." rows={4} className="w-full rounded border border-gray-400 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500" />
-                                                </Field>
-                                                <Field label="Skills (comma or Enter to add)">
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {form.skills.map((s, idx) => (
-                                                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">
-                                                                {s}
-                                                                <button type="button" className="text-blue-700" onClick={() => setForm((st) => ({ ...st, skills: st.skills.filter((_, i) => i !== idx) }))}>×</button>
-                                                            </span>
-                                                        ))}
-                                                    </div>
                                                     <input
-                                                        value={skillsInput}
-                                                        onChange={(e) => setSkillsInput(e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter' || e.key === ',') {
-                                                                e.preventDefault();
-                                                                const val = skillsInput.trim().replace(/,$/, '');
-                                                                if (!val) return;
-                                                                setForm((st) => ({ ...st, skills: Array.from(new Set([...(st.skills || []), val])) }));
-                                                                setSkillsInput("");
-                                                            }
-                                                        }}
-                                                        placeholder="Type a skill and press Enter"
-                                                        className="mt-2 h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                        ref={fileRef}
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={handleAvatarChange}
+                                                        className="hidden"
                                                     />
-                                                </Field>
+                                                </div>
+                                                
+                                                <div className="flex-1">
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => fileRef.current?.click()}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Upload Photo
+                                                        </button>
+                                                        {avatarOriginal && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowCropper(true)}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Crop Photo
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-gray-500 mt-2">JPG, PNG or GIF (max. 5MB)</p>
+                                                    {errors.avatar && (
+                                                        <p className="text-sm text-red-600 mt-1">{errors.avatar}</p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </Section>
+                                        </div>
 
-                                        {/* Team Assignment (quick edit) */}
-                                        <Section title="Team Assignment">
-                                            <div className="space-y-3">
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                    <Field label="Main Team">
-                                                        <input
-                                                            value={form.teams?.mainTeam?.name || ''}
-                                                            onChange={(e) => setForm((s) => ({
-                                                                ...s,
-                                                                teams: { ...s.teams, mainTeam: { ...(s.teams?.mainTeam || {}), name: e.target.value } }
-                                                            }))}
-                                                            placeholder="Your primary team"
-                                                            className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
-                                                        />
-                                                    </Field>
-                                                    <Field label="Add Other Team">
-                                                        <div className="flex gap-2">
-                                                            <input id="addOtherTeam" placeholder="Team name" className="flex-1 h-10 rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9" />
-                                                            <button type="button" className="px-3 rounded bg-green-600 text-white text-sm" onClick={() => {
-                                                                const el = document.getElementById('addOtherTeam');
-                                                                const name = el?.value?.trim();
-                                                                if (!name) return;
-                                                                setForm((s) => ({
-                                                                    ...s,
-                                                                    teams: { ...s.teams, otherTeams: [...(s.teams?.otherTeams || []), { name, role: 'Contributor', members: 0 }] }
+                                        {/* Personal Details Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">Personal Details</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingPersonal ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Ensure form shows saved values when entering edit mode
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    name: savedPersonal.name,
+                                                                    email: savedPersonal.email,
+                                                                    phone: savedPersonal.phone,
                                                                 }));
-                                                                if (el) el.value = '';
-                                                            }}>Add</button>
+                                                                setIsEditingPersonal(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert form to saved snapshot and exit edit
+                                                                    setForm((prev) => ({
+                                                                        ...prev,
+                                                                        name: savedPersonal.name,
+                                                                        email: savedPersonal.email,
+                                                                        phone: savedPersonal.phone,
+                                                                    }));
+                                                                    setErrors((e) => ({ ...e, name: undefined, email: undefined, phone: undefined }));
+                                                                    setIsEditingPersonal(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    const newErrors = {};
+                                                                    if (!form.name.trim()) newErrors.name = "Name is required";
+                                                                    if (!form.email.trim()) newErrors.email = "Email is required";
+                                                                    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = "Email is invalid";
+                                                                    if (form.phone && !/^\+?[\d\s\-\(\)]+$/.test(form.phone)) newErrors.phone = "Phone number is invalid";
+                                                                    setErrors((prev) => ({ ...prev, ...newErrors }));
+                                                                    if (Object.keys(newErrors).length) return;
+
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    // Commit to saved snapshot
+                                                                    setSavedPersonal({ name: form.name, email: form.email, phone: form.phone });
+                                                                    setIsEditingPersonal(false);
+                                                                    setAccountSaved(true);
+                                                                    setTimeout(() => setAccountSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingPersonal ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Full Name</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">👤</span>
+                                                            <span className="font-medium break-all">{savedPersonal.name || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Email</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">✉️</span>
+                                                            <span className="font-medium break-all">{savedPersonal.email || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Phone</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">📞</span>
+                                                            <span className="font-medium break-all">{savedPersonal.phone || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-4 space-y-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                                                            <input type="text" value={form.name} onChange={upd('name')} className="mt-1 w-full border rounded-lg p-2.5 focus:ring focus:border-blue-500" />
+                                                            {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                                                            <input type="email" value={form.email} onChange={upd('email')} className="mt-1 w-full border rounded-lg p-2.5 focus:ring focus:border-blue-500" />
+                                                            {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700">Phone</label>
+                                                            <input type="tel" value={form.phone} onChange={upd('phone')} className="mt-1 w-full border rounded-lg p-2.5 focus:ring focus:border-blue-500" />
+                                                            {errors.phone && <p className="text-sm text-red-600 mt-1">{errors.phone}</p>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Success Toast */}
+                                            {accountSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">Personal details saved successfully!</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Professional Details Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">Professional Details</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingProfessional ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Ensure form shows saved values when entering edit mode
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    jobTitle: savedProfessional.jobTitle,
+                                                                    department: savedProfessional.department,
+                                                                    manager: savedProfessional.manager,
+                                                                }));
+                                                                setIsEditingProfessional(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert to saved and exit edit
+                                                                    setForm((prev) => ({
+                                                                        ...prev,
+                                                                        jobTitle: savedProfessional.jobTitle,
+                                                                        department: savedProfessional.department,
+                                                                        manager: savedProfessional.manager,
+                                                                    }));
+                                                                    setIsEditingProfessional(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    // Minimal validation: allow empty, but trim values
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    setSavedProfessional({
+                                                                        jobTitle: (form.jobTitle || "").trim(),
+                                                                        department: (form.department || "").trim(),
+                                                                        manager: (form.manager || "").trim(),
+                                                                    });
+                                                                    setIsEditingProfessional(false);
+                                                                    setProfessionalSaved(true);
+                                                                    setTimeout(() => setProfessionalSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingProfessional ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Job Title</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">💼</span>
+                                                            <span className="font-medium break-all">{savedProfessional.jobTitle || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Department</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">🏢</span>
+                                                            <span className="font-medium break-all">{savedProfessional.department || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Manager</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">👨‍💼</span>
+                                                            <span className="font-medium break-all">{savedProfessional.manager || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {/* Job Title */}
+                                                    <Field label="Job Title">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">💼</span>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.jobTitle}
+                                                                onChange={upd("jobTitle")}
+                                                                placeholder="e.g., Product Manager"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Department */}
+                                                    <Field label="Department">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">🏢</span>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.department}
+                                                                onChange={upd("department")}
+                                                                placeholder="e.g., Engineering"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Manager */}
+                                                    <Field label="Manager">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">👨‍💼</span>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.manager}
+                                                                onChange={upd("manager")}
+                                                                placeholder="Manager name"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
                                                         </div>
                                                     </Field>
                                                 </div>
-                                                <div>
-                                                    <div className="text-xs text-gray-600 mb-1">Other Teams</div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {(form.teams?.otherTeams || []).map((t, idx) => (
-                                                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border">
-                                                                {t.name}
-                                                                <button type="button" className="text-gray-600" onClick={() => setForm((s) => ({
-                                                                    ...s,
-                                                                    teams: { ...s.teams, otherTeams: (s.teams?.otherTeams || []).filter((_, i) => i !== idx) }
-                                                                }))}>×</button>
-                                                            </span>
-                                                        ))}
-                                                        {!(form.teams?.otherTeams || []).length && (
-                                                            <span className="text-xs text-gray-500">No other teams yet.</span>
+                                            )}
+
+                                            {/* Success Toast */}
+                                            {professionalSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">Professional details saved successfully!</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Bio / Skills / About Me Section (Optional) */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">About Me & Skills <span className="text-sm font-normal text-gray-500">(Optional)</span></h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingAbout ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    bio: savedAbout.bio || "",
+                                                                    skills: savedAbout.skills || [],
+                                                                }));
+                                                                setIsEditingAbout(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert and exit edit
+                                                                    setForm((prev) => ({
+                                                                        ...prev,
+                                                                        bio: savedAbout.bio || "",
+                                                                        skills: savedAbout.skills || [],
+                                                                    }));
+                                                                    setIsEditingAbout(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    setSavedAbout({ bio: form.bio || "", skills: form.skills || [] });
+                                                                    setIsEditingAbout(false);
+                                                                    setAboutSaved(true);
+                                                                    setTimeout(() => setAboutSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingAbout ? (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Bio / About Me</div>
+                                                        <div className="flex items-start gap-2 text-gray-900">
+                                                            <span className="text-lg mt-0.5">📝</span>
+                                                            <p className="text-sm whitespace-pre-wrap">{(savedAbout.bio || "").trim() || "—"}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-3">Skills</div>
+                                                        {Array.isArray(savedAbout.skills) && savedAbout.skills.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {savedAbout.skills.map((skill, idx) => (
+                                                                    <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full border border-blue-200">
+                                                                        {skill}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-500">No skills added yet</p>
                                                         )}
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </Section>
+                                            ) : (
+                                                <div className="space-y-6">
+                                                    {/* Bio */}
+                                                    <Field label="Bio / About Me">
+                                                        <div className="relative">
+                                                            <div className="absolute top-3 left-3 pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">📝</span>
+                                                            </div>
+                                                            <textarea
+                                                                value={form.bio}
+                                                                onChange={upd("bio")}
+                                                                placeholder="Tell us a bit about yourself..."
+                                                                rows={4}
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors resize-none"
+                                                            />
+                                                        </div>
+                                                    </Field>
 
-                                        {/* Change Password */}
-                                        <Section title="Change Password">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                                <Field label="Current Password" error={errors.oldPw}>
-                                                    <PasswordField value={form.oldPw} onChange={upd('oldPw')} placeholder="Current password" open={showPw.old} toggle={() => setShowPw((s) => ({ ...s, old: !s.old }))} error={errors.oldPw} />
-                                                </Field>
-                                                <Field label="New Password" error={errors.newPw}>
-                                                    <PasswordField value={form.newPw} onChange={upd('newPw')} placeholder="New password" open={showPw.new1} toggle={() => setShowPw((s) => ({ ...s, new1: !s.new1 }))} error={errors.newPw} />
-                                                </Field>
-                                                <Field label="Confirm Password" error={errors.confirmPw}>
-                                                    <PasswordField value={form.confirmPw} onChange={upd('confirmPw')} placeholder="Confirm password" open={showPw.new2} toggle={() => setShowPw((s) => ({ ...s, new2: !s.new2 }))} error={errors.confirmPw} />
-                                                </Field>
-                                            </div>
-                                            <div className="flex justify-end mt-3">
-                                                <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white text-sm" onClick={async () => {
-                                                    const errs = {};
-                                                    if (!form.oldPw) errs.oldPw = 'Current password is required';
-                                                    if (!form.newPw || form.newPw.length < 8) errs.newPw = 'Minimum 8 characters';
-                                                    if (form.newPw !== form.confirmPw) errs.confirmPw = 'Passwords do not match';
-                                                    setErrors((e) => ({ ...e, ...errs }));
-                                                    if (Object.keys(errs).length) return;
-                                                    setIsLoading(true);
-                                                    await new Promise(r => setTimeout(r, 800));
-                                                    setIsLoading(false);
-                                                    setPasswordSaved(true);
-                                                    setTimeout(() => setPasswordSaved(false), 2000);
-                                                }}>Update Password</button>
-                                            </div>
-                                            {passwordSaved && <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Password updated.</div>}
-                                        </Section>
+                                                    {/* Skills */}
+                                                    <Field label="Skills">
+                                                        <div className="space-y-3">
+                                                            {/* Skills Display */}
+                                                            {form.skills.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
+                                                                    {form.skills.map((skill, idx) => (
+                                                                        <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full border border-blue-200">
+                                                                            {skill}
+                                                                            <button 
+                                                                                type="button" 
+                                                                                className="text-blue-600 hover:text-blue-800 ml-1 text-xs" 
+                                                                                onClick={() => setForm((st) => ({ ...st, skills: st.skills.filter((_, i) => i !== idx) }))}
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* Add Skills Input */}
+                                                            <div className="relative">
+                                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                    <span className="text-gray-500 text-lg">🎯</span>
+                                                                </div>
+                                                                <input
+                                                                    value={skillsInput}
+                                                                    onChange={(e) => setSkillsInput(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter' || e.key === ',') {
+                                                                            e.preventDefault();
+                                                                            const val = skillsInput.trim().replace(/,$/, '');
+                                                                            if (!val) return;
+                                                                            setForm((st) => ({ ...st, skills: Array.from(new Set([...(st.skills || []), val])) }));
+                                                                            setSkillsInput("");
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Add skills (press Enter or comma to add)"
+                                                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                                />
+                                                            </div>
+                                                            <p className="text-xs text-gray-500">Press Enter or comma to add skills. Click ✕ to remove.</p>
+                                                        </div>
+                                                    </Field>
+                                                </div>
+                                            )}
 
-                                        {/* Change Email */}
-                                        <Section title="Change Email">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <Field label="Current Email" error={errors.oldEmail}>
-                                                    <input type="email" value={form.oldEmail} onChange={upd("oldEmail")} placeholder="Current email" className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${errors.oldEmail ? 'border-red-500 bg-red-50' : 'border-gray-400 bg-white'}`} />
-                                                </Field>
-                                                <Field label="New Email" error={errors.newEmail}>
-                                                    <input type="email" value={form.newEmail} onChange={upd("newEmail")} placeholder="New email" className={`h-10 w-full rounded border px-3 text-sm outline-none focus:border-blue-500 sm:h-9 ${errors.newEmail ? 'border-red-500 bg-red-50' : 'border-gray-400 bg-white'}`} />
-                                                </Field>
-                                            </div>
-                                            <div className="flex justify-end mt-3">
-                                                <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white text-sm" onClick={async () => {
-                                                    const errs = {};
-                                                    if (!form.oldEmail) errs.oldEmail = 'Current email is required';
-                                                    if (!form.newEmail) errs.newEmail = 'New email is required';
-                                                    else if (!/\S+@\S+\.\S+/.test(form.newEmail)) errs.newEmail = 'Email is invalid';
-                                                    setErrors((e) => ({ ...e, ...errs }));
-                                                    if (Object.keys(errs).length) return;
-                                                    setIsLoading(true);
-                                                    await new Promise(r => setTimeout(r, 800));
-                                                    setIsLoading(false);
-                                                    setEmailSaved(true);
-                                                    setTimeout(() => setEmailSaved(false), 2000);
-                                                }}>Update Email</button>
-                                            </div>
-                                            {emailSaved && <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Email updated.</div>}
-                                        </Section>
-
-                                        <div className="flex justify-end mt-4">
-                                            <button type="submit" className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700" disabled={isLoading}>
-                                                {isLoading ? 'Saving...' : 'Save Changes'}
-                                            </button>
+                                            {/* Success Toast */}
+                                            {aboutSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">About me & skills saved successfully!</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {accountSaved && (
-                                            <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Account details saved.</div>
-                                        )}
-                                    </form>
+
+                                        {/* Password & Email Change Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Security Settings</h3>
+                                            
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                {/* Change Password */}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="font-medium text-gray-900">Change Password</h4>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setChangeMode(changeMode === 'password' ? null : 'password')}
+                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                        >
+                                                            {changeMode === 'password' ? 'Cancel' : 'Change'}
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {changeMode === 'password' && (
+                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                                            <Field label="Current Password" error={errors.oldPw}>
+                                                                <PasswordField 
+                                                                    value={form.oldPw} 
+                                                                    onChange={upd('oldPw')} 
+                                                                    placeholder="Enter current password" 
+                                                                    open={showPw.old} 
+                                                                    toggle={() => setShowPw((s) => ({ ...s, old: !s.old }))} 
+                                                                    error={errors.oldPw} 
+                                                                />
+                                                            </Field>
+                                                            <Field label="New Password" error={errors.newPw}>
+                                                                <PasswordField 
+                                                                    value={form.newPw} 
+                                                                    onChange={upd('newPw')} 
+                                                                    placeholder="Enter new password" 
+                                                                    open={showPw.new1} 
+                                                                    toggle={() => setShowPw((s) => ({ ...s, new1: !s.new1 }))} 
+                                                                    error={errors.newPw} 
+                                                                />
+                                                            </Field>
+                                                            <Field label="Confirm Password" error={errors.confirmPw}>
+                                                                <PasswordField 
+                                                                    value={form.confirmPw} 
+                                                                    onChange={upd('confirmPw')} 
+                                                                    placeholder="Confirm new password" 
+                                                                    open={showPw.new2} 
+                                                                    toggle={() => setShowPw((s) => ({ ...s, new2: !s.new2 }))} 
+                                                                    error={errors.confirmPw} 
+                                                                />
+                                                            </Field>
+                                                            <div className="flex justify-end">
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
+                                                                    onClick={async () => {
+                                                                        const errs = {};
+                                                                        if (!form.oldPw) errs.oldPw = 'Current password is required';
+                                                                        if (!form.newPw || form.newPw.length < 8) errs.newPw = 'Minimum 8 characters';
+                                                                        if (form.newPw !== form.confirmPw) errs.confirmPw = 'Passwords do not match';
+                                                                        setErrors((e) => ({ ...e, ...errs }));
+                                                                        if (Object.keys(errs).length) return;
+                                                                        setIsLoading(true);
+                                                                        await new Promise(r => setTimeout(r, 1000));
+                                                                        setIsLoading(false);
+                                                                        setPasswordSaved(true);
+                                                                        setTimeout(() => {
+                                                                            setPasswordSaved(false);
+                                                                            setChangeMode(null);
+                                                                        }, 3000);
+                                                                    }}
+                                                                >
+                                                                    Update Password
+                                                                </button>
+                                                            </div>
+                                                            {passwordSaved && (
+                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                                    <span className="text-green-600">✓</span>
+                                                                    <span className="text-sm font-medium">Password updated successfully!</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Change Email */}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="font-medium text-gray-900">Change Email</h4>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setChangeMode(changeMode === 'email' ? null : 'email')}
+                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                        >
+                                                            {changeMode === 'email' ? 'Cancel' : 'Change'}
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {changeMode === 'email' && (
+                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                                            <Field label="Current Email" error={errors.oldEmail}>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">✉️</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="email" 
+                                                                        value={form.oldEmail} 
+                                                                        onChange={upd("oldEmail")} 
+                                                                        placeholder="Current email address" 
+                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.oldEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                                                    />
+                                                                </div>
+                                                            </Field>
+                                                            <Field label="New Email" error={errors.newEmail}>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">✉️</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="email" 
+                                                                        value={form.newEmail} 
+                                                                        onChange={upd("newEmail")} 
+                                                                        placeholder="New email address" 
+                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.newEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                                                    />
+                                                                </div>
+                                                            </Field>
+                                                            <div className="flex justify-end">
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
+                                                                    onClick={async () => {
+                                                                        const errs = {};
+                                                                        if (!form.oldEmail) errs.oldEmail = 'Current email is required';
+                                                                        if (!form.newEmail) errs.newEmail = 'New email is required';
+                                                                        else if (!/\S+@\S+\.\S+/.test(form.newEmail)) errs.newEmail = 'Email is invalid';
+                                                                        setErrors((e) => ({ ...e, ...errs }));
+                                                                        if (Object.keys(errs).length) return;
+                                                                        setIsLoading(true);
+                                                                        await new Promise(r => setTimeout(r, 1000));
+                                                                        setIsLoading(false);
+                                                                        setEmailSaved(true);
+                                                                        setTimeout(() => {
+                                                                            setEmailSaved(false);
+                                                                            setChangeMode(null);
+                                                                        }, 3000);
+                                                                    }}
+                                                                >
+                                                                    Update Email
+                                                                </button>
+                                                            </div>
+                                                            {emailSaved && (
+                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                                    <span className="text-green-600">✓</span>
+                                                                    <span className="text-sm font-medium">Email updated successfully!</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Team Assignment Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">Team Assignment</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingTeams ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Load saved into form for editing
+                                                                setForm((s) => ({
+                                                                    ...s,
+                                                                    teams: {
+                                                                        ...(s.teams || {}),
+                                                                        mainTeam: savedTeams.mainTeam,
+                                                                        otherTeams: savedTeams.otherTeams,
+                                                                        canCreateTeams: s.teams?.canCreateTeams ?? true,
+                                                                        canJoinTeams: s.teams?.canJoinTeams ?? true,
+                                                                    },
+                                                                }));
+                                                                setIsEditingTeams(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert and exit edit
+                                                                    setForm((s) => ({
+                                                                        ...s,
+                                                                        teams: {
+                                                                            ...(s.teams || {}),
+                                                                            mainTeam: savedTeams.mainTeam,
+                                                                            otherTeams: savedTeams.otherTeams,
+                                                                        },
+                                                                    }));
+                                                                    setIsEditingTeams(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    // Commit to saved snapshot
+                                                                    setSavedTeams({
+                                                                        mainTeam: form.teams?.mainTeam || { name: "" },
+                                                                        otherTeams: form.teams?.otherTeams || [],
+                                                                    });
+                                                                    setIsEditingTeams(false);
+                                                                    setTeamsSaved(true);
+                                                                    setTimeout(() => setTeamsSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingTeams ? (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Main Team</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">👥</span>
+                                                            <span className="font-medium break-all">{savedTeams.mainTeam?.name || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Other Teams</div>
+                                                        {Array.isArray(savedTeams.otherTeams) && savedTeams.otherTeams.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {savedTeams.otherTeams.map((t, i) => (
+                                                                    <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 text-sm rounded-full border border-gray-200">
+                                                                        {t.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-500">No additional teams</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-6">
+                                                    {/* Main Team */}
+                                                    <Field label="Main Team">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">👥</span>
+                                                            </div>
+                                                            <input
+                                                                value={form.teams?.mainTeam?.name || ''}
+                                                                onChange={(e) => setForm((s) => ({
+                                                                    ...s,
+                                                                    teams: { ...s.teams, mainTeam: { ...(s.teams?.mainTeam || {}), name: e.target.value } }
+                                                                }))}
+                                                                placeholder="Your primary team"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Other Teams */}
+                                                    <div>
+                                                        <Field label="Add Other Team">
+                                                            <div className="flex gap-3">
+                                                                <div className="relative flex-1">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">👥</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        id="addOtherTeam" 
+                                                                        placeholder="Team name" 
+                                                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors" 
+                                                                    />
+                                                                </div>
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0" 
+                                                                    onClick={() => {
+                                                                        const el = document.getElementById('addOtherTeam');
+                                                                        const name = el?.value?.trim();
+                                                                        if (!name) return;
+                                                                        setForm((s) => ({
+                                                                            ...s,
+                                                                            teams: { ...s.teams, otherTeams: [...(s.teams?.otherTeams || []), { name, role: 'Contributor', members: 0 }] }
+                                                                        }));
+                                                                        if (el) el.value = '';
+                                                                    }}
+                                                                >
+                                                                    Add Team
+                                                                </button>
+                                                            </div>
+                                                        </Field>
+                                                        
+                                                        {/* Other Teams List */}
+                                                        {(form.teams?.otherTeams || []).length > 0 && (
+                                                            <div className="mt-4">
+                                                                <label className="block text-sm font-medium text-gray-700 mb-3">Other Teams</label>
+                                                                <div className="space-y-2">
+                                                                    {(form.teams?.otherTeams || []).map((team, idx) => (
+                                                                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <span className="text-lg">👥</span>
+                                                                                <div>
+                                                                                    <span className="font-medium text-gray-900">{team.name}</span>
+                                                                                    <span className="text-sm text-gray-500 ml-2">• {team.role}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <button 
+                                                                                type="button" 
+                                                                                className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors" 
+                                                                                onClick={() => setForm((s) => ({
+                                                                                    ...s,
+                                                                                    teams: { ...s.teams, otherTeams: (s.teams?.otherTeams || []).filter((_, i) => i !== idx) }
+                                                                                }))}
+                                                                            >
+                                                                                Remove
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Success Toast */}
+                                            {teamsSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">Team assignment saved successfully!</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
 
                                 {activeTab === "Preferences" && (
@@ -1595,7 +2247,11 @@ export default function ProfileSetting() {
                                                         <h4 className="text-sm font-semibold text-gray-800 mb-1">Change Password</h4>
                                                         <p className="text-xs text-gray-600 mb-2">Update your password (current, new, and confirm).</p>
                                                         <button
-                                                            onClick={() => { setActiveTab('Account'); setChangeMode('password'); }}
+                                                            onClick={() => { 
+                                                                setActiveTab('Account'); 
+                                                                setAccountSubTab('actions'); 
+                                                                setChangeMode('password'); 
+                                                            }}
                                                             className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
                                                         >
                                                             Open Change Password
