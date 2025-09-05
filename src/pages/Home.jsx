@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from 'react-router-dom';
 import { Award, Target, Timer, Smile, Star, Shield, Handshake, Mail } from "lucide-react";
 
 // Background image for the hero can be provided via environment variable:
@@ -47,6 +48,13 @@ const testimonials = [
 ];
 
 const Home = () => {
+    const navigate = useNavigate();
+    const handleNavigate = (e, to) => {
+        e && e.preventDefault();
+        if (!to) return;
+        navigate(to);
+    };
+
     return (
         <main className="font-sans bg-gray-50 text-gray-900 min-h-screen">
             {/* Tailwind CSS `style` block for custom animations and hero polish */}
@@ -131,7 +139,38 @@ const Home = () => {
                 `}
             </style>
 
-            {/* Top CTA removed as requested */}
+            {/* Slim top strip with quick links (matches site header) */}
+            <div className="bg-teal-50 border-b border-teal-100 text-sm">
+                <div className="container mx-auto px-4">
+                    <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-6">
+                            <a href="/why" className="text-teal-800 font-semibold hover:underline">WHY PRACTICAL MANAGER?</a>
+                            <a href="/how-it-works" className="text-teal-800 hover:underline">HOW IT WORKS?</a>
+
+                            <div className="relative group">
+                                <button className="flex items-center gap-2 text-teal-800 hover:underline focus:outline-none font-medium tracking-wide">
+                                    ABOUT EMPLOYEESHIP
+                                    <span className="text-xs text-teal-700">▾</span>
+                                </button>
+                                <div className="absolute left-0 mt-2 w-48 bg-white shadow-sm border-t-2 border-black z-50 opacity-0 group-hover:opacity-100 transform scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none group-hover:pointer-events-auto">
+                                    <ul className="py-3">
+                                        <li><a href="/employeeship" className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50">EMPLOYEESHIP</a></li>
+                                        <li><a href="/leadership" className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50">LEADERSHIP</a></li>
+                                        <li><a href="/excellence" className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50">EXCELLENCE</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <a href="/knowledge-base" className="text-teal-800 hover:underline">KNOWLEDGE BASE</a>
+                            <a href="/pricing" className="text-teal-800 hover:underline">PRICING</a>
+                            <a href="/contact" className="text-teal-800 hover:underline">CONTACT US</a>
+                            <a href="/blog" className="text-teal-800 hover:underline">BLOG</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Navigation Bar */}
             <nav className="flex flex-col sm:flex-row justify-between items-center px-6 py-4 bg-white shadow-lg sticky top-0 z-20 transition-shadow duration-300">
@@ -139,12 +178,11 @@ const Home = () => {
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-base">
                     <a href="#modules" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Modules</a>
                     <a href="#values" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Values</a>
-                    <a href="/pricing" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Pricing</a>
                     <a href="/testimonials" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Testimonials</a>
                 </div>
                 <div className="flex gap-2 mt-4 sm:mt-0">
-                    <a href="/login" className="bg-blue-700 text-white rounded-full px-6 py-2 font-semibold hover:bg-blue-800 transition-transform transform hover:scale-105 shadow-md">Login</a>
-                    <a href="/registration" className="ml-2 bg-yellow-600 text-white rounded-full px-6 py-2 font-semibold hover:bg-yellow-700 transition-transform transform hover:scale-105 shadow-md">Register</a>
+                    <a href="/login" onClick={(e) => handleNavigate(e, '/login')} className="bg-blue-700 text-white rounded-full px-6 py-2 font-semibold hover:bg-blue-800 transition-transform transform hover:scale-105 shadow-md">Login</a>
+                    <a href="/registration" onClick={(e) => handleNavigate(e, '/registration')} className="ml-2 bg-yellow-600 text-white rounded-full px-6 py-2 font-semibold hover:bg-yellow-700 transition-transform transform hover:scale-105 shadow-md">Register</a>
                 </div>
             </nav>
 
@@ -176,7 +214,7 @@ const Home = () => {
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start mt-2">
-                                <a href="/registration" className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-full px-8 py-4 text-lg font-semibold shadow-xl" aria-label="Get started - it's free">Get started — it's free</a>
+                                <a href="/registration" onClick={(e) => handleNavigate(e, '/registration')} className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-full px-8 py-4 text-lg font-semibold shadow-xl" aria-label="Get started - it's free">Get started — it's free</a>
                                 <a href="#contact" className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-full px-6 py-3 text-lg font-medium hover:bg-slate-50" aria-label="Request a demo">Request a demo</a>
                             </div>
                         </div>
@@ -229,7 +267,7 @@ const Home = () => {
                     <p className="text-lg text-gray-700 mb-6 max-w-lg mx-auto md:mx-0">
                         Join thousands of teams who are simplifying their workflows and boosting productivity with our all-in-one platform.
                     </p>
-                    <a href="/registration" className="rounded-full bg-blue-700 text-white font-bold py-4 px-10 text-lg transition-transform hover:bg-blue-800 transform hover:scale-110 shadow-lg">
+                    <a href="/registration" onClick={(e) => handleNavigate(e, '/registration')} className="rounded-full bg-blue-700 text-white font-bold py-4 px-10 text-lg transition-transform hover:bg-blue-800 transform hover:scale-110 shadow-lg">
                         Sign up for a Free Account
                     </a>
                 </div>
@@ -240,16 +278,6 @@ const Home = () => {
                 <div className="container mx-auto px-4">
                     <div className="flex items-center justify-center gap-6 mb-16 animate-fade-in-up">
                         <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700">Featured Modules</h2>
-                        <div className="hidden md:block relative w-28 h-auto rounded-lg shadow-sm overflow-visible">
-                            <img
-                                src={`${import.meta.env.BASE_URL}graph.png`}
-                                alt="Graph"
-                                className="w-28 h-auto rounded-lg opacity-95"
-                            />
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] md:text-xs text-white font-semibold text-center px-2" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>
-                                Ready to transform your team?
-                            </span>
-                        </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
                         {modules.map((m, i) => (
@@ -316,29 +344,39 @@ const Home = () => {
                 </div>
 
                 <div className="container mx-auto px-4 relative z-10">
-                    <h2 className="text-3xl md:text-4xl font-bold text-blue-700 mb-6">Ready to transform your team?</h2>
-                    <p className="text-lg text-gray-700 mb-10 max-w-2xl mx-auto">
-                        Get a live demo from one of our specialists and see how Practical Manager can work for you.
-                    </p>
-                    <a href="#contact" className="inline-block bg-yellow-600 text-white rounded-full px-10 py-4 font-bold text-lg hover:bg-yellow-700 transition-transform transform hover:scale-110 shadow-xl">
-                        Request a Demo
-                    </a>
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
+                        <img
+                            src={`${import.meta.env.BASE_URL}graph.png`}
+                            alt="Graph"
+                            className="w-48 md:w-80 lg:w-96 h-auto rounded-md shadow-md"
+                        />
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-bold text-blue-700">Ready to transform your team?</h2>
+                            <p className="text-lg text-gray-700 mb-6 max-w-2xl mx-auto md:mx-0">
+                                Get a live demo from one of our specialists and see how Practical Manager can work for you.
+                            </p>
+                            <a href="#contact" className="inline-block bg-yellow-600 text-white rounded-full px-10 py-4 font-bold text-lg hover:bg-yellow-700 transition-transform transform hover:scale-110 shadow-xl">
+                                Request a Demo
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             {/* Contact Form Section */}
             <section id="contact" className="bg-white py-20 flex flex-col items-center justify-center">
-                <div className="bg-gray-100 rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-start gap-6">
-                    <div className="w-full md:w-2/3">
-                        <div className="text-blue-700 mb-6 md:mb-8"><Mail size={80} /></div>
-                        <h2 className="text-3xl font-bold text-blue-700 mb-6 md:mb-8">Contact us for a DEMO</h2>
+                <div className="bg-gray-100 rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-3xl mx-auto flex flex-col items-center gap-6">
+                    <div className="w-full">
+                        <div className="text-blue-700 mb-6 md:mb-8 flex justify-center"><Mail size={72} /></div>
+                        <h2 className="text-3xl font-bold text-blue-700 mb-4 md:mb-6 text-center">Contact us for a DEMO</h2>
+
                         <form className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input type="text" placeholder="First Name" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
-                            <input type="text" placeholder="Last Name*" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
-                            <input type="text" placeholder="Phone" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
-                            <input type="email" placeholder="Email*" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
-                            <input type="text" placeholder="Company*" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" required />
-                            <input type="number" placeholder="No. of Employees" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" />
+                            <input type="text" placeholder="First Name" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
+                            <input type="text" placeholder="Last Name*" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
+                            <input type="text" placeholder="Phone" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
+                            <input type="email" placeholder="Email*" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
+                            <input type="text" placeholder="Company*" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" required />
+                            <input type="number" placeholder="No. of Employees" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" />
                             
                             <div className="w-full text-left col-span-1 md:col-span-2">
                                 <label className="text-sm text-gray-600 flex items-center">
@@ -346,28 +384,16 @@ const Home = () => {
                                 </label>
                             </div>
                             <div className="col-span-1 md:col-span-2 flex flex-col items-center">
-                                <input type="text" placeholder="Enter the Captcha" className="w-full p-4 mb-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
+                                <input type="text" placeholder="Enter the Captcha" className="w-full p-3 mb-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
                                 <div className="mb-4 text-blue-700 font-bold">m5yg32 <button type="button" className="ml-2 text-blue-700 underline">Reload</button></div>
                             </div>
 
                             <div className="flex w-full gap-4 col-span-1 md:col-span-2">
-                                <button type="submit" className="w-1/2 rounded-full bg-blue-700 text-white font-bold py-4 text-lg transition-transform hover:bg-blue-800 transform hover:scale-105 shadow-lg">Submit</button>
-                                <button type="reset" className="w-1/2 rounded-full bg-yellow-600 text-white font-bold py-4 text-lg transition-transform hover:bg-yellow-700 transform hover:scale-105 shadow-lg">Reset</button>
+                                <button type="submit" className="w-1/2 rounded-full btn-gradient btn-glow text-white font-semibold py-4 text-lg shadow-xl">Submit</button>
+                                <button type="reset" className="w-1/2 rounded-full bg-yellow-600 text-white font-bold py-4 text-lg hover:bg-yellow-700 transition-shadow">Reset</button>
                             </div>
                         </form>
                     </div>
-
-                    {/* Aside image - keeps compact padding and prevents large empty gaps */}
-                    <aside className="w-full md:w-1/3 flex justify-center md:justify-end items-start">
-                        <div className="max-w-xs w-full flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm">
-                            <img
-                                src={`${import.meta.env.BASE_URL}contact-demo.png`}
-                                alt="Contact demo"
-                                className="w-36 h-36 rounded-full object-cover"
-                                style={{ padding: 4 }}
-                            />
-                        </div>
-                    </aside>
                 </div>
             </section>
 
