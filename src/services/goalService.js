@@ -1,75 +1,97 @@
 // src/services/goalService.js
-import apiClient from "./apiClient";
-import keyAreaService from "./keyAreaService";
+import axios from 'axios';
 
-class GoalService {
-    async getGoals(filters) {
-        const params = new URLSearchParams();
+// Create a reusable Axios instance.
+const apiClient = axios.create({
+  baseURL: 'http://localhost:3000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-        if (filters?.status) params.append("status", filters.status);
-        if (filters?.keyAreaId) params.append("keyAreaId", filters.keyAreaId);
-        if (filters?.includeSubGoalCount) params.append("includeSubGoalCount", "true");
-        if (filters?.includeKeyAreaName) params.append("includeKeyAreaName", "true");
-        if (filters?.includeMilestoneCount) params.append("includeMilestoneCount", "true");
+/**
+ * A helper to handle API errors consistently.
+ * @param {string} context - The context of the API call (e.g., 'fetching goals').
+ * @param {Error} error - The error object caught.
+ */
+const handleError = (context, error) => {
+    console.error(`Error ${context}:`, error);
+    if (error.response && error.response.data && error.response.data.message) {
+        // Log detailed validation errors from the NestJS backend
+        console.error('Backend validation errors:', error.response.data.message);
+        // We can create a more user-friendly error message here if needed
+        const messages = Array.isArray(error.response.data.message) ? error.response.data.message.join(', ') : error.response.data.message;
+        throw new Error(`Failed to ${context.split(' ')[0]} goal. ${messages}`);
+    }
+    throw error;
+};
 
-        const response = await apiClient.get(`/goals?${params.toString()}`);
+/**
+ * Fetches all goals from the API.
+ * @returns {Promise<Array>} A promise that resolves to an array of goals.
+ */
+export const getGoals = async () => {
+  try {
+    const response = await apiClient.get('/goals');
+    return response.data;
+  } catch (error) {
+    handleError('fetching goals', error);
+  }
+};
+
+/**
+ * Fetches a single goal by its ID.
+ * @param {string} id - The ID of the goal to fetch.
+ * @returns {Promise<object>} A promise that resolves to the goal object.
+ */
+export const getGoalById = async (id) => {
+    try {
+        const response = await apiClient.get(`/goals/${id}`);
         return response.data;
+    } catch (error) {
+        handleError(`fetching goal ${id}`, error);
     }
+};
 
-    async getGoalById(id, includeKeyAreaName = false) {
-        const params = includeKeyAreaName ? "?includeKeyAreaName=true" : "";
-        const response = await apiClient.get(`/goals/${id}${params}`);
+/**
+ * Creates a new goal.
+ * @param {object} goalData - The data for the new goal, matching the CreateGoalDto.
+ * @returns {Promise<object>} A promise that resolves to the newly created goal.
+ */
+export const createGoal = async (goalData) => {
+  try {
+    const response = await apiClient.post('/goals', goalData);
+    return response.data;
+  } catch (error) {
+    handleError('creating goal', error);
+  }
+};
+
+/**
+ * Updates an existing goal.
+ * @param {string} id - The ID of the goal to update.
+ * @param {object} updateData - The data to update, matching UpdateGoalDto.
+ * @returns {Promise<object>} A promise that resolves to the updated goal.
+ */
+export const updateGoal = async (id, updateData) => {
+    try {
+        const response = await apiClient.put(`/goals/${id}`, updateData);
         return response.data;
+    } catch (error) {
+        handleError(`updating goal ${id}`, error);
     }
+};
 
-    async createGoal(goalData) {
-        // Map FE -> BE fields as needed: parentId -> parentGoalId, areaId -> keyAreaId
-        const payload = {
-            title: goalData.title,
-            description: goalData.description,
-            keyAreaId: goalData.keyAreaId || goalData.areaId,
-            parentGoalId: goalData.parentGoalId || goalData.parentId || undefined,
-            startDate: goalData.startDate,
-            dueDate: goalData.dueDate,
-            visibility: goalData.visibility || "public",
-            milestones:
-                Array.isArray(goalData.milestones) && goalData.milestones.length > 0
-                    ? goalData.milestones.map((m) => ({ title: m.title, dueDate: m.dueDate, weight: m.weight }))
-                    : [{ title: "Milestone 1", weight: 1.0 }],
-        };
-        const response = await apiClient.post("/goals", payload);
-        return response.data;
+/**
+ * Deletes a goal by its ID.
+ * @param {string} id - The ID of the goal to delete.
+ * @returns {Promise<void>}
+ */
+export const deleteGoal = async (id) => {
+    try {
+        await apiClient.delete(`/goals/${id}`);
+    } catch (error) {
+        handleError(`deleting goal ${id}`, error);
     }
+};
 
-    async updateGoal(id, goalData) {
-        const payload = {
-            title: goalData.title,
-            description: goalData.description,
-            keyAreaId: goalData.keyAreaId || goalData.areaId,
-            parentGoalId: goalData.parentGoalId || goalData.parentId || undefined,
-            startDate: goalData.startDate,
-            dueDate: goalData.dueDate,
-            visibility: goalData.visibility,
-            status: goalData.status,
-        };
-        const response = await apiClient.put(`/goals/${id}`, payload);
-        return response.data;
-    }
-
-    async deleteGoal(id) {
-        const response = await apiClient.delete(`/goals/${id}`);
-        return response.data;
-    }
-
-    async getGoalsSummary() {
-        const response = await apiClient.get("/goals/summary");
-        return response.data;
-    }
-
-    async getKeyAreas() {
-        // Use unified Key Areas service (returns FE-mapped shape)
-        return keyAreaService.list({ includeTaskCount: false });
-    }
-}
-
-export default new GoalService();

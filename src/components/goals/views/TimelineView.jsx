@@ -1,7 +1,5 @@
 import React from "react";
 import { FaStream, FaCheck, FaExclamationTriangle } from "react-icons/fa";
-import Chip from "../Chip.jsx";
-import ProgressBar from "../ProgressBar.jsx";
 
 const TimelineView = ({ filtered, onOpen }) => {
     return (
