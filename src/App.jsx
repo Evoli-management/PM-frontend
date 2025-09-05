@@ -22,6 +22,7 @@ import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
+import VerifyEmail from "./pages/VerifyEmail.jsx";
 
 export default function App() {
     return (
@@ -42,6 +43,7 @@ export default function App() {
                             <Route path="/PasswordPageForget" element={<PasswordPageForget />} />
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/registration" element={<Registration />} />
+                            <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
                             <Route path="/admin-settings" element={<AdminSettings />} />

@@ -1,28 +1,17 @@
 // src/services/apiClient.js
 import axios from "axios";
 
+const apiBase = import.meta.env.DEV
+    ? "/api" // use Vite proxy in development for same-origin cookies
+    : import.meta.env.VITE_API_URL || "/api";
+
 const apiClient = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
+    baseURL: apiBase,
     timeout: 10000,
+    withCredentials: true,
 });
 
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem("access_token");
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        } else if (import.meta.env.DEV) {
-            // Provide a temp dev token compatible with TempAuthGuard
-            const tempPayload = btoa(JSON.stringify({ email: "dev.user@example.com" }));
-            config.headers.Authorization = `Bearer temp_${tempPayload}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    },
-);
+// No Authorization header injection; rely on httpOnly cookie only
 
 // Response interceptor to handle errors
 apiClient.interceptors.response.use(
@@ -31,12 +20,18 @@ apiClient.interceptors.response.use(
     },
     (error) => {
         if (error.response?.status === 401) {
-            // Token expired or invalid
+            try {
+                const m = error.config?.method?.toUpperCase?.() || "GET";
+                const u = error.config?.baseURL
+                    ? `${error.config.baseURL}${error.config.url || ""}`
+                    : error.config?.url || "";
+                // Helpful log to pinpoint which call failed auth
+                console.warn(`401 Unauthorized: ${m} ${u}`);
+            } catch {}
+            // Token expired or not logged in; rely on cookie-based auth
             localStorage.removeItem("access_token");
-            // Redirect to login or show login modal
-            // Temporarily disabled for development
-            // window.location.href = "/login";
-            console.warn("Authentication error - login redirect disabled for development");
+            // Use HashRouter
+            window.location.hash = "#/login";
         }
         return Promise.reject(error);
     },
