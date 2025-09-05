@@ -1199,6 +1199,169 @@ export default function ProfileSetting() {
                                             )}
                                         </div>
 
+                                        {/* Password & Email Change Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Security Settings</h3>
+                                            
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                {/* Change Password */}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="font-medium text-gray-900">Change Password</h4>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setChangeMode(changeMode === 'password' ? null : 'password')}
+                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                        >
+                                                            {changeMode === 'password' ? 'Cancel' : 'Change'}
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {changeMode === 'password' && (
+                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                                            <Field label="Current Password" error={errors.oldPw}>
+                                                                <PasswordField 
+                                                                    value={form.oldPw} 
+                                                                    onChange={upd('oldPw')} 
+                                                                    placeholder="Enter current password" 
+                                                                    open={showPw.old} 
+                                                                    toggle={() => setShowPw((s) => ({ ...s, old: !s.old }))} 
+                                                                    error={errors.oldPw} 
+                                                                />
+                                                            </Field>
+                                                            <Field label="New Password" error={errors.newPw}>
+                                                                <PasswordField 
+                                                                    value={form.newPw} 
+                                                                    onChange={upd('newPw')} 
+                                                                    placeholder="Enter new password" 
+                                                                    open={showPw.new1} 
+                                                                    toggle={() => setShowPw((s) => ({ ...s, new1: !s.new1 }))} 
+                                                                    error={errors.newPw} 
+                                                                />
+                                                            </Field>
+                                                            <Field label="Confirm Password" error={errors.confirmPw}>
+                                                                <PasswordField 
+                                                                    value={form.confirmPw} 
+                                                                    onChange={upd('confirmPw')} 
+                                                                    placeholder="Confirm new password" 
+                                                                    open={showPw.new2} 
+                                                                    toggle={() => setShowPw((s) => ({ ...s, new2: !s.new2 }))} 
+                                                                    error={errors.confirmPw} 
+                                                                />
+                                                            </Field>
+                                                            <div className="flex justify-end">
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
+                                                                    onClick={async () => {
+                                                                        const errs = {};
+                                                                        if (!form.oldPw) errs.oldPw = 'Current password is required';
+                                                                        if (!form.newPw || form.newPw.length < 8) errs.newPw = 'Minimum 8 characters';
+                                                                        if (form.newPw !== form.confirmPw) errs.confirmPw = 'Passwords do not match';
+                                                                        setErrors((e) => ({ ...e, ...errs }));
+                                                                        if (Object.keys(errs).length) return;
+                                                                        setIsLoading(true);
+                                                                        await new Promise(r => setTimeout(r, 1000));
+                                                                        setIsLoading(false);
+                                                                        setPasswordSaved(true);
+                                                                        setTimeout(() => {
+                                                                            setPasswordSaved(false);
+                                                                            setChangeMode(null);
+                                                                        }, 3000);
+                                                                    }}
+                                                                >
+                                                                    Update Password
+                                                                </button>
+                                                            </div>
+                                                            {passwordSaved && (
+                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                                    <span className="text-green-600">✓</span>
+                                                                    <span className="text-sm font-medium">Password updated successfully!</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Change Email */}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="font-medium text-gray-900">Change Email</h4>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setChangeMode(changeMode === 'email' ? null : 'email')}
+                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                        >
+                                                            {changeMode === 'email' ? 'Cancel' : 'Change'}
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {changeMode === 'email' && (
+                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                                            <Field label="Current Email" error={errors.oldEmail}>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">✉️</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="email" 
+                                                                        value={form.oldEmail} 
+                                                                        onChange={upd("oldEmail")} 
+                                                                        placeholder="Current email address" 
+                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.oldEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                                                    />
+                                                                </div>
+                                                            </Field>
+                                                            <Field label="New Email" error={errors.newEmail}>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">✉️</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="email" 
+                                                                        value={form.newEmail} 
+                                                                        onChange={upd("newEmail")} 
+                                                                        placeholder="New email address" 
+                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.newEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                                                    />
+                                                                </div>
+                                                            </Field>
+                                                            <div className="flex justify-end">
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
+                                                                    onClick={async () => {
+                                                                        const errs = {};
+                                                                        if (!form.oldEmail) errs.oldEmail = 'Current email is required';
+                                                                        if (!form.newEmail) errs.newEmail = 'New email is required';
+                                                                        else if (!/\S+@\S+\.\S+/.test(form.newEmail)) errs.newEmail = 'Email is invalid';
+                                                                        setErrors((e) => ({ ...e, ...errs }));
+                                                                        if (Object.keys(errs).length) return;
+                                                                        setIsLoading(true);
+                                                                        await new Promise(r => setTimeout(r, 1000));
+                                                                        setIsLoading(false);
+                                                                        setEmailSaved(true);
+                                                                        setTimeout(() => {
+                                                                            setEmailSaved(false);
+                                                                            setChangeMode(null);
+                                                                        }, 3000);
+                                                                    }}
+                                                                >
+                                                                    Update Email
+                                                                </button>
+                                                            </div>
+                                                            {emailSaved && (
+                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                                    <span className="text-green-600">✓</span>
+                                                                    <span className="text-sm font-medium">Email updated successfully!</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* Professional Details Section */}
                                         <div className="bg-white rounded-lg border border-gray-200 p-6">
                                             <div className="flex items-center justify-between mb-6">
@@ -1507,169 +1670,6 @@ export default function ProfileSetting() {
                                                     <span className="text-sm font-medium">About me & skills saved successfully!</span>
                                                 </div>
                                             )}
-                                        </div>
-
-                                        {/* Password & Email Change Section */}
-                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Security Settings</h3>
-                                            
-                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                                {/* Change Password */}
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="font-medium text-gray-900">Change Password</h4>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setChangeMode(changeMode === 'password' ? null : 'password')}
-                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                                                        >
-                                                            {changeMode === 'password' ? 'Cancel' : 'Change'}
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    {changeMode === 'password' && (
-                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                                                            <Field label="Current Password" error={errors.oldPw}>
-                                                                <PasswordField 
-                                                                    value={form.oldPw} 
-                                                                    onChange={upd('oldPw')} 
-                                                                    placeholder="Enter current password" 
-                                                                    open={showPw.old} 
-                                                                    toggle={() => setShowPw((s) => ({ ...s, old: !s.old }))} 
-                                                                    error={errors.oldPw} 
-                                                                />
-                                                            </Field>
-                                                            <Field label="New Password" error={errors.newPw}>
-                                                                <PasswordField 
-                                                                    value={form.newPw} 
-                                                                    onChange={upd('newPw')} 
-                                                                    placeholder="Enter new password" 
-                                                                    open={showPw.new1} 
-                                                                    toggle={() => setShowPw((s) => ({ ...s, new1: !s.new1 }))} 
-                                                                    error={errors.newPw} 
-                                                                />
-                                                            </Field>
-                                                            <Field label="Confirm Password" error={errors.confirmPw}>
-                                                                <PasswordField 
-                                                                    value={form.confirmPw} 
-                                                                    onChange={upd('confirmPw')} 
-                                                                    placeholder="Confirm new password" 
-                                                                    open={showPw.new2} 
-                                                                    toggle={() => setShowPw((s) => ({ ...s, new2: !s.new2 }))} 
-                                                                    error={errors.confirmPw} 
-                                                                />
-                                                            </Field>
-                                                            <div className="flex justify-end">
-                                                                <button 
-                                                                    type="button" 
-                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
-                                                                    onClick={async () => {
-                                                                        const errs = {};
-                                                                        if (!form.oldPw) errs.oldPw = 'Current password is required';
-                                                                        if (!form.newPw || form.newPw.length < 8) errs.newPw = 'Minimum 8 characters';
-                                                                        if (form.newPw !== form.confirmPw) errs.confirmPw = 'Passwords do not match';
-                                                                        setErrors((e) => ({ ...e, ...errs }));
-                                                                        if (Object.keys(errs).length) return;
-                                                                        setIsLoading(true);
-                                                                        await new Promise(r => setTimeout(r, 1000));
-                                                                        setIsLoading(false);
-                                                                        setPasswordSaved(true);
-                                                                        setTimeout(() => {
-                                                                            setPasswordSaved(false);
-                                                                            setChangeMode(null);
-                                                                        }, 3000);
-                                                                    }}
-                                                                >
-                                                                    Update Password
-                                                                </button>
-                                                            </div>
-                                                            {passwordSaved && (
-                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
-                                                                    <span className="text-green-600">✓</span>
-                                                                    <span className="text-sm font-medium">Password updated successfully!</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Change Email */}
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="font-medium text-gray-900">Change Email</h4>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setChangeMode(changeMode === 'email' ? null : 'email')}
-                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                                                        >
-                                                            {changeMode === 'email' ? 'Cancel' : 'Change'}
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    {changeMode === 'email' && (
-                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                                                            <Field label="Current Email" error={errors.oldEmail}>
-                                                                <div className="relative">
-                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                                        <span className="text-gray-500 text-lg">✉️</span>
-                                                                    </div>
-                                                                    <input 
-                                                                        type="email" 
-                                                                        value={form.oldEmail} 
-                                                                        onChange={upd("oldEmail")} 
-                                                                        placeholder="Current email address" 
-                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.oldEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                                                    />
-                                                                </div>
-                                                            </Field>
-                                                            <Field label="New Email" error={errors.newEmail}>
-                                                                <div className="relative">
-                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                                        <span className="text-gray-500 text-lg">✉️</span>
-                                                                    </div>
-                                                                    <input 
-                                                                        type="email" 
-                                                                        value={form.newEmail} 
-                                                                        onChange={upd("newEmail")} 
-                                                                        placeholder="New email address" 
-                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.newEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                                                    />
-                                                                </div>
-                                                            </Field>
-                                                            <div className="flex justify-end">
-                                                                <button 
-                                                                    type="button" 
-                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
-                                                                    onClick={async () => {
-                                                                        const errs = {};
-                                                                        if (!form.oldEmail) errs.oldEmail = 'Current email is required';
-                                                                        if (!form.newEmail) errs.newEmail = 'New email is required';
-                                                                        else if (!/\S+@\S+\.\S+/.test(form.newEmail)) errs.newEmail = 'Email is invalid';
-                                                                        setErrors((e) => ({ ...e, ...errs }));
-                                                                        if (Object.keys(errs).length) return;
-                                                                        setIsLoading(true);
-                                                                        await new Promise(r => setTimeout(r, 1000));
-                                                                        setIsLoading(false);
-                                                                        setEmailSaved(true);
-                                                                        setTimeout(() => {
-                                                                            setEmailSaved(false);
-                                                                            setChangeMode(null);
-                                                                        }, 3000);
-                                                                    }}
-                                                                >
-                                                                    Update Email
-                                                                </button>
-                                                            </div>
-                                                            {emailSaved && (
-                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
-                                                                    <span className="text-green-600">✓</span>
-                                                                    <span className="text-sm font-medium">Email updated successfully!</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
                                         </div>
 
                                         {/* Team Assignment Section */}
