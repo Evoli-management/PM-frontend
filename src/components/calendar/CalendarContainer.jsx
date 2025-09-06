@@ -7,6 +7,9 @@ import WeekView from "./WeekView";
 import DayView from "./DayView";
 import ListView from "./ListView";
 import EventModal from "./EventModal";
+import TaskActivityModal from "./TaskActivityModal";
+import taskService from "../../services/taskService";
+import activityService from "../../services/activityService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
@@ -48,6 +51,10 @@ const CalendarContainer = () => {
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
+    const [addModalOpen, setAddModalOpen] = useState(false);
+    const [addDate, setAddDate] = useState(null);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editItem, setEditItem] = useState(null); // { type: 'task'|'activity', id, ...fields }
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -88,6 +95,14 @@ const CalendarContainer = () => {
                 start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
                 end.setTime(start.getTime());
                 end.setDate(start.getDate() + 6);
+            } else if (view === "day") {
+                // Fetch a wider window around the selected day so multi-day tasks overlapping this day are included
+                const s = new Date(currentDate);
+                s.setDate(s.getDate() - 7);
+                const e = new Date(currentDate);
+                e.setDate(e.getDate() + 7);
+                start.setTime(s.getTime());
+                end.setTime(e.getTime());
             } else if (view === "month") {
                 start.setDate(1);
                 end.setMonth(start.getMonth() + 1, 0); // last day of month
@@ -122,6 +137,37 @@ const CalendarContainer = () => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [view, timezone, currentDate]);
+
+    const refreshTodosForRange = async () => {
+        // Reuse the same range logic as above for listTodos only
+        const start = new Date(currentDate);
+        const end = new Date(currentDate);
+        if (view === "week") {
+            start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+            end.setTime(start.getTime());
+            end.setDate(start.getDate() + 6);
+        } else if (view === "day") {
+            const s = new Date(currentDate);
+            s.setDate(s.getDate() - 7);
+            const e = new Date(currentDate);
+            e.setDate(e.getDate() + 7);
+            start.setTime(s.getTime());
+            end.setTime(e.getTime());
+        } else if (view === "month" || view === "list") {
+            start.setDate(1);
+            end.setMonth(start.getMonth() + 1, 0);
+        } else if (view === "quarter") {
+            const q = Math.floor(start.getMonth() / 3);
+            start.setMonth(q * 3, 1);
+            end.setMonth(q * 3 + 3, 0);
+        }
+        const fromISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0).toISOString();
+        const toISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString();
+        try {
+            const tds = await calendarService.listTodos({ from: fromISO, to: toISO });
+            setTodos(Array.isArray(tds) ? tds : []);
+        } catch {}
+    };
 
     // Drag-and-drop: create a calendar event (timebox) for a task
     const handleTaskDrop = async (taskOrId, date) => {
@@ -161,6 +207,136 @@ const CalendarContainer = () => {
     const openModal = (event = null) => {
         setSelectedEvent(event);
         setModalOpen(true);
+    };
+
+    const [addDefaultTab, setAddDefaultTab] = useState("task");
+    const openAddModal = (date, options = {}) => {
+        setAddDate(date instanceof Date ? date : new Date(date));
+        setAddDefaultTab(options.defaultTab === "activity" ? "activity" : "task");
+        setAddModalOpen(true);
+    };
+
+    // Open edit modal for a task from MonthView bars
+    const openEditTask = async (taskOrId) => {
+        if (!taskOrId) return;
+        let task = taskOrId;
+        try {
+            if (typeof taskOrId === "string") {
+                task = await taskService.get(taskOrId);
+            }
+        } catch (e) {
+            addToast({ title: "Task not found", variant: "error" });
+            return;
+        }
+        const toDateStr = (d) => {
+            if (!d) return "";
+            const dt = new Date(d);
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, "0");
+            const day = String(dt.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+        };
+        const toTimeStr = (d) => {
+            if (!d) return "00:00";
+            const dt = new Date(d);
+            const hh = String(dt.getHours()).padStart(2, "0");
+            const mm = String(dt.getMinutes()).padStart(2, "0");
+            return `${hh}:${mm}`;
+        };
+        const item = {
+            id: task.id,
+            type: "task",
+            title: task.title || "",
+            description: task.description || "",
+            keyAreaId: task.keyAreaId || "",
+            date: toDateStr(task.startDate || task.dueDate || task.endDate),
+            time: toTimeStr(task.startDate),
+            dueDate: toDateStr(task.dueDate),
+            endDate: toDateStr(task.endDate),
+            priority: task.priority || "medium",
+            assignee: task.assignee || "",
+        };
+        setEditItem(item);
+        setEditModalOpen(true);
+    };
+
+    const handleAddSave = async (form) => {
+        // form: { title, type: 'task'|'activity', date: 'YYYY-MM-DD', time?: 'HH:MM', description? }
+        const when = (() => {
+            try {
+                const [y, m, d] = String(form.date || "")
+                    .split("-")
+                    .map((v) => parseInt(v, 10));
+                const [hh, mm] = String(form.time || "00:00")
+                    .split(":")
+                    .map((v) => parseInt(v, 10));
+                const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0);
+                // Snap to 30-minute slots
+                const minutes = dt.getMinutes();
+                const snapped = minutes < 15 ? 0 : minutes < 45 ? 30 : 0; // round to nearest half hour
+                if (snapped === 0 && minutes >= 45) dt.setHours(dt.getHours() + 1);
+                dt.setMinutes(snapped, 0, 0);
+                // Clamp to visible range 00:00–23:30 (full day)
+                if (dt.getHours() < 0) dt.setHours(0, 0, 0, 0);
+                if (dt.getHours() > 23 || (dt.getHours() === 23 && dt.getMinutes() > 30)) dt.setHours(23, 30, 0, 0);
+                return dt;
+            } catch {
+                return addDate || new Date();
+            }
+        })();
+        try {
+            if (form.type === "activity") {
+                await activityService.create({ text: form.text || form.title, taskId: form.taskId || null });
+                addToast({ title: "Activity added", variant: "success" });
+            } else {
+                const toEndOfDayIso = (dateStr) => {
+                    if (!dateStr) return null;
+                    try {
+                        const [yy, mm, dd] = String(dateStr)
+                            .split("-")
+                            .map((v) => parseInt(v, 10));
+                        const d = new Date(yy, (mm || 1) - 1, dd || 1, 23, 59, 59, 999);
+                        return d.toISOString();
+                    } catch {
+                        return null;
+                    }
+                };
+                const dueIso = toEndOfDayIso(form.dueDate);
+                const endIso = toEndOfDayIso(form.endDate);
+                const createdTask = await taskService.create({
+                    title: form.title,
+                    description: form.description || null,
+                    startDate: when.toISOString(),
+                    dueDate: dueIso,
+                    endDate: endIso,
+                    status: "open",
+                    priority: "medium",
+                    keyAreaId: form.keyAreaId || undefined,
+                });
+                addToast({ title: "Task added", variant: "success" });
+                // Immediately create a calendar event at the selected time for this new task
+                try {
+                    const start = new Date(when);
+                    const end = new Date(start.getTime() + 60 * 60 * 1000); // default 60 minutes
+                    const ev = await calendarService.createEvent({
+                        title: form.title,
+                        start: start.toISOString(),
+                        end: end.toISOString(),
+                        allDay: false,
+                        taskId: createdTask.id,
+                        keyAreaId: form.keyAreaId || undefined,
+                        kind: "custom",
+                    });
+                    setEvents((prev) => [...prev, ev]);
+                } catch (e) {
+                    // Event creation failure shouldn't block task creation
+                    console.warn("Failed to create calendar event for task", e);
+                }
+            }
+            await refreshTodosForRange();
+        } catch (e) {
+            addToast({ title: "Failed to add", description: String(e?.message || e), variant: "error" });
+        }
     };
 
     // Quick create event on double-click
@@ -352,8 +528,10 @@ const CalendarContainer = () => {
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
+                        todos={todos}
                         categories={EVENT_CATEGORIES}
                         onEventClick={openModal}
+                        onTaskClick={openEditTask}
                     />
                 )}
                 {view === "week" && (
@@ -362,6 +540,7 @@ const CalendarContainer = () => {
                         onShiftDate={shiftDate}
                         onSetDate={setCurrentDate}
                         onQuickCreate={handleQuickCreate}
+                        onAddTaskOrActivity={openAddModal}
                         view={view}
                         onChangeView={setView}
                         filterType={filterType}
@@ -372,7 +551,8 @@ const CalendarContainer = () => {
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
                         onEventMove={handleEventMove}
-                        onEventClick={openModal}
+                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onTaskClick={openEditTask}
                     />
                 )}
                 {view === "day" && (
@@ -381,6 +561,7 @@ const CalendarContainer = () => {
                         onShiftDate={shiftDate}
                         onSetDate={setCurrentDate}
                         onQuickCreate={handleQuickCreate}
+                        onAddTaskOrActivity={openAddModal}
                         view={view}
                         onChangeView={setView}
                         filterType={filterType}
@@ -391,7 +572,8 @@ const CalendarContainer = () => {
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
                         onEventMove={handleEventMove}
-                        onEventClick={openModal}
+                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onTaskClick={openEditTask}
                         onPlanTomorrow={() => {}}
                     />
                 )}
@@ -404,7 +586,7 @@ const CalendarContainer = () => {
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
-                        onEventClick={openModal}
+                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
                     />
                 )}
             </div>
@@ -422,6 +604,120 @@ const CalendarContainer = () => {
                     onEventDeleted={(id) => {
                         setEvents((prev) => prev.filter((e) => e.id !== id));
                         addToast({ title: "Event deleted", variant: "success" });
+                    }}
+                />
+            )}
+            {addModalOpen && (
+                <TaskActivityModal
+                    item={{
+                        title: "",
+                        type: addDefaultTab,
+                        // Use local date to avoid UTC shift (off-by-one day)
+                        date: (() => {
+                            const d = addDate || new Date();
+                            const y = d.getFullYear();
+                            const m = String(d.getMonth() + 1).padStart(2, "0");
+                            const day = String(d.getDate()).padStart(2, "0");
+                            return `${y}-${m}-${day}`;
+                        })(),
+                        // Let the modal choose its default time (e.g., 08:00)
+                        time: undefined,
+                        status: "pending",
+                        description: "",
+                    }}
+                    onClose={() => setAddModalOpen(false)}
+                    onSave={handleAddSave}
+                />
+            )}
+            {editModalOpen && editItem && (
+                <TaskActivityModal
+                    item={editItem}
+                    onClose={() => {
+                        setEditModalOpen(false);
+                        setEditItem(null);
+                    }}
+                    onSave={async (form) => {
+                        try {
+                            if (editItem?.type === "task") {
+                                const toEndOfDayIso = (dateStr) => {
+                                    if (!dateStr) return null;
+                                    try {
+                                        const [yy, mm, dd] = String(dateStr)
+                                            .split("-")
+                                            .map((v) => parseInt(v, 10));
+                                        const d = new Date(yy, (mm || 1) - 1, dd || 1, 23, 59, 59, 999);
+                                        return d.toISOString();
+                                    } catch {
+                                        return null;
+                                    }
+                                };
+                                const when = (() => {
+                                    try {
+                                        const [y, m, d] = String(form.date || "")
+                                            .split("-")
+                                            .map((v) => parseInt(v, 10));
+                                        const [hh, mm] = String(form.time || "00:00")
+                                            .split(":")
+                                            .map((v) => parseInt(v, 10));
+                                        const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0);
+                                        // snap to nearest 30m
+                                        const minutes = dt.getMinutes();
+                                        const snapped = minutes < 15 ? 0 : minutes < 45 ? 30 : 0;
+                                        if (snapped === 0 && minutes >= 45) dt.setHours(dt.getHours() + 1);
+                                        dt.setMinutes(snapped, 0, 0);
+                                        return dt;
+                                    } catch {
+                                        return new Date();
+                                    }
+                                })();
+                                const payload = {
+                                    title: form.title,
+                                    description: form.description || null,
+                                    startDate: when.toISOString(),
+                                    dueDate: toEndOfDayIso(form.dueDate),
+                                    endDate: toEndOfDayIso(form.endDate),
+                                    priority: form.priority || "medium",
+                                    keyAreaId: form.keyAreaId || undefined,
+                                };
+                                const updated = await taskService.update(editItem.id, payload);
+                                // reflect change locally (todos source)
+                                await refreshTodosForRange();
+                                addToast({ title: "Task updated", variant: "success" });
+                            } else if (editItem?.type === "activity") {
+                                // Optional support
+                                await activityService.update(editItem.id, {
+                                    text: form.text,
+                                    taskId: form.taskId || null,
+                                });
+                                addToast({ title: "Activity updated", variant: "success" });
+                            }
+                        } catch (e) {
+                            addToast({
+                                title: "Failed to update",
+                                description: String(e?.message || e),
+                                variant: "error",
+                            });
+                        }
+                    }}
+                    onDelete={async () => {
+                        try {
+                            if (editItem?.type === "task") {
+                                await taskService.remove(editItem.id);
+                                await refreshTodosForRange();
+                                addToast({ title: "Task deleted", variant: "success" });
+                            } else if (editItem?.type === "activity") {
+                                await activityService.remove(editItem.id);
+                                addToast({ title: "Activity deleted", variant: "success" });
+                            }
+                            setEditModalOpen(false);
+                            setEditItem(null);
+                        } catch (e) {
+                            addToast({
+                                title: "Failed to delete",
+                                description: String(e?.message || e),
+                                variant: "error",
+                            });
+                        }
                     }}
                 />
             )}

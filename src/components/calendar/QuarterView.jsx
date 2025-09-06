@@ -220,11 +220,7 @@ export default function QuarterView({
                                                         day: "numeric",
                                                     })}
                                                 </span>
-                                                {/* Placeholder for empty cell */}
-                                                {(!eventsByDay[date.toLocaleDateString()] ||
-                                                    eventsByDay[date.toLocaleDateString()].length === 0) && (
-                                                    <span className="block text-xs text-gray-400 mt-1">No events</span>
-                                                )}
+                                                {/* Keep empty cells clean: no placeholders */}
                                             </td>
                                         );
                                     })}

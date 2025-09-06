@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 
@@ -11,9 +11,10 @@ function getWeekNumber(date) {
 const defaultSlotSize = 30;
 const timeSlots = (slotSize) => {
     const slots = [];
-    for (let h = 8; h <= 23; h++) {
+    // Full day: 00:00 – 23:30
+    for (let h = 0; h <= 23; h++) {
         for (let m = 0; m < 60; m += slotSize) {
-            slots.push(`${h}:${m.toString().padStart(2, "0")}`);
+            slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
         }
     }
     return slots;
@@ -32,6 +33,8 @@ const WeekView = ({
     onTaskDrop,
     onEventClick,
     onEventMove,
+    onAddTaskOrActivity,
+    onTaskClick,
     view,
     onChangeView,
     filterType,
@@ -41,9 +44,12 @@ const WeekView = ({
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
-    // Fixed column widths to keep header and grid aligned
+    // Fixed time column width; day columns will flex to fill available space
     const TIME_COL_PX = 80; // matches w-20
-    const DAY_COL_PX = 140;
+    const containerRef = useRef(null);
+    const tasksScrollRef = useRef(null);
+    const [showTasksLeftCue, setShowTasksLeftCue] = useState(false);
+    const [showTasksRightCue, setShowTasksRightCue] = useState(false);
 
     // Calculate week start (Monday)
     const weekStart = new Date(currentDate || new Date());
@@ -53,8 +59,47 @@ const WeekView = ({
         (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
     );
     const slots = timeSlots(slotSize);
+    const ITEM_SIZE = 38; // px per time slot row
+    const LIST_HEIGHT_PX = 400; // fixed viewport height for grid scroll
     const weekNum = getWeekNumber(weekStart);
-    const totalWidth = TIME_COL_PX + days.length * DAY_COL_PX;
+
+    // No explicit width calculations; columns will flex to fit container
+
+    // Map vertical wheel to horizontal scroll on tasks scroller for better UX
+    useEffect(() => {
+        const el = tasksScrollRef.current;
+        if (!el) return;
+        const onWheel = (e) => {
+            if (e.deltaY !== 0 && !e.shiftKey) {
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        };
+        el.addEventListener("wheel", onWheel, { passive: false });
+        return () => el.removeEventListener("wheel", onWheel);
+    }, []);
+
+    // Show/hide scroll cues based on overflow and position
+    useEffect(() => {
+        const el = tasksScrollRef.current;
+        if (!el) return;
+        const updateCues = () => {
+            const maxScrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+            setShowTasksLeftCue(el.scrollLeft > 0);
+            setShowTasksRightCue(el.scrollLeft < maxScrollLeft - 1);
+        };
+        updateCues();
+        const onScroll = () => updateCues();
+        el.addEventListener("scroll", onScroll);
+        const ro = new ResizeObserver(updateCues);
+        ro.observe(el);
+        window.addEventListener("resize", updateCues);
+        return () => {
+            el.removeEventListener("scroll", onScroll);
+            ro.disconnect();
+            window.removeEventListener("resize", updateCues);
+        };
+    }, []);
 
     // Navigation handlers
     // Navigation is handled by container; keep internal handlers unused or remove if not needed
@@ -82,6 +127,35 @@ const WeekView = ({
     const endOfWeek = new Date(weekStart);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${endOfWeek.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+
+    // Helper: does event start match this slot (rounded to nearest slot size)?
+    const eventMatchesSlot = (startIso, day, slot, sizeMin) => {
+        try {
+            const ev = new Date(startIso);
+            if (
+                ev.getFullYear() !== day.getFullYear() ||
+                ev.getMonth() !== day.getMonth() ||
+                ev.getDate() !== day.getDate()
+            )
+                return false;
+            const [sh, smRaw] = slot.split(":");
+            const shNum = Number(sh);
+            const smNum = Number(smRaw);
+            let eh = ev.getHours();
+            let em = ev.getMinutes();
+            // round to nearest sizeMin (e.g., 30)
+            const rounded = Math.round(em / sizeMin) * sizeMin;
+            if (rounded === 60) {
+                eh = eh + 1;
+                em = 0;
+            } else {
+                em = rounded;
+            }
+            return eh === shNum && em === smNum;
+        } catch {
+            return false;
+        }
+    };
 
     return (
         <div className="p-0" style={{ overflow: "hidden" }}>
@@ -118,7 +192,7 @@ const WeekView = ({
                                 role="menu"
                                 className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                             >
-                                {["day", "week"].map((v) => (
+                                {["day", "week", "month", "quarter", "list"].map((v) => (
                                     <button
                                         key={v}
                                         role="menuitemradio"
@@ -178,14 +252,19 @@ const WeekView = ({
                 </div>
             </div>
             {/* Calendar grid */}
-            <div className="overflow-x-auto px-2" style={{ maxWidth: "100vw" }}>
-                <div style={{ minWidth: totalWidth + "px" }}>
-                    {/* Vertical scroller for header table and time grid (shorter to keep bottom buttons visible) */}
-                    <div style={{ maxHeight: "50vh", overflowY: "auto" }}>
+            <div ref={containerRef} className="no-scrollbar" style={{ overflowX: "hidden", overflowY: "hidden" }}>
+                <div style={{ width: "100%" }}>
+                    {/* Header stays fixed; only the grid below is vertically scrollable */}
+                    <div className="no-scrollbar">
                         {/* Table for header and all-day row only */}
                         <table
                             className="min-w-full border border-blue-100 rounded-lg"
-                            style={{ minWidth: totalWidth + "px", borderCollapse: "separate", borderSpacing: 0 }}
+                            style={{
+                                width: "100%",
+                                tableLayout: "fixed",
+                                borderCollapse: "separate",
+                                borderSpacing: 0,
+                            }}
                         >
                             <thead>
                                 <tr className="bg-blue-50">
@@ -199,7 +278,6 @@ const WeekView = ({
                                         <th
                                             key={dIdx}
                                             className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${dIdx === days.length - 1 ? "rounded-tr-lg" : ""}`}
-                                            style={{ width: DAY_COL_PX + "px" }}
                                         >
                                             {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
                                         </th>
@@ -218,7 +296,6 @@ const WeekView = ({
                                         <td
                                             key={dIdx}
                                             className="border-r border-blue-100 px-2 py-2 text-center align-top"
-                                            style={{ width: DAY_COL_PX + "px" }}
                                         >
                                             <span className="text-gray-300">—</span>
                                         </td>
@@ -227,8 +304,14 @@ const WeekView = ({
                             </tbody>
                         </table>
                         {/* Time slots - virtualized as flexbox grid below the table */}
-                        <div className="w-full" style={{ minWidth: totalWidth + "px" }}>
-                            <FixedSizeList height={320} itemCount={slots.length} itemSize={38} width={undefined}>
+                        <div className="w-full no-scrollbar" style={{ width: "100%" }}>
+                            <FixedSizeList
+                                className="no-scrollbar"
+                                height={LIST_HEIGHT_PX}
+                                itemCount={slots.length}
+                                itemSize={ITEM_SIZE}
+                                width={undefined}
+                            >
                                 {({ index, style }) => {
                                     const slot = slots[index];
                                     return (
@@ -244,22 +327,14 @@ const WeekView = ({
                                                 {slot}
                                             </div>
                                             {days.map((date, dIdx) => {
-                                                const slotEvents = events.filter((ev) => {
-                                                    const evDate = new Date(ev.start);
-                                                    return (
-                                                        evDate.getDate() === date.getDate() &&
-                                                        evDate.getHours() === Number(slot.split(":")[0]) &&
-                                                        evDate.getMinutes() === Number(slot.split(":")[1])
-                                                    );
-                                                });
+                                                const slotEvents = events.filter((ev) =>
+                                                    eventMatchesSlot(ev.start, date, slot, slotSize),
+                                                );
                                                 return (
                                                     <div
                                                         key={dIdx}
                                                         className="border-r border-blue-100 px-2 py-1 h-8 align-top group flex items-center"
-                                                        style={{
-                                                            flex: "0 0 " + DAY_COL_PX + "px",
-                                                            width: DAY_COL_PX + "px",
-                                                        }}
+                                                        style={{ flex: "1 1 0", minWidth: 0 }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => handleDrop(e, date, slot)}
                                                         onDoubleClick={() => {
@@ -274,40 +349,38 @@ const WeekView = ({
                                                             onQuickCreate && onQuickCreate(dt);
                                                         }}
                                                     >
-                                                        {slotEvents.length === 0 ? (
-                                                            <span className="text-gray-300 group-hover:text-blue-300">
-                                                                —
-                                                            </span>
-                                                        ) : (
-                                                            slotEvents.map((ev, i) => (
-                                                                <div
-                                                                    key={i}
-                                                                    className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                                    draggable
-                                                                    onDragStart={(e) => {
-                                                                        try {
-                                                                            e.dataTransfer.setData(
-                                                                                "eventId",
-                                                                                String(ev.id),
-                                                                            );
-                                                                            const dur = ev.end
-                                                                                ? new Date(ev.end).getTime() -
-                                                                                  new Date(ev.start).getTime()
-                                                                                : 60 * 60 * 1000;
-                                                                            e.dataTransfer.setData(
-                                                                                "durationMs",
-                                                                                String(Math.max(dur, 0)),
-                                                                            );
-                                                                            e.dataTransfer.effectAllowed = "move";
-                                                                        } catch {}
-                                                                    }}
-                                                                    onClick={() => onEventClick(ev)}
-                                                                >
-                                                                    <span>{categories[ev.kind]?.icon || ""}</span>
-                                                                    <span className="truncate text-xs">{ev.title}</span>
-                                                                </div>
-                                                            ))
-                                                        )}
+                                                        {slotEvents.length === 0
+                                                            ? null
+                                                            : slotEvents.map((ev, i) => (
+                                                                  <div
+                                                                      key={i}
+                                                                      className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}
+                                                                      draggable
+                                                                      onDragStart={(e) => {
+                                                                          try {
+                                                                              e.dataTransfer.setData(
+                                                                                  "eventId",
+                                                                                  String(ev.id),
+                                                                              );
+                                                                              const dur = ev.end
+                                                                                  ? new Date(ev.end).getTime() -
+                                                                                    new Date(ev.start).getTime()
+                                                                                  : 60 * 60 * 1000;
+                                                                              e.dataTransfer.setData(
+                                                                                  "durationMs",
+                                                                                  String(Math.max(dur, 0)),
+                                                                              );
+                                                                              e.dataTransfer.effectAllowed = "move";
+                                                                          } catch {}
+                                                                      }}
+                                                                      onClick={() => onEventClick(ev)}
+                                                                  >
+                                                                      <span>{categories[ev.kind]?.icon || ""}</span>
+                                                                      <span className="truncate text-xs">
+                                                                          {ev.title}
+                                                                      </span>
+                                                                  </div>
+                                                              ))}
                                                     </div>
                                                 );
                                             })}
@@ -322,8 +395,8 @@ const WeekView = ({
                         <div className="p-2" style={{ width: TIME_COL_PX + "px" }}>
                             <div className="text-xs text-slate-500">Tasks</div>
                         </div>
-                        <div className="p-2" style={{ flex: "1 1 auto" }}>
-                            <div className="flex gap-2 overflow-x-auto">
+                        <div className="p-2 min-w-0 relative" style={{ flex: "1 1 auto" }}>
+                            <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
                                 {(Array.isArray(todos) ? todos : []).map((t) => (
                                     <div
                                         key={t.id}
@@ -336,6 +409,7 @@ const WeekView = ({
                                         }}
                                         className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing min-w-[160px]"
                                         title={t.title}
+                                        onClick={() => onTaskClick && onTaskClick(String(t.id))}
                                     >
                                         <div className="truncate font-medium">{t.title}</div>
                                         <div className="text-[10px] text-slate-500">
@@ -346,23 +420,52 @@ const WeekView = ({
                                     </div>
                                 ))}
                             </div>
+                            {/* Scroll cues and buttons */}
+                            {showTasksLeftCue && (
+                                <>
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
+                                    <button
+                                        type="button"
+                                        className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
+                                        aria-label="Scroll left"
+                                        onClick={() =>
+                                            tasksScrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })
+                                        }
+                                    >
+                                        <FaChevronLeft />
+                                    </button>
+                                </>
+                            )}
+                            {showTasksRightCue && (
+                                <>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
+                                    <button
+                                        type="button"
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
+                                        aria-label="Scroll right"
+                                        onClick={() =>
+                                            tasksScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
+                                        }
+                                    >
+                                        <FaChevronRight />
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                     {/* Add task/activity button at the very bottom of the container (outside the scroller) */}
-                    <div
-                        className="flex w-full bg-blue-50 rounded-b-lg border-t border-blue-100"
-                        style={{ minWidth: totalWidth + "px" }}
-                    >
+                    <div className="flex w-full bg-blue-50 rounded-b-lg border-t border-blue-100">
                         <div style={{ width: TIME_COL_PX + "px" }}></div>
                         {days.map((date, dIdx) => (
                             <div
                                 key={dIdx}
-                                className={`px-2 py-2 text-center align-top ${dIdx === days.length - 1 ? "rounded-br-lg" : ""}`}
-                                style={{ width: DAY_COL_PX + "px", flex: "0 0 " + DAY_COL_PX + "px" }}
+                                className={`px-2 py-1 text-center align-top ${dIdx === days.length - 1 ? "rounded-br-lg" : ""}`}
+                                style={{ flex: "1 1 0", minWidth: 0 }}
                             >
                                 <button
-                                    className="bg-blue-100 text-blue-700 px-3 py-2 rounded text-sm w-full"
-                                    onClick={() => onEventClick({ day: date, slot: "bottom" })}
+                                    className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs w-full leading-tight whitespace-nowrap"
+                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(date)}
+                                    aria-label="Add task or activity"
                                 >
                                     Add task/activity
                                 </button>

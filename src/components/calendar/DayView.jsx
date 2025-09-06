@@ -22,14 +22,64 @@ export default function DayView({
     onTaskDrop,
     onEventMove,
     onEventClick,
+    onTaskClick,
     onPlanTomorrow,
     onShiftDate,
     onSetDate,
     onQuickCreate,
+    onAddTaskOrActivity,
     loading = false,
 }) {
     const [showViewMenu, setShowViewMenu] = React.useState(false);
     const today = currentDate || new Date();
+    const slotSizeMin = 30;
+    // Build date-only value for comparisons and filter todos to those spanning today
+    const toDateOnly = (iso) => {
+        if (!iso) return null;
+        const d = new Date(iso);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    };
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const isInRangeToday = (t) => {
+        let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
+        let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
+        if (!start && !end) return false;
+        if (start && end && start > end) {
+            const tmp = start;
+            start = end;
+            end = tmp;
+        }
+        if (!start) start = end;
+        if (!end) end = start;
+        return start <= todayOnly && todayOnly <= end;
+    };
+    const dayTodos = Array.isArray(todos) ? todos.filter(isInRangeToday) : [];
+    const matchesSlot = (startIso, refDate, slot) => {
+        try {
+            const ev = new Date(startIso);
+            if (
+                ev.getFullYear() !== refDate.getFullYear() ||
+                ev.getMonth() !== refDate.getMonth() ||
+                ev.getDate() !== refDate.getDate()
+            )
+                return false;
+            const [sh, smRaw] = slot.split(":");
+            const shNum = Number(sh);
+            const smNum = Number(smRaw);
+            let eh = ev.getHours();
+            let em = ev.getMinutes();
+            const rounded = Math.round(em / slotSizeMin) * slotSizeMin;
+            if (rounded === 60) {
+                eh = eh + 1;
+                em = 0;
+            } else {
+                em = rounded;
+            }
+            return eh === shNum && em === smNum;
+        } catch {
+            return false;
+        }
+    };
     // Drag-and-drop handler
     const handleDrop = (e, hour) => {
         try {
@@ -85,7 +135,7 @@ export default function DayView({
                                     role="menu"
                                     className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                                 >
-                                    {["day", "week"].map((v) => (
+                                    {["day", "week", "month", "quarter", "list"].map((v) => (
                                         <button
                                             key={v}
                                             role="menuitemradio"
@@ -153,13 +203,7 @@ export default function DayView({
                     className="flex flex-col gap-1"
                     style={{ maxWidth: "100%", maxHeight: "60vh", overflowX: "auto", overflowY: "auto" }}
                 >
-                    {Array.isArray(events) && events.length === 0 && !loading && (
-                        <div className="mb-2">
-                            <span className="text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-0.5">
-                                No events for this day
-                            </span>
-                        </div>
-                    )}
+                    {/* Keep clean: no empty-state banner when there are no events */}
                     <table
                         className="min-w-full border border-sky-100 rounded-lg"
                         style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}
@@ -172,14 +216,7 @@ export default function DayView({
                         </thead>
                         <tbody>
                             {hours.map((h, idx) => {
-                                const slotEvents = events.filter((ev) => {
-                                    const evDate = new Date(ev.start);
-                                    return (
-                                        evDate.getDate() === today.getDate() &&
-                                        evDate.getHours() === Number(h.split(":")[0]) &&
-                                        evDate.getMinutes() === Number(h.split(":")[1])
-                                    );
-                                });
+                                const slotEvents = events.filter((ev) => matchesSlot(ev.start, today, h));
                                 return (
                                     <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-blue-50/40"}>
                                         <td className="border px-2 py-1 text-xs w-24 align-top">
@@ -200,37 +237,35 @@ export default function DayView({
                                                 onQuickCreate && onQuickCreate(date);
                                             }}
                                         >
-                                            {slotEvents.length === 0 ? (
-                                                <span className="text-gray-400 text-xs">No events</span>
-                                            ) : (
-                                                slotEvents.map((ev, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 ${
-                                                            categories[ev.kind]?.color || "bg-gray-200"
-                                                        }`}
-                                                        draggable
-                                                        onDragStart={(e) => {
-                                                            try {
-                                                                e.dataTransfer.setData("eventId", String(ev.id));
-                                                                const dur = ev.end
-                                                                    ? new Date(ev.end).getTime() -
-                                                                      new Date(ev.start).getTime()
-                                                                    : 60 * 60 * 1000;
-                                                                e.dataTransfer.setData(
-                                                                    "durationMs",
-                                                                    String(Math.max(dur, 0)),
-                                                                );
-                                                                e.dataTransfer.effectAllowed = "move";
-                                                            } catch {}
-                                                        }}
-                                                        onClick={() => onEventClick(ev)}
-                                                    >
-                                                        <span>{categories[ev.kind]?.icon || ""}</span>
-                                                        <span className="truncate text-xs">{ev.title}</span>
-                                                    </div>
-                                                ))
-                                            )}
+                                            {slotEvents.length === 0
+                                                ? null
+                                                : slotEvents.map((ev, i) => (
+                                                      <div
+                                                          key={i}
+                                                          className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 ${
+                                                              categories[ev.kind]?.color || "bg-gray-200"
+                                                          }`}
+                                                          draggable
+                                                          onDragStart={(e) => {
+                                                              try {
+                                                                  e.dataTransfer.setData("eventId", String(ev.id));
+                                                                  const dur = ev.end
+                                                                      ? new Date(ev.end).getTime() -
+                                                                        new Date(ev.start).getTime()
+                                                                      : 60 * 60 * 1000;
+                                                                  e.dataTransfer.setData(
+                                                                      "durationMs",
+                                                                      String(Math.max(dur, 0)),
+                                                                  );
+                                                                  e.dataTransfer.effectAllowed = "move";
+                                                              } catch {}
+                                                          }}
+                                                          onClick={() => onEventClick(ev)}
+                                                      >
+                                                          <span>{categories[ev.kind]?.icon || ""}</span>
+                                                          <span className="truncate text-xs">{ev.title}</span>
+                                                      </div>
+                                                  ))}
                                         </td>
                                     </tr>
                                 );
@@ -251,7 +286,14 @@ export default function DayView({
                                 <FaTasks className="text-blue-600" />
                                 <span>Tasks</span>
                             </button>
-                            <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
+                            <button
+                                type="button"
+                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+                                onClick={() =>
+                                    onAddTaskOrActivity &&
+                                    onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })
+                                }
+                            >
                                 <FaPlus />
                                 <span>Add task</span>
                             </button>
@@ -260,7 +302,14 @@ export default function DayView({
                                 <FaRegCalendarAlt className="text-blue-600" />
                                 <span>Activities</span>
                             </button>
-                            <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
+                            <button
+                                type="button"
+                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+                                onClick={() =>
+                                    onAddTaskOrActivity &&
+                                    onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })
+                                }
+                            >
                                 <FaPlus />
                                 <span>Add activity</span>
                             </button>
@@ -268,32 +317,32 @@ export default function DayView({
                     </div>
                     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
                         <h3 className="text-sm font-semibold text-slate-700 mb-2">Dated tasks (drag onto time)</h3>
-                        {(!Array.isArray(todos) || todos.length === 0) && (
+                        {dayTodos.length === 0 && (
                             <div className="text-xs text-slate-500">No dated tasks for this day</div>
                         )}
                         <div className="flex flex-col gap-1">
-                            {Array.isArray(todos) &&
-                                todos.map((t) => (
-                                    <div
-                                        key={t.id}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            try {
-                                                e.dataTransfer.setData("taskId", String(t.id));
-                                                e.dataTransfer.effectAllowed = "copy";
-                                            } catch {}
-                                        }}
-                                        className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing"
-                                        title={t.title}
-                                    >
-                                        <div className="truncate font-medium">{t.title}</div>
-                                        <div className="text-[10px] text-slate-500">
-                                            {t.startDate || t.dueDate
-                                                ? new Date(t.startDate || t.dueDate).toLocaleString()
-                                                : ""}
-                                        </div>
+                            {dayTodos.map((t) => (
+                                <div
+                                    key={t.id}
+                                    draggable
+                                    onDragStart={(e) => {
+                                        try {
+                                            e.dataTransfer.setData("taskId", String(t.id));
+                                            e.dataTransfer.effectAllowed = "copy";
+                                        } catch {}
+                                    }}
+                                    className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing"
+                                    title={t.title}
+                                    onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                >
+                                    <div className="truncate font-medium">{t.title}</div>
+                                    <div className="text-[10px] text-slate-500">
+                                        {t.startDate || t.dueDate
+                                            ? new Date(t.startDate || t.dueDate).toLocaleString()
+                                            : ""}
                                     </div>
-                                ))}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
