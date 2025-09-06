@@ -410,6 +410,10 @@ export default function MonthView({
                                                     {slotEvents.length > 0 &&
                                                         slotEvents.map((ev, i) => {
                                                             const color = categories[ev.kind]?.color || "bg-gray-200";
+                                                            const isTaskBox =
+                                                                Boolean(ev.taskId) ||
+                                                                (typeof ev.id === "string" &&
+                                                                    ev.id.startsWith("todo-"));
                                                             const handleClick = (e) => {
                                                                 e.stopPropagation();
                                                                 if (typeof onTaskClick !== "function") return;
@@ -425,11 +429,18 @@ export default function MonthView({
                                                             return (
                                                                 <span
                                                                     key={i}
-                                                                    className={`block px-2 py-1 rounded text-xs mb-1 ${color} cursor-pointer`}
+                                                                    className={`block px-2 py-1 rounded text-xs mb-1 ${isTaskBox ? "" : color} cursor-pointer w-full max-w-full overflow-hidden`}
                                                                     onClick={handleClick}
                                                                     title={ev.title}
+                                                                    style={
+                                                                        isTaskBox
+                                                                            ? { backgroundColor: "#7ED4E3" }
+                                                                            : undefined
+                                                                    }
                                                                 >
-                                                                    {ev.title}
+                                                                    <span className="truncate whitespace-nowrap min-w-0 block">
+                                                                        {ev.title}
+                                                                    </span>
                                                                 </span>
                                                             );
                                                         })}
@@ -494,7 +505,7 @@ export default function MonthView({
                                     return (
                                         <div
                                             key={`ov-${r.task.id}`}
-                                            className="bg-indigo-500 border border-indigo-400 rounded text-[10px] font-medium text-white flex items-start pointer-events-auto cursor-default"
+                                            className="rounded text-[10px] font-medium text-blue-900 flex items-start pointer-events-auto cursor-default"
                                             style={{
                                                 position: "absolute",
                                                 top,
@@ -502,6 +513,8 @@ export default function MonthView({
                                                 width: laneWidth,
                                                 height,
                                                 overflow: "hidden",
+                                                backgroundColor: "#7ED4E3",
+                                                border: "1px solid #7ED4E3",
                                             }}
                                             title={r.task.title}
                                             onClick={(e) => {

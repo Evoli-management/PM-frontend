@@ -318,7 +318,7 @@ const WeekView = ({
                                         <div
                                             key={index}
                                             style={style}
-                                            className={`flex w-full ${index % 2 === 0 ? "bg-white" : "bg-blue-50/40"}`}
+                                            className={`flex w-full ${index % 2 === 0 ? "bg-blue-50" : "bg-white"}`}
                                         >
                                             <div
                                                 className="border-r border-blue-100 px-2 py-1 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center"
@@ -351,36 +351,48 @@ const WeekView = ({
                                                     >
                                                         {slotEvents.length === 0
                                                             ? null
-                                                            : slotEvents.map((ev, i) => (
-                                                                  <div
-                                                                      key={i}
-                                                                      className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                                      draggable
-                                                                      onDragStart={(e) => {
-                                                                          try {
-                                                                              e.dataTransfer.setData(
-                                                                                  "eventId",
-                                                                                  String(ev.id),
-                                                                              );
-                                                                              const dur = ev.end
-                                                                                  ? new Date(ev.end).getTime() -
-                                                                                    new Date(ev.start).getTime()
-                                                                                  : 60 * 60 * 1000;
-                                                                              e.dataTransfer.setData(
-                                                                                  "durationMs",
-                                                                                  String(Math.max(dur, 0)),
-                                                                              );
-                                                                              e.dataTransfer.effectAllowed = "move";
-                                                                          } catch {}
-                                                                      }}
-                                                                      onClick={() => onEventClick(ev)}
-                                                                  >
-                                                                      <span>{categories[ev.kind]?.icon || ""}</span>
-                                                                      <span className="truncate text-xs">
-                                                                          {ev.title}
-                                                                      </span>
-                                                                  </div>
-                                                              ))}
+                                                            : slotEvents.map((ev, i) => {
+                                                                  const isTaskBox = !!ev.taskId;
+                                                                  return (
+                                                                      <div
+                                                                          key={i}
+                                                                          className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden ${isTaskBox ? "" : categories[ev.kind]?.color || "bg-gray-200"}`}
+                                                                          style={
+                                                                              isTaskBox
+                                                                                  ? { backgroundColor: "#7ED4E3" }
+                                                                                  : undefined
+                                                                          }
+                                                                          draggable
+                                                                          onDragStart={(e) => {
+                                                                              try {
+                                                                                  e.dataTransfer.setData(
+                                                                                      "eventId",
+                                                                                      String(ev.id),
+                                                                                  );
+                                                                                  const dur = ev.end
+                                                                                      ? new Date(ev.end).getTime() -
+                                                                                        new Date(ev.start).getTime()
+                                                                                      : 60 * 60 * 1000;
+                                                                                  e.dataTransfer.setData(
+                                                                                      "durationMs",
+                                                                                      String(Math.max(dur, 0)),
+                                                                                  );
+                                                                                  e.dataTransfer.effectAllowed = "move";
+                                                                              } catch {}
+                                                                          }}
+                                                                          onClick={() => onEventClick(ev)}
+                                                                      >
+                                                                          {!isTaskBox && (
+                                                                              <span className="shrink-0">
+                                                                                  {categories[ev.kind]?.icon || ""}
+                                                                              </span>
+                                                                          )}
+                                                                          <span className="truncate whitespace-nowrap text-xs min-w-0">
+                                                                              {ev.title}
+                                                                          </span>
+                                                                      </div>
+                                                                  );
+                                                              })}
                                                     </div>
                                                 );
                                             })}
@@ -393,7 +405,7 @@ const WeekView = ({
                     {/* Dated tasks panel for drag-and-drop */}
                     <div className="flex w-full bg-white border border-blue-100 rounded-b-lg mt-2">
                         <div className="p-2" style={{ width: TIME_COL_PX + "px" }}>
-                            <div className="text-xs text-slate-500">Tasks</div>
+                            <div className="text-xs text-blue-500">Added Tasks</div>
                         </div>
                         <div className="p-2 min-w-0 relative" style={{ flex: "1 1 auto" }}>
                             <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
@@ -407,16 +419,12 @@ const WeekView = ({
                                                 e.dataTransfer.effectAllowed = "copy";
                                             } catch {}
                                         }}
-                                        className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing min-w-[160px]"
+                                        className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
+                                        style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
                                         title={t.title}
                                         onClick={() => onTaskClick && onTaskClick(String(t.id))}
                                     >
                                         <div className="truncate font-medium">{t.title}</div>
-                                        <div className="text-[10px] text-slate-500">
-                                            {t.startDate || t.dueDate
-                                                ? new Date(t.startDate || t.dueDate).toLocaleString()
-                                                : ""}
-                                        </div>
                                     </div>
                                 ))}
                             </div>

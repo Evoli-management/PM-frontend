@@ -1,5 +1,5 @@
 import React from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaTasks, FaPlus, FaRegCalendarAlt } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 
@@ -18,6 +18,7 @@ export default function DayView({
     onChangeFilter,
     events,
     todos,
+    activitiesByTask = {},
     categories,
     onTaskDrop,
     onEventMove,
@@ -54,6 +55,13 @@ export default function DayView({
         return start <= todayOnly && todayOnly <= end;
     };
     const dayTodos = Array.isArray(todos) ? todos.filter(isInRangeToday) : [];
+    const dayActivities = React.useMemo(
+        () =>
+            (dayTodos || []).flatMap((t) =>
+                Array.isArray(activitiesByTask?.[String(t.id)]) ? activitiesByTask[String(t.id)] : [],
+            ),
+        [dayTodos, activitiesByTask],
+    );
     const matchesSlot = (startIso, refDate, slot) => {
         try {
             const ev = new Date(startIso);
@@ -100,7 +108,7 @@ export default function DayView({
         } catch {}
     };
     return (
-        <div className="p-0 flex gap-4">
+        <div className="p-0 flex gap-4 w-full max-w-none">
             {/* Left: Calendar day view */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-2">
@@ -205,7 +213,7 @@ export default function DayView({
                 >
                     {/* Keep clean: no empty-state banner when there are no events */}
                     <table
-                        className="min-w-full border border-sky-100 rounded-lg"
+                        className="min-w-full border border-blue-100 rounded-lg"
                         style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}
                     >
                         <thead>
@@ -218,12 +226,12 @@ export default function DayView({
                             {hours.map((h, idx) => {
                                 const slotEvents = events.filter((ev) => matchesSlot(ev.start, today, h));
                                 return (
-                                    <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-blue-50/40"}>
-                                        <td className="border px-2 py-1 text-xs w-24 align-top">
+                                    <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
+                                        <td className="border-t border-r border-blue-100 px-2 py-1 text-xs w-24 align-top">
                                             <span>{h}</span>
                                         </td>
                                         <td
-                                            className="border px-2 py-1 align-top"
+                                            className="border-t border-blue-100 px-2 py-1 align-top"
                                             style={{ width: "100%" }}
                                             onDoubleClick={() => {
                                                 const [hh, mm] = h.split(":");
@@ -239,33 +247,47 @@ export default function DayView({
                                         >
                                             {slotEvents.length === 0
                                                 ? null
-                                                : slotEvents.map((ev, i) => (
-                                                      <div
-                                                          key={i}
-                                                          className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 ${
-                                                              categories[ev.kind]?.color || "bg-gray-200"
-                                                          }`}
-                                                          draggable
-                                                          onDragStart={(e) => {
-                                                              try {
-                                                                  e.dataTransfer.setData("eventId", String(ev.id));
-                                                                  const dur = ev.end
-                                                                      ? new Date(ev.end).getTime() -
-                                                                        new Date(ev.start).getTime()
-                                                                      : 60 * 60 * 1000;
-                                                                  e.dataTransfer.setData(
-                                                                      "durationMs",
-                                                                      String(Math.max(dur, 0)),
-                                                                  );
-                                                                  e.dataTransfer.effectAllowed = "move";
-                                                              } catch {}
-                                                          }}
-                                                          onClick={() => onEventClick(ev)}
-                                                      >
-                                                          <span>{categories[ev.kind]?.icon || ""}</span>
-                                                          <span className="truncate text-xs">{ev.title}</span>
-                                                      </div>
-                                                  ))}
+                                                : slotEvents.map((ev, i) => {
+                                                      const isTaskBox = !!ev.taskId;
+                                                      return (
+                                                          <div
+                                                              key={i}
+                                                              className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden ${
+                                                                  isTaskBox
+                                                                      ? ""
+                                                                      : categories[ev.kind]?.color || "bg-gray-200"
+                                                              }`}
+                                                              style={
+                                                                  isTaskBox ? { backgroundColor: "#7ED4E3" } : undefined
+                                                              }
+                                                              draggable
+                                                              onDragStart={(e) => {
+                                                                  try {
+                                                                      e.dataTransfer.setData("eventId", String(ev.id));
+                                                                      const dur = ev.end
+                                                                          ? new Date(ev.end).getTime() -
+                                                                            new Date(ev.start).getTime()
+                                                                          : 60 * 60 * 1000;
+                                                                      e.dataTransfer.setData(
+                                                                          "durationMs",
+                                                                          String(Math.max(dur, 0)),
+                                                                      );
+                                                                      e.dataTransfer.effectAllowed = "move";
+                                                                  } catch {}
+                                                              }}
+                                                              onClick={() => onEventClick(ev)}
+                                                          >
+                                                              {!isTaskBox && (
+                                                                  <span className="shrink-0">
+                                                                      {categories[ev.kind]?.icon || ""}
+                                                                  </span>
+                                                              )}
+                                                              <span className="truncate whitespace-nowrap text-xs min-w-0">
+                                                                  {ev.title}
+                                                              </span>
+                                                          </div>
+                                                      );
+                                                  })}
                                         </td>
                                     </tr>
                                 );
@@ -277,18 +299,103 @@ export default function DayView({
             </div>
 
             {/* Right: Actions column */}
-            <div className="w-64 md:w-72 shrink-0">
+            <div className="w-[26rem] md:w-[30rem] shrink-0">
                 <div className="sticky top-2">
                     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3 mb-3">
                         <h3 className="text-sm font-semibold text-slate-700 mb-3">Quick actions</h3>
-                        <div className="grid grid-cols-1 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            {/* Row 1: Category buttons (Tasks left, Activities right) */}
                             <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium">
-                                <FaTasks className="text-blue-600" />
+                                <svg
+                                    stroke="currentColor"
+                                    fill="currentColor"
+                                    strokeWidth="0"
+                                    viewBox="0 0 448 512"
+                                    className="w-4 h-4 text-[#4DC3D8] shrink-0"
+                                    aria-hidden="true"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+                                </svg>
                                 <span>Tasks</span>
                             </button>
+                            <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium">
+                                <svg
+                                    stroke="currentColor"
+                                    fill="currentColor"
+                                    strokeWidth="0"
+                                    viewBox="0 0 448 512"
+                                    className="w-4 h-4 text-[#4DC3D8] shrink-0"
+                                    aria-hidden="true"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                </svg>
+                                <span>Activities</span>
+                            </button>
+                            {/* Row 2: Lists (Tasks list left, Activities list right) */}
+                            <div className="w-full max-h-32 overflow-auto rounded border border-slate-200 bg-slate-50 p-2">
+                                {dayTodos.length === 0 ? (
+                                    <div className="text-[11px] text-slate-500 text-center">No tasks</div>
+                                ) : (
+                                    <div className="flex flex-col gap-1">
+                                        {dayTodos.map((t) => (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                className="w-full px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center gap-2 text-left"
+                                                title={t.title}
+                                                onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                            >
+                                                <svg
+                                                    stroke="currentColor"
+                                                    fill="currentColor"
+                                                    strokeWidth="0"
+                                                    viewBox="0 0 448 512"
+                                                    className="w-3.5 h-3.5 text-[#4DC3D8] shrink-0"
+                                                    aria-hidden="true"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                >
+                                                    <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+                                                </svg>
+                                                <span className="truncate">{t.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="w-full max-h-32 overflow-auto rounded border border-slate-200 bg-slate-50 p-2">
+                                {dayActivities.length === 0 ? (
+                                    <div className="text-[11px] text-slate-500 text-center">No activities</div>
+                                ) : (
+                                    <div className="flex flex-col gap-1">
+                                        {dayActivities.map((a) => (
+                                            <div
+                                                key={a.id}
+                                                className="w-full px-2 py-1 rounded bg-white border border-slate-200 text-xs text-slate-700 flex items-center gap-2"
+                                                title={a.text || a.title}
+                                            >
+                                                <svg
+                                                    stroke="currentColor"
+                                                    fill="currentColor"
+                                                    strokeWidth="0"
+                                                    viewBox="0 0 448 512"
+                                                    className="w-3.5 h-3.5 text-[#4DC3D8] shrink-0"
+                                                    aria-hidden="true"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                >
+                                                    <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                                </svg>
+                                                <span className="truncate">{a.text || a.title}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {/* Row 2: Add buttons (Add task left, Add activity right) */}
                             <button
                                 type="button"
-                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
                                 onClick={() =>
                                     onAddTaskOrActivity &&
                                     onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })
@@ -297,14 +404,9 @@ export default function DayView({
                                 <FaPlus />
                                 <span>Add task</span>
                             </button>
-                            <div className="h-px bg-slate-200 my-2" />
-                            <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium">
-                                <FaRegCalendarAlt className="text-blue-600" />
-                                <span>Activities</span>
-                            </button>
                             <button
                                 type="button"
-                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
                                 onClick={() =>
                                     onAddTaskOrActivity &&
                                     onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })
@@ -313,36 +415,6 @@ export default function DayView({
                                 <FaPlus />
                                 <span>Add activity</span>
                             </button>
-                        </div>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
-                        <h3 className="text-sm font-semibold text-slate-700 mb-2">Dated tasks (drag onto time)</h3>
-                        {dayTodos.length === 0 && (
-                            <div className="text-xs text-slate-500">No dated tasks for this day</div>
-                        )}
-                        <div className="flex flex-col gap-1">
-                            {dayTodos.map((t) => (
-                                <div
-                                    key={t.id}
-                                    draggable
-                                    onDragStart={(e) => {
-                                        try {
-                                            e.dataTransfer.setData("taskId", String(t.id));
-                                            e.dataTransfer.effectAllowed = "copy";
-                                        } catch {}
-                                    }}
-                                    className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs text-slate-700 cursor-grab active:cursor-grabbing"
-                                    title={t.title}
-                                    onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                >
-                                    <div className="truncate font-medium">{t.title}</div>
-                                    <div className="text-[10px] text-slate-500">
-                                        {t.startDate || t.dueDate
-                                            ? new Date(t.startDate || t.dueDate).toLocaleString()
-                                            : ""}
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>

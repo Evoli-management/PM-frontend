@@ -49,6 +49,7 @@ const CalendarContainer = () => {
     const [events, setEvents] = useState([]);
     const [todos, setTodos] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [activitiesByTask, setActivitiesByTask] = useState({}); // { taskId: Activity[] }
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [addModalOpen, setAddModalOpen] = useState(false);
@@ -84,6 +85,31 @@ const CalendarContainer = () => {
         } catch {}
     }, [view, currentDate]);
 
+    // Helper: determine if a todo spans the given day (date-only compare)
+    const isTodoInRangeOfDay = (t, dayDate) => {
+        try {
+            const toDateOnly = (iso) => {
+                if (!iso) return null;
+                const d = new Date(iso);
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            };
+            const todayOnly = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate());
+            let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
+            let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
+            if (!start && !end) return false;
+            if (start && end && start > end) {
+                const tmp = start;
+                start = end;
+                end = tmp;
+            }
+            if (!start) start = end;
+            if (!end) end = start;
+            return start <= todayOnly && todayOnly <= end;
+        } catch {
+            return false;
+        }
+    };
+
     // Fetch events/todos from backend for day/week/month/quarter/list views
     useEffect(() => {
         const load = async () => {
@@ -96,13 +122,9 @@ const CalendarContainer = () => {
                 end.setTime(start.getTime());
                 end.setDate(start.getDate() + 6);
             } else if (view === "day") {
-                // Fetch a wider window around the selected day so multi-day tasks overlapping this day are included
-                const s = new Date(currentDate);
-                s.setDate(s.getDate() - 7);
-                const e = new Date(currentDate);
-                e.setDate(e.getDate() + 7);
-                start.setTime(s.getTime());
-                end.setTime(e.getTime());
+                // Fetch exactly the selected day; tasks spanning the day will be included by backend overlap logic
+                start.setTime(currentDate.getTime());
+                end.setTime(currentDate.getTime());
             } else if (view === "month") {
                 start.setDate(1);
                 end.setMonth(start.getMonth() + 1, 0); // last day of month
@@ -126,10 +148,36 @@ const CalendarContainer = () => {
                 ]);
                 setEvents(Array.isArray(evs) ? evs : []);
                 setTodos(Array.isArray(tds) ? tds : []);
+                // If Day view, also fetch activities for tasks that are dated today
+                if (view === "day") {
+                    try {
+                        const todayTodos = (Array.isArray(tds) ? tds : []).filter((t) =>
+                            isTodoInRangeOfDay(t, currentDate),
+                        );
+                        const uniqueIds = Array.from(new Set(todayTodos.map((t) => String(t.id))));
+                        const pairs = await Promise.all(
+                            uniqueIds.map(async (id) => {
+                                try {
+                                    const list = await activityService.list({ taskId: id });
+                                    return [id, Array.isArray(list) ? list : []];
+                                } catch {
+                                    return [id, []];
+                                }
+                            }),
+                        );
+                        const map = Object.fromEntries(pairs);
+                        setActivitiesByTask(map);
+                    } catch {
+                        setActivitiesByTask({});
+                    }
+                } else {
+                    setActivitiesByTask({});
+                }
             } catch (err) {
                 console.warn("Failed to load calendar data", err);
                 setEvents([]);
                 setTodos([]);
+                setActivitiesByTask({});
             } finally {
                 setLoading(false);
             }
@@ -147,12 +195,9 @@ const CalendarContainer = () => {
             end.setTime(start.getTime());
             end.setDate(start.getDate() + 6);
         } else if (view === "day") {
-            const s = new Date(currentDate);
-            s.setDate(s.getDate() - 7);
-            const e = new Date(currentDate);
-            e.setDate(e.getDate() + 7);
-            start.setTime(s.getTime());
-            end.setTime(e.getTime());
+            // Exact day range for refresh
+            start.setTime(currentDate.getTime());
+            end.setTime(currentDate.getTime());
         } else if (view === "month" || view === "list") {
             start.setDate(1);
             end.setMonth(start.getMonth() + 1, 0);
@@ -166,6 +211,29 @@ const CalendarContainer = () => {
         try {
             const tds = await calendarService.listTodos({ from: fromISO, to: toISO });
             setTodos(Array.isArray(tds) ? tds : []);
+            // Also refresh activities map if day view
+            if (view === "day") {
+                try {
+                    const todayTodos = (Array.isArray(tds) ? tds : []).filter((t) =>
+                        isTodoInRangeOfDay(t, currentDate),
+                    );
+                    const uniqueIds = Array.from(new Set(todayTodos.map((t) => String(t.id))));
+                    const pairs = await Promise.all(
+                        uniqueIds.map(async (id) => {
+                            try {
+                                const list = await activityService.list({ taskId: id });
+                                return [id, Array.isArray(list) ? list : []];
+                            } catch {
+                                return [id, []];
+                            }
+                        }),
+                    );
+                    const map = Object.fromEntries(pairs);
+                    setActivitiesByTask(map);
+                } catch {
+                    setActivitiesByTask({});
+                }
+            }
         } catch {}
     };
 
@@ -515,8 +583,11 @@ const CalendarContainer = () => {
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
+                        todos={todos}
                         categories={EVENT_CATEGORIES}
-                        onDayClick={openModal}
+                        onDayClick={(date) => openAddModal(date, { defaultTab: "task" })}
+                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onTaskClick={openEditTask}
                     />
                 )}
                 {view === "month" && (
@@ -568,6 +639,7 @@ const CalendarContainer = () => {
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         todos={todos}
+                        activitiesByTask={activitiesByTask}
                         loading={loading}
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
@@ -586,7 +658,9 @@ const CalendarContainer = () => {
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
+                        todos={todos}
                         onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onTaskClick={openEditTask}
                     />
                 )}
             </div>
