@@ -157,6 +157,16 @@ import taskService from "../services/taskService";
 import activityService from "../services/activityService";
 // ...existing code...
 
+// Normalize backend task status to UI status
+const mapTaskStatusToUi = (s) => {
+    const v = String(s || "todo").toLowerCase();
+    if (v === "todo") return "open";
+    if (v === "in_progress") return "in_progress";
+    if (v === "completed") return "done";
+    if (v === "cancelled" || v === "canceled") return "blocked";
+    return "open";
+};
+
 const api = {
     async listKeyAreas() {
         try {
@@ -189,17 +199,9 @@ const api = {
         // Fetch from backend and normalize for UI
         try {
             const rows = await taskService.list({ keyAreaId });
-            const mapStatusToUi = (s) => {
-                const v = String(s || "todo").toLowerCase();
-                if (v === "todo") return "open";
-                if (v === "in_progress") return "in_progress";
-                if (v === "completed") return "done";
-                if (v === "cancelled" || v === "canceled") return "blocked";
-                return "open";
-            };
             return (Array.isArray(rows) ? rows : []).map((t) => ({
                 ...t,
-                status: mapStatusToUi(t.status),
+                status: mapTaskStatusToUi(t.status),
                 // normalize for UI naming
                 due_date: t.dueDate || t.due_date || null,
                 deadline: t.dueDate || t.due_date || null,

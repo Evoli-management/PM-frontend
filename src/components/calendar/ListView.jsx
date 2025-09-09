@@ -5,7 +5,9 @@ const ListView = ({
     currentDate,
     onShiftDate,
     events = [],
+    todos = [],
     onEventClick,
+    onTaskClick,
     view,
     onChangeView,
     filterType,
@@ -14,7 +16,41 @@ const ListView = ({
     const label = new Date(currentDate || Date.now()).toLocaleDateString(undefined, { month: "long", year: "numeric" });
     const [showViewMenu, setShowViewMenu] = useState(false);
 
-    if (!events.length) {
+    // Build a combined list: events from BE + tasks (todos) that fall in the current range
+    const showTasks = filterType === "all" || filterType === "task";
+    const items = [
+        // map events to items
+        ...events.map((e) => ({
+            type: "event",
+            id: e.id,
+            title: e.title,
+            start: new Date(e.start),
+            end: e.end ? new Date(e.end) : null,
+            kind: e.kind,
+            taskId: e.taskId,
+            data: e,
+        })),
+        // map tasks (todos) to items
+        ...(showTasks ? todos : []).map((t) => {
+            const s = t.startDate ? new Date(t.startDate) : null;
+            const d = t.dueDate ? new Date(t.dueDate) : null;
+            const e = t.endDate ? new Date(t.endDate) : null;
+            // choose a representative date for sorting/display: prefer startDate, then dueDate, then endDate
+            const rep = s || d || e || null;
+            return {
+                type: "task",
+                id: t.id,
+                title: t.title,
+                start: rep,
+                end: null,
+                data: t,
+            };
+        }),
+    ]
+        .filter((it) => it.start instanceof Date && !isNaN(it.start))
+        .sort((a, b) => a.start - b.start);
+
+    if (!items.length) {
         return (
             <>
                 <div className="flex items-center justify-between mb-2">
@@ -92,9 +128,7 @@ const ListView = ({
                         </button>
                     </div>
                 </div>
-                <div className="text-center text-gray-400 py-8">
-                    No events scheduled. Add tasks or activities to see them here.
-                </div>
+                <div className="text-center text-gray-400 py-8">No items in this period.</div>
             </>
         );
     }
@@ -175,31 +209,65 @@ const ListView = ({
                     </button>
                 </div>
             </div>
-            <div className="space-y-4">
-                {events
-                    .sort((a, b) => new Date(a.start) - new Date(b.start))
-                    .map((event, idx) => (
-                        <div
-                            key={idx}
-                            className="bg-white rounded-lg shadow p-4 flex flex-col md:flex-row md:items-center gap-2 cursor-pointer hover:bg-blue-50"
-                            onClick={() => onEventClick(event)}
-                        >
-                            <div className="flex-1">
-                                <div className="font-bold text-blue-700 text-lg">{event.title}</div>
-                                <div className="text-sm text-gray-500">
-                                    {event.type} • {event.source ? `from ${event.source}` : "Custom"}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                    {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleString()}
-                                </div>
-                            </div>
-                            <div className="flex gap-2 mt-2 md:mt-0">
-                                <button className="bg-blue-600 text-white px-3 py-1 rounded text-xs">View</button>
-                                <button className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Edit</button>
-                                <button className="bg-red-500 text-white px-3 py-1 rounded text-xs">Delete</button>
-                            </div>
+            <div className="space-y-3">
+                {items.map((it) => (
+                    <div
+                        key={`${it.type}-${it.id}`}
+                        className="bg-white rounded-lg border border-blue-100 p-3 flex flex-col md:flex-row md:items-center gap-2 cursor-pointer hover:bg-blue-50"
+                        onClick={() => {
+                            if (it.type === "event") {
+                                if (it.taskId && onTaskClick) return onTaskClick(String(it.taskId));
+                                return onEventClick && onEventClick(it.data);
+                            }
+                            if (it.type === "task") return onTaskClick && onTaskClick(String(it.id));
+                        }}
+                        title={it.title}
+                    >
+                        <div className="w-36 text-xs text-blue-700 font-semibold">
+                            {it.start?.toLocaleDateString(undefined, {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                            })}
                         </div>
-                    ))}
+                        <div className="flex-1">
+                            <div className="font-semibold text-slate-800 flex items-center gap-2">
+                                {it.type === "event" && <span>Event:</span>}
+                                {it.type === "task" && (
+                                    <svg
+                                        stroke="currentColor"
+                                        fill="currentColor"
+                                        strokeWidth="0"
+                                        viewBox="0 0 448 512"
+                                        className="w-4 h-4 text-[#4DC3D8]"
+                                        aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+                                    </svg>
+                                )}
+                                <span className="text-blue-700">{it.title}</span>
+                            </div>
+                            {it.type === "event" && (
+                                <div className="text-xs text-gray-500">
+                                    {it.start?.toLocaleTimeString()}
+                                    {it.end ? ` - ${it.end.toLocaleTimeString()}` : ""}
+                                </div>
+                            )}
+                        </div>
+                        <div
+                            className="text-[10px] px-2 py-1 rounded border"
+                            style={
+                                it.type === "task"
+                                    ? { backgroundColor: "#E6F7FA", color: "#0B4A53", borderColor: "#7ED4E3" }
+                                    : { backgroundColor: "#EFF6FF", color: "#1D4ED8", borderColor: "#BFDBFE" }
+                            }
+                        >
+                            {it.type === "task" ? "Task" : it.kind || "Event"}
+                        </div>
+                    </div>
+                ))}
             </div>
         </>
     );

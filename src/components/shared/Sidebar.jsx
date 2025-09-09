@@ -12,6 +12,7 @@ import {
     FaClock,
     FaChartBar,
 } from "react-icons/fa";
+import { isFeatureEnabled } from "../../utils/flags.js";
 
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
@@ -95,9 +96,11 @@ export default function Sidebar({
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
-    // no navigation for Key Areas toggle; we only open/close
-
     const navigate = useNavigate();
+
+    const calendarEnabled = isFeatureEnabled("calendar");
+
+    // no navigation for Key Areas toggle; we only open/close
 
     // Key Areas list comes from page events; no local cache
 
@@ -261,6 +264,7 @@ export default function Sidebar({
                         <nav aria-label="Sidebar navigation">
                             {navItems
                                 .filter((item) => item.label.toLowerCase().includes(search.toLowerCase()))
+                                .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
                                 .map((item) => {
                                     const isKeyAreas =
                                         item.label === "Key Areas" || (item.to && item.to === "/key-areas");
