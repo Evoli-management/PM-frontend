@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 import { Award, Target, Timer, Smile, Star, Shield, Handshake, Mail } from "lucide-react";
 
 // Background image for the hero can be provided via environment variable:
@@ -48,6 +48,13 @@ const testimonials = [
 ];
 
 const Home = () => {
+    const navigate = useNavigate();
+    const handleNavigate = (e, to) => {
+        e && e.preventDefault();
+        if (!to) return;
+        navigate(to);
+    };
+
     return (
         <main className="font-sans bg-gray-50 text-gray-900 min-h-screen">
             {/* Tailwind CSS `style` block for custom animations and hero polish */}
@@ -132,7 +139,38 @@ const Home = () => {
                 `}
             </style>
 
-            {/* Top CTA removed as requested */}
+            {/* Slim top strip with quick links (matches site header) */}
+            <div className="bg-teal-50 border-b border-teal-100 text-sm">
+                <div className="container mx-auto px-4">
+                    <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-6">
+                            <a href="/why" className="text-teal-800 font-semibold hover:underline">WHY PRACTICAL MANAGER?</a>
+                            <a href="/how-it-works" className="text-teal-800 hover:underline">HOW IT WORKS?</a>
+
+                            <div className="relative group">
+                                <button className="flex items-center gap-2 text-teal-800 hover:underline focus:outline-none font-medium tracking-wide">
+                                    ABOUT EMPLOYEESHIP
+                                    <span className="text-xs text-teal-700">▾</span>
+                                </button>
+                                <div className="absolute left-0 mt-2 w-48 bg-white shadow-sm border-t-2 border-black z-50 opacity-0 group-hover:opacity-100 transform scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none group-hover:pointer-events-auto">
+                                    <ul className="py-3">
+                                        <li><a href="/employeeship" className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50">EMPLOYEESHIP</a></li>
+                                        <li><a href="/leadership" className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50">LEADERSHIP</a></li>
+                                        <li><a href="/excellence" className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50">EXCELLENCE</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <a href="/knowledge-base" className="text-teal-800 hover:underline">KNOWLEDGE BASE</a>
+                            <a href="/pricing" className="text-teal-800 hover:underline">PRICING</a>
+                            <a href="/contact" className="text-teal-800 hover:underline">CONTACT US</a>
+                            <a href="/blog" className="text-teal-800 hover:underline">BLOG</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Navigation Bar */}
             <nav className="flex flex-col sm:flex-row justify-between items-center px-6 py-4 bg-white shadow-lg sticky top-0 z-20 transition-shadow duration-300">
@@ -140,19 +178,18 @@ const Home = () => {
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-base">
                     <a href="#modules" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Modules</a>
                     <a href="#values" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Values</a>
-                    <a href="/pricing" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Pricing</a>
                     <a href="/testimonials" className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200">Testimonials</a>
                 </div>
                 <div className="flex gap-2 mt-4 sm:mt-0">
-                    <Link to="/login" className="bg-blue-700 text-white rounded-full px-6 py-2 font-semibold hover:bg-blue-800 transition-transform transform hover:scale-105 shadow-md">Login</Link>
-                    <Link to="/registration" className="ml-2 bg-yellow-600 text-white rounded-full px-6 py-2 font-semibold hover:bg-yellow-700 transition-transform transform hover:scale-105 shadow-md">Register</Link>
+                    <a href="/login" onClick={(e) => handleNavigate(e, '/login')} className="bg-blue-700 text-white rounded-full px-6 py-2 font-semibold hover:bg-blue-800 transition-transform transform hover:scale-105 shadow-md">Login</a>
+                    <a href="/registration" onClick={(e) => handleNavigate(e, '/registration')} className="ml-2 bg-yellow-600 text-white rounded-full px-6 py-2 font-semibold hover:bg-yellow-700 transition-transform transform hover:scale-105 shadow-md">Register</a>
                 </div>
             </nav>
 
             {/* Page links removed to avoid repetition in the top bar */}
 
             {/* Hero Section (clean, professional two-column variant) */}
-            <section className="relative bg-white pt-20 pb-20 px-4 text-gray-900">
+            <section className="relative bg-white pt-16 pb-16 px-4 text-gray-900">
                 <div className="container mx-auto">
                     <div className="flex flex-col-reverse md:flex-row items-center gap-10 md:gap-20">
                         {/* Left column: headline, copy, CTAs, stats */}
@@ -162,23 +199,23 @@ const Home = () => {
                                 <span className="heading-subtle">Deliver with confidence.</span>
                             </h1>
 
-                            <p className="text-lg text-slate-600 mb-6 max-w-xl mx-auto md:mx-0">
-                                Practical Manager helps teams set clear outcomes, celebrate progress, and manage work with simple, repeatable rituals — so leaders can focus on what matters.
+                            <p className="text-lg text-slate-600 mb-4 max-w-xl mx-auto md:mx-0">
+                                Practical Manager is a productivity and leadership tool for your team to excel.
                             </p>
 
+                            <div className="text-base text-slate-700 mb-4 max-w-xl mx-auto md:mx-0">
+                                <div className="font-semibold mb-2">A different tool that helps your team:</div>
+                                <ul className="list-disc list-inside space-y-2">
+                                    <li>Goal-setting and alignment</li>
+                                    <li>Share recognition and practice 1-minute management</li>
+                                    <li>Manage your time and achieve results</li>
+                                    <li>Develop managerial behaviour and leadership excellence</li>
+                                </ul>
+                            </div>
+
                             <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start mt-2">
-                                <Link to="/registration" className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-full px-8 py-4 text-lg font-semibold shadow-xl" aria-label="Get started - it's free">Get started — it's free</Link>
+                                <a href="/registration" onClick={(e) => handleNavigate(e, '/registration')} className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-full px-8 py-4 text-lg font-semibold shadow-xl" aria-label="Get started - it's free">Get started — it's free</a>
                                 <a href="#contact" className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-full px-6 py-3 text-lg font-medium hover:bg-slate-50" aria-label="Request a demo">Request a demo</a>
-                            </div>
-
-                            <div className="mt-6 flex items-center gap-4 flex-wrap justify-center md:justify-start">
-                                <div className="stat-chip px-4 py-2 rounded-full text-sm font-medium">Trusted by 2,300+ managers</div>
-                                <div className="stat-chip px-4 py-2 rounded-full text-sm font-medium">Avg. 15% time saved</div>
-                                <div className="stat-chip px-4 py-2 rounded-full text-sm font-medium">4.8/5 avg rating</div>
-                            </div>
-
-                            <div className="mt-4 text-sm text-slate-600 md:text-left text-center">
-                                Our Core Values also here — <a href="#values" className="text-blue-700 font-semibold underline">see them</a>
                             </div>
                         </div>
 
@@ -207,13 +244,21 @@ const Home = () => {
             </section>
             
             {/* New Section: Join Practical Manager with a visual element */}
-            <section className="bg-white py-20 flex flex-col md:flex-row items-center justify-center gap-16 px-4 shadow-inner">
+            <section className="bg-white py-16 flex flex-col md:flex-row items-center justify-center gap-12 px-4 shadow-inner">
                 <div className="md:w-1/2 flex justify-center animate-fade-in-up">
-                    <div className="bg-white p-4 rounded-xl shadow-md">
+                    <div className="relative bg-white p-2 rounded-xl shadow-md overflow-hidden">
+                        {/* Main illustration (original home.png as requested) */}
                         <img
                             src={`${import.meta.env.BASE_URL}home.png`}
                             alt="Practical illustration"
-                            className="w-64 md:w-80 h-auto rounded-lg object-cover"
+                            className="w-64 md:w-80 h-auto rounded-lg object-cover shadow-lg"
+                        />
+                        {/* Decorative SVG background - subtle, non-interactive */}
+                        <img
+                            src={`${import.meta.env.BASE_URL}home-bg.svg`}
+                            alt=""
+                            aria-hidden="true"
+                            className="hidden md:block pointer-events-none absolute -top-6 -left-8 w-36 opacity-25 transform rotate-6"
                         />
                     </div>
                 </div>
@@ -222,16 +267,18 @@ const Home = () => {
                     <p className="text-lg text-gray-700 mb-6 max-w-lg mx-auto md:mx-0">
                         Join thousands of teams who are simplifying their workflows and boosting productivity with our all-in-one platform.
                     </p>
-                    <Link to="/registration" className="rounded-full bg-blue-700 text-white font-bold py-4 px-10 text-lg transition-transform hover:bg-blue-800 transform hover:scale-110 shadow-lg">
+                    <a href="/registration" onClick={(e) => handleNavigate(e, '/registration')} className="rounded-full bg-blue-700 text-white font-bold py-4 px-10 text-lg transition-transform hover:bg-blue-800 transform hover:scale-110 shadow-lg">
                         Sign up for a Free Account
-                    </Link>
+                    </a>
                 </div>
             </section>
 
             {/* Featured Modules Section */}
             <section id="modules" className="bg-gray-100 py-20">
                 <div className="container mx-auto px-4">
-                    <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700 mb-16 animate-fade-in-up">Featured Modules</h2>
+                    <div className="flex items-center justify-center gap-6 mb-16 animate-fade-in-up">
+                        <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700">Featured Modules</h2>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
                         {modules.map((m, i) => (
                             <div
@@ -277,9 +324,9 @@ const Home = () => {
                     <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700 mb-16 animate-fade-in-up">Our Core Values</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
                         {values.map((v, i) => (
-                            <div key={i} className="group bg-white rounded-3xl p-8 text-center transition-all duration-300 transform group-hover-scale group-hover-shadow flex flex-col items-center animate-fade-in-up shadow-md" style={{ animationDelay: `${0.2 * i}s` }}>
-                                <div className="text-yellow-600 mb-6 transition-transform duration-300 transform group-hover:scale-125">{v.icon}</div>
-                                <h3 className="text-xl font-bold text-blue-900 mb-2">{v.title}</h3>
+                            <div key={i} className="group bg-white rounded-3xl p-8 text-center transition-all duration-300 transform group-hover-scale group-hover-shadow flex flex-col items-center animate-fade-in-up shadow-md hover:bg-amber-50" style={{ animationDelay: `${0.2 * i}s` }}>
+                                <div className="text-yellow-600 mb-6 transition-transform duration-300 transform group-hover:scale-125 transition-colors duration-300 group-hover:text-amber-600">{v.icon}</div>
+                                <h3 className="text-xl font-bold text-blue-900 mb-2 transition-colors duration-300 group-hover:text-amber-600">{v.title}</h3>
                                 <p className="text-base text-gray-700">{v.desc}</p>
                             </div>
                         ))}
@@ -288,31 +335,48 @@ const Home = () => {
             </section>
             
             {/* CTA Section for demo */}
-            <section className="bg-blue-50 py-20 text-center">
-                <div className="container mx-auto px-4">
-                    <h2 className="text-3xl md:text-4xl font-bold text-blue-700 mb-6">Ready to transform your team?</h2>
-                    <p className="text-lg text-gray-700 mb-10 max-w-2xl mx-auto">
-                        Get a live demo from one of our specialists and see how Practical Manager can work for you.
-                    </p>
-                    <a href="#contact" className="inline-block bg-yellow-600 text-white rounded-full px-10 py-4 font-bold text-lg hover:bg-yellow-700 transition-transform transform hover:scale-110 shadow-xl">
-                        Request a Demo
-                    </a>
+            <section className="bg-blue-50 py-20 text-center relative">
+                {/* Decorative translucent background text acting like a transparent image */}
+                <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[48px] md:text-[96px] lg:text-[140px] font-extrabold text-white opacity-8 select-none" style={{ transform: 'translateY(-10px)', mixBlendMode: 'overlay' }}>
+                        Ready to transform your team?
+                    </span>
+                </div>
+
+                <div className="container mx-auto px-4 relative z-10">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
+                        <img
+                            src={`${import.meta.env.BASE_URL}graph.png`}
+                            alt="Graph"
+                            className="w-48 md:w-80 lg:w-96 h-auto rounded-md shadow-md"
+                        />
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-bold text-blue-700">Ready to transform your team?</h2>
+                            <p className="text-lg text-gray-700 mb-6 max-w-2xl mx-auto md:mx-0">
+                                Get a live demo from one of our specialists and see how Practical Manager can work for you.
+                            </p>
+                            <a href="#contact" className="inline-block bg-yellow-600 text-white rounded-full px-10 py-4 font-bold text-lg hover:bg-yellow-700 transition-transform transform hover:scale-110 shadow-xl">
+                                Request a Demo
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             {/* Contact Form Section */}
             <section id="contact" className="bg-white py-20 flex flex-col items-center justify-center">
-                <div className="bg-gray-100 rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-start gap-6">
-                    <div className="w-full md:w-2/3">
-                        <div className="text-blue-700 mb-6 md:mb-8"><Mail size={80} /></div>
-                        <h2 className="text-3xl font-bold text-blue-700 mb-6 md:mb-8">Contact us for a DEMO</h2>
+                <div className="bg-gray-100 rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-3xl mx-auto flex flex-col items-center gap-6">
+                    <div className="w-full">
+                        <div className="text-blue-700 mb-6 md:mb-8 flex justify-center"><Mail size={72} /></div>
+                        <h2 className="text-3xl font-bold text-blue-700 mb-4 md:mb-6 text-center">Contact us for a DEMO</h2>
+
                         <form className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input type="text" placeholder="First Name" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
-                            <input type="text" placeholder="Last Name*" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
-                            <input type="text" placeholder="Phone" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
-                            <input type="email" placeholder="Email*" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
-                            <input type="text" placeholder="Company*" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" required />
-                            <input type="number" placeholder="No. of Employees" className="p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" />
+                            <input type="text" placeholder="First Name" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
+                            <input type="text" placeholder="Last Name*" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
+                            <input type="text" placeholder="Phone" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
+                            <input type="email" placeholder="Email*" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
+                            <input type="text" placeholder="Company*" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" required />
+                            <input type="number" placeholder="No. of Employees" className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2" />
                             
                             <div className="w-full text-left col-span-1 md:col-span-2">
                                 <label className="text-sm text-gray-600 flex items-center">
@@ -320,28 +384,16 @@ const Home = () => {
                                 </label>
                             </div>
                             <div className="col-span-1 md:col-span-2 flex flex-col items-center">
-                                <input type="text" placeholder="Enter the Captcha" className="w-full p-4 mb-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
+                                <input type="text" placeholder="Enter the Captcha" className="w-full p-3 mb-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" required />
                                 <div className="mb-4 text-blue-700 font-bold">m5yg32 <button type="button" className="ml-2 text-blue-700 underline">Reload</button></div>
                             </div>
 
                             <div className="flex w-full gap-4 col-span-1 md:col-span-2">
-                                <button type="submit" className="w-1/2 rounded-full bg-blue-700 text-white font-bold py-4 text-lg transition-transform hover:bg-blue-800 transform hover:scale-105 shadow-lg">Submit</button>
-                                <button type="reset" className="w-1/2 rounded-full bg-yellow-600 text-white font-bold py-4 text-lg transition-transform hover:bg-yellow-700 transform hover:scale-105 shadow-lg">Reset</button>
+                                <button type="submit" className="w-1/2 rounded-full btn-gradient btn-glow text-white font-semibold py-4 text-lg shadow-xl">Submit</button>
+                                <button type="reset" className="w-1/2 rounded-full bg-yellow-600 text-white font-bold py-4 text-lg hover:bg-yellow-700 transition-shadow">Reset</button>
                             </div>
                         </form>
                     </div>
-
-                    {/* Aside image - keeps compact padding and prevents large empty gaps */}
-                    <aside className="w-full md:w-1/3 flex justify-center md:justify-end items-start">
-                        <div className="max-w-xs w-full flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm">
-                            <img
-                                src={`${import.meta.env.BASE_URL}contact-demo.png`}
-                                alt="Contact demo"
-                                className="w-36 h-36 rounded-full object-cover"
-                                style={{ padding: 4 }}
-                            />
-                        </div>
-                    </aside>
                 </div>
             </section>
 
