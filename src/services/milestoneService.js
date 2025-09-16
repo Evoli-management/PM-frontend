@@ -1,40 +1,153 @@
 // src/services/milestoneService.js
-import axios from 'axios';
-
-const apiClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+import apiClient from './apiClient';
 
 /**
  * A generic error handler for milestone service calls.
- * @param {string} context - The action being performed (e.g., 'updating milestone').
+ * @param {string} context - The action being performed (e.g., 'creating milestone').
  * @param {Error} error - The caught error object.
  */
-const handleError = (context, error) => {
+const handleMilestoneError = (context, error) => {
     console.error(`Error ${context}:`, error);
     if (error.response && error.response.data && error.response.data.message) {
         const messages = Array.isArray(error.response.data.message) 
             ? error.response.data.message.join(', ') 
             : error.response.data.message;
+        console.error('Backend validation errors:', messages);
         throw new Error(`Failed to ${context}. ${messages}`);
     }
-    throw error;
+    throw new Error(`Failed to ${context}. ${error.message || 'Please try again.'}`);
 };
 
 /**
- * Updates an existing milestone.
- * @param {string} id - The ID of the milestone to update.
- * @param {object} updateData - The data for the update (e.g., { done: true }).
+ * Creates a new milestone.
+ * @param {string} goalId - The ID of the goal to create a milestone for.
+ * @param {object} milestoneData - The milestone data to create.
+ * @returns {Promise<object>} A promise that resolves to the created milestone.
+ */
+export const createMilestone = async (goalId, milestoneData) => {
+  try {
+    // Clean milestone data to match backend expectations
+    const cleanData = {
+      title: milestoneData.title,
+      weight: parseFloat(milestoneData.weight) || 1.0
+    };
+    
+    // Handle dates properly
+    if (milestoneData.dueDate) {
+      cleanData.dueDate = new Date(milestoneData.dueDate).toISOString();
+    }
+    
+    // NOTE: don't include 'done' in create operation - it's not allowed
+    
+    console.log('Creating milestone with data:', cleanData);
+    const response = await apiClient.post(`/goals/${goalId}/milestones`, cleanData);
+    return response.data;
+  } catch (error) {
+    handleMilestoneError('creating milestone', error);
+  }
+};
+
+/**
+ * Updates an existing milestone by ID.
+ * @param {string} milestoneId - The ID of the milestone to update.
+ * @param {object} updateData - The updated milestone data.
  * @returns {Promise<object>} A promise that resolves to the updated milestone.
  */
-export const updateMilestone = async (id, updateData) => {
-    try {
-        const response = await apiClient.put(`/milestones/${id}`, updateData);
-        return response.data;
-    } catch (error) {
-        handleError(`updating milestone ${id}`, error);
+export const updateMilestone = async (milestoneId, updateData) => {
+  try {
+    // Clean milestone data to match backend expectations
+    const cleanData = {};
+    
+    // Only include fields that are likely supported by the backend
+    if (updateData.title !== undefined) cleanData.title = updateData.title;
+    if (updateData.weight !== undefined) cleanData.weight = parseFloat(updateData.weight) || 1.0;
+    
+    // Handle dates properly
+    if (updateData.dueDate !== undefined) {
+      cleanData.dueDate = updateData.dueDate ? new Date(updateData.dueDate).toISOString() : null;
     }
+    
+    // Try PATCH first for 'done' updates (most likely scenario)
+    if (updateData.done !== undefined) {
+      try {
+        console.log('Trying PATCH for milestone done status');
+        const response = await apiClient.patch(`/milestones/${milestoneId}`, { done: updateData.done });
+        return response.data;
+      } catch (patchError) {
+        console.log('PATCH failed, falling back to PUT:', patchError);
+        // If patch fails, include done in the PUT request
+        cleanData.done = updateData.done;
+      }
+    }
+    
+    console.log('Updating milestone with data:', cleanData);
+    try {
+      const response = await apiClient.put(`/milestones/${milestoneId}`, cleanData);
+      return response.data;
+    } catch (putError) {
+      // If PUT fails with 404, try PATCH
+      if (putError.response?.status === 404) {
+        console.log('PUT not supported, trying PATCH');
+        const response = await apiClient.patch(`/milestones/${milestoneId}`, cleanData);
+        return response.data;
+      }
+      throw putError;
+    }
+  } catch (error) {
+    handleMilestoneError('updating milestone', error);
+  }
+};
+
+/**
+ * Marks a milestone as done/undone.
+ * @param {string} milestoneId - The ID of the milestone.
+ * @param {boolean} done - Whether the milestone is done.
+ * @returns {Promise<object>} A promise that resolves to the updated milestone.
+ */
+export const toggleMilestoneDone = async (milestoneId, done) => {
+  try {
+    console.log(`Marking milestone ${milestoneId} as ${done ? 'done' : 'not done'}`);
+    
+    // Try dedicated endpoint first
+    try {
+      const response = await apiClient.patch(`/milestones/${milestoneId}/${done ? 'complete' : 'uncomplete'}`);
+      return response.data;
+    } catch (endpointError) {
+      if (endpointError.response?.status === 404) {
+        // Fall back to regular update
+        console.log('Toggle endpoint not found, using regular update');
+        return await updateMilestone(milestoneId, { done });
+      }
+      throw endpointError;
+    }
+  } catch (error) {
+    handleMilestoneError(`marking milestone as ${done ? 'done' : 'not done'}`, error);
+  }
+};
+
+/**
+ * Deletes a milestone by ID.
+ * @param {string} milestoneId - The ID of the milestone to delete.
+ * @returns {Promise<void>} A promise that resolves when the milestone is deleted.
+ */
+export const deleteMilestone = async (milestoneId) => {
+  try {
+    console.log('Deleting milestone:', milestoneId);
+    try {
+      await apiClient.delete(`/milestones/${milestoneId}`);
+      return true;
+    } catch (deleteError) {
+      if (deleteError.response?.status === 404) {
+        // Some backends don't allow direct deletion, try marking as deleted
+        console.log('DELETE not supported, trying to mark as deleted');
+        await apiClient.patch(`/milestones/${milestoneId}`, { 
+          deleted: true
+        });
+        return true;
+      }
+      throw deleteError;
+    }
+  } catch (error) {
+    handleMilestoneError('deleting milestone', error);
+  }
 };

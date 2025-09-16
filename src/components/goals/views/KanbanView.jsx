@@ -1,71 +1,273 @@
-//src/components/goals/views/KanbanView.jsx
-import React from "react";
-import { FaEdit } from "react-icons/fa";;
+// src/components/goals/views/KanbanView.jsx - Professional Kanban Board
+import React, { useState } from 'react';
+import { 
+  FaEdit, 
+  FaCheckCircle, 
+  FaTrash, 
+  FaEllipsisH,
+  FaCalendarAlt,
+  FaFlag,
+  FaEyeSlash,
+  FaArchive,
+  FaClock,
+  FaPlus
+} from 'react-icons/fa';
 
-const KanbanView = ({ filtered, onOpen, onEdit, onDelete }) => {
+const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
+  const [actionGoal, setActionGoal] = useState(null);
+
+  // Group goals by status
+  const groupedGoals = {
+    active: goals.filter(goal => goal.status === 'active') || [],
+    completed: goals.filter(goal => goal.status === 'completed') || [],
+    archived: goals.filter(goal => goal.status === 'archived') || []
+  };
+
+  const columns = [
+    { id: 'active', title: 'Active Goals', goals: groupedGoals.active, color: 'blue' },
+    { id: 'completed', title: 'Completed', goals: groupedGoals.completed, color: 'emerald' },
+    { id: 'archived', title: 'Archived', goals: groupedGoals.archived, color: 'slate' }
+  ];
+
+  const handleComplete = async (goalId) => {
+    try {
+      const { completeGoal } = await import('../../../services/goalService');
+      await completeGoal(goalId);
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to complete goal:', error);
+      alert(`Failed to complete goal: ${error.message}`);
+    }
+  };
+
+  const handleArchive = async (goalId) => {
+    if (onUpdate) {
+      try {
+        await onUpdate(goalId, { status: 'archived' });
+      } catch (error) {
+        console.error('Failed to archive goal:', error);
+      }
+    }
+  };
+
+  const handleToggleVisibility = async (goalId) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (goal && onUpdate) {
+      try {
+        await onUpdate(goalId, { visibility: goal.visibility === 'public' ? 'private' : 'public' });
+      } catch (error) {
+        console.error('Failed to toggle visibility:', error);
+      }
+    }
+  };
+
+  const handleDelete = async (goalId) => {
+    if (window.confirm('Are you sure you want to delete this goal?')) {
+      if (onDelete) {
+        try {
+          await onDelete(goalId);
+        } catch (error) {
+          console.error('Failed to delete goal:', error);
+        }
+      }
+    }
+  };
+
+  const GoalCard = ({ goal }) => {
+    const completedMilestones = goal.milestones?.filter(m => m.done).length || 0;
+    const totalMilestones = goal.milestones?.length || 0;
+    const progressPercent = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : (goal.progressPercent || 0);
+    
+    const now = new Date();
+    const dueDate = new Date(goal.dueDate);
+    const isOverdue = dueDate < now && goal.status === 'active';
+    const dueInDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+    
+    const getKanbanDateDisplay = () => {
+      if (goal.status === 'completed') {
+        const completedDate = goal.completedAt ? new Date(goal.completedAt) : dueDate;
+        if (completedDate < dueDate) return 'Early';
+        if (completedDate > dueDate) return 'Late';
+        return 'On time';
+      }
+      if (goal.status === 'archived') return 'Archived';
+      if (isOverdue) return `${Math.abs(dueInDays)}d overdue`;
+      if (dueInDays === 0) return 'Today';
+      if (dueInDays === 1) return 'Tomorrow';
+      if (dueInDays <= 7) return `${dueInDays}d left`;
+      return dueDate.toLocaleDateString();
+    };
+
     return (
-        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {["active", "paused", "completed", "cancelled"].map((col) => {
-                const columnGoals = filtered.filter((g) => g.status === col);
-                return (
-                    <div key={col} className="bg-slate-50 rounded-2xl border p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className={`w-3 h-3 rounded-full ${
-                                        col === "active"
-                                            ? "bg-blue-500"
-                                            : col === "completed"
-                                              ? "bg-green-500"
-                                              : col === "paused"
-                                                ? "bg-yellow-500"
-                                                : "bg-gray-500"
-                                    }`}
-                                />
-                                <h4 className="font-bold text-slate-900 capitalize">{col}</h4>
-                            </div>
-                            <span className="text-xs font-semibold text-slate-600 bg-white px-2 py-1 rounded-full">
-                                {columnGoals.length}
-                            </span>
-                        </div>
-                        <div className="space-y-3 min-h-[200px]">
-                            {columnGoals.map((g) => (
-                                <div
-                                    key={g.id}
-                                    className="bg-white rounded-xl border p-3 hover:shadow-sm transition-shadow"
-                                >
-                                    <div className="flex items-start justify-between gap-2 mb-2">
-                                        <h5 className="font-semibold text-slate-900 text-sm line-clamp-2">{g.title}</h5>
-                                        <div className="flex gap-1">
-                                            <button
-                                                onClick={() => onEdit(g)}
-                                                className="p-1 text-slate-500 hover:text-blue-600"
-                                            >
-                                                <FaEdit className="text-xs" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {g.keyAreaName && <Chip label={g.keyAreaName} className="mb-2" />}
-                                    <div className="mb-2">
-                                        <ProgressBar value={g.progressPercentage || 0} />
-                                    </div>
-                                    <div className="text-xs text-slate-600 flex items-center justify-between">
-                                        <span>{g.progressPercentage || 0}% complete</span>
-                                        <button onClick={() => onOpen(g)} className="text-blue-600 hover:underline">
-                                            View
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {columnGoals.length === 0 && (
-                                <div className="text-sm text-slate-500 text-center py-8">No goals</div>
-                            )}
-                        </div>
-                    </div>
-                );
-            })}
+      <div 
+        className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        onClick={() => onGoalClick(goal)}
+      >
+        <div className="flex items-start justify-between mb-3">
+          <h4 className="font-semibold text-gray-900 text-sm line-clamp-2">{goal.title}</h4>
+          <div className="relative">
+            <button
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setActionGoal(actionGoal === goal.id ? null : goal.id);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-600 rounded transition-all"
+            >
+              <FaEllipsisH className="w-3 h-3" />
+            </button>
+
+            {actionGoal === goal.id && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setActionGoal(null)} />
+                <div className="absolute right-0 top-6 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
+                  <button
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      onGoalClick(goal, 'edit');
+                      setActionGoal(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
+                  >
+                    Edit
+                  </button>
+                  
+                  {goal.status === 'active' && (
+                    <button
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        handleComplete(goal.id);
+                        setActionGoal(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
+                    >
+                      Mark Complete
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      handleToggleVisibility(goal.id);
+                      setActionGoal(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
+                  >
+                    Make {goal.visibility === 'public' ? 'Private' : 'Public'}
+                  </button>
+                  
+                  {goal.status !== 'archived' && (
+                    <button
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        handleArchive(goal.id);
+                        setActionGoal(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
+                    >
+                      Archive
+                    </button>
+                  )}
+                  
+                  <hr className="my-1 border-gray-100" />
+                  <button
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      handleDelete(goal.id);
+                      setActionGoal(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
+
+        {goal.description && (
+          <p className="text-gray-600 text-xs line-clamp-2 mb-3">{goal.description}</p>
+        )}
+
+        {/* Progress */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-500">{completedMilestones}/{totalMilestones} milestones</span>
+            <span className="text-xs font-medium text-gray-700">{progressPercent}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div
+              className={`h-1.5 rounded-full transition-all ${
+                progressPercent >= 80 ? 'bg-emerald-500' :
+                progressPercent >= 60 ? 'bg-blue-500' :
+                progressPercent >= 40 ? 'bg-amber-500' : 'bg-gray-400'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Meta info */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {goal.visibility === "private" && (
+              <FaEyeSlash className="w-3 h-3 text-amber-500" />
+            )}
+            {isOverdue && goal.status === 'active' && <FaClock className="w-3 h-3 text-red-500" />}
+          </div>
+          <div className={`text-xs font-medium ${
+            goal.status === 'completed' ? 'text-green-600' :
+            goal.status === 'archived' ? 'text-gray-500' :
+            isOverdue ? "text-red-600" : 
+            dueInDays <= 3 ? "text-amber-600" : "text-gray-500"
+          }`}>
+            {getKanbanDateDisplay()}
+          </div>
+        </div>
+      </div>
     );
+  };
+
+  if (!goals || goals.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">No goals found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-6 overflow-x-auto pb-4">
+      {columns.map((column) => (
+        <div key={column.id} className="flex-shrink-0 w-80">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            {/* Column Header */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">{column.title}</h3>
+                <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
+                  {column.goals.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Column Content */}
+            <div className="p-4 space-y-3 min-h-[400px]">
+              {column.goals.map((goal) => (
+                <GoalCard key={goal.id} goal={goal} />
+              ))}
+              
+              {column.goals.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">No {column.title.toLowerCase()}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 export default KanbanView;
