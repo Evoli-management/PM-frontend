@@ -1,13 +1,5 @@
 // src/services/goalService.js
-import axios from 'axios';
-
-// Create a reusable Axios instance.
-const apiClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+import apiClient from "./apiClient";
 
 /**
  * A helper to handle API errors consistently.
@@ -18,10 +10,12 @@ const handleError = (context, error) => {
     console.error(`Error ${context}:`, error);
     if (error.response && error.response.data && error.response.data.message) {
         // Log detailed validation errors from the NestJS backend
-        console.error('Backend validation errors:', error.response.data.message);
+        console.error("Backend validation errors:", error.response.data.message);
         // We can create a more user-friendly error message here if needed
-        const messages = Array.isArray(error.response.data.message) ? error.response.data.message.join(', ') : error.response.data.message;
-        throw new Error(`Failed to ${context.split(' ')[0]} goal. ${messages}`);
+        const messages = Array.isArray(error.response.data.message)
+            ? error.response.data.message.join(", ")
+            : error.response.data.message;
+        throw new Error(`Failed to ${context.split(" ")[0]} goal. ${messages}`);
     }
     throw error;
 };
@@ -31,12 +25,12 @@ const handleError = (context, error) => {
  * @returns {Promise<Array>} A promise that resolves to an array of goals.
  */
 export const getGoals = async () => {
-  try {
-    const response = await apiClient.get('/goals');
-    return response.data;
-  } catch (error) {
-    handleError('fetching goals', error);
-  }
+    try {
+        const response = await apiClient.get("/goals");
+        return response.data;
+    } catch (error) {
+        handleError("fetching goals", error);
+    }
 };
 
 /**
@@ -59,12 +53,12 @@ export const getGoalById = async (id) => {
  * @returns {Promise<object>} A promise that resolves to the newly created goal.
  */
 export const createGoal = async (goalData) => {
-  try {
-    const response = await apiClient.post('/goals', goalData);
-    return response.data;
-  } catch (error) {
-    handleError('creating goal', error);
-  }
+    try {
+        const response = await apiClient.post("/goals", goalData);
+        return response.data;
+    } catch (error) {
+        handleError("creating goal", error);
+    }
 };
 
 /**
@@ -94,4 +88,3 @@ export const deleteGoal = async (id) => {
         handleError(`deleting goal ${id}`, error);
     }
 };
-

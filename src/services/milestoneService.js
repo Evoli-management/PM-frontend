@@ -1,12 +1,5 @@
 // src/services/milestoneService.js
-import axios from 'axios';
-
-const apiClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+import apiClient from "./apiClient";
 
 /**
  * A generic error handler for milestone service calls.
@@ -16,8 +9,8 @@ const apiClient = axios.create({
 const handleError = (context, error) => {
     console.error(`Error ${context}:`, error);
     if (error.response && error.response.data && error.response.data.message) {
-        const messages = Array.isArray(error.response.data.message) 
-            ? error.response.data.message.join(', ') 
+        const messages = Array.isArray(error.response.data.message)
+            ? error.response.data.message.join(", ")
             : error.response.data.message;
         throw new Error(`Failed to ${context}. ${messages}`);
     }
