@@ -9,8 +9,8 @@ import apiClient from './apiClient';
 const handleMilestoneError = (context, error) => {
     console.error(`Error ${context}:`, error);
     if (error.response && error.response.data && error.response.data.message) {
-        const messages = Array.isArray(error.response.data.message) 
-            ? error.response.data.message.join(', ') 
+        const messages = Array.isArray(error.response.data.message)
+            ? error.response.data.message.join(", ")
             : error.response.data.message;
         console.error('Backend validation errors:', messages);
         throw new Error(`Failed to ${context}. ${messages}`);
