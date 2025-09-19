@@ -3,6 +3,7 @@
 ---
 
 ## Requirements:
+
 - Node | Bun
 - Text Editor | IDE
 
@@ -20,30 +21,45 @@
 ## Setup Info:
 
 1. Clone Repo
-`git clone https://github.com/Evoli-management/PM-frontend.git -b <branch_name>`
+   `git clone https://github.com/Evoli-management/PM-frontend.git -b <branch_name>`
 
 2. Navigate to the repo
-`cd <PM-frontend>`
+   `cd <PM-frontend>`
 
 3. Install dependencies
-`npm install`
+
+```sh
+  npm install # pnpm install | bun install
+```
 
 4. Start dev server
-`npm run dev`
+
+```sh
+  npm run dev # pnpm run dev | bun run dev
+```
 
 ## Testing:
 
-`npm run test`
+```sh
+  npm run test # pnpm run test | bun run test
+```
 
 ## To check production
 
 1. Build the app
-`npm run build`
+
+```sh
+  npm run build # pnpm run build | bun run build
+```
 
 2. Preview the build
-`npm run preview`
+
+```sh
+  npm run preview # pnpm run preview | bun run preview
+```
 
 ## License
+
 - None
 
 ---

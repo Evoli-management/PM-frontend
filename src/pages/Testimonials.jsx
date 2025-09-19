@@ -1,8 +1,4 @@
-import React from 'react'
+import React from "react";
 export default function Testimonials() {
-  return (
-      <>
-          Testimonials Page Here
-      </>
-  )
+    return <>Testimonials Page Here</>;
 }

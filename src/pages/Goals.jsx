@@ -10,7 +10,16 @@ import GoalDetailModal from "../components/goals/GoalDetailModal";
 import KanbanView from "../components/goals/views/KanbanView";
 import ListView from "../components/goals/views/ListView";
 import TimelineView from "../components/goals/views/TimelineView";
-import { FaExclamationCircle, FaSearch, FaFilter, FaSortAmountDown, FaRocket, FaBullseye, FaCheckCircle, FaClock } from "react-icons/fa";
+import {
+    FaExclamationCircle,
+    FaSearch,
+    FaFilter,
+    FaSortAmountDown,
+    FaRocket,
+    FaBullseye,
+    FaCheckCircle,
+    FaClock,
+} from "react-icons/fa";
 import { getKeyAreas } from "../services/keyAreaService";
 
 const Goals = () => {
@@ -25,7 +34,7 @@ const Goals = () => {
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [keyAreas, setKeyAreas] = useState([]);
     const [toast, setToast] = useState(null);
-    const [currentView, setCurrentView] = useState('grid');
+    const [currentView, setCurrentView] = useState("grid");
 
     const showToast = (type, message) => {
         setToast({ type, message });
@@ -93,72 +102,66 @@ const Goals = () => {
         try {
             await createGoal(goalData);
             await fetchGoals();
-            showToast('success', 'Goal created successfully!');
+            showToast("success", "Goal created successfully!");
         } catch (error) {
             console.error("Failed to create goal from page:", error);
-            showToast('error', 'Failed to create goal. Please try again.');
+            showToast("error", "Failed to create goal. Please try again.");
             throw error;
         }
     };
 
     const handleUpdateGoal = async (goalId, updateData) => {
         try {
-            console.log('Goals.jsx - Updating goal:', goalId, 'with:', updateData);
+            console.log("Goals.jsx - Updating goal:", goalId, "with:", updateData);
             const updatedGoal = await updateGoal(goalId, updateData);
-            
+
             // Immediately update the goals list with the returned data
-            setGoals(prevGoals => 
-                prevGoals.map(goal => 
-                    goal.id === goalId ? { ...goal, ...updatedGoal } : goal
-                )
-            );
-            
+            setGoals((prevGoals) => prevGoals.map((goal) => (goal.id === goalId ? { ...goal, ...updatedGoal } : goal)));
+
             // Update filtered goals as well
-            setFilteredGoals(prevGoals => 
-                prevGoals.map(goal => 
-                    goal.id === goalId ? { ...goal, ...updatedGoal } : goal
-                )
+            setFilteredGoals((prevGoals) =>
+                prevGoals.map((goal) => (goal.id === goalId ? { ...goal, ...updatedGoal } : goal)),
             );
-            
+
             // If we're updating the currently selected goal, update it immediately
             if (selectedGoal && selectedGoal.id === goalId) {
                 setSelectedGoal({ ...selectedGoal, ...updatedGoal });
             }
-            
+
             // Also fetch fresh data to ensure consistency
             await fetchGoals();
-            
-            showToast('success', 'Goal updated successfully!');
+
+            showToast("success", "Goal updated successfully!");
         } catch (error) {
             console.error("Failed to update goal:", error);
-            showToast('error', `Failed to update goal: ${error.message}`);
+            showToast("error", `Failed to update goal: ${error.message}`);
             throw error;
         }
     };
 
     // Delete goal
     const handleDeleteGoal = async (goalId) => {
-        if (window.confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
+        if (window.confirm("Are you sure you want to delete this goal? This action cannot be undone.")) {
             try {
-                console.log('Goals.jsx - Attempting to delete goal:', goalId);
-                
+                console.log("Goals.jsx - Attempting to delete goal:", goalId);
+
                 // Try archiving first as a safer alternative
                 try {
-                    console.log('Trying to archive goal first');
+                    console.log("Trying to archive goal first");
                     await archiveGoal(goalId);
-                    setGoals(goals.filter(g => g.id !== goalId));
-                    setFilteredGoals(filteredGoals.filter(g => g.id !== goalId));
-                    showToast('success', 'Goal has been archived.');
+                    setGoals(goals.filter((g) => g.id !== goalId));
+                    setFilteredGoals(filteredGoals.filter((g) => g.id !== goalId));
+                    showToast("success", "Goal has been archived.");
                 } catch (archiveError) {
-                    console.log('Archive failed, trying hard delete');
+                    console.log("Archive failed, trying hard delete");
                     await deleteGoal(goalId);
-                    setGoals(goals.filter(g => g.id !== goalId));
-                    setFilteredGoals(filteredGoals.filter(g => g.id !== goalId));
-                    showToast('success', 'Goal has been permanently deleted.');
+                    setGoals(goals.filter((g) => g.id !== goalId));
+                    setFilteredGoals(filteredGoals.filter((g) => g.id !== goalId));
+                    showToast("success", "Goal has been permanently deleted.");
                 }
             } catch (error) {
-                console.error('Failed to delete goal:', error);
-                showToast('error', `Failed to delete goal: ${error.message}`);
+                console.error("Failed to delete goal:", error);
+                showToast("error", `Failed to delete goal: ${error.message}`);
             }
         }
     };
@@ -204,19 +207,47 @@ const Goals = () => {
 
         // Render different views based on currentView
         switch (currentView) {
-            case 'list':
-                return <ListView goals={filteredGoals} onGoalClick={handleGoalClick} onUpdate={handleUpdateGoal} onDelete={handleDeleteGoal} />;
-            case 'kanban':
-                return <KanbanView goals={filteredGoals} onGoalClick={handleGoalClick} onUpdate={handleUpdateGoal} onDelete={handleDeleteGoal} />;
-            case 'timeline':
-                return <TimelineView goals={filteredGoals} onGoalClick={handleGoalClick} onUpdate={handleUpdateGoal} onDelete={handleDeleteGoal} />;
+            case "list":
+                return (
+                    <ListView
+                        goals={filteredGoals}
+                        onGoalClick={handleGoalClick}
+                        onUpdate={handleUpdateGoal}
+                        onDelete={handleDeleteGoal}
+                    />
+                );
+            case "kanban":
+                return (
+                    <KanbanView
+                        goals={filteredGoals}
+                        onGoalClick={handleGoalClick}
+                        onUpdate={handleUpdateGoal}
+                        onDelete={handleDeleteGoal}
+                    />
+                );
+            case "timeline":
+                return (
+                    <TimelineView
+                        goals={filteredGoals}
+                        onGoalClick={handleGoalClick}
+                        onUpdate={handleUpdateGoal}
+                        onDelete={handleDeleteGoal}
+                    />
+                );
             default:
-                return <GoalList goals={filteredGoals} onGoalClick={handleGoalClick} onUpdate={handleUpdateGoal} onDelete={handleDeleteGoal} />;
+                return (
+                    <GoalList
+                        goals={filteredGoals}
+                        onGoalClick={handleGoalClick}
+                        onUpdate={handleUpdateGoal}
+                        onDelete={handleDeleteGoal}
+                    />
+                );
         }
     };
 
-    const handleGoalClick = (goal, mode = 'view') => {
-        if (mode === 'edit') {
+    const handleGoalClick = (goal, mode = "view") => {
+        if (mode === "edit") {
             setSelectedGoal(goal);
             // We'll handle edit mode in the modal
         } else {
@@ -232,8 +263,8 @@ const Goals = () => {
             <div className="flex-1 p-4 md:p-8">
                 {/* Header with Stats */}
                 <div className="mb-8">
-                    <GoalsHeader 
-                        onAddGoal={() => setIsModalOpen(true)} 
+                    <GoalsHeader
+                        onAddGoal={() => setIsModalOpen(true)}
                         currentView={currentView}
                         onViewChange={setCurrentView}
                     />
@@ -343,12 +374,16 @@ const Goals = () => {
 
                 {/* Modal */}
                 {isModalOpen && (
-                    <GoalForm onClose={() => setIsModalOpen(false)} onGoalCreated={handleCreateGoal} keyAreas={keyAreas} />
+                    <GoalForm
+                        onClose={() => setIsModalOpen(false)}
+                        onGoalCreated={handleCreateGoal}
+                        keyAreas={keyAreas}
+                    />
                 )}
                 {selectedGoal && (
-                    <GoalDetailModal 
-                        goal={selectedGoal} 
-                        onClose={() => setSelectedGoal(null)} 
+                    <GoalDetailModal
+                        goal={selectedGoal}
+                        onClose={() => setSelectedGoal(null)}
                         keyAreas={keyAreas}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
@@ -356,13 +391,7 @@ const Goals = () => {
                 )}
 
                 {/* Toast Notifications */}
-                {toast && (
-                    <Toast
-                        type={toast.type}
-                        message={toast.message}
-                        onClose={() => setToast(null)}
-                    />
-                )}
+                {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
             </div>
         </div>
     );

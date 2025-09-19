@@ -6,37 +6,37 @@ import { faLock, faEyeSlash, faEye } from "@fortawesome/free-solid-svg-icons";
 const ResetPasswordPage = () => {
     const [passwords, setPasswords] = useState({
         newPassword: "",
-        confirmPassword: ""
+        confirmPassword: "",
     });
     const [showPassword, setShowPassword] = useState({
         newPassword: false,
-        confirmPassword: false
+        confirmPassword: false,
     });
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    
+
     // Get email from navigation state
     const email = location.state?.email || "";
 
     const handlePasswordChange = (e) => {
         const { name, value } = e.target;
-        setPasswords(prev => ({
+        setPasswords((prev) => ({
             ...prev,
-            [name]: value
+            [name]: value,
         }));
     };
 
     const togglePasswordVisibility = (field) => {
-        setShowPassword(prev => ({
+        setShowPassword((prev) => ({
             ...prev,
-            [field]: !prev[field]
+            [field]: !prev[field],
         }));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         // Validation
         if (!passwords.newPassword || !passwords.confirmPassword) {
             alert("Please fill in all password fields");
@@ -68,8 +68,12 @@ const ResetPasswordPage = () => {
                 <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
                 {/* Left: form pane */}
                 <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
-                    <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">Reset password</h2>
-                    <p className="text-gray-600 font-medium mb-4 text-base text-center">Please enter your new password to reset your account</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
+                        Reset password
+                    </h2>
+                    <p className="text-gray-600 font-medium mb-4 text-base text-center">
+                        Please enter your new password to reset your account
+                    </p>
 
                     {email && (
                         <div className="w-full mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg max-w-[420px] mx-auto text-center">
@@ -83,8 +87,12 @@ const ResetPasswordPage = () => {
 
                     <form onSubmit={handleSubmit} className="w-full">
                         {passwords.confirmPassword && passwords.newPassword && (
-                            <div className={`text-xs sm:text-sm mb-2 ${passwords.newPassword === passwords.confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
-                                {passwords.newPassword === passwords.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                            <div
+                                className={`text-xs sm:text-sm mb-2 ${passwords.newPassword === passwords.confirmPassword ? "text-green-600" : "text-red-600"}`}
+                            >
+                                {passwords.newPassword === passwords.confirmPassword
+                                    ? "✓ Passwords match"
+                                    : "✗ Passwords do not match"}
                             </div>
                         )}
 
@@ -101,11 +109,14 @@ const ResetPasswordPage = () => {
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
                                 <FontAwesomeIcon icon={faLock} className="text-lg sm:text-xl" />
                             </span>
-                            <span 
+                            <span
                                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-black cursor-pointer"
-                                onClick={() => togglePasswordVisibility('newPassword')}
+                                onClick={() => togglePasswordVisibility("newPassword")}
                             >
-                                <FontAwesomeIcon icon={showPassword.newPassword ? faEye : faEyeSlash} className="text-lg sm:text-xl" />
+                                <FontAwesomeIcon
+                                    icon={showPassword.newPassword ? faEye : faEyeSlash}
+                                    className="text-lg sm:text-xl"
+                                />
                             </span>
                         </div>
 
@@ -122,11 +133,14 @@ const ResetPasswordPage = () => {
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
                                 <FontAwesomeIcon icon={faLock} className="text-lg sm:text-xl" />
                             </span>
-                            <span 
+                            <span
                                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-black cursor-pointer"
-                                onClick={() => togglePasswordVisibility('confirmPassword')}
+                                onClick={() => togglePasswordVisibility("confirmPassword")}
                             >
-                                <FontAwesomeIcon icon={showPassword.confirmPassword ? faEye : faEyeSlash} className="text-lg sm:text-xl" />
+                                <FontAwesomeIcon
+                                    icon={showPassword.confirmPassword ? faEye : faEyeSlash}
+                                    className="text-lg sm:text-xl"
+                                />
                             </span>
                         </div>
 
@@ -150,7 +164,8 @@ const ResetPasswordPage = () => {
                         />
                     </div>
                     <p className="mt-4 text-black text-sm sm:text-base font-semibold mx-auto max-w-[439px] px-4 text-center">
-                        No worries we’ll get you back in quickly and securely. Reset your password in seconds and regain access to your tasks and projects.
+                        No worries we’ll get you back in quickly and securely. Reset your password in seconds and regain
+                        access to your tasks and projects.
                     </p>
                 </div>
             </div>

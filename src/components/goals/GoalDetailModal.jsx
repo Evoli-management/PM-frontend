@@ -20,9 +20,9 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
     const [editingKeyArea, setEditingKeyArea] = useState(false);
-    const [tempKeyAreaId, setTempKeyAreaId] = useState(goal?.keyAreaId || '');
+    const [tempKeyAreaId, setTempKeyAreaId] = useState(goal?.keyAreaId || "");
     const [editingMilestone, setEditingMilestone] = useState(null);
-    const [tempMilestoneTitle, setTempMilestoneTitle] = useState('');
+    const [tempMilestoneTitle, setTempMilestoneTitle] = useState("");
 
     if (!goal) return null;
 
@@ -46,7 +46,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
     };
 
     const handleKeyAreaCancel = () => {
-        setTempKeyAreaId(goal?.keyAreaId || '');
+        setTempKeyAreaId(goal?.keyAreaId || "");
         setEditingKeyArea(false);
     };
 
@@ -58,15 +58,15 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
     const handleMilestoneSave = async (index) => {
         const updatedMilestones = [...goal.milestones];
         updatedMilestones[index].title = tempMilestoneTitle;
-        
+
         await onUpdate(goal.id, { milestones: updatedMilestones });
         setEditingMilestone(null);
-        setTempMilestoneTitle('');
+        setTempMilestoneTitle("");
     };
 
     const handleMilestoneCancel = () => {
         setEditingMilestone(null);
-        setTempMilestoneTitle('');
+        setTempMilestoneTitle("");
     };
 
     const handleDateUpdate = async (field, value) => {
@@ -87,20 +87,20 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
             await onUpdate(goal.id, { keyAreaId: tempKeyAreaId });
             setEditingKeyArea(false);
         } catch (error) {
-            console.error('Failed to update key area:', error);
+            console.error("Failed to update key area:", error);
             alert(`Failed to update key area: ${error.message}`);
         }
     };
 
     const handleMilestoneToggle = async (milestoneIndex) => {
         if (!goal.milestones || !goal.milestones[milestoneIndex]) {
-            console.error('Milestone not found at index:', milestoneIndex);
+            console.error("Milestone not found at index:", milestoneIndex);
             return;
         }
-        
+
         const updatedMilestones = [...goal.milestones];
         updatedMilestones[milestoneIndex].done = !updatedMilestones[milestoneIndex].done;
-        
+
         await onUpdate(goal.id, { milestones: updatedMilestones });
     };
 
@@ -301,9 +301,12 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                         className="flex-1 p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                                     >
                                                         <option value="">No key area</option>
-                                                        {keyAreas && keyAreas.map(area => (
-                                                            <option key={area.id} value={area.id}>{area.name}</option>
-                                                        ))}
+                                                        {keyAreas &&
+                                                            keyAreas.map((area) => (
+                                                                <option key={area.id} value={area.id}>
+                                                                    {area.name}
+                                                                </option>
+                                                            ))}
                                                     </select>
                                                     <button
                                                         onClick={handleKeyAreaSave}
@@ -383,12 +386,12 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                     {completedMilestones} of {totalMilestones} completed
                                 </span>
                             </div>
-                            
+
                             {goal.milestones && Array.isArray(goal.milestones) && goal.milestones.length > 0 ? (
                                 <div className="space-y-4">
                                     {goal.milestones.map((milestone, idx) => (
-                                        <div 
-                                            key={milestone.id || idx} 
+                                        <div
+                                            key={milestone.id || idx}
                                             className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-2xl hover:shadow-md transition-all"
                                         >
                                             <button
@@ -401,7 +404,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                             >
                                                 {milestone.done && <FaCheckCircle className="w-4 h-4" />}
                                             </button>
-                                            
+
                                             <div className="flex-1">
                                                 {editingMilestone === idx ? (
                                                     <div className="flex items-center gap-3">
@@ -435,11 +438,12 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                                         : "text-slate-900"
                                                                 }`}
                                                             >
-                                                                {milestone.title || 'Untitled milestone'}
+                                                                {milestone.title || "Untitled milestone"}
                                                             </p>
                                                             {milestone.dueDate && (
                                                                 <p className="text-sm text-slate-500 mt-1">
-                                                                    Due: {new Date(milestone.dueDate).toLocaleDateString()}
+                                                                    Due:{" "}
+                                                                    {new Date(milestone.dueDate).toLocaleDateString()}
                                                                 </p>
                                                             )}
                                                         </div>
