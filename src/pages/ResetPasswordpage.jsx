@@ -73,102 +73,116 @@ const ResetPasswordPage = () => {
                 <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
                 {/* Left: form pane */}
                 <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
-                    <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
-                        Reset password
-                    </h2>
-                    <p className="text-gray-600 font-medium mb-4 text-base text-center">
-                        Please enter your new password to reset your account
-                    </p>
                     {!token ? (
                         <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-lg max-w-[420px] mx-auto text-center">
+                            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-red-700 text-center">
+                                Invalid Access
+                            </h2>
                             <p className="text-red-800 font-medium text-sm sm:text-base">
                                 Missing or invalid password reset token. Please use the link from your email.
                             </p>
                         </div>
                     ) : (
-                        <form onSubmit={handleSubmit} className="w-full">
-                            {error && (
-                                <div className="text-red-600 text-sm mb-2">{error}</div>
-                            )}
-                            {passwords.confirmPassword && passwords.newPassword && (
-                                <div
-                                    className={`text-xs sm:text-sm mb-2 ${passwords.newPassword === passwords.confirmPassword ? "text-green-600" : "text-red-600"}`}
-                                >
-                                    {passwords.newPassword === passwords.confirmPassword
-                                        ? "✓ Passwords match"
-                                        : "✗ Passwords do not match"}
+                        <>
+                            <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
+                                Reset password
+                            </h2>
+                            <p className="text-gray-600 font-medium mb-4 text-base text-center">
+                                Please enter your new password to reset your account
+                            </p>
+                            <div className="w-full mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg max-w-[420px] mx-auto text-center">
+                                <p className="text-blue-800 font-medium text-sm sm:text-base">
+                                    <span className="text-xs sm:text-sm text-blue-600">Reset password for:</span>
+                                    <br />
+                                    <span className="font-bold">(email hidden for privacy)</span>
+                                </p>
+                            </div>
+                            <form onSubmit={handleSubmit} className="w-full">
+                                {error && (
+                                    <div className="text-red-600 text-sm mb-2">{error}</div>
+                                )}
+                                {passwords.confirmPassword && passwords.newPassword && (
+                                    <div
+                                        className={`text-xs sm:text-sm mb-2 ${passwords.newPassword === passwords.confirmPassword ? "text-green-600" : "text-red-600"}`}
+                                    >
+                                        {passwords.newPassword === passwords.confirmPassword
+                                            ? "✓ Passwords match"
+                                            : "✗ Passwords do not match"}
+                                    </div>
+                                )}
+                                <div className="relative mb-4 sm:mb-6 w-full">
+                                    <input
+                                        type={showPassword.newPassword ? "text" : "password"}
+                                        name="newPassword"
+                                        value={passwords.newPassword}
+                                        onChange={handlePasswordChange}
+                                        placeholder="Enter your new password"
+                                        className="w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 border-gray-300 text-black"
+                                        required
+                                    />
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                        <FontAwesomeIcon icon={faLock} className="text-lg sm:text-xl" />
+                                    </span>
+                                    <span
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-black cursor-pointer"
+                                        onClick={() => togglePasswordVisibility("newPassword")}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={showPassword.newPassword ? faEye : faEyeSlash}
+                                            className="text-lg sm:text-xl"
+                                        />
+                                    </span>
                                 </div>
-                            )}
-                            <div className="relative mb-4 sm:mb-6 w-full">
-                                <input
-                                    type={showPassword.newPassword ? "text" : "password"}
-                                    name="newPassword"
-                                    value={passwords.newPassword}
-                                    onChange={handlePasswordChange}
-                                    placeholder="Enter your new password"
-                                    className="w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 border-gray-300 text-black"
-                                    required
-                                />
-                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
-                                    <FontAwesomeIcon icon={faLock} className="text-lg sm:text-xl" />
-                                </span>
-                                <span
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-black cursor-pointer"
-                                    onClick={() => togglePasswordVisibility("newPassword")}
-                                >
-                                    <FontAwesomeIcon
-                                        icon={showPassword.newPassword ? faEye : faEyeSlash}
-                                        className="text-lg sm:text-xl"
+                                <div className="relative mb-4 sm:mb-6 w-full">
+                                    <input
+                                        type={showPassword.confirmPassword ? "text" : "password"}
+                                        name="confirmPassword"
+                                        value={passwords.confirmPassword}
+                                        onChange={handlePasswordChange}
+                                        placeholder="Confirm new password"
+                                        className="w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 border-gray-300 text-black"
+                                        required
                                     />
-                                </span>
-                            </div>
-                            <div className="relative mb-4 sm:mb-6 w-full">
-                                <input
-                                    type={showPassword.confirmPassword ? "text" : "password"}
-                                    name="confirmPassword"
-                                    value={passwords.confirmPassword}
-                                    onChange={handlePasswordChange}
-                                    placeholder="Confirm new password"
-                                    className="w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 border-gray-300 text-black"
-                                    required
-                                />
-                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
-                                    <FontAwesomeIcon icon={faLock} className="text-lg sm:text-xl" />
-                                </span>
-                                <span
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-black cursor-pointer"
-                                    onClick={() => togglePasswordVisibility("confirmPassword")}
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                        <FontAwesomeIcon icon={faLock} className="text-lg sm:text-xl" />
+                                    </span>
+                                    <span
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-black cursor-pointer"
+                                        onClick={() => togglePasswordVisibility("confirmPassword")}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={showPassword.confirmPassword ? faEye : faEyeSlash}
+                                            className="text-lg sm:text-xl"
+                                        />
+                                    </span>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full rounded-lg bg-green-500 hover:bg-green-600 text-white h-10 sm:h-12 font-semibold"
                                 >
-                                    <FontAwesomeIcon
-                                        icon={showPassword.confirmPassword ? faEye : faEyeSlash}
-                                        className="text-lg sm:text-xl"
-                                    />
-                                </span>
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full rounded-lg bg-green-500 hover:bg-green-600 text-white h-10 sm:h-12 font-semibold"
-                            >
-                                {isLoading ? "RESETTING..." : "Reset password"}
-                            </button>
-                        </form>
+                                    {isLoading ? "RESETTING..." : "Reset password"}
+                                </button>
+                            </form>
+                        </>
                     )}
                 </div>
                 {/* Right: Illustration */}
-                <div className="hidden md:flex md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
-                    <div className="w-full overflow-hidden flex items-center justify-center px-4 sm:px-6">
-                        <img
-                            src={`${import.meta.env.BASE_URL}reset.png`}
-                            alt="Reset Password Illustration"
-                            className="max-w-[320px] md:max-w-[360px] lg:max-w-[420px] w-full h-auto max-h-[240px] md:max-h-[320px] lg:max-h-[420px] object-contain object-center bg-white p-3 rounded-lg mx-auto"
-                        />
+                {token && (
+                    <div className="hidden md:flex md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
+                        <div className="w-full overflow-hidden flex items-center justify-center px-4 sm:px-6">
+                            <img
+                                src={`${import.meta.env.BASE_URL}reset.png`}
+                                alt="Reset Password Illustration"
+                                className="max-w-[320px] md:max-w-[360px] lg:max-w-[420px] w-full h-auto max-h-[240px] md:max-h-[320px] lg:max-h-[420px] object-contain object-center bg-white p-3 rounded-lg mx-auto"
+                            />
+                        </div>
+                        <p className="mt-4 text-black text-sm sm:text-base font-semibold mx-auto max-w-[439px] px-4 text-center">
+                            No worries we’ll get you back in quickly and securely. Reset your password in seconds and regain
+                            access to your tasks and projects.
+                        </p>
                     </div>
-                    <p className="mt-4 text-black text-sm sm:text-base font-semibold mx-auto max-w-[439px] px-4 text-center">
-                        No worries we’ll get you back in quickly and securely. Reset your password in seconds and regain
-                        access to your tasks and projects.
-                    </p>
-                </div>
+                )}
             </div>
         </div>
     );
