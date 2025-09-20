@@ -2,6 +2,10 @@
 import apiClient from "./apiClient";
 
 class AuthService {
+    async forgotPassword(email) {
+        const res = await apiClient.post("/auth/forgot-password", { email });
+        return res.data; // { message }
+    }
     async register({ firstName, lastName, email, password }) {
         const res = await apiClient.post("/auth/register", {
             firstName,
