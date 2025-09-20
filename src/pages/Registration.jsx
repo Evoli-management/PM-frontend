@@ -149,7 +149,8 @@ export default function Registration() {
                                 <h3 className="text-2xl font-bold text-green-700">Registration Successful!</h3>
                                 <p className="mt-2 text-gray-600">
                                     A verification email has been sent to your address.<br />
-                                    Please check your inbox and verify your email to continue.
+                                    Please check your inbox and verify your email to continue.<br />
+                                    <span className="text-sm text-gray-500">If you don't see the email, please look in your spam or junk folder.</span>
                                 </p>
                             </div>
                         ) : (
