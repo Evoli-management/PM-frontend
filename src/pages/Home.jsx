@@ -1,86 +1,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Award, Target, Timer, Smile, Star, Shield, Handshake, Mail } from "lucide-react";
-
-// Background image for the hero can be provided via environment variable:
-// - VITE_HERO_BG: URL to a remote image (or a path under /public/)
-// - VITE_HERO_BG_OPACITY: overlay opacity (0.0 - 1.0) to keep text readable
-const HERO_BG = import.meta.env.VITE_HERO_BG || `${import.meta.env.BASE_URL}bg.png`;
-// Slightly lighter overlay by default so the illustration reads through while keeping text legible.
-const HERO_BG_OPACITY = import.meta.env.VITE_HERO_BG_OPACITY ? parseFloat(import.meta.env.VITE_HERO_BG_OPACITY) : 0.48;
-// Hero illustration can be a remote PNG URL via VITE_HERO_ILLUST or fallback to the project's bg.png
-const HERO_ILLUST_URL = import.meta.env.VITE_HERO_ILLUST || `${import.meta.env.BASE_URL}bg.png`;
-// Opacity for the illustration overlay (0.0 - 1.0). Lower = image more visible.
-const HERO_ILLUST_OPACITY = import.meta.env.VITE_HERO_ILLUST_OPACITY
-    ? parseFloat(import.meta.env.VITE_HERO_ILLUST_OPACITY)
-    : 0.18;
-// Tint color and opacity for the hero image overlay to match/echo copy color
-const HERO_ILLUST_TINT = import.meta.env.VITE_HERO_ILLUST_TINT || "#F59E0B";
-const HERO_ILLUST_TINT_OPACITY = import.meta.env.VITE_HERO_ILLUST_TINT_OPACITY
-    ? parseFloat(import.meta.env.VITE_HERO_ILLUST_TINT_OPACITY)
-    : 0.08;
-
-function hexToRgb(hex) {
-    const raw = hex.replace("#", "");
-    const full =
-        raw.length === 3
-            ? raw
-                  .split("")
-                  .map((c) => c + c)
-                  .join("")
-            : raw;
-    const num = parseInt(full, 16);
-    const r = (num >> 16) & 255;
-    const g = (num >> 8) & 255;
-    const b = num & 255;
-    return `${r}, ${g}, ${b}`;
-}
-
-// Lucide React is an icon library that provides clean, modern icons.
-// The icons are imported here and used directly in the components below.
-
-const modules = [
-    {
-        icon: Target,
-        color: "#EF4444",
-        title: "Goals & Alignment",
-        desc: "Set and track goals, align your team, and drive results.",
-    },
-    {
-        icon: Timer,
-        color: "#F59E0B",
-        title: "Time Management",
-        desc: "Manage tasks, deadlines, and priorities for maximum productivity.",
-    },
-    {
-        icon: Handshake,
-        color: "#8B4513",
-        title: "Recognition",
-        desc: "Share recognition and feedback to foster a positive culture.",
-    },
-    { icon: Smile, color: "#7C3AED", title: "Engagement", desc: "Assess and improve team engagement and well-being." },
-];
-
-const values = [
-    { icon: <Award size={48} />, title: "Customer-first", desc: "We build for our users and their success." },
-    {
-        icon: <Star size={48} />,
-        title: "Continuous Improvement",
-        desc: "We invest in research and development to deliver the best.",
-    },
-    { icon: <Shield size={48} />, title: "Privacy-focused", desc: "Your data is secure and private with us." },
-];
-
-const testimonials = [
-    {
-        quote: "Practical Manager helped us align our goals and improve team engagement by 15%.",
-        author: "Team Lead, TechCorp",
-    },
-    {
-        quote: "The feedback and recognition tools make management easy and effective.",
-        author: "HR Manager, InnovateX",
-    },
-];
+import ContactForm from "../components/ContactForm.jsx";
+import TestimonialCards from "../components/TestimonialCards.jsx";
+import Hero from "../components/Hero.jsx";
+import ValuesComponent from "../components/ValuesComponent.jsx";
+import FeaturedModulesComponent from "../components/FeaturedModulesComponent.jsx";
 
 const Home = () => {
     const navigate = useNavigate();
@@ -284,79 +208,7 @@ const Home = () => {
             {/* Page links removed to avoid repetition in the top bar */}
 
             {/* Hero Section (clean, professional two-column variant) */}
-            <section className="relative bg-white pt-16 pb-16 px-4 text-gray-900">
-                <div className="container mx-auto">
-                    <div className="flex flex-col-reverse md:flex-row items-center gap-10 md:gap-20">
-                        {/* Left column: headline, copy, CTAs, stats */}
-                        <div className="md:w-6/12 text-center md:text-left">
-                            <h1 className="text-5xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-tight mb-2">
-                                <span className="heading-gradient">Lead with clarity.</span>
-                                <span className="heading-subtle">Deliver with confidence.</span>
-                            </h1>
-
-                            <p className="text-lg text-slate-600 mb-4 max-w-xl mx-auto md:mx-0">
-                                Practical Manager is a productivity and leadership tool for your team to excel.
-                            </p>
-
-                            <div className="text-base text-slate-700 mb-4 max-w-xl mx-auto md:mx-0">
-                                <div className="font-semibold mb-2">A different tool that helps your team:</div>
-                                <ul className="list-disc list-inside space-y-2">
-                                    <li>Goal-setting and alignment</li>
-                                    <li>Share recognition and practice 1-minute management</li>
-                                    <li>Manage your time and achieve results</li>
-                                    <li>Develop managerial behaviour and leadership excellence</li>
-                                </ul>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start mt-2">
-                                <a
-                                    href="/registration"
-                                    onClick={(e) => handleNavigate(e, "/registration")}
-                                    className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-full px-8 py-4 text-lg font-semibold shadow-xl"
-                                    aria-label="Get started - it's free"
-                                >
-                                    Get started — it's free
-                                </a>
-                                <a
-                                    href="#contact"
-                                    className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-full px-6 py-3 text-lg font-medium hover:bg-slate-50"
-                                    aria-label="Request a demo"
-                                >
-                                    Request a demo
-                                </a>
-                            </div>
-                        </div>
-
-                        {/* Right column: polished illustration card */}
-                        <div className="md:w-6/12 flex justify-center md:justify-end">
-                            <div className="w-full relative" style={{ minHeight: 420 }}>
-                                <div
-                                    aria-hidden="true"
-                                    style={{
-                                        position: "absolute",
-                                        inset: 0,
-                                        backgroundImage: `url('${HERO_ILLUST_URL}')`,
-                                        backgroundSize: "cover",
-                                        backgroundPosition: "center",
-                                        backgroundRepeat: "no-repeat",
-                                        width: "100%",
-                                        height: "100%",
-                                        filter: "saturate(1.02) contrast(1.03)",
-                                    }}
-                                />
-                                <div
-                                    aria-hidden="true"
-                                    style={{
-                                        position: "absolute",
-                                        inset: 0,
-                                        backgroundColor: `rgba(${hexToRgb(HERO_ILLUST_TINT)}, ${HERO_ILLUST_TINT_OPACITY})`,
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <Hero />
 
             {/* New Section: Join Practical Manager with a visual element */}
             <section className="bg-white py-16 flex flex-col md:flex-row items-center justify-center gap-12 px-4 shadow-inner">
@@ -399,100 +251,13 @@ const Home = () => {
             </section>
 
             {/* Featured Modules Section */}
-            <section id="modules" className="bg-gray-100 py-20">
-                <div className="container mx-auto px-4">
-                    <div className="flex items-center justify-center gap-6 mb-16 animate-fade-in-up">
-                        <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700">Featured Modules</h2>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
-                        {modules.map((m, i) => (
-                            <div
-                                key={i}
-                                className="group bg-white rounded-3xl p-8 text-center transition-transform duration-300 transform hover:scale-[1.02] hover:shadow-2xl flex flex-col items-center animate-fade-in-up shadow-md hover:bg-amber-50"
-                                style={{ animationDelay: `${0.2 * i}s` }}
-                            >
-                                <div className="mb-6 transition-all duration-300 transform group-hover:scale-110">
-                                    <div className="relative" style={{ width: 72, height: 72 }}>
-                                        <div
-                                            style={{
-                                                width: 72,
-                                                height: 72,
-                                                borderRadius: 9999,
-                                                background: m.color,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                            }}
-                                            className="transition-shadow duration-300 group-hover:shadow-lg"
-                                        >
-                                            {React.createElement(m.icon, { size: 36, color: "#ffffff" })}
-                                        </div>
-                                        <span
-                                            className="absolute inset-0 rounded-full ring-0 group-hover:ring-4"
-                                            style={{ boxShadow: "0 6px 18px rgba(0,0,0,0.08)", borderColor: m.color }}
-                                        />
-                                    </div>
-                                </div>
-                                <h3 className="text-xl font-bold text-blue-900 mb-2 transition-colors duration-200 group-hover:text-amber-600">
-                                    {m.title}
-                                </h3>
-                                <div
-                                    className="mb-3"
-                                    style={{ width: 28, height: 8, borderRadius: 4, background: m.color }}
-                                />
-                                <p className="text-base text-gray-700">{m.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
+            <FeaturedModulesComponent />
 
             {/* Testimonials Section */}
-            <section id="testimonials" className="bg-white py-20">
-                <div className="container mx-auto px-4 text-center">
-                    <h2 className="text-3xl md:text-4xl font-bold text-yellow-600 mb-16 animate-fade-in-up">
-                        What our users say
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                        {testimonials.map((t, i) => (
-                            <blockquote
-                                key={i}
-                                className="bg-yellow-50 rounded-3xl p-10 font-serif italic text-gray-700 shadow-xl border-l-4 border-yellow-500 transition-transform duration-300 hover:scale-105 animate-fade-in-up"
-                                style={{ animationDelay: `${0.2 * i}s` }}
-                            >
-                                <p className="text-lg md:text-xl leading-relaxed mb-6">“{t.quote}”</p>
-                                <div className="font-bold text-blue-700 text-base">{t.author}</div>
-                            </blockquote>
-                        ))}
-                    </div>
-                </div>
-            </section>
+            <TestimonialCards />
 
             {/* Values Section */}
-            <section id="values" className="bg-gray-100 py-20">
-                <div className="container mx-auto px-4">
-                    <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700 mb-16 animate-fade-in-up">
-                        Our Core Values
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
-                        {values.map((v, i) => (
-                            <div
-                                key={i}
-                                className="group bg-white rounded-3xl p-8 text-center transition-all duration-300 transform group-hover-scale group-hover-shadow flex flex-col items-center animate-fade-in-up shadow-md hover:bg-amber-50"
-                                style={{ animationDelay: `${0.2 * i}s` }}
-                            >
-                                <div className="text-yellow-600 mb-6 transition-transform duration-300 transform group-hover:scale-125 transition-colors duration-300 group-hover:text-amber-600">
-                                    {v.icon}
-                                </div>
-                                <h3 className="text-xl font-bold text-blue-900 mb-2 transition-colors duration-300 group-hover:text-amber-600">
-                                    {v.title}
-                                </h3>
-                                <p className="text-base text-gray-700">{v.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
+            <ValuesComponent />
 
             {/* CTA Section for demo */}
             <section className="bg-blue-50 py-20 text-center relative">
@@ -536,125 +301,7 @@ const Home = () => {
             </section>
 
             {/* Contact Form Section */}
-            <section id="contact" className="bg-white py-20 flex flex-col items-center justify-center">
-                <div className="bg-gray-100 rounded-3xl shadow-2xl p-6 md:p-10 w-full max-w-3xl mx-auto flex flex-col items-center gap-6">
-                    <div className="w-full">
-                        <div className="text-blue-700 mb-6 md:mb-8 flex justify-center">
-                            <Mail size={72} />
-                        </div>
-                        <h2 className="text-3xl font-bold text-blue-700 mb-4 md:mb-6 text-center">
-                            Contact us for a DEMO
-                        </h2>
-
-                        <form className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input
-                                type="text"
-                                placeholder="First Name"
-                                className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Last Name*"
-                                className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                                required
-                            />
-                            <input
-                                type="text"
-                                placeholder="Phone"
-                                className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                            />
-                            <input
-                                type="email"
-                                placeholder="Email*"
-                                className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                                required
-                            />
-                            <input
-                                type="text"
-                                placeholder="Company*"
-                                className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2"
-                                required
-                            />
-                            <input
-                                type="number"
-                                placeholder="No. of Employees"
-                                className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow col-span-1 md:col-span-2"
-                            />
-
-                            <div className="w-full text-left col-span-1 md:col-span-2">
-                                <label className="text-sm text-gray-600 flex items-center">
-                                    <input type="checkbox" required className="mr-2 h-4 w-4 text-blue-600 rounded" /> I
-                                    agree with{" "}
-                                    <a href="#" className="text-blue-700 underline ml-1">
-                                        terms and conditions
-                                    </a>{" "}
-                                    and{" "}
-                                    <a href="#" className="text-blue-700 underline ml-1">
-                                        privacy policy
-                                    </a>
-                                    .
-                                </label>
-                            </div>
-                            <div className="col-span-1 md:col-span-2 flex flex-col items-center">
-                                <input
-                                    type="text"
-                                    placeholder="Enter the Captcha"
-                                    className="w-full p-3 mb-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                                    required
-                                />
-                                <div className="mb-4 text-blue-700 font-bold">
-                                    m5yg32{" "}
-                                    <button type="button" className="ml-2 text-blue-700 underline">
-                                        Reload
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex w-full gap-4 col-span-1 md:col-span-2">
-                                <button
-                                    type="submit"
-                                    className="w-1/2 rounded-full btn-gradient btn-glow text-white font-semibold py-4 text-lg shadow-xl"
-                                >
-                                    Submit
-                                </button>
-                                <button
-                                    type="reset"
-                                    className="w-1/2 rounded-full bg-yellow-600 text-white font-bold py-4 text-lg hover:bg-yellow-700 transition-shadow"
-                                >
-                                    Reset
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </section>
-
-            {/* Footer Section */}
-            <footer className="bg-blue-900 text-white py-12 text-center">
-                <div className="container mx-auto px-4">
-                    <div className="mb-6 flex flex-wrap justify-center gap-6 text-sm">
-                        <a href="#" className="hover:text-yellow-400 transition-colors">
-                            User guidelines
-                        </a>
-                        <a href="#" className="hover:text-yellow-400 transition-colors">
-                            FAQ
-                        </a>
-                        <a href="#" className="hover:text-yellow-400 transition-colors">
-                            Contact us
-                        </a>
-                        <a href="#" className="hover:text-yellow-400 transition-colors">
-                            About us
-                        </a>
-                        <a href="#" className="hover:text-yellow-400 transition-colors">
-                            Privacy policy
-                        </a>
-                        <a href="#" className="hover:text-yellow-400 transition-colors">
-                            Terms of service
-                        </a>
-                    </div>
-                    <div className="text-gray-400 text-xs mt-4">Copyright © 2025 Evoli management d.o.o.</div>
-                </div>
-            </footer>
+            <ContactForm />
         </main>
     );
 };
