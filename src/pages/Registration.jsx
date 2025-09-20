@@ -148,7 +148,8 @@ export default function Registration() {
                                 <CheckCircle2 size={48} className="text-green-500 mb-4" />
                                 <h3 className="text-2xl font-bold text-green-700">Registration Successful!</h3>
                                 <p className="mt-2 text-gray-600">
-                                    Your account has been created. You can now sign in.
+                                    A verification email has been sent to your address.<br />
+                                    Please check your inbox and verify your email to continue.
                                 </p>
                             </div>
                         ) : (
