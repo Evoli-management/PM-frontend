@@ -21,6 +21,13 @@ const ResetPasswordPage = () => {
     const searchParams = new URLSearchParams(location.search);
     const token = searchParams.get("token");
 
+    React.useEffect(() => {
+        if (!token) {
+            // Redirect to login if token is missing
+            navigate("/login");
+        }
+    }, [token, navigate]);
+
     const handlePasswordChange = (e) => {
         const { name, value } = e.target;
         setPasswords((prev) => ({
