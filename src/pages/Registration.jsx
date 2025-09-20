@@ -69,8 +69,8 @@ export default function Registration() {
                 sessionStorage.setItem("recent_registration_email", email);
             } catch {}
             setIsSubmitted(true);
-            // Temporarily skip email verification: send users straight to login
-            setTimeout(() => navigate("/login"), 800);
+            // Give users more time to read the success message before redirecting
+            setTimeout(() => navigate("/login"), 4000);
         } catch (err) {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
