@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
 
@@ -7,6 +7,9 @@ const ForgotPasswordPage = () => {
     const [email, setEmail] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [error, setError] = useState("");
+    const [successMsg, setSuccessMsg] = useState("");
+    const [cooldown, setCooldown] = useState(0);
 
     const handleEmailChange = (e) => {
         setEmail(e.target.value);
@@ -14,25 +17,41 @@ const ForgotPasswordPage = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-
-        // Basic email validation
+        setError("");
+        setSuccessMsg("");
         if (!email) {
-            alert("Please enter your email address");
+            setError("Please enter your email address");
             return;
         }
-
         if (!email.includes("@") || !email.includes(".")) {
-            alert("Please enter a valid email address");
+            setError("Please enter a valid email address");
             return;
         }
-
+        if (cooldown > 0) return;
         setIsLoading(true);
-        // Simulate API call for sending reset email
-        setTimeout(() => {
-            setIsLoading(false);
-            setSubmitted(true);
-        }, 1000);
+        import("../services/authService").then(({ default: authService }) => {
+            authService.forgotPassword(email)
+                .then((res) => {
+                    setSubmitted(true);
+                    setSuccessMsg(res?.message || "If your email exists, you’ll receive a reset link.");
+                    setCooldown(30); // 30s cooldown
+                })
+                .catch((err) => {
+                    const msg = err?.response?.data?.message || "Failed to send reset email.";
+                    setError(typeof msg === "string" ? msg : "Failed to send reset email.");
+                })
+                .finally(() => setIsLoading(false));
+        });
     };
+
+    // Cooldown timer effect
+    useEffect(() => {
+        if (cooldown > 0) {
+            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [cooldown]);
+
     return (
         <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
             <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
@@ -61,20 +80,33 @@ const ForgotPasswordPage = () => {
                                         <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
                                     </span>
                                 </div>
+                                {error && <div className="text-red-600 text-sm mb-2 text-center">{error}</div>}
                                 <button
                                     type="submit"
-                                    disabled={isLoading}
+                                    disabled={isLoading || cooldown > 0}
                                     className="w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {isLoading ? "SENDING..." : "Submit"}
+                                    {isLoading ? "SENDING..." : cooldown > 0 ? `Wait ${cooldown}s` : "Submit"}
                                 </button>
-                                <div className="w-full flex flex-col items-center mt-6">
+                                <div className="w-full flex flex-col items-center mt-6 gap-2">
                                     <span className="text-gray-500 text-sm mb-2">Remembered your password?</span>
                                     <Link
                                         to="/login"
                                         className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
                                     >
                                         Back to Login
+                                    </Link>
+                                    <Link
+                                        to="/register"
+                                        className="w-full rounded-lg bg-green-600 text-white font-bold py-3 text-lg transition hover:bg-green-700 text-center"
+                                    >
+                                        Go to Registration
+                                    </Link>
+                                    <Link
+                                        to="/verify-email"
+                                        className="w-full rounded-lg bg-blue-500 text-white font-bold py-3 text-lg transition hover:bg-blue-600 text-center"
+                                    >
+                                        Go to Email Verification
                                     </Link>
                                 </div>
                             </form>
@@ -85,14 +117,30 @@ const ForgotPasswordPage = () => {
                                 Check your email
                             </h2>
                             <p className="text-gray-600 font-medium mb-4 text-base text-center">
-                                If an account exists for <span className="font-bold">{email}</span>, you will receive a password reset link. Please check your inbox and spam folder.
+                                {successMsg || `If an account exists for ${email}, you will receive a password reset link. Please check your inbox and spam folder.`}
+                                <br />
+                                <span className="text-sm text-gray-500">If you don’t see the email, check your spam or junk folder.</span>
                             </p>
-                            <Link
-                                to="/login"
-                                className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
-                            >
-                                Back to Login
-                            </Link>
+                            <div className="w-full flex flex-col items-center gap-2">
+                                <Link
+                                    to="/login"
+                                    className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
+                                >
+                                    Back to Login
+                                </Link>
+                                <Link
+                                    to="/register"
+                                    className="w-full rounded-lg bg-green-600 text-white font-bold py-3 text-lg transition hover:bg-green-700 text-center"
+                                >
+                                    Go to Registration
+                                </Link>
+                                <Link
+                                    to="/verify-email"
+                                    className="w-full rounded-lg bg-blue-500 text-white font-bold py-3 text-lg transition hover:bg-blue-600 text-center"
+                                >
+                                    Go to Email Verification
+                                </Link>
+                            </div>
                         </div>
                     )}
                 </div>
