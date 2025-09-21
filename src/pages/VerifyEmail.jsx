@@ -12,11 +12,12 @@ export default function VerifyEmail() {
     const [cooldown, setCooldown] = useState(0);
 
     useEffect(() => {
+        // Pre-fill email from sessionStorage if available
         try {
             const cached = sessionStorage.getItem("recent_registration_email") || "";
-            if (cached) setResendEmail(cached);
+            if (cached && !resendEmail) setResendEmail(cached);
         } catch {}
-    }, []);
+    }, [resendEmail]);
 
     useEffect(() => {
         const params = new URLSearchParams(search);
@@ -79,6 +80,7 @@ export default function VerifyEmail() {
                             onChange={(e) => setResendEmail(e.target.value)}
                             className="mt-1 w-full border rounded px-3 py-2"
                         />
+                        <span className="text-xs text-gray-500 block mt-1">You can change your email if you made a typo.</span>
                     </label>
                     <button
                         type="submit"

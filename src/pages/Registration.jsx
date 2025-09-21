@@ -152,6 +152,20 @@ export default function Registration() {
                                     Please check your inbox and verify your email to continue.<br />
                                     <span className="text-sm text-gray-500">If you don't see the email, please look in your spam or junk folder.</span>
                                 </p>
+                                <button
+                                    type="button"
+                                    className="mt-4 px-4 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white font-semibold"
+                                    onClick={async () => {
+                                        try {
+                                            await authService.resendVerification({ email: formData.email });
+                                            alert("Verification email resent! Please check your inbox.");
+                                        } catch (err) {
+                                            alert("Failed to resend verification email. Please try again later.");
+                                        }
+                                    }}
+                                >
+                                    Resend verification email
+                                </button>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
