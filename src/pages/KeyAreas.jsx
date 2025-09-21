@@ -497,6 +497,9 @@ function TaskSlideOver({
     onClearActivities,
     initialTab = "details",
     hideActivitiesTab = false,
+    listNames = {},
+    kaId = null,
+    listNumbers = [],
 }) {
     const [form, setForm] = useState(null);
     const [activeTab, setActiveTab] = useState("details"); // details | activities
@@ -601,6 +604,12 @@ function TaskSlideOver({
     };
 
     if (!task || !form) return null;
+
+    const listNameFor = (n) => {
+        if (!kaId) return `List ${n}`;
+        const names = listNames[kaId] || {};
+        return names[n] || `List ${n}`;
+    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -723,12 +732,10 @@ function TaskSlideOver({
                                                             />
                                                         </div>
                                                         <div>
-                                                            <div className="text-[11px] text-slate-600">List (Tab)</div>
-                                                            <input
-                                                                type="number"
-                                                                min={1}
+                                                            <div className="text-[11px] text-slate-600">{`List (Tab) — ${listNameFor(form.list_index || 1)}`}</div>
+                                                            <select
                                                                 className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                                value={form.list_index || 1}
+                                                                value={String(form.list_index || 1)}
                                                                 onChange={(e) =>
                                                                     setForm((s) => ({
                                                                         ...s,
@@ -736,7 +743,16 @@ function TaskSlideOver({
                                                                     }))
                                                                 }
                                                                 disabled={readOnly}
-                                                            />
+                                                            >
+                                                                {(listNumbers && listNumbers.length
+                                                                    ? listNumbers
+                                                                    : Array.from({ length: 10 }, (_, i) => i + 1)
+                                                                ).map((n) => (
+                                                                    <option key={n} value={String(n)}>
+                                                                        {listNameFor(n)}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -815,8 +831,8 @@ function TaskSlideOver({
                                             <div className="grid grid-cols-3 gap-1.5">
                                                 {[
                                                     { key: "start_date", label: "Start" },
-                                                    { key: "deadline", label: "Deadline" },
                                                     { key: "end_date", label: "End date" },
+                                                    { key: "deadline", label: "Deadline" },
                                                 ].map((f) => (
                                                     <div key={f.key}>
                                                         <div className="text-[11px] text-slate-600">{f.label}</div>
@@ -970,6 +986,9 @@ function TaskFullView({
     activitiesByTask = {},
     onUpdateActivities,
     initialTab = "activities",
+    listNames = {},
+    kaId = null,
+    listNumbers = [],
 }) {
     const [tab, setTab] = useState(initialTab || "activities");
     const [isEditing, setIsEditing] = useState(false);
@@ -1082,6 +1101,12 @@ function TaskFullView({
     const clearActivities = () => {
         if (!confirm("Clear all activities for this task?")) return;
         onUpdateActivities && onUpdateActivities(String(task.id), []);
+    };
+
+    const listNameFor = (n) => {
+        if (!kaId) return `List ${n}`;
+        const names = listNames[kaId] || {};
+        return names[n] || `List ${n}`;
     };
 
     // Save handler for details tab
@@ -1215,6 +1240,117 @@ function TaskFullView({
                     </div>
                 )}
             </div>
+            {/* Professional summary card under header */}
+            {(() => {
+                const vt = form || task;
+                const assignee = vt?.assignee || "—";
+                const statusText = String(vt?.status || "open").replace("_", " ");
+                const priorityLabel = (() => {
+                    const p = String(vt?.priority || "med").toLowerCase();
+                    if (p === "med" || p === "medium") return "Normal";
+                    if (p === "low") return "Low";
+                    if (p === "high") return "High";
+                    return p;
+                })();
+                const q = computeEisenhowerQuadrant({
+                    deadline: vt?.deadline,
+                    end_date: vt?.end_date,
+                    priority: String(vt?.priority || "med").toLowerCase(),
+                });
+                const goalTitle = (() => {
+                    const id = vt?.goal_id;
+                    if (!id) return "—";
+                    const g = (goals || []).find((x) => String(x.id) === String(id));
+                    return g?.title || `#${id}`;
+                })();
+                const rawTags = vt?.tags || "";
+                const tagsArr = rawTags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean);
+                const tags = tagsArr.length ? tagsArr : null;
+                const startD = toDateOnly(vt?.start_date) || "—";
+                const deadlineD = toDateOnly(vt?.deadline) || "—";
+                const endD = toDateOnly(vt?.end_date) || "—";
+                const durationText = vt?.start_date && vt?.end_date ? formatDuration(vt.start_date, vt.end_date) : "—";
+                return (
+                    <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-white">
+                        <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2">
+                            <div className="text-sm">
+                                {/* Row 1: Labels in exact order */}
+                                <div className="grid grid-cols-10 gap-x-1">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Assignee</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Status</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Priority</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Quadrant</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Goal</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Tags</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">End date</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Deadline</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Duration</div>
+                                </div>
+                                {/* Row 2: Values aligned under each label */}
+                                <div className="grid grid-cols-10 gap-x-1 mt-0.5">
+                                    {/* Assignee value */}
+                                    <div className="text-slate-900 truncate min-w-0">{assignee}</div>
+                                    {/* Status value */}
+                                    <div className="text-slate-900 capitalize truncate min-w-0 inline-flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />
+                                        {statusText}
+                                    </div>
+                                    {/* Priority value */}
+                                    <div className="text-slate-900 truncate min-w-0 inline-flex items-center gap-1 whitespace-nowrap">
+                                        <span>{priorityLabel}</span>
+                                        {(() => {
+                                            const lvl = getPriorityLevel(vt?.priority || "med");
+                                            if (lvl === 2) return null;
+                                            const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
+                                            const label = lvl === 3 ? "High" : "Low";
+                                            return (
+                                                <span
+                                                    className={`inline-block text-sm font-bold ${cls}`}
+                                                    title={`Priority: ${label}`}
+                                                >
+                                                    !
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
+                                    {/* Quadrant value */}
+                                    <div className="min-w-0">
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-medium">{`Q${q}`}</span>
+                                    </div>
+                                    {/* Goal value */}
+                                    <div className="text-slate-900 truncate min-w-0" title={goalTitle}>
+                                        {goalTitle}
+                                    </div>
+                                    {/* Tags value (compact) */}
+                                    <div className="text-slate-900 truncate min-w-0">
+                                        {(() => {
+                                            if (!tags) return "—";
+                                            const maxTags = 2;
+                                            const shown = tags.slice(0, maxTags);
+                                            const extra = Math.max(0, tags.length - shown.length);
+                                            return `${shown.join(", ")}${extra ? `, +${extra}` : ""}`;
+                                        })()}
+                                    </div>
+                                    {/* Start Date value */}
+                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{startD}</div>
+                                    {/* End date value */}
+                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{endD}</div>
+                                    {/* Deadline value */}
+                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{deadlineD}</div>
+                                    {/* Duration value */}
+                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">
+                                        {durationText}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
             {/* Local tabs for Activities / Details */}
             <div className="px-2 pt-2 border-b border-slate-200 bg-white">
                 <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
@@ -1618,23 +1754,31 @@ function TaskFullView({
                                         </div>
                                         {/* List (Tab) */}
                                         <div>
-                                            <div className="text-[11px] text-slate-600">List (Tab)</div>
-                                            <input
-                                                type="number"
-                                                min={1}
+                                            <div className="text-[11px] text-slate-600">{`List (Tab) — ${listNameFor((isEditing && !readOnly ? form.list_index || 1 : task.list_index || 1) || 1)}`}</div>
+                                            <select
                                                 className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                                value={
-                                                    isEditing && !readOnly ? form.list_index || 1 : task.list_index || 1
-                                                }
+                                                value={String(
+                                                    isEditing && !readOnly
+                                                        ? form.list_index || 1
+                                                        : task.list_index || 1,
+                                                )}
                                                 onChange={(e) =>
                                                     setForm((s) => ({
                                                         ...s,
                                                         list_index: Number(e.target.value || 1),
                                                     }))
                                                 }
-                                                readOnly={!isEditing || readOnly}
                                                 disabled={!isEditing || readOnly}
-                                            />
+                                            >
+                                                {(listNumbers && listNumbers.length
+                                                    ? listNumbers
+                                                    : Array.from({ length: 10 }, (_, i) => i + 1)
+                                                ).map((n) => (
+                                                    <option key={n} value={String(n)}>
+                                                        {listNameFor(n)}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -1715,8 +1859,8 @@ function TaskFullView({
                             <div className="grid grid-cols-3 gap-1.5">
                                 {[
                                     { key: "start_date", label: "Start" },
-                                    { key: "deadline", label: "Deadline" },
                                     { key: "end_date", label: "End date" },
+                                    { key: "deadline", label: "Deadline" },
                                 ].map((f) => (
                                     <div key={f.key}>
                                         <div className="text-[11px] text-slate-600">{f.label}</div>
@@ -1747,6 +1891,9 @@ function TaskFullView({
                 <TaskSlideOver
                     task={task}
                     goals={goals}
+                    listNames={listNames}
+                    kaId={selectedKA?.id}
+                    listNumbers={availableListNumbers}
                     readOnly={readOnly}
                     initialTab="details"
                     hideActivitiesTab
@@ -1838,6 +1985,17 @@ export default function KeyAreas() {
     const [expandedActivityRows, setExpandedActivityRows] = useState(new Set());
     const [editingActivity, setEditingActivity] = useState(null); // { taskId, id }
     const [openActivityDetails, setOpenActivityDetails] = useState(new Set()); // Set of activity ids for a given task row render
+    // Sidebar sort: Alphabetical A→Z, with "Ideas" (or system default) always last
+    const sortForSidebar = React.useCallback((arr) => {
+        const items = Array.isArray(arr) ? arr.slice() : [];
+        return items.sort((a, b) => {
+            const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
+            const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
+            if (aIsIdeas && !bIsIdeas) return 1;
+            if (!aIsIdeas && bIsIdeas) return -1;
+            return String(a.title || "").localeCompare(String(b.title || ""));
+        });
+    }, []);
     const toggleActivitiesRow = (id) => {
         setExpandedActivityRows((prev) => {
             const next = new Set(prev);
@@ -2003,7 +2161,10 @@ export default function KeyAreas() {
                 // Do not persist key areas in localStorage; always rely on backend
                 // emit key areas so sidebar can populate its dropdown
                 try {
-                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+                    const sidebarList = sortForSidebar(sorted);
+                    window.dispatchEvent(
+                        new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
+                    );
                 } catch (e) {
                     // ignore if window not available or dispatch fails
                 }
@@ -2038,8 +2199,8 @@ export default function KeyAreas() {
     useEffect(() => {
         if (loading) return;
         try {
-            const sorted = [...keyAreas].sort((a, b) => (a.position || 0) - (b.position || 0));
-            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sorted } }));
+            const sidebarList = sortForSidebar(keyAreas);
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
         } catch (e) {}
     }, [keyAreas, loading]);
 
@@ -2241,10 +2402,11 @@ export default function KeyAreas() {
                 description: payload.description,
             });
             setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
-            // emit updated list
+            // emit updated list for sidebar (alphabetical with Ideas last)
             try {
                 const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: updatedList } }));
+                const sidebarList = sortForSidebar(updatedList);
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
             } catch (e) {}
         } else {
             const used = new Set(keyAreas.map((k) => k.position));
@@ -2268,7 +2430,10 @@ export default function KeyAreas() {
                         ...(keyAreas || []).filter((k) => k.position !== pos),
                         { ...created, position: pos },
                     ].sort((a, b) => a.position - b.position);
-                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: after } }));
+                    const sidebarList = sortForSidebar(after);
+                    window.dispatchEvent(
+                        new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
+                    );
                 } catch (e) {}
             } catch (err) {
                 const msg = err?.response?.data?.message || err?.message || "Action not allowed";
@@ -2304,7 +2469,8 @@ export default function KeyAreas() {
             const next = (keyAreas || []).filter((k) => k.id !== ka.id);
             setKeyAreas(next);
             try {
-                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
+                const sidebarList = sortForSidebar(next);
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
             } catch (e) {}
             if (selectedKA?.id === ka.id) {
                 setSelectedKA(null);
@@ -2349,7 +2515,10 @@ export default function KeyAreas() {
                 withPos.forEach((k) => map.set(String(k.id), { ...map.get(String(k.id)), position: k.position }));
                 const next = Array.from(map.values()).sort((a, b) => (a.position || 0) - (b.position || 0));
                 try {
-                    window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: next } }));
+                    const sidebarList = sortForSidebar(next);
+                    window.dispatchEvent(
+                        new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
+                    );
                 } catch {}
                 return next;
             });
@@ -2468,6 +2637,21 @@ export default function KeyAreas() {
         const maxFromNames = nameKeys.length ? Math.max(...nameKeys) : 0;
         // Allow fewer than 4 when empty; always show at least 1 list
         return Math.max(1, maxFromTabs, maxFromNames);
+    }, [selectedKA, listNames, tabNumbers]);
+
+    // Available lists for the selected KA: union of tabs (used by tasks) and named lists.
+    const availableListNumbers = useMemo(() => {
+        const s = new Set(tabNumbers);
+        const kaId = selectedKA?.id;
+        if (kaId) {
+            const nameKeys = Object.keys(listNames[kaId] || {})
+                .map((k) => Number(k))
+                .filter(Boolean);
+            nameKeys.forEach((n) => s.add(n));
+        }
+        const arr = Array.from(s);
+        arr.sort((a, b) => a - b);
+        return arr;
     }, [selectedKA, listNames, tabNumbers]);
 
     // Helpers to manage per-key-area list names
@@ -2926,6 +3110,9 @@ export default function KeyAreas() {
                                     task={selectedTaskFull}
                                     goals={goals}
                                     kaTitle={selectedKA?.title}
+                                    listNames={listNames}
+                                    kaId={selectedKA?.id}
+                                    listNumbers={availableListNumbers}
                                     readOnly={
                                         Boolean(selectedKA?.is_default) &&
                                         (selectedKA?.title || "").toLowerCase() !== "ideas"
@@ -3957,7 +4144,6 @@ export default function KeyAreas() {
                                                                                                                                 className="mt-1 text-xs text-amber-700"
                                                                                                                                 id={`activity-message-${a.id}`}
                                                                                                                             ></div>
-                                                                                                                            {/* Details section removed from task list view */}
                                                                                                                         </div>
                                                                                                                     ),
                                                                                                                 )}
@@ -4450,11 +4636,9 @@ export default function KeyAreas() {
                                                                     <label className="text-sm font-semibold text-slate-900">
                                                                         List (Tab)
                                                                     </label>
-                                                                    <input
+                                                                    <select
                                                                         name="list_index"
-                                                                        type="number"
-                                                                        min={1}
-                                                                        value={taskForm.list_index}
+                                                                        value={String(taskForm.list_index || 1)}
                                                                         onChange={(e) =>
                                                                             setTaskForm((s) => ({
                                                                                 ...s,
@@ -4462,7 +4646,13 @@ export default function KeyAreas() {
                                                                             }))
                                                                         }
                                                                         className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    />
+                                                                    >
+                                                                        {availableListNumbers.map((n) => (
+                                                                            <option key={n} value={String(n)}>
+                                                                                {getListName(selectedKA?.id, n)}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
                                                                 </div>
                                                             </div>
                                                         </div>
