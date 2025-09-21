@@ -35,6 +35,10 @@ const LoginPage = () => {
         try {
             const { email, password } = formData;
             const res = await authService.login({ email, password });
+            // Store token in localStorage for PrivateRoute
+            if (res.token) {
+                localStorage.setItem("access_token", res.token);
+            }
             navigate("/dashboard");
         } catch (err) {
             const msg = err.response?.data?.message || "Login failed";
