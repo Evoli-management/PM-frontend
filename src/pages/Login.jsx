@@ -35,11 +35,14 @@ const LoginPage = () => {
         try {
             const { email, password } = formData;
             const res = await authService.login({ email, password });
-            // Store token in localStorage for PrivateRoute
-            if (res.token) {
-                localStorage.setItem("access_token", res.token);
+            // Try to get token from response
+            let token = res.token || (res.user && res.user.token);
+            if (token) {
+                localStorage.setItem("access_token", token);
+                navigate("/dashboard");
+            } else {
+                setError("Login failed: No token received. Please contact support.");
             }
-            navigate("/dashboard");
         } catch (err) {
             const msg = err.response?.data?.message || "Login failed";
             // Detect unverified user error (customize if backend uses a different message)
