@@ -69,8 +69,8 @@ export default function Registration() {
                 sessionStorage.setItem("recent_registration_email", email);
             } catch {}
             setIsSubmitted(true);
-            // Temporarily skip email verification: send users straight to login
-            setTimeout(() => navigate("/login"), 800);
+            // Give users more time to read the success message before redirecting
+            setTimeout(() => navigate("/login"), 4000);
         } catch (err) {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
@@ -148,7 +148,9 @@ export default function Registration() {
                                 <CheckCircle2 size={48} className="text-green-500 mb-4" />
                                 <h3 className="text-2xl font-bold text-green-700">Registration Successful!</h3>
                                 <p className="mt-2 text-gray-600">
-                                    Your account has been created. You can now sign in.
+                                    A verification email has been sent to your address.<br />
+                                    Please check your inbox and verify your email to continue.<br />
+                                    <span className="text-sm text-gray-500">If you don't see the email, please look in your spam or junk folder.</span>
                                 </p>
                             </div>
                         ) : (
