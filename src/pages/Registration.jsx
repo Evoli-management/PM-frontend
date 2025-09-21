@@ -70,7 +70,7 @@ export default function Registration() {
             } catch {}
             setIsSubmitted(true);
             // Give users more time to read the success message before redirecting
-            setTimeout(() => navigate("/login"), 4000);
+            setTimeout(() => navigate("/verify-email"), 4000);
         } catch (err) {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
