@@ -1,6 +1,5 @@
 // src/services/keyAreaService.js
 import apiClient from "./apiClient";
-import axios from "axios";
 
 // FE<->BE mapping helpers
 const toFE = (area) => ({
@@ -90,7 +89,7 @@ const keyAreaService = {
 export default keyAreaService;
 
 export async function getKeyAreas() {
-    // Replace with your actual backend endpoint if different
-    const response = await axios.get("http://localhost:3000/api/key-areas");
+    // Use shared apiClient so cookies and base URL are correct in dev/prod
+    const response = await apiClient.get("/key-areas");
     return response.data;
 }
