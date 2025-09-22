@@ -1,10 +1,10 @@
 // src/services/apiClient.js
 import axios from "axios";
 
-// Prefer env override in production; keep proxy in dev for cookie-based auth
-const apiBase = import.meta.env.DEV
-    ? "/api" // use Vite proxy in development for same-origin cookies
-    : "https://practicalmanager-4241d0bfc5ed.herokuapp.com/api";
+
+// Use VITE_API_BASE_URL from .env for all API requests
+const apiBase = import.meta.env.VITE_API_BASE_URL || 
+    (import.meta.env.DEV ? "/api" : "https://practicalmanager-4241d0bfc5ed.herokuapp.com/api");
 
 const apiClient = axios.create({
     baseURL: apiBase,
