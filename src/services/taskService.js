@@ -23,38 +23,63 @@ const mapStatusFromApi = (s) => {
     return v;
 };
 
+// Map FE priority → BE enum
+// FE uses: high | normal | low
+// BE expects: high | medium | low
+const mapPriorityToApi = (p) => {
+    const v = String(p || "medium").toLowerCase();
+    if (v === "normal") return "medium";
+    if (v === "med") return "medium";
+    if (v === "high" || v === "low" || v === "medium") return v;
+    return v;
+};
+
+// Map BE enum → FE priority
+const mapPriorityFromApi = (p) => {
+    const v = String(p || "medium").toLowerCase();
+    if (v === "medium") return "normal";
+    return v; // high|low remain as-is
+};
+
 const base = "/tasks";
 
 const taskService = {
-    async list({ keyAreaId } = {}) {
+    async list({ keyAreaId, unassigned } = {}) {
         // In dev, bypass browser cache to avoid 304/Not Modified confusion after updates
         const params = { keyAreaId };
+        if (unassigned) params.unassigned = true;
         if (import.meta.env?.DEV) params._ts = Date.now();
         const res = await apiClient.get(base, {
             params,
             headers: import.meta.env?.DEV ? { "Cache-Control": "no-cache" } : undefined,
         });
-        return res.data.map((t) => ({ ...t, status: mapStatusFromApi(t.status) }));
+        return res.data.map((t) => ({
+            ...t,
+            status: mapStatusFromApi(t.status),
+            priority: mapPriorityFromApi(t.priority),
+        }));
     },
     async get(id) {
         const res = await apiClient.get(`${base}/${id}`);
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status) };
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
     },
     async create(payload) {
         const res = await apiClient.post(base, {
             ...payload,
             status: mapStatusToApi(payload.status),
+            priority: mapPriorityToApi(payload.priority),
         });
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status) };
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
     },
     async update(id, payload) {
         const data = { ...payload };
         if (data.status) data.status = mapStatusToApi(data.status);
+        if (data.priority) data.priority = mapPriorityToApi(data.priority);
         const res = await apiClient.put(`${base}/${id}`, data);
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status) };
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
     },
     async remove(id) {
         const res = await apiClient.delete(`${base}/${id}`);

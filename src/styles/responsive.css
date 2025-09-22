@@ -72,6 +72,17 @@ input:focus {
     outline-offset: -2px;
 }
 
+/* Ensure selects (dropdowns) do not show green focus outline */
+select {
+    outline: none;
+}
+
+select:focus,
+select:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 /* Ensure proper viewport handling */
 @viewport {
     width: device-width;

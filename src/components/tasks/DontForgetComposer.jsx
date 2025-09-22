@@ -19,6 +19,17 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
     const [notes, setNotes] = useState("");
     const [saving, setSaving] = useState(false);
 
+    // Use same naming convention as Tasks page if present
+    const dfListNames = React.useMemo(() => {
+        try {
+            const raw = localStorage.getItem("dfListNames");
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    }, []);
+    const getDfListName = (n) => (dfListNames?.[n] ? dfListNames[n] : `List ${n}`);
+
     useEffect(() => {
         if (!open) return;
         const onKey = (e) => {
@@ -269,15 +280,25 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                             />
                         </div>
                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                            <label className="text-sm font-semibold text-slate-900 block">List</label>
-                            <input
-                                type="number"
-                                min={1}
-                                max={4}
-                                value={listIndex}
+                            <label className="text-sm font-semibold text-slate-900 block">
+                                {`List — ${getDfListName(listIndex || 1)}`}
+                            </label>
+                            <select
+                                value={String(listIndex || 1)}
                                 onChange={(e) => setListIndex(Number(e.target.value || 1))}
                                 className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                            />
+                            >
+                                {Object.keys(dfListNames || {})
+                                    .map((k) => Number(k))
+                                    .concat([1])
+                                    .filter((v, i, arr) => arr.indexOf(v) === i)
+                                    .sort((a, b) => a - b)
+                                    .map((n) => (
+                                        <option key={n} value={String(n)}>
+                                            {getDfListName(n)}
+                                        </option>
+                                    ))}
+                            </select>
                         </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between">

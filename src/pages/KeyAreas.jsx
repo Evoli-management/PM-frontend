@@ -5,9 +5,6 @@ import Sidebar from "../components/shared/Sidebar";
 import TaskActivityModal from "../components/calendar/TaskActivityModal";
 import {
     FaPlus,
-    FaLock,
-    FaEdit,
-    FaBars,
     FaChevronLeft,
     FaSearch,
     FaEllipsisV,
@@ -607,8 +604,8 @@ function TaskSlideOver({
 
     const listNameFor = (n) => {
         if (!kaId) return `List ${n}`;
-        const names = listNames[kaId] || {};
-        return names[n] || `List ${n}`;
+        const names = listNames[String(kaId)] || {};
+        return names[String(n)] || `List ${n}`;
     };
 
     const submit = (e) => {
@@ -617,7 +614,7 @@ function TaskSlideOver({
         const attachmentsNames = (form.attachmentsFiles || []).map((f) => f.name || f).filter(Boolean);
         const payload = {
             ...form,
-            attachments: attachmentsNames.join(","),
+            attachments: attachmentsNames.join(",") || null,
             start_date: form.start_date ? toDateOnly(form.start_date) : null,
             deadline: form.deadline ? toDateOnly(form.deadline) : null,
             end_date: form.end_date ? toDateOnly(form.end_date) : null,
@@ -1105,8 +1102,8 @@ function TaskFullView({
 
     const listNameFor = (n) => {
         if (!kaId) return `List ${n}`;
-        const names = listNames[kaId] || {};
-        return names[n] || `List ${n}`;
+        const names = listNames[String(kaId)] || {};
+        return names[String(n)] || `List ${n}`;
     };
 
     // Save handler for details tab
@@ -2581,11 +2578,21 @@ export default function KeyAreas() {
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const kaParam = params.get("ka");
+        const taskParam = params.get("task");
         if (kaParam && keyAreas.length) {
             const found = keyAreas.find((k) => String(k.id) === String(kaParam));
-            if (found) openKA(found);
+            // Only (re)open if it's a different KA than the current selection
+            if (found && (!selectedKA || String(selectedKA.id) !== String(found.id))) {
+                openKA(found);
+            }
         }
-    }, [location.search, keyAreas]);
+        // If task param present and we already have selectedKA tasks loaded, open it
+        if (taskParam && selectedKA && String(selectedKA.id) === String(kaParam)) {
+            const tId = String(taskParam);
+            const hit = (allTasks || []).find((t) => String(t.id) === tId);
+            if (hit) setSelectedTaskFull(hit);
+        }
+    }, [location.search, keyAreas, selectedKA, allTasks]);
 
     const openKA = async (ka) => {
         // Close any open task full view when switching Key Areas
@@ -2630,7 +2637,7 @@ export default function KeyAreas() {
         const kaId = selectedKA?.id;
         const maxFromTabs = tabNumbers && tabNumbers.length ? Math.max(...tabNumbers) : 4;
         const nameKeys = kaId
-            ? Object.keys(listNames[kaId] || {})
+            ? Object.keys(listNames[String(kaId)] || {})
                   .map((k) => Number(k))
                   .filter(Boolean)
             : [];
@@ -2644,7 +2651,7 @@ export default function KeyAreas() {
         const s = new Set(tabNumbers);
         const kaId = selectedKA?.id;
         if (kaId) {
-            const nameKeys = Object.keys(listNames[kaId] || {})
+            const nameKeys = Object.keys(listNames[String(kaId)] || {})
                 .map((k) => Number(k))
                 .filter(Boolean);
             nameKeys.forEach((n) => s.add(n));
@@ -2657,8 +2664,8 @@ export default function KeyAreas() {
     // Helpers to manage per-key-area list names
     const getListName = (kaId, n) => {
         if (!kaId) return `List ${n}`;
-        const names = listNames[kaId] || {};
-        return names[n] || `List ${n}`;
+        const names = listNames[String(kaId)] || {};
+        return names[String(n)] || `List ${n}`;
     };
 
     const renameList = async (n) => {
@@ -2670,8 +2677,8 @@ export default function KeyAreas() {
         const current = getListName(selectedKA.id, n);
         const val = prompt("Rename list", current);
         if (val === null) return; // cancelled
-        const newMap = { ...(listNames[selectedKA.id] || {}), [n]: val };
-        setListNames((prev) => ({ ...prev, [selectedKA.id]: newMap }));
+        const newMap = { ...(listNames[String(selectedKA.id)] || {}), [String(n)]: val };
+        setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: newMap }));
         try {
             await keyAreaService.update(selectedKA.id, { listNames: newMap });
         } catch (e) {
@@ -2695,15 +2702,15 @@ export default function KeyAreas() {
             alert("This list contains tasks. Move or update those tasks to another list before deleting.");
             return;
         }
-        const names = listNames[kaId] || {};
-        const hasCustomName = !!(names && names[n]);
+        const names = listNames[String(kaId)] || {};
+        const hasCustomName = !!(names && names[String(n)]);
         const msg = hasCustomName
             ? `Delete custom name for list ${n}? Tasks in this list will not be affected.`
             : `Remove list ${n}? It will disappear since it has no tasks.`;
         if (!confirm(msg)) return;
-        const { [n]: _rem, ...rest } = names;
+        const { [String(n)]: _rem, ...rest } = names;
         const newMap = { ...rest };
-        setListNames((prev) => ({ ...prev, [kaId]: newMap }));
+        setListNames((prev) => ({ ...prev, [String(kaId)]: newMap }));
         if (taskTab === n) setTaskTab(1);
         try {
             await keyAreaService.update(kaId, { listNames: newMap });
@@ -3622,7 +3629,16 @@ export default function KeyAreas() {
                                                                                         }
                                                                                     />
                                                                                 </td>
-                                                                                <td className="px-3 py-2 align-top">
+                                                                                <td
+                                                                                    className="px-3 py-2 align-top cursor-pointer"
+                                                                                    onClick={() => {
+                                                                                        setSelectedTaskFull(t);
+                                                                                        setTaskFullInitialTab(
+                                                                                            "activities",
+                                                                                        );
+                                                                                    }}
+                                                                                    title="Open task"
+                                                                                >
                                                                                     <div className="flex items-start gap-2">
                                                                                         {(() => {
                                                                                             const lvl =
@@ -3648,9 +3664,11 @@ export default function KeyAreas() {
                                                                                             );
                                                                                         })()}
                                                                                         <button
+                                                                                            type="button"
                                                                                             className="text-blue-700 hover:underline font-semibold"
                                                                                             title="Click to open task"
-                                                                                            onClick={() => {
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
                                                                                                 setSelectedTaskFull(t);
                                                                                                 setTaskFullInitialTab(
                                                                                                     "activities",
@@ -4634,7 +4652,7 @@ export default function KeyAreas() {
                                                             <div className="grid md:grid-cols-2 gap-4">
                                                                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
                                                                     <label className="text-sm font-semibold text-slate-900">
-                                                                        List (Tab)
+                                                                        {`List (Tab) — ${getListName(selectedKA?.id, taskForm.list_index || 1)}`}
                                                                     </label>
                                                                     <select
                                                                         name="list_index"
