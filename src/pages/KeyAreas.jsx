@@ -21,6 +21,8 @@ import {
     FaChevronDown,
     FaChevronUp,
     FaStop,
+    FaBars,
+    FaEdit,
 } from "react-icons/fa";
 
 // InlineAddActivity removed per UI simplification
