@@ -3,8 +3,8 @@ import axios from "axios";
 
 // Prefer env override in production; keep proxy in dev for cookie-based auth
 const apiBase = import.meta.env.DEV
-    ? "/api" // dev: use Vite proxy for same-origin cookies
-    : import.meta.env.VITE_API_BASE_URL || "https://practicalmanager-backend-0950beb2f0df.herokuapp.com/api";
+    ? "/api" // use Vite proxy in development for same-origin cookies
+    : "https://practicalmanager-4241d0bfc5ed.herokuapp.com/api";
 
 const apiClient = axios.create({
     baseURL: apiBase,
