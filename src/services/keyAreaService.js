@@ -35,24 +35,26 @@ const keyAreaService = {
         const res = await apiClient.get("/key-areas", {
             params: { includeTaskCount },
         });
-        const items = Array.isArray(res.data) ? res.data.map(toFE) : [];
-        // Sort: non-Ideas first (by position, then title), Ideas always last
-        return items.sort((a, b) => {
-            const aIsIdeas =
-                String(a.title || "")
+        let items = Array.isArray(res.data) ? res.data.map(toFE) : [];
+        // Trust backend order; only ensure single Ideas entry client-side as a guard
+        const ideas = items.filter(
+            (i) =>
+                String(i.title || "")
                     .trim()
-                    .toLowerCase() === "ideas";
-            const bIsIdeas =
-                String(b.title || "")
-                    .trim()
-                    .toLowerCase() === "ideas";
-            if (aIsIdeas && !bIsIdeas) return 1;
-            if (!aIsIdeas && bIsIdeas) return -1;
-            const ap = Number.isFinite(a.position) ? a.position : 0;
-            const bp = Number.isFinite(b.position) ? b.position : 0;
-            if (ap !== bp) return ap - bp;
-            return String(a.title || "").localeCompare(String(b.title || ""));
-        });
+                    .toLowerCase() === "ideas" || i.is_default,
+        );
+        if (ideas.length > 1) {
+            const keep = ideas.find((i) => i.is_default) || ideas[0];
+            const keepId = keep.id;
+            items = items.filter((i) => {
+                const isIdeas =
+                    String(i.title || "")
+                        .trim()
+                        .toLowerCase() === "ideas" || i.is_default;
+                return !isIdeas || i.id === keepId;
+            });
+        }
+        return items;
     },
 
     async get(id, { includeTaskCount = false } = {}) {
