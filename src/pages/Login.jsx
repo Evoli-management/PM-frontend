@@ -35,12 +35,40 @@ const LoginPage = () => {
         try {
             const { email, password } = formData;
             const res = await authService.login({ email, password });
-            // Optionally store any returned token if you switch to token auth; cookie is set server-side.
-            // localStorage.setItem("access_token", res.accessToken);
-            navigate("/dashboard");
+            // Try to get token from response
+            let token = res.token || (res.user && res.user.token);
+            if (token) {
+                localStorage.setItem("access_token", token);
+                navigate("/dashboard");
+            } else {
+                setError("Login failed: No token received. Please contact support.");
+            }
         } catch (err) {
             const msg = err.response?.data?.message || "Login failed";
-            setError(Array.isArray(msg) ? msg.join(", ") : msg);
+            // Detect unverified user error (customize if backend uses a different message)
+            if (typeof msg === "string" && msg.toLowerCase().includes("verify your email")) {
+                setError(
+                    <span>
+                        Your email is not verified. <br />
+                        <button
+                            type="button"
+                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer"
+                            onClick={async () => {
+                                try {
+                                    await authService.resendVerification(email);
+                                    alert("Verification email resent! Please check your inbox.");
+                                } catch {
+                                    alert("Failed to resend verification email. Try again later.");
+                                }
+                            }}
+                        >
+                            Resend verification email
+                        </button>
+                    </span>
+                );
+            } else {
+                setError(Array.isArray(msg) ? msg.join(", ") : msg);
+            }
         } finally {
             setLoading(false);
         }
