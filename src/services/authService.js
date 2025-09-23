@@ -8,7 +8,9 @@ class AuthService {
     }
 
     async resetPassword(token, newPassword) {
+        console.log('Calling resetPassword with:', { token: token?.substring(0, 8) + '...', passwordLength: newPassword?.length });
         const res = await apiClient.post("/auth/reset-password", { token, newPassword });
+        console.log('Reset password response:', res.data);
         return res.data; // { message }
     }
     async register({ firstName, lastName, email, password }) {
