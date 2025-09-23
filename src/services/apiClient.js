@@ -6,14 +6,6 @@ import axios from "axios";
 const apiBase = import.meta.env.VITE_API_BASE_URL || 
     (import.meta.env.DEV ? "/api" : "https://practicalmanager-4241d0bfc5ed.herokuapp.com/api");
 
-console.log("API Client Configuration:", {
-    isDev: import.meta.env.DEV,
-    mode: import.meta.env.MODE,
-    apiBase,
-    currentOrigin: window.location.origin,
-    envApiBase: import.meta.env.VITE_API_BASE_URL
-});
-
 const apiClient = axios.create({
     baseURL: apiBase,
     timeout: 10000,

@@ -34,10 +34,7 @@ const LoginPage = () => {
         setLoading(true);
         try {
             const { email, password } = formData;
-            console.log("Attempting login with:", { email, apiBase: import.meta.env.VITE_API_BASE_URL });
-            
             const res = await authService.login({ email, password });
-            console.log("Login response:", res);
             
             // Try to get token from response
             let token = res.token || (res.user && res.user.token);
