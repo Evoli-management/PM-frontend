@@ -1,11 +1,13 @@
 # Admin Organization Settings Implementation
 
 ## Overview
+
 A comprehensive **Admin Settings Module** separate from the Profile & Settings module, designed specifically for organization-wide administrative settings and system configuration.
 
 ## Key Features
 
 ### 🏢 **Organization Information**
+
 - **Organization Name** - Company/institution name
 - **Organization Code** - Unique identifier (e.g., ABC001)
 - **Industry Selection** - Technology, Healthcare, Finance, Education, Manufacturing, Retail, Other
@@ -13,11 +15,13 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
 - **Timezone Configuration** - Global organization timezone
 
 ### ⏰ **Working Hours & Calendar**
+
 - **Work Hours Definition** - Start and end times
 - **Working Days Configuration** - Which days are work days
 - **Calendar Integration** - Organization calendar settings
 
 ### 🔒 **Security Settings**
+
 - **Single Sign-On (SSO)** - Enable/disable external identity providers
 - **Password Enforcement** - Require secure passwords meeting standards
 - **Login Attempt Limits** - Lock accounts after failed attempts
@@ -27,53 +31,60 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
 - **Max Login Attempts** - Define security lockout thresholds
 
 ### 📋 **Organizational Policies**
+
 - **Password Policy Configuration**:
-  - Minimum length requirements
-  - Character requirements (uppercase, lowercase, numbers, special chars)
-  - Password expiry periods
+    - Minimum length requirements
+    - Character requirements (uppercase, lowercase, numbers, special chars)
+    - Password expiry periods
 - **Data Retention Policies**:
-  - User activity logs retention
-  - Audit logs retention (compliance)
-  - Temporary files cleanup
-  - Deleted items recovery period
+    - User activity logs retention
+    - Audit logs retention (compliance)
+    - Temporary files cleanup
+    - Deleted items recovery period
 
 ### 🔌 **System Integrations**
+
 - **Email Configuration**:
-  - Email provider selection (SMTP, SendGrid, Mailgun, AWS SES)
-  - SMTP settings and authentication
-  - Port configuration
+    - Email provider selection (SMTP, SendGrid, Mailgun, AWS SES)
+    - SMTP settings and authentication
+    - Port configuration
 - **API Access Controls**:
-  - Enable/disable API access
-  - Rate limiting configuration
-  - Webhook endpoints management
+    - Enable/disable API access
+    - Rate limiting configuration
+    - Webhook endpoints management
 
 ### 📊 **Reporting & Notifications**
+
 - **System Notifications**:
-  - Maintenance notices
-  - Security alerts
-  - User registration notifications
+    - Maintenance notices
+    - Security alerts
+    - User registration notifications
 - **Automated Reports**:
-  - Daily, weekly, monthly reports
-  - Administrative dashboards
-  - Compliance reporting
+    - Daily, weekly, monthly reports
+    - Administrative dashboards
+    - Compliance reporting
 
 ## Technical Implementation
 
 ### **Files Created/Modified:**
+
 1. **`src/pages/AdminSettings.jsx`** - Main admin settings interface
 2. **`src/App.jsx`** - Added routing for `/admin-settings` and `/settings`
 3. **`src/components/shared/Navbar.jsx`** - Added Admin Settings to user menu
 
 ### **Routing:**
+
 - `/admin-settings` - Direct access to admin settings
 - `/settings` - Sidebar shortcut to admin settings
 
 ### **Navigation Access:**
+
 - **Sidebar**: Settings icon → Admin Settings
 - **User Menu**: ⚙️ Admin Settings option
 - **Direct URL**: Navigate to `/admin-settings`
 
 ### **Data Structure:**
+
 ```javascript
 {
   // Organization Information
@@ -83,7 +94,7 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
   timezone: "America/New_York",
   country: "United States",
   currency: "USD",
-  
+
   // Security Settings
   security: {
     enableSingleSignOn: false,
@@ -94,7 +105,7 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
     enable2FAForAdmins: true,
     allowPublicRegistration: false
   },
-  
+
   // Password Policy
   passwordPolicy: {
     minLength: 8,
@@ -104,7 +115,7 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
     requireSpecialChars: true,
     passwordExpiry: 90
   },
-  
+
   // Data Retention
   dataRetention: {
     userActivityLogs: 365,
@@ -112,7 +123,7 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
     temporaryFiles: 30,
     deletedItems: 30
   },
-  
+
   // Integrations
   integrations: {
     emailProvider: "smtp",
@@ -121,7 +132,7 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
     enableAPIAccess: false,
     apiRateLimit: 1000
   },
-  
+
   // Notifications
   notifications: {
     systemMaintenanceNotices: true,
@@ -137,31 +148,37 @@ A comprehensive **Admin Settings Module** separate from the Profile & Settings m
 ## Usage Instructions
 
 ### **For System Administrators:**
+
 1. **Access Admin Settings**:
-   - Click Settings in sidebar, OR
-   - Click user menu → ⚙️ Admin Settings, OR
-   - Navigate to `/admin-settings`
+
+    - Click Settings in sidebar, OR
+    - Click user menu → ⚙️ Admin Settings, OR
+    - Navigate to `/admin-settings`
 
 2. **Configure Organization**:
-   - Set organization details in "Organization" tab
-   - Define working hours and calendar settings
-   - Configure data retention policies
+
+    - Set organization details in "Organization" tab
+    - Define working hours and calendar settings
+    - Configure data retention policies
 
 3. **Set Security Policies**:
-   - Configure authentication requirements
-   - Set password policies
-   - Enable security features
+
+    - Configure authentication requirements
+    - Set password policies
+    - Enable security features
 
 4. **Manage Integrations**:
-   - Set up email service
-   - Configure API access
-   - Manage external connections
+
+    - Set up email service
+    - Configure API access
+    - Manage external connections
 
 5. **Set Reporting Preferences**:
-   - Choose notification types
-   - Configure automated reports
+    - Choose notification types
+    - Configure automated reports
 
 ### **Navigation Structure:**
+
 ```
 Admin Settings Module
 ├── Organization
@@ -181,28 +198,31 @@ Admin Settings Module
 
 ## Key Differences from Profile Settings
 
-| **Profile Settings** | **Admin Settings** |
-|---------------------|-------------------|
-| 👤 Individual user preferences | 🏢 Organization-wide policies |
-| Personal dashboard customization | System configuration |
-| User privacy controls | Administrative controls |
-| Individual notification settings | System-wide notifications |
-| Personal 2FA setup | Organization security policies |
+| **Profile Settings**             | **Admin Settings**             |
+| -------------------------------- | ------------------------------ |
+| 👤 Individual user preferences   | 🏢 Organization-wide policies  |
+| Personal dashboard customization | System configuration           |
+| User privacy controls            | Administrative controls        |
+| Individual notification settings | System-wide notifications      |
+| Personal 2FA setup               | Organization security policies |
 
 ## Security & Compliance
 
 ### **Data Protection:**
+
 - ✅ Secure storage of sensitive configuration
 - ✅ Role-based access (admin only)
 - ✅ Audit logging for policy changes
 - ✅ Compliance-ready data retention settings
 
 ### **Access Control:**
+
 - ✅ Admin-only access to organization settings
 - ✅ Clear separation from user profile settings
 - ✅ Secure configuration management
 
 ## Future Enhancements
+
 - Role-based permissions for different admin levels
 - Configuration backup and restore
 - Advanced compliance reporting

@@ -35,12 +35,53 @@ const LoginPage = () => {
         try {
             const { email, password } = formData;
             const res = await authService.login({ email, password });
-            // Optionally store any returned token if you switch to token auth; cookie is set server-side.
-            // localStorage.setItem("access_token", res.accessToken);
-            navigate("/dashboard");
+            
+            // Try to get token from response
+            let token = res.token || (res.user && res.user.token);
+            if (token) {
+                console.log("Storing token in localStorage");
+                localStorage.setItem("access_token", token);
+                
+                // Verify the token works by testing an authenticated endpoint
+                try {
+                    const testRes = await authService.verifyToken();
+                    console.log("Token verification successful:", testRes);
+                    navigate("/dashboard");
+                } catch (verifyError) {
+                    console.error("Token verification failed:", verifyError);
+                    setError("Authentication failed. Please try again.");
+                }
+            } else {
+                console.error("No token in response:", res);
+                setError("Login failed: No token received. Please contact support.");
+            }
         } catch (err) {
+            console.error("Login error:", err);
             const msg = err.response?.data?.message || "Login failed";
-            setError(Array.isArray(msg) ? msg.join(", ") : msg);
+            // Detect unverified user error (customize if backend uses a different message)
+            if (typeof msg === "string" && msg.toLowerCase().includes("verify your email")) {
+                setError(
+                    <span>
+                        Your email is not verified. <br />
+                        <button
+                            type="button"
+                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer"
+                            onClick={async () => {
+                                try {
+                                    await authService.resendVerification(email);
+                                    alert("Verification email resent! Please check your inbox.");
+                                } catch {
+                                    alert("Failed to resend verification email. Try again later.");
+                                }
+                            }}
+                        >
+                            Resend verification email
+                        </button>
+                    </span>
+                );
+            } else {
+                setError(Array.isArray(msg) ? msg.join(", ") : msg);
+            }
         } finally {
             setLoading(false);
         }
@@ -69,6 +110,12 @@ const LoginPage = () => {
                     <p className="text-black font-semibold mb-4 text-base text-center">
                         Login and Take Control of Your Workflow.
                     </p>
+                    {/* Debug info for troubleshooting */}
+                    {import.meta.env.DEV && (
+                        <div className="text-xs text-gray-500 mb-2">
+                            API: {import.meta.env.VITE_API_BASE_URL}
+                        </div>
+                    )}
                     <form className="space-y-4 w-full" onSubmit={handleSubmit} aria-label="Login form">
                         <div className="relative w-full">
                             <input

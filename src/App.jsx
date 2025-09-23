@@ -1,6 +1,7 @@
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
+import PrivateRoute from "./components/shared/PrivateRoute.jsx";
 import Footer from "./components/shared/Footer.jsx";
 import { isFeatureEnabled } from "./utils/flags.js";
 
@@ -12,6 +13,7 @@ import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
+import ConnectionTest from "./pages/ConnectionTest.jsx";
 
 // Dashboard pages
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
@@ -30,6 +32,11 @@ import VerifyEmail from "./pages/VerifyEmail.jsx";
 
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
+    // Only show footer on public/auth pages
+    const publicFooterRoutes = [
+        "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", "/verify-email"
+    ];
+    const currentPath = window.location.hash.replace(/^#\/?/, "/");
     return (
         <Router>
             <div className="flex flex-col min-h-screen">
@@ -64,10 +71,27 @@ export default function App() {
                             <Route path="/analytics" element={<Analytics />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
+                            <Route path="/connection-test" element={<ConnectionTest />} />
+                            {/* Private routes below */}
+                            <Route path="/profile-settings" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
+                            <Route path="/profile" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
+                            <Route path="/admin-settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
+                            <Route path="/settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
+                            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                            {calendarEnabled && <Route path="/calendar" element={<PrivateRoute><Calendar /></PrivateRoute>} />}
+                            <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
+                            <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
+                            <Route path="/goals/:goalId" element={<PrivateRoute><GoalDetailPage /></PrivateRoute>} />
+                            <Route path="/enps" element={<PrivateRoute><ENPS /></PrivateRoute>} />
+                            <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
+                            <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+                            <Route path="/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
+                            <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
+                            <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
                 </main>
-                <Footer />
+                {publicFooterRoutes.includes(currentPath) && <Footer />}
             </div>
         </Router>
     );

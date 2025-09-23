@@ -1,6 +1,5 @@
 // src/services/keyAreaService.js
 import apiClient from "./apiClient";
-import axios from "axios";
 
 // FE<->BE mapping helpers
 const toFE = (area) => ({
@@ -38,14 +37,8 @@ const keyAreaService = {
         const items = Array.isArray(res.data) ? res.data.map(toFE) : [];
         // Sort: non-Ideas first (by position, then title), Ideas always last
         return items.sort((a, b) => {
-            const aIsIdeas =
-                String(a.title || "")
-                    .trim()
-                    .toLowerCase() === "ideas";
-            const bIsIdeas =
-                String(b.title || "")
-                    .trim()
-                    .toLowerCase() === "ideas";
+            const aIsIdeas = String(a.title || "").trim().toLowerCase() === "ideas";
+            const bIsIdeas = String(b.title || "").trim().toLowerCase() === "ideas";
             if (aIsIdeas && !bIsIdeas) return 1;
             if (!aIsIdeas && bIsIdeas) return -1;
             const ap = Number.isFinite(a.position) ? a.position : 0;
@@ -87,8 +80,8 @@ const keyAreaService = {
 
 export default keyAreaService;
 
+// Temporary compatibility export for callers expecting this helper
 export async function getKeyAreas() {
-    // Replace with your actual backend endpoint if different
-    const response = await axios.get("http://localhost:3000/api/key-areas");
+    const response = await apiClient.get("/key-areas");
     return response.data;
 }
