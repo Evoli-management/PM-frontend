@@ -18,6 +18,11 @@ class AuthService {
 
     async login({ email, password }) {
         const res = await apiClient.post("/auth/login", { email, password });
+        return res.data; // { message, user, token }
+    }
+
+    async verifyToken() {
+        const res = await apiClient.get("/users/me");
         return res.data; // { message, user }
     }
 
@@ -30,6 +35,16 @@ class AuthService {
     async resendVerification(email) {
         const res = await apiClient.post(`/auth/resend-verification`, { email });
         return res.data; // { message }
+    }
+
+    async logout() {
+        try {
+            await apiClient.post("/auth/logout");
+        } catch (error) {
+            console.log("Logout API call failed:", error);
+        } finally {
+            localStorage.removeItem("access_token");
+        }
     }
 }
 
