@@ -81,7 +81,7 @@ export default function App() {
                             {calendarEnabled && <Route path="/calendar" element={<PrivateRoute><Calendar /></PrivateRoute>} />}
                             <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
                             <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
-                            <Route path="/goals/:goalId" element={<PrivateRoute><GoalDetailPage /></PrivateRoute>} />
+                            <Route path="/goals/:goalId" element={<PrivateRoute><Goals /></PrivateRoute>} />
                             <Route path="/enps" element={<PrivateRoute><ENPS /></PrivateRoute>} />
                             <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
