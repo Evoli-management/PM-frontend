@@ -1,5 +1,6 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import apiClient from "../../services/apiClient";
 
 // Simple auth check: look for a cookie or localStorage token
 function isAuthenticated() {
@@ -14,18 +15,28 @@ const PrivateRoute = ({ children }) => {
     const [isAuth, setIsAuth] = React.useState(false);
 
     React.useEffect(() => {
-        fetch("/api/users/me", {
-            method: "GET",
-            credentials: "include",
-        })
+        // Use apiClient instead of fetch to ensure proper API base URL
+        const token = localStorage.getItem("access_token");
+        console.log("PrivateRoute: Checking auth, token exists:", !!token);
+        console.log("PrivateRoute: API Base URL:", import.meta.env.VITE_API_BASE_URL);
+        
+        apiClient.get("/users/me")
             .then((res) => {
+                console.log("PrivateRoute: Auth check successful:", res.status);
                 if (res.status === 200) {
                     setIsAuth(true);
                 } else {
                     setIsAuth(false);
                 }
             })
-            .catch(() => setIsAuth(false))
+            .catch((error) => {
+                console.log("PrivateRoute: Auth check failed:", {
+                    status: error.response?.status,
+                    message: error.message,
+                    hasToken: !!token
+                });
+                setIsAuth(false);
+            })
             .finally(() => setAuthChecked(true));
     }, []);
 

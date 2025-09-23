@@ -13,6 +13,7 @@ import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
+import ConnectionTest from "./pages/ConnectionTest.jsx";
 
 // Dashboard pages
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
@@ -56,6 +57,7 @@ export default function App() {
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
+                            <Route path="/connection-test" element={<ConnectionTest />} />
                             {/* Private routes below */}
                             <Route path="/profile-settings" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
                             <Route path="/profile" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />

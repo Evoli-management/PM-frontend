@@ -34,16 +34,32 @@ const LoginPage = () => {
         setLoading(true);
         try {
             const { email, password } = formData;
+            console.log("Attempting login with:", { email, apiBase: import.meta.env.VITE_API_BASE_URL });
+            
             const res = await authService.login({ email, password });
+            console.log("Login response:", res);
+            
             // Try to get token from response
             let token = res.token || (res.user && res.user.token);
             if (token) {
+                console.log("Storing token in localStorage");
                 localStorage.setItem("access_token", token);
-                navigate("/dashboard");
+                
+                // Verify the token works by testing an authenticated endpoint
+                try {
+                    const testRes = await authService.verifyToken();
+                    console.log("Token verification successful:", testRes);
+                    navigate("/dashboard");
+                } catch (verifyError) {
+                    console.error("Token verification failed:", verifyError);
+                    setError("Authentication failed. Please try again.");
+                }
             } else {
+                console.error("No token in response:", res);
                 setError("Login failed: No token received. Please contact support.");
             }
         } catch (err) {
+            console.error("Login error:", err);
             const msg = err.response?.data?.message || "Login failed";
             // Detect unverified user error (customize if backend uses a different message)
             if (typeof msg === "string" && msg.toLowerCase().includes("verify your email")) {
