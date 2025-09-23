@@ -113,6 +113,12 @@ const LoginPage = () => {
                     <p className="text-black font-semibold mb-4 text-base text-center">
                         Login and Take Control of Your Workflow.
                     </p>
+                    {/* Debug info for troubleshooting */}
+                    {import.meta.env.DEV && (
+                        <div className="text-xs text-gray-500 mb-2">
+                            API: {import.meta.env.VITE_API_BASE_URL}
+                        </div>
+                    )}
                     <form className="space-y-4 w-full" onSubmit={handleSubmit} aria-label="Login form">
                         <div className="relative w-full">
                             <input
