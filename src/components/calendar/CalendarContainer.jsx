@@ -8,8 +8,10 @@ import DayView from "./DayView";
 import ListView from "./ListView";
 import EventModal from "./EventModal";
 import TaskActivityModal from "./TaskActivityModal";
+import ElephantTaskModal from "./ElephantTaskModal";
 import taskService from "../../services/taskService";
 import activityService from "../../services/activityService";
+import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
@@ -19,6 +21,7 @@ const EVENT_CATEGORIES = {
     focus: { color: "bg-blue-500", icon: "🧠" },
     meeting: { color: "bg-yellow-500", icon: "📅" },
     travel: { color: "bg-purple-500", icon: "✈️" },
+    elephant_bite: { color: "bg-orange-500", icon: "🐘" },
     green: { color: "bg-green-400", icon: "✔️" },
     red: { color: "bg-red-400", icon: "⛔" },
     custom: { color: "bg-gray-300", icon: "•" },
@@ -26,25 +29,35 @@ const EVENT_CATEGORIES = {
 
 const CalendarContainer = () => {
     const { addToast } = useToast();
-    // Elephant Task state (mock)
-    const [elephantTasks, setElephantTasks] = useState({}); // { '2025-08-22': '...' }
+    // Elephant Task state
+    const [elephantTasks, setElephantTasks] = useState([]);
+    const [elephantTaskModalOpen, setElephantTaskModalOpen] = useState(false);
+    const [selectedTaskForElephant, setSelectedTaskForElephant] = useState(null);
     const [currentDate, setCurrentDate] = useState(new Date());
     const today = new Date();
     const dateKey = currentDate.toISOString().slice(0, 10);
-    const [elephantInput, setElephantInput] = useState("");
-    useEffect(() => {
-        setElephantInput(elephantTasks[dateKey] || "");
-    }, [dateKey, elephantTasks]);
 
-    function handleSaveElephant() {
-        setElephantTasks({ ...elephantTasks, [dateKey]: elephantInput });
-    }
-    function handleDeleteElephant() {
-        const copy = { ...elephantTasks };
-        delete copy[dateKey];
-        setElephantTasks(copy);
-        setElephantInput("");
-    }
+    // Load elephant tasks
+    const loadElephantTasks = async () => {
+        try {
+            const tasks = await elephantTaskService.getElephantTasks();
+            setElephantTasks(tasks || []);
+        } catch (error) {
+            console.error('Error loading elephant tasks:', error);
+        }
+    };
+
+    const handleCreateElephantTask = (taskId = null) => {
+        setSelectedTaskForElephant(taskId);
+        setElephantTaskModalOpen(true);
+    };
+
+    const handleElephantTaskSaved = () => {
+        loadElephantTasks();
+        loadEvents(); // Reload calendar events to show new elephant bites
+        setElephantTaskModalOpen(false);
+        setSelectedTaskForElephant(null);
+    };
     const [view, setView] = useState("day");
     const [events, setEvents] = useState([]);
     const [todos, setTodos] = useState([]);
@@ -148,6 +161,15 @@ const CalendarContainer = () => {
                 ]);
                 setEvents(Array.isArray(evs) ? evs : []);
                 setTodos(Array.isArray(tds) ? tds : []);
+                
+                // Load elephant tasks
+                try {
+                    const elephantTasksData = await elephantTaskService.getElephantTasks();
+                    setElephantTasks(elephantTasksData || []);
+                } catch (error) {
+                    console.warn('Failed to load elephant tasks:', error);
+                }
+                
                 // If Day view, also fetch activities for tasks that are dated today
                 if (view === "day") {
                     try {
@@ -540,38 +562,29 @@ const CalendarContainer = () => {
             <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
                 {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
-                {/* Elephant Task Input */}
-                <div
-                    className="w-full flex items-center gap-2 mb-2 bg-gradient-to-r from-sky-100 to-blue-50 border border-sky-200 px-2 py-1 rounded"
-                    style={{ minHeight: 36 }}
-                >
-                    <span className="text-2xl mr-2" title="Your most important task of the day.">
+                {/* Elephant Tasks Section */}
+                <div className="w-full flex items-center gap-2 mb-2 bg-gradient-to-r from-orange-100 to-amber-50 border border-orange-200 px-3 py-2 rounded-lg">
+                    <span className="text-2xl" title="Elephant Tasks - Break down large tasks into manageable bites">
                         🐘
                     </span>
-                    <input
-                        type="text"
-                        value={elephantInput}
-                        onChange={(e) => setElephantInput(e.target.value)}
-                        placeholder="Enter your elephant task..."
-                        className="flex-1 px-2 py-1 rounded border border-sky-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                    />
-                    {elephantInput && (
-                        <button
-                            className="bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 rounded font-semibold text-sm transition-all duration-150 ml-1 shadow"
-                            onClick={handleSaveElephant}
-                        >
-                            {elephantTasks[dateKey] ? "Update" : "Save"}
-                        </button>
-                    )}
-                    {elephantTasks[dateKey] && (
-                        <button
-                            className="bg-red-100 hover:bg-red-200 text-red-600 px-1.5 py-1 rounded ml-1"
-                            onClick={handleDeleteElephant}
-                            title="Delete Elephant Task"
-                        >
-                            ✕
-                        </button>
-                    )}
+                    <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">
+                                Elephant Tasks ({elephantTasks.length})
+                            </span>
+                            <button
+                                onClick={() => handleCreateElephantTask()}
+                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
+                            >
+                                Create Elephant Task
+                            </button>
+                        </div>
+                        {elephantTasks.length > 0 && (
+                            <div className="text-xs text-gray-600 mt-1">
+                                {elephantTasks.map(task => task.title).join(', ')}
+                            </div>
+                        )}
+                    </div>
                 </div>
                 {/* Active view content */}
                 {view === "quarter" && (
@@ -795,6 +808,17 @@ const CalendarContainer = () => {
                     }}
                 />
             )}
+
+            {/* Elephant Task Modal */}
+            <ElephantTaskModal
+                isOpen={elephantTaskModalOpen}
+                onClose={() => {
+                    setElephantTaskModalOpen(false);
+                    setSelectedTaskForElephant(null);
+                }}
+                onSave={handleElephantTaskSaved}
+                taskId={selectedTaskForElephant}
+            />
         </div>
     );
 };
