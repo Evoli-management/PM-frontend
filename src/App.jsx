@@ -27,7 +27,6 @@ import TeamDashboard from "./pages/dashboard/TeamDashboard.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
 import Tasks from "./pages/Tasks.jsx";
-import GoalDetailPage from "./pages/GoalDetailPage.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 
@@ -57,6 +56,21 @@ export default function App() {
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
+                            <Route path="/profile-settings" element={<ProfileSetting />} />
+                            <Route path="/profile" element={<ProfileSetting />} />
+                            <Route path="/admin-settings" element={<AdminSettings />} />
+                            <Route path="/settings" element={<AdminSettings />} />
+                            <Route path="/dashboard" element={<Dashboard />} />
+                            {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
+                            <Route path="/tasks" element={<Tasks />} />
+                            <Route path="/goals" element={<Goals />} />
+                            <Route path="/goals/:goalId" element={<Goals />} />
+                            <Route path="/enps" element={<ENPS />} />
+                            <Route path="/recognition" element={<Recognition />} />
+                            <Route path="/notifications" element={<Notifications />} />
+                            <Route path="/analytics" element={<Analytics />} />
+                            <Route path="/dashboard/team" element={<TeamDashboard />} />
+                            <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
                             {/* Private routes below */}
                             <Route path="/profile-settings" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
@@ -67,7 +81,7 @@ export default function App() {
                             {calendarEnabled && <Route path="/calendar" element={<PrivateRoute><Calendar /></PrivateRoute>} />}
                             <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
                             <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
-                            <Route path="/goals/:goalId" element={<PrivateRoute><GoalDetailPage /></PrivateRoute>} />
+                            <Route path="/goals/:goalId" element={<PrivateRoute><Goals /></PrivateRoute>} />
                             <Route path="/enps" element={<PrivateRoute><ENPS /></PrivateRoute>} />
                             <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
