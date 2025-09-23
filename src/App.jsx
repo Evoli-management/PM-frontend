@@ -25,7 +25,6 @@ import TeamDashboard from "./pages/dashboard/TeamDashboard.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
 import Tasks from "./pages/Tasks.jsx";
-import GoalDetailPage from "./pages/GoalDetailPage.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 
@@ -58,7 +57,7 @@ export default function App() {
                             {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
                             <Route path="/tasks" element={<Tasks />} />
                             <Route path="/goals" element={<Goals />} />
-                            <Route path="/goals/:goalId" element={<GoalDetailPage />} />
+                            <Route path="/goals/:goalId" element={<Goals />} />
                             <Route path="/enps" element={<ENPS />} />
                             <Route path="/recognition" element={<Recognition />} />
                             <Route path="/notifications" element={<Notifications />} />
@@ -73,3 +72,4 @@ export default function App() {
         </Router>
     );
 }
+z
