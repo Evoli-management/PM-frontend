@@ -43,7 +43,7 @@ const ResetPasswordPage = () => {
         }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         // Validation
@@ -67,12 +67,19 @@ const ResetPasswordPage = () => {
             return;
         }
         setIsLoading(true);
-        // Simulate API call for password reset with token
-        setTimeout(() => {
-            setIsLoading(false);
+        setError("");
+        
+        try {
+            const authService = await import("../services/authService").then(module => module.default);
+            await authService.resetPassword(token, passwords.newPassword);
             alert("Password reset successful! You can now login with your new password.");
             navigate("/login");
-        }, 1500);
+        } catch (err) {
+            const msg = err?.response?.data?.message || "Failed to reset password. Please try again.";
+            setError(typeof msg === "string" ? msg : "Failed to reset password. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
     return (
         <div className="min-h-screen flex items-center justify-center bg-white px-4">

@@ -6,6 +6,11 @@ class AuthService {
         const res = await apiClient.post("/auth/forgot-password", { email });
         return res.data; // { message }
     }
+
+    async resetPassword(token, newPassword) {
+        const res = await apiClient.post("/auth/reset-password", { token, newPassword });
+        return res.data; // { message }
+    }
     async register({ firstName, lastName, email, password }) {
         const res = await apiClient.post("/auth/register", {
             firstName,
