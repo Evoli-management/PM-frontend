@@ -35,13 +35,13 @@ const LoginPage = () => {
         try {
             const { email, password } = formData;
             const res = await authService.login({ email, password });
-            
+
             // Try to get token from response
             let token = res.token || (res.user && res.user.token);
             if (token) {
                 console.log("Storing token in localStorage");
                 localStorage.setItem("access_token", token);
-                
+
                 // Verify the token works by testing an authenticated endpoint
                 try {
                     const testRes = await authService.verifyToken();
@@ -77,7 +77,7 @@ const LoginPage = () => {
                         >
                             Resend verification email
                         </button>
-                    </span>
+                    </span>,
                 );
             } else {
                 setError(Array.isArray(msg) ? msg.join(", ") : msg);
@@ -110,11 +110,9 @@ const LoginPage = () => {
                     <p className="text-black font-semibold mb-4 text-base text-center">
                         Login and Take Control of Your Workflow.
                     </p>
-                    {/* Debug info for troubleshooting */}
-                    {import.meta.env.DEV && (
-                        <div className="text-xs text-gray-500 mb-2">
-                            API: {import.meta.env.VITE_API_BASE_URL}
-                        </div>
+                    {/* Debug info for troubleshooting (opt-in via VITE_SHOW_DEBUG=true) */}
+                    {import.meta.env.VITE_SHOW_DEBUG === "true" && (
+                        <div className="text-xs text-gray-500 mb-2">API: {import.meta.env.VITE_API_BASE_URL}</div>
                     )}
                     <form className="space-y-4 w-full" onSubmit={handleSubmit} aria-label="Login form">
                         <div className="relative w-full">
