@@ -1181,7 +1181,9 @@ function TaskFullView({
                                             onClick={() => {
                                                 setMenuOpen(false);
                                                 // Open unified Task modal in edit mode
-                                                window.dispatchEvent(new CustomEvent("ka-open-task-editor", { detail: { task } }));
+                                                window.dispatchEvent(
+                                                    new CustomEvent("ka-open-task-editor", { detail: { task } }),
+                                                );
                                             }}
                                         >
                                             Edit details
@@ -1978,7 +1980,10 @@ export default function KeyAreas() {
                 recurrence: task.recurrence || "",
                 attachments: task.attachments || "",
                 attachmentsFiles: task.attachments
-                    ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
+                    ? task.attachments
+                          .split(",")
+                          .filter(Boolean)
+                          .map((n) => ({ name: n }))
                     : [],
                 assignee: task.assignee || "",
                 key_area_id: task.key_area_id || selectedKA?.id || "",
@@ -2951,7 +2956,7 @@ export default function KeyAreas() {
         const duration = (f.get("duration") || "").toString();
 
         const payload = {
-            key_area_id: editingTaskId ? (taskForm.key_area_id || selectedKA?.id) : selectedKA.id,
+            key_area_id: editingTaskId ? taskForm.key_area_id || selectedKA?.id : selectedKA.id,
             title,
             description,
             assignee,
@@ -3007,7 +3012,10 @@ export default function KeyAreas() {
                 if (activityAttachTaskId) {
                     try {
                         const list = await activityService.list({ taskId: activityAttachTaskId });
-                        setActivitiesByTask((prev) => ({ ...prev, [String(activityAttachTaskId)]: Array.isArray(list) ? list : [] }));
+                        setActivitiesByTask((prev) => ({
+                            ...prev,
+                            [String(activityAttachTaskId)]: Array.isArray(list) ? list : [],
+                        }));
                     } catch {}
                 }
                 // Also broadcast a refresh event for any open views
@@ -3419,7 +3427,9 @@ export default function KeyAreas() {
                                                                                     onClick={() => {
                                                                                         setActivityForm((s) => ({
                                                                                             ...s,
-                                                                                            key_area_id: selectedKA?.id || s.key_area_id,
+                                                                                            key_area_id:
+                                                                                                selectedKA?.id ||
+                                                                                                s.key_area_id,
                                                                                         }));
                                                                                         setActivityAttachTaskId(null);
                                                                                         setShowActivityComposer(true);
@@ -4095,13 +4105,30 @@ export default function KeyAreas() {
                                                                                                     );
                                                                                                 };
 
-                                                                                                const toggleDetails = (id) => {
-                                                                                                    setOpenActivityDetails((prev) => {
-                                                                                                        const next = new Set(prev);
-                                                                                                        if (next.has(id)) next.delete(id);
-                                                                                                        else next.add(id);
-                                                                                                        return next;
-                                                                                                    });
+                                                                                                const toggleDetails = (
+                                                                                                    id,
+                                                                                                ) => {
+                                                                                                    setOpenActivityDetails(
+                                                                                                        (prev) => {
+                                                                                                            const next =
+                                                                                                                new Set(
+                                                                                                                    prev,
+                                                                                                                );
+                                                                                                            if (
+                                                                                                                next.has(
+                                                                                                                    id,
+                                                                                                                )
+                                                                                                            )
+                                                                                                                next.delete(
+                                                                                                                    id,
+                                                                                                                );
+                                                                                                            else
+                                                                                                                next.add(
+                                                                                                                    id,
+                                                                                                                );
+                                                                                                            return next;
+                                                                                                        },
+                                                                                                    );
                                                                                                 };
 
                                                                                                 const addNew = async (
@@ -4261,6 +4288,30 @@ export default function KeyAreas() {
                                                                                                                                         }
                                                                                                                                     >
                                                                                                                                         <FaTrash />
+                                                                                                                                    </button>
+                                                                                                                                    {/* Edit activity (opens the global editor modal) */}
+                                                                                                                                    <button
+                                                                                                                                        type="button"
+                                                                                                                                        className="text-slate-700"
+                                                                                                                                        title="Edit activity"
+                                                                                                                                        onClick={() => {
+                                                                                                                                            try {
+                                                                                                                                                window.dispatchEvent(
+                                                                                                                                                    new CustomEvent(
+                                                                                                                                                        "ka-open-activity-editor",
+                                                                                                                                                        {
+                                                                                                                                                            detail: {
+                                                                                                                                                                activity:
+                                                                                                                                                                    a,
+                                                                                                                                                                taskId: t.id,
+                                                                                                                                                            },
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                );
+                                                                                                                                            } catch {}
+                                                                                                                                        }}
+                                                                                                                                    >
+                                                                                                                                        <FaEdit />
                                                                                                                                     </button>
                                                                                                                                     <button
                                                                                                                                         type="button"
@@ -5052,7 +5103,9 @@ export default function KeyAreas() {
                                             <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
                                                 {editingActivityId ? "Edit Activity" : "Add Activity"}
                                                 {activityAttachTaskId && (
-                                                    <span className="ml-2 text-xs font-normal text-slate-500">(attaching to task #{activityAttachTaskId})</span>
+                                                    <span className="ml-2 text-xs font-normal text-slate-500">
+                                                        (attaching to task #{activityAttachTaskId})
+                                                    </span>
                                                 )}
                                             </div>
                                             <form onSubmit={onCreateActivity} className="p-4 md:p-6">
@@ -5119,8 +5172,8 @@ export default function KeyAreas() {
                                                                     aria-label="Open date picker"
                                                                     onClick={(e) => {
                                                                         try {
-                                                                            const el = e.currentTarget
-                                                                                .previousElementSibling;
+                                                                            const el =
+                                                                                e.currentTarget.previousElementSibling;
                                                                             el?.focus();
                                                                             el?.showPicker?.();
                                                                         } catch {}
@@ -5128,8 +5181,9 @@ export default function KeyAreas() {
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === "Enter" || e.key === " ") {
                                                                             try {
-                                                                                const el = e.currentTarget
-                                                                                    .previousElementSibling;
+                                                                                const el =
+                                                                                    e.currentTarget
+                                                                                        .previousElementSibling;
                                                                                 el?.focus();
                                                                                 el?.showPicker?.();
                                                                             } catch {}
@@ -5166,8 +5220,8 @@ export default function KeyAreas() {
                                                                     aria-label="Open date picker"
                                                                     onClick={(e) => {
                                                                         try {
-                                                                            const el = e.currentTarget
-                                                                                .previousElementSibling;
+                                                                            const el =
+                                                                                e.currentTarget.previousElementSibling;
                                                                             el?.focus();
                                                                             el?.showPicker?.();
                                                                         } catch {}
@@ -5175,8 +5229,9 @@ export default function KeyAreas() {
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === "Enter" || e.key === " ") {
                                                                             try {
-                                                                                const el = e.currentTarget
-                                                                                    .previousElementSibling;
+                                                                                const el =
+                                                                                    e.currentTarget
+                                                                                        .previousElementSibling;
                                                                                 el?.focus();
                                                                                 el?.showPicker?.();
                                                                             } catch {}
@@ -5212,8 +5267,8 @@ export default function KeyAreas() {
                                                                     aria-label="Open date picker"
                                                                     onClick={(e) => {
                                                                         try {
-                                                                            const el = e.currentTarget
-                                                                                .previousElementSibling;
+                                                                            const el =
+                                                                                e.currentTarget.previousElementSibling;
                                                                             el?.focus();
                                                                             el?.showPicker?.();
                                                                         } catch {}
@@ -5221,8 +5276,9 @@ export default function KeyAreas() {
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === "Enter" || e.key === " ") {
                                                                             try {
-                                                                                const el = e.currentTarget
-                                                                                    .previousElementSibling;
+                                                                                const el =
+                                                                                    e.currentTarget
+                                                                                        .previousElementSibling;
                                                                                 el?.focus();
                                                                                 el?.showPicker?.();
                                                                             } catch {}
@@ -5233,7 +5289,9 @@ export default function KeyAreas() {
                                                                     📅
                                                                 </span>
                                                             </div>
-                                                            <p className="mt-1 text-[11px] text-slate-500">No later than</p>
+                                                            <p className="mt-1 text-[11px] text-slate-500">
+                                                                No later than
+                                                            </p>
                                                         </div>
                                                         {/* Date (finish) */}
                                                         <div className="flex flex-col">
@@ -5259,8 +5317,8 @@ export default function KeyAreas() {
                                                                     aria-label="Open date picker"
                                                                     onClick={(e) => {
                                                                         try {
-                                                                            const el = e.currentTarget
-                                                                                .previousElementSibling;
+                                                                            const el =
+                                                                                e.currentTarget.previousElementSibling;
                                                                             el?.focus();
                                                                             el?.showPicker?.();
                                                                         } catch {}
@@ -5268,8 +5326,9 @@ export default function KeyAreas() {
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === "Enter" || e.key === " ") {
                                                                             try {
-                                                                                const el = e.currentTarget
-                                                                                    .previousElementSibling;
+                                                                                const el =
+                                                                                    e.currentTarget
+                                                                                        .previousElementSibling;
                                                                                 el?.focus();
                                                                                 el?.showPicker?.();
                                                                             } catch {}
@@ -5316,7 +5375,10 @@ export default function KeyAreas() {
                                                                 name="list"
                                                                 value={activityForm.list || ""}
                                                                 onChange={(e) =>
-                                                                    setActivityForm((s) => ({ ...s, list: e.target.value }))
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        list: e.target.value,
+                                                                    }))
                                                                 }
                                                                 className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                 placeholder="List name"
@@ -5339,10 +5401,16 @@ export default function KeyAreas() {
                                                                 className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                             >
                                                                 {selectedKA && !activityForm.key_area_id && (
-                                                                    <option value={selectedKA.id}>{selectedKA.name}</option>
+                                                                    <option value={selectedKA.id}>
+                                                                        {selectedKA.name}
+                                                                    </option>
                                                                 )}
                                                                 {keyAreas
-                                                                    .filter((ka) => !selectedKA || String(ka.id) !== String(selectedKA.id))
+                                                                    .filter(
+                                                                        (ka) =>
+                                                                            !selectedKA ||
+                                                                            String(ka.id) !== String(selectedKA.id),
+                                                                    )
                                                                     .map((ka) => (
                                                                         <option key={ka.id} value={ka.id}>
                                                                             {ka.title || ka.name}
@@ -5404,7 +5472,10 @@ export default function KeyAreas() {
                                                                 name="goal"
                                                                 value={activityForm.goal || ""}
                                                                 onChange={(e) =>
-                                                                    setActivityForm((s) => ({ ...s, goal: e.target.value }))
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        goal: e.target.value,
+                                                                    }))
                                                                 }
                                                                 className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                                 placeholder="Goal"
