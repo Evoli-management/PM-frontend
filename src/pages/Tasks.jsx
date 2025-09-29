@@ -207,16 +207,27 @@ export default function Tasks() {
         const name = (payload?.name ?? dfName).trim();
         if (!name) return;
         try {
+            // Map UI values to backend enums where applicable
+            const statusMap = {
+                open: "todo",
+                "in progress": "in_progress",
+                done: "completed",
+                cancelled: "cancelled",
+            };
+            const mappedStatus = payload?.status ? statusMap[payload.status] : undefined;
+            const mappedPriority = payload?.priority === "normal" ? "medium" : payload?.priority;
+
             const body = {
                 title: name,
                 description: payload?.notes || "",
                 assignee: payload?.assignee || "",
-                startDate: payload?.start_date ? new Date(payload.start_date).toISOString() : null,
-                endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : null,
-                dueDate: payload?.dueDate ? new Date(payload.dueDate).toISOString() : null,
-                duration: payload?.duration || null,
-                status: payload?.status || "open",
-                priority: payload?.priority || "normal",
+                startDate: payload?.start_date ? new Date(payload.start_date).toISOString() : undefined,
+                endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : undefined,
+                dueDate: payload?.dueDate ? new Date(payload.dueDate).toISOString() : undefined,
+                duration: payload?.duration ? String(payload.duration) : undefined,
+                // Only include status/priority if provided, else let backend defaults apply
+                ...(mappedStatus ? { status: mappedStatus } : {}),
+                ...(mappedPriority ? { priority: mappedPriority } : {}),
             };
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
             const created = await taskService.create(body);
@@ -1033,37 +1044,17 @@ export default function Tasks() {
 
                                             <tr className="bg-gray-50">
                                                 <td className="px-4 py-3" />
-                                                <td className="px-2 py-3">
-                                                    <div className="inline-flex items-stretch w-full">
-                                                        <label
-                                                            htmlFor="df-quick-add"
-                                                            className="px-3 py-2 bg-blue-600 border border-blue-600 rounded-l-lg text-white select-none"
-                                                            title="New quick add"
+                                                <td className="pl-2 pr-6 py-3" colSpan={3}>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowComposer(true)}
+                                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                            title="Open Add Task dialog"
                                                         >
-                                                            New
-                                                        </label>
-                                                        <input
-                                                            id="df-quick-add"
-                                                            type="text"
-                                                            value={dfName}
-                                                            onChange={(e) => setDfName(e.target.value)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter")
-                                                                    addDontForgetTask({ name: dfName });
-                                                            }}
-                                                            placeholder="Quick add... press Enter"
-                                                            className="flex-1 min-w-0 px-3 py-2 border border-l-0 border-slate-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        />
+                                                            Add Task
+                                                        </button>
                                                     </div>
-                                                </td>
-                                                <td className="pl-2 pr-6 py-3" colSpan={2}>
-                                                    <button
-                                                        onClick={() => addDontForgetTask({ name: dfName })}
-                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                                                        disabled={!dfName.trim()}
-                                                    >
-                                                        Add task
-                                                    </button>
                                                 </td>
                                             </tr>
 

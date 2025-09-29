@@ -152,6 +152,7 @@ const kaImageFor = (title = "") => {
 
 // Backend service for Key Areas (no localStorage fallback)
 import keyAreaService from "../services/keyAreaService";
+import usersService from "../services/usersService";
 import taskService from "../services/taskService";
 import activityService from "../services/activityService";
 // ...existing code...
@@ -562,6 +563,23 @@ function TaskSlideOver({
         })();
     }, [activitiesTarget, task]);
 
+    // When activities are updated elsewhere (e.g., via global composer), refresh this task's list
+    useEffect(() => {
+        if (!task?.id) return;
+        const handler = async (e) => {
+            const tid = e?.detail?.taskId;
+            if (tid && String(tid) !== String(task.id)) return; // ignore events for other tasks
+            try {
+                const list = await activityService.list({ taskId: task.id });
+                setTaskActivities(Array.isArray(list) ? list : []);
+            } catch (err) {
+                // ignore
+            }
+        };
+        window.addEventListener("ka-activities-updated", handler);
+        return () => window.removeEventListener("ka-activities-updated", handler);
+    }, [task?.id]);
+
     const addActivity = async () => {
         const text = (newActivity || "").trim();
         if (!text) return;
@@ -875,85 +893,50 @@ function TaskSlideOver({
                                 <div className="text-xs text-slate-500">Attach to a task or keep as new</div>
                             </div>
 
-                            <div className="mt-3 space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <select
-                                        value={activitiesTarget}
-                                        onChange={(e) => setActivitiesTarget(e.target.value)}
-                                        className="p-2 border rounded bg-white text-sm"
-                                        aria-label="Select task for activity"
-                                    >
-                                        <option value={String(task.id)}>This task</option>
-                                        <option value="new">New (unattached)</option>
-                                    </select>
-
-                                    <div className="flex-1 flex items-stretch">
-                                        <label
-                                            htmlFor="slideover-add-activity"
-                                            className="inline-flex items-center justify-center w-20 px-2 text-xs font-semibold bg-blue-600 text-white border border-blue-600 rounded-l"
-                                        >
-                                            New
-                                        </label>
-                                        <input
-                                            id="slideover-add-activity"
-                                            value={newActivity}
-                                            onChange={(e) => setNewActivity(e.target.value)}
-                                            placeholder="Activity name..."
-                                            className="flex-1 p-2 border border-l-0 rounded-r text-sm"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={addActivity}
-                                        className="px-3 py-2 bg-blue-600 text-white rounded text-sm"
-                                    >
-                                        Add
-                                    </button>
-
-                                    {taskActivities && taskActivities.length > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={clearActivities}
-                                            className="px-2 py-2 bg-slate-100 rounded text-sm text-slate-700"
-                                        >
-                                            Clear
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div>
-                                    {taskActivities && taskActivities.length > 0 ? (
-                                        <div className="mt-2 space-y-2">
-                                            {taskActivities.map((a) => (
-                                                <div
-                                                    key={a.id}
-                                                    className="flex items-start justify-between p-2 border rounded bg-white"
-                                                >
-                                                    <div className="flex-1">
-                                                        <div className="text-sm text-slate-800">{a.text}</div>
-                                                        <div className="text-xs text-slate-500 mt-1">
-                                                            {/* createdAt removed */}
-                                                        </div>
-                                                    </div>
-                                                    <div className="ml-3 flex items-start">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeActivity(a.id)}
-                                                            className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
-                                                        >
-                                                            Delete
-                                                        </button>
+                            <div className="mt-3">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        window.dispatchEvent(
+                                            new CustomEvent("ka-open-activity-composer", {
+                                                detail: { taskId: task?.id },
+                                            }),
+                                        )
+                                    }
+                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                                >
+                                    Add Activity
+                                </button>
+                            </div>
+                            <div>
+                                {taskActivities && taskActivities.length > 0 ? (
+                                    <div className="mt-2 space-y-2">
+                                        {taskActivities.map((a) => (
+                                            <div
+                                                key={a.id}
+                                                className="flex items-start justify-between p-2 border rounded bg-white"
+                                            >
+                                                <div className="flex-1">
+                                                    <div className="text-sm text-slate-800">{a.text}</div>
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        {/* createdAt removed */}
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
-                                    )}
-                                </div>
+                                                <div className="ml-3 flex items-start">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeActivity(a.id)}
+                                                        className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
+                                )}
                             </div>
 
                             <div className="mt-4 flex items-center gap-2">
@@ -1003,6 +986,8 @@ function TaskFullView({
     useEffect(() => {
         setTab(initialTab || "activities");
     }, [initialTab]);
+
+    // Removed: global activity composer listener belongs to KeyAreas component
 
     useEffect(() => {
         setForm(task || null);
@@ -1195,8 +1180,8 @@ function TaskFullView({
                                             className="block w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
                                             onClick={() => {
                                                 setMenuOpen(false);
-                                                setTab("details");
-                                                setIsEditing(true);
+                                                // Open unified Task modal in edit mode
+                                                window.dispatchEvent(new CustomEvent("ka-open-task-editor", { detail: { task } }));
                                             }}
                                         >
                                             Edit details
@@ -1466,6 +1451,22 @@ function TaskFullView({
                                             >
                                                 <FaTrash className="w-4 h-4" />
                                             </button>
+                                            {/* Edit activity */}
+                                            <button
+                                                type="button"
+                                                className="p-1 rounded hover:bg-slate-100 text-slate-700"
+                                                title="Edit activity"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    window.dispatchEvent(
+                                                        new CustomEvent("ka-open-activity-editor", {
+                                                            detail: { activity: a, taskId: task.id },
+                                                        }),
+                                                    );
+                                                }}
+                                            >
+                                                <FaEdit className="w-4 h-4" />
+                                            </button>
                                             {/* Create as task (disabled if already created) */}
                                             <button
                                                 type="button"
@@ -1648,46 +1649,16 @@ function TaskFullView({
                         </ul>
                     )}
                     <div className="mt-3 flex items-center gap-2">
-                        <div className="flex-1 flex items-stretch">
-                            <label
-                                htmlFor="taskfull-add-activity"
-                                className="inline-flex items-center justify-center w-20 px-2 text-xs font-semibold bg-blue-600 text-white border border-blue-600 rounded-l-lg"
-                            >
-                                New
-                            </label>
-                            <input
-                                id="taskfull-add-activity"
-                                className="flex-1 px-3 py-2 border border-l-0 rounded-r-lg bg-white"
-                                placeholder="Add activity"
-                                value={newActivity}
-                                onChange={(e) => setNewActivity(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        const t = (newActivity || "").trim();
-                                        if (!t) return;
-                                        addActivity(t);
-                                        setNewActivity("");
-                                    }
-                                }}
-                            />
-                        </div>
                         <button
+                            type="button"
                             className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                            onClick={() => {
-                                const t = (newActivity || "").trim();
-                                if (!t) return;
-                                addActivity(t);
-                                setNewActivity("");
-                            }}
+                            onClick={() =>
+                                window.dispatchEvent(
+                                    new CustomEvent("ka-open-activity-composer", { detail: { taskId: task?.id } }),
+                                )
+                            }
                         >
-                            Add
-                        </button>
-                        <button
-                            className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                            onClick={clearActivities}
-                        >
-                            Clear all
+                            Add Activity
                         </button>
                     </div>
                 </div>
@@ -1949,6 +1920,10 @@ export default function KeyAreas() {
     const [goals, setGoals] = useState([]);
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [showTaskComposer, setShowTaskComposer] = useState(false);
+    const [editingTaskId, setEditingTaskId] = useState(null);
+    const [showActivityComposer, setShowActivityComposer] = useState(false);
+    const [editingActivityId, setEditingActivityId] = useState(null);
+    const [showTaskHelp, setShowTaskHelp] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
@@ -1961,6 +1936,108 @@ export default function KeyAreas() {
     // Mass edit UI toggle and anchor
     const [showMassEdit, setShowMassEdit] = useState(false);
     const tasksDisplayRef = useRef(null);
+    const [users, setUsers] = useState([]);
+    const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
+
+    // Open global activity composer on request (from various UI spots)
+    useEffect(() => {
+        const handler = (e) => {
+            const tid = e?.detail?.taskId ?? null;
+            setActivityAttachTaskId(tid ? String(tid) : null);
+            setShowActivityComposer(true);
+        };
+        window.addEventListener("ka-open-activity-composer", handler);
+        return () => window.removeEventListener("ka-open-activity-composer", handler);
+    }, []);
+
+    // Open task editor (reuse Add Task modal) populated for editing
+    useEffect(() => {
+        const handler = (e) => {
+            const task = e?.detail?.task;
+            if (!task) return;
+            // Prefill form from task
+            const mapPriority = (p) => {
+                const v = String(p || "normal").toLowerCase();
+                if (v === "med" || v === "medium" || v === "normal") return "normal";
+                if (v === "low") return "low";
+                if (v === "high") return "high";
+                return "normal";
+            };
+            setTaskForm({
+                title: task.title || "",
+                description: task.description || "",
+                list_index: task.list_index || 1,
+                category: task.category || "Key Areas",
+                goal_id: task.goal_id || "",
+                start_date: toDateOnly(task.start_date) || "",
+                deadline: toDateOnly(task.deadline) || "",
+                end_date: toDateOnly(task.end_date) || "",
+                status: task.status || "open",
+                priority: mapPriority(task.priority),
+                tags: task.tags || "",
+                recurrence: task.recurrence || "",
+                attachments: task.attachments || "",
+                attachmentsFiles: task.attachments
+                    ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
+                    : [],
+                assignee: task.assignee || "",
+                key_area_id: task.key_area_id || selectedKA?.id || "",
+                list: "",
+                finish_date: "",
+                duration: task.duration || "",
+                _endAuto: false, // avoid auto-mirroring on edit
+            });
+            setEditingTaskId(task.id);
+            setShowTaskComposer(true);
+        };
+        window.addEventListener("ka-open-task-editor", handler);
+        return () => window.removeEventListener("ka-open-task-editor", handler);
+    }, [selectedKA]);
+
+    // Open activity editor (reuse Add Activity modal) populated for editing
+    useEffect(() => {
+        const handler = (e) => {
+            const activity = e?.detail?.activity;
+            if (!activity) return;
+            const tid = e?.detail?.taskId ?? null;
+            setActivityAttachTaskId(tid ? String(tid) : null);
+            const mapPriority = (v) => {
+                const n = Number(v);
+                if (!Number.isNaN(n)) return n === 3 ? "high" : n === 1 ? "low" : "normal";
+                return String(v || "normal").toLowerCase();
+            };
+            setActivityForm({
+                title: activity.text || activity.activity_name || "",
+                description: activity.notes || "",
+                list: activity.list || "",
+                key_area_id: selectedKA?.id || "",
+                assignee: activity.responsible || "",
+                priority: mapPriority(activity.priority),
+                goal: activity.goal || "",
+                start_date: toDateOnly(activity.date_start) || "",
+                end_date: toDateOnly(activity.date_end) || "",
+                deadline: toDateOnly(activity.deadline) || "",
+                finish_date: toDateOnly(activity.finish_date) || "",
+                duration: activity.duration || "",
+                _endAuto: false,
+            });
+            setEditingActivityId(activity.id);
+            setShowActivityComposer(true);
+        };
+        window.addEventListener("ka-open-activity-editor", handler);
+        return () => window.removeEventListener("ka-open-activity-editor", handler);
+    }, [selectedKA]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const list = await usersService.list();
+                setUsers(list);
+            } catch {
+                setUsers([]);
+            }
+        })();
+    }, []);
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -1972,12 +2049,30 @@ export default function KeyAreas() {
         deadline: "",
         end_date: "",
         status: "open",
-        priority: "med",
+        priority: "normal",
         tags: "",
         recurrence: "",
         attachments: "",
         attachmentsFiles: [],
         assignee: "",
+        _endAuto: true, // internal flag: keep end date synced to start date until user changes it
+    });
+
+    // Activity composer form (mirrors task fields for UI consistency; most are UI-only)
+    const [activityForm, setActivityForm] = useState({
+        title: "",
+        description: "",
+        list: "",
+        key_area_id: "",
+        assignee: "",
+        priority: "normal",
+        goal: "",
+        start_date: "",
+        end_date: "",
+        deadline: "",
+        finish_date: "",
+        duration: "",
+        _endAuto: true,
     });
 
     // Expanded inline activities (tree mode) per task id
@@ -2145,6 +2240,30 @@ export default function KeyAreas() {
             setTaskForm((s) => ({ ...s, list_index: taskTab }));
         }
     }, [taskTab]);
+
+    // When start_date changes while auto mode is on (or end_date empty), mirror to end_date
+    useEffect(() => {
+        if (!showTaskComposer) return;
+        setTaskForm((s) => {
+            const start = s.start_date || "";
+            if (s._endAuto || !s.end_date) {
+                return { ...s, end_date: start };
+            }
+            return s;
+        });
+    }, [taskForm.start_date, showTaskComposer]);
+
+    // Mirror start -> end for Activity composer
+    useEffect(() => {
+        if (!showActivityComposer) return;
+        setActivityForm((s) => {
+            const start = s.start_date || "";
+            if (s._endAuto || !s.end_date) {
+                return { ...s, end_date: start };
+            }
+            return s;
+        });
+    }, [activityForm.start_date, showActivityComposer]);
 
     // Auto-hide mass edit when selection is cleared
     useEffect(() => {
@@ -2408,7 +2527,9 @@ export default function KeyAreas() {
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
             } catch (e) {}
         } else {
-            const used = new Set(keyAreas.map((k) => k.position));
+            // Only consider non-default, non-Ideas key areas for positions 1..9
+            const isRegular = (k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default;
+            const used = new Set(keyAreas.filter(isRegular).map((k) => k.position));
             let pos = 1;
             while (used.has(pos) && pos <= 9) pos++;
             try {
@@ -2418,17 +2539,24 @@ export default function KeyAreas() {
                     position: pos,
                     is_default: false,
                 });
-                setKeyAreas((prev) =>
-                    [...prev.filter((k) => k.position !== pos), { ...created, position: pos }].sort(
-                        (a, b) => a.position - b.position,
-                    ),
-                );
+                setKeyAreas((prev) => {
+                    const regular = prev.filter(isRegular);
+                    const others = prev.filter((k) => !isRegular(k));
+                    const nextRegular = [
+                        ...regular.filter((k) => k.position !== pos),
+                        { ...created, position: pos },
+                    ].sort((a, b) => (a.position || 0) - (b.position || 0));
+                    return [...others, ...nextRegular].sort((a, b) => (a.position || 0) - (b.position || 0));
+                });
                 // emit updated list after create
                 try {
-                    const after = [
-                        ...(keyAreas || []).filter((k) => k.position !== pos),
+                    const regular = (keyAreas || []).filter(isRegular);
+                    const others = (keyAreas || []).filter((k) => !isRegular(k));
+                    const nextRegular = [
+                        ...regular.filter((k) => k.position !== pos),
                         { ...created, position: pos },
-                    ].sort((a, b) => a.position - b.position);
+                    ].sort((a, b) => (a.position || 0) - (b.position || 0));
+                    const after = [...others, ...nextRegular];
                     const sidebarList = sortForSidebar(after);
                     window.dispatchEvent(
                         new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }),
@@ -2804,73 +2932,127 @@ export default function KeyAreas() {
 
     const onCreateTask = async (e) => {
         e.preventDefault();
-        if (!selectedKA) return;
-        // allow manual task creation in Ideas; still block if other system-locked areas exist in future
+        if (!selectedKA && !editingTaskId) return;
         const f = new FormData(e.currentTarget);
-        const title = f.get("title").toString().trim();
+        const title = (f.get("title") || "").toString().trim();
         if (!title) return;
 
-        const category = f.get("category").toString();
-        const status = f.get("status").toString();
-        const priority = (() => {
-            const p = String(f.get("priority").toString()).toLowerCase();
-            if (p === "med") return "medium";
-            if (p === "low" || p === "high") return p;
-            return "medium";
-        })();
-        const tags = f.get("tags").toString();
-        const recurrence = f.get("recurrence").toString();
-        // gather attachments from device uploads and composer state (including storage picks)
-        const deviceFiles = f.getAll("attachments_files") || [];
-        const deviceNames = deviceFiles.map((file) => file.name);
-        const stateNames =
-            taskForm && taskForm.attachmentsFiles ? taskForm.attachmentsFiles.map((ff) => ff.name || ff) : [];
-        const allNames = Array.from(new Set([...(stateNames || []), ...deviceNames]));
-        const attachments = allNames.join(",");
-        const assignee = f.get("assignee").toString();
+        // Only the requested fields
+        const description = (f.get("description") || "").toString();
+        const list = (f.get("list") || "").toString(); // UI-only
+        const assignee = (f.get("assignee") || "").toString();
+        const priorityRaw = (f.get("priority") || "normal").toString().toLowerCase();
+        const priority = priorityRaw === "normal" ? "medium" : priorityRaw; // map to API enum
+        const goal = (f.get("goal") || "").toString(); // UI-only
         const start_date = f.get("start_date") ? toDateOnly(f.get("start_date")) : null;
-        const deadline = f.get("deadline") ? toDateOnly(f.get("deadline")) : null;
         const end_date = f.get("end_date") ? toDateOnly(f.get("end_date")) : null;
+        const deadline = f.get("deadline") ? toDateOnly(f.get("deadline")) : null;
+        const finish_date = f.get("finish_date") ? toDateOnly(f.get("finish_date")) : null; // UI-only
+        const duration = (f.get("duration") || "").toString();
 
         const payload = {
-            key_area_id: selectedKA.id,
+            key_area_id: editingTaskId ? (taskForm.key_area_id || selectedKA?.id) : selectedKA.id,
             title,
-            description: f.get("description").toString(),
-            status,
-            priority,
-            category,
-            goal_id: f.get("goal_id").toString() || null,
-            list_index: Number(f.get("list_index")) || 1,
-            start_date,
-            deadline,
-            end_date,
-            tags,
-            recurrence,
-            attachments,
+            description,
             assignee,
+            start_date,
+            end_date,
+            deadline,
+            duration,
+            priority,
+            // UI-only fields kept for potential future use; not persisted by backend
+            list,
+            goal,
+            finish_date,
         };
-
-        payload.eisenhower_quadrant = computeEisenhowerQuadrant({ deadline, end_date, priority });
-
-        const created = await api.createTask(payload);
-        setAllTasks((prev) => [...prev, created]);
-
-        setTaskForm((s) => ({
-            ...s,
-            title: "",
-            description: "",
-            goal_id: "",
-            start_date: "",
-            deadline: "",
-            end_date: "",
-            tags: "",
-            recurrence: "",
-            attachments: "",
-            attachmentsFiles: [],
-            assignee: "",
-        }));
+        if (editingTaskId) {
+            // Update existing task
+            const updated = await api.updateTask(editingTaskId, { id: editingTaskId, ...payload });
+            setAllTasks((prev) => prev.map((t) => (String(t.id) === String(editingTaskId) ? { ...t, ...updated } : t)));
+        } else {
+            const created = await api.createTask(payload);
+            setAllTasks((prev) => [...prev, created]);
+        }
+        setEditingTaskId(null);
         setShowTaskComposer(false);
     };
+
+    // Create Activity using the same UI fields; persist only supported backend fields
+    const onCreateActivity = async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const title = (f.get("title") || "").toString().trim();
+        if (!title) return;
+
+        try {
+            if (editingActivityId) {
+                await activityService.update(editingActivityId, { text: title });
+                const tid = activityAttachTaskId;
+                if (tid) {
+                    try {
+                        const list = await activityService.list({ taskId: tid });
+                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list : [] }));
+                    } catch {}
+                }
+                window.dispatchEvent(
+                    new CustomEvent("ka-activities-updated", {
+                        detail: { refresh: true, taskId: activityAttachTaskId || undefined },
+                    }),
+                );
+            } else {
+                const payload = { text: title };
+                if (activityAttachTaskId) payload.taskId = activityAttachTaskId;
+                const created = await activityService.create(payload);
+                // Update local state immediately for the specific task (if attached)
+                if (activityAttachTaskId) {
+                    try {
+                        const list = await activityService.list({ taskId: activityAttachTaskId });
+                        setActivitiesByTask((prev) => ({ ...prev, [String(activityAttachTaskId)]: Array.isArray(list) ? list : [] }));
+                    } catch {}
+                }
+                // Also broadcast a refresh event for any open views
+                window.dispatchEvent(
+                    new CustomEvent("ka-activities-updated", {
+                        detail: { refresh: true, taskId: activityAttachTaskId || undefined },
+                    }),
+                );
+            }
+            setShowActivityComposer(false);
+            setActivityForm({
+                title: "",
+                description: "",
+                list: "",
+                key_area_id: "",
+                assignee: "",
+                priority: "normal",
+                goal: "",
+                start_date: "",
+                end_date: "",
+                deadline: "",
+                finish_date: "",
+                duration: "",
+                _endAuto: true,
+            });
+            setActivityAttachTaskId(null);
+            setEditingActivityId(null);
+        } catch (err) {
+            console.error("Failed to create activity", err);
+            alert("Could not create activity.");
+        }
+    };
+
+    // Close activity composer with Escape
+    useEffect(() => {
+        if (!showActivityComposer) return;
+        const onKey = (e) => {
+            if (e.key === "Escape") {
+                setShowActivityComposer(false);
+                setActivityAttachTaskId(null);
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [showActivityComposer]);
 
     const handleSaveTask = async (updated) => {
         const q = computeEisenhowerQuadrant({
@@ -3231,6 +3413,21 @@ export default function KeyAreas() {
                                                                                     className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                                                                 >
                                                                                     Add Task
+                                                                                </button>
+                                                                                <button
+                                                                                    role="menuitem"
+                                                                                    onClick={() => {
+                                                                                        setActivityForm((s) => ({
+                                                                                            ...s,
+                                                                                            key_area_id: selectedKA?.id || s.key_area_id,
+                                                                                        }));
+                                                                                        setActivityAttachTaskId(null);
+                                                                                        setShowActivityComposer(true);
+                                                                                        setOpenListMenu(null);
+                                                                                    }}
+                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                >
+                                                                                    Add Activity
                                                                                 </button>
                                                                                 <button
                                                                                     role="menuitem"
@@ -3898,30 +4095,13 @@ export default function KeyAreas() {
                                                                                                     );
                                                                                                 };
 
-                                                                                                const toggleDetails = (
-                                                                                                    id,
-                                                                                                ) => {
-                                                                                                    setOpenActivityDetails(
-                                                                                                        (prev) => {
-                                                                                                            const next =
-                                                                                                                new Set(
-                                                                                                                    prev,
-                                                                                                                );
-                                                                                                            if (
-                                                                                                                next.has(
-                                                                                                                    id,
-                                                                                                                )
-                                                                                                            )
-                                                                                                                next.delete(
-                                                                                                                    id,
-                                                                                                                );
-                                                                                                            else
-                                                                                                                next.add(
-                                                                                                                    id,
-                                                                                                                );
-                                                                                                            return next;
-                                                                                                        },
-                                                                                                    );
+                                                                                                const toggleDetails = (id) => {
+                                                                                                    setOpenActivityDetails((prev) => {
+                                                                                                        const next = new Set(prev);
+                                                                                                        if (next.has(id)) next.delete(id);
+                                                                                                        else next.add(id);
+                                                                                                        return next;
+                                                                                                    });
                                                                                                 };
 
                                                                                                 const addNew = async (
@@ -4311,6 +4491,9 @@ export default function KeyAreas() {
                                                 >
                                                     <FaListUl /> Open Lists
                                                 </button>
+                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs border border-slate-200">
+                                                    Position: 10
+                                                </span>
                                                 <p className="text-sm text-slate-700 ml-2">
                                                     This Key Area is read-only (cannot edit or delete).
                                                 </p>
@@ -4318,108 +4501,115 @@ export default function KeyAreas() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {filteredKAs.map((ka) => (
-                                            <div
-                                                key={ka.id}
-                                                className="bg-white rounded-2xl shadow border border-slate-200 p-4 flex flex-col"
-                                                draggable={!ka.is_default}
-                                                onDragStart={(e) => {
-                                                    if (ka.is_default) return;
-                                                    setDragKAId(String(ka.id));
-                                                    e.dataTransfer.effectAllowed = "move";
-                                                }}
-                                                onDragOver={(e) => {
-                                                    if (ka.is_default) return;
-                                                    e.preventDefault();
-                                                    e.dataTransfer.dropEffect = "move";
-                                                }}
-                                                onDrop={async (e) => {
-                                                    e.preventDefault();
-                                                    if (!dragKAId || String(dragKAId) === String(ka.id)) return;
-                                                    await reorderByDrop(String(dragKAId), String(ka.id));
-                                                    setDragKAId(null);
-                                                }}
-                                                onDragEnd={() => setDragKAId(null)}
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <h3 className="text-lg font-bold text-slate-900">
-                                                                {ka.title}
-                                                            </h3>
-                                                            {ka.is_default && (
-                                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                                                    <FaLock /> Locked
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                                                            {ka.description || "—"}
-                                                        </p>
-                                                        <p className="text-xs text-slate-700 mt-2">
-                                                            Position: {ka.position}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-4 flex items-center gap-2">
-                                                    <button
-                                                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                        onClick={() => openKA(ka)}
-                                                    >
-                                                        <FaListUl /> Open Lists
-                                                    </button>
-                                                    {!ka.is_default && (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                title="Move up"
-                                                                className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                                onClick={() => reorderKA(ka, "up")}
-                                                            >
-                                                                <FaChevronUp />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                title="Move down"
-                                                                className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                                onClick={() => reorderKA(ka, "down")}
-                                                            >
-                                                                <FaChevronDown />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    <button
-                                                        className="rounded-lg bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                        onClick={() => {
-                                                            setEditing(ka);
-                                                            setShowForm(true);
+                                    <div className="bg-white border border-slate-200 rounded-xl">
+                                        <ol className="divide-y divide-slate-200">
+                                            {filteredKAs
+                                                .slice()
+                                                .sort((a, b) => (a.position || 0) - (b.position || 0))
+                                                .map((ka, idx) => (
+                                                    <li
+                                                        key={ka.id}
+                                                        className="flex items-center justify-between px-3 py-2"
+                                                        draggable={!ka.is_default}
+                                                        onDragStart={(e) => {
+                                                            if (ka.is_default) return;
+                                                            setDragKAId(String(ka.id));
+                                                            e.dataTransfer.effectAllowed = "move";
                                                         }}
+                                                        onDragOver={(e) => {
+                                                            if (ka.is_default) return;
+                                                            e.preventDefault();
+                                                            e.dataTransfer.dropEffect = "move";
+                                                        }}
+                                                        onDrop={async (e) => {
+                                                            e.preventDefault();
+                                                            if (!dragKAId || String(dragKAId) === String(ka.id)) return;
+                                                            await reorderByDrop(String(dragKAId), String(ka.id));
+                                                            setDragKAId(null);
+                                                        }}
+                                                        onDragEnd={() => setDragKAId(null)}
                                                     >
-                                                        <FaEdit /> Edit
-                                                    </button>
-                                                    <button
-                                                        disabled={ka.is_default}
-                                                        title={
-                                                            ka.is_default
-                                                                ? undefined
-                                                                : typeof ka.taskCount === "number" && ka.taskCount > 0
-                                                                  ? `${ka.taskCount} task(s) present`
-                                                                  : undefined
-                                                        }
-                                                        className={`rounded-lg font-semibold flex items-center gap-2 px-2 py-1 text-sm border ${
-                                                            ka.is_default
-                                                                ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
-                                                                : "bg-white text-red-600 hover:bg-red-50 border-red-200"
-                                                        }`}
-                                                        onClick={() => onDeleteKA(ka)}
-                                                    >
-                                                        <FaTrash /> Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold shrink-0">
+                                                                {ka.position && ka.position > 0 ? ka.position : idx + 1}
+                                                            </span>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <span className="font-semibold text-slate-900 truncate">
+                                                                        {ka.title}
+                                                                    </span>
+                                                                    {ka.is_default && (
+                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                                            <FaLock /> Locked
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {ka.description ? (
+                                                                    <div className="text-xs text-slate-600 truncate">
+                                                                        {ka.description}
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 px-2 py-1 text-xs"
+                                                                onClick={() => openKA(ka)}
+                                                            >
+                                                                <FaListUl /> Open Lists
+                                                            </button>
+                                                            {!ka.is_default && (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Move up"
+                                                                        className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
+                                                                        onClick={() => reorderKA(ka, "up")}
+                                                                    >
+                                                                        <FaChevronUp />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Move down"
+                                                                        className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
+                                                                        onClick={() => reorderKA(ka, "down")}
+                                                                    >
+                                                                        <FaChevronDown />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
+                                                                onClick={() => {
+                                                                    setEditing(ka);
+                                                                    setShowForm(true);
+                                                                }}
+                                                            >
+                                                                <FaEdit /> Edit
+                                                            </button>
+                                                            <button
+                                                                disabled={ka.is_default}
+                                                                title={
+                                                                    ka.is_default
+                                                                        ? undefined
+                                                                        : typeof ka.taskCount === "number" &&
+                                                                            ka.taskCount > 0
+                                                                          ? `${ka.taskCount} task(s) present`
+                                                                          : undefined
+                                                                }
+                                                                className={`rounded-md font-semibold flex items-center gap-1.5 px-2 py-1 text-xs border ${
+                                                                    ka.is_default
+                                                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
+                                                                        : "bg-white text-red-600 hover:bg-red-50 border-red-200"
+                                                                }`}
+                                                                onClick={() => onDeleteKA(ka)}
+                                                            >
+                                                                <FaTrash /> Delete
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                        </ol>
                                     </div>
                                 )}
 
@@ -4437,69 +4627,62 @@ export default function KeyAreas() {
                                     >
                                         <div
                                             ref={composerModalRef}
-                                            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xl w-[92vw] max-w-3xl max-h-[85vh] overflow-auto"
+                                            className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden"
                                             onClick={(e) => e.stopPropagation()}
                                         >
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h2 className="text-lg font-bold text-slate-900">New Task</h2>
-                                                <button
-                                                    type="button"
-                                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-700"
-                                                    onClick={() => setShowTaskComposer(false)}
-                                                    aria-label="Close"
-                                                >
-                                                    <FaTimes />
-                                                </button>
+                                            {/* Header strip */}
+                                            <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
+                                                {editingTaskId ? "Edit Task" : "Add Task"}
                                             </div>
-                                            <form onSubmit={onCreateTask}>
-                                                <div className="grid md:grid-cols-2 gap-6">
-                                                    {/* Left column: Title + Extra info */}
-                                                    <div className="flex flex-col gap-4">
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900 block">
-                                                                Task Title *
+                                            <form onSubmit={onCreateTask} className="p-4 md:p-6">
+                                                {/* Task name field under header */}
+                                                <div className="mb-4">
+                                                    <label className="sr-only" htmlFor="ka-task-title">
+                                                        Task name
+                                                    </label>
+                                                    <input
+                                                        id="ka-task-title"
+                                                        name="title"
+                                                        required
+                                                        value={taskForm.title}
+                                                        onChange={(e) =>
+                                                            setTaskForm((s) => ({ ...s, title: e.target.value }))
+                                                        }
+                                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Task name"
+                                                    />
+                                                </div>
+                                                {/* Two-column layout */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                                    {/* Left column */}
+                                                    <div className="grid gap-3 content-start">
+                                                        {/* Description */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Description
                                                             </label>
                                                             <input
-                                                                name="title"
-                                                                required
-                                                                value={taskForm.title}
+                                                                name="description"
+                                                                value={taskForm.description}
                                                                 onChange={(e) =>
                                                                     setTaskForm((s) => ({
                                                                         ...s,
-                                                                        title: e.target.value,
+                                                                        description: e.target.value,
                                                                     }))
                                                                 }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                placeholder="e.g., Draft Q3 campaign brief"
+                                                                className="mt-1 h-9 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="Brief description"
                                                             />
                                                         </div>
-
-                                                        <div className="grid gap-4">
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Tags (comma separated)
-                                                                </label>
+                                                        {/* Start date */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Start date
+                                                            </label>
+                                                            <div className="relative mt-1">
                                                                 <input
-                                                                    name="tags"
-                                                                    value={taskForm.tags}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            tags: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    placeholder="e.g., q3,campaign,urgent"
-                                                                />
-                                                            </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Start Date
-                                                                </label>
-                                                                <input
-                                                                    name="start_date"
                                                                     type="date"
+                                                                    name="start_date"
                                                                     value={toDateOnly(taskForm.start_date)}
                                                                     onChange={(e) =>
                                                                         setTaskForm((s) => ({
@@ -4507,17 +4690,86 @@ export default function KeyAreas() {
                                                                             start_date: e.target.value,
                                                                         }))
                                                                     }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                    ref={(el) => (taskForm._startRef = el)}
                                                                 />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={() => {
+                                                                        try {
+                                                                            taskForm._startRef?.focus();
+                                                                            taskForm._startRef?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                taskForm._startRef?.focus();
+                                                                                taskForm._startRef?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
                                                             </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Deadline
-                                                                </label>
+                                                        </div>
+                                                        {/* End date */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                End date
+                                                            </label>
+                                                            <div className="relative mt-1">
                                                                 <input
-                                                                    name="deadline"
                                                                     type="date"
+                                                                    name="end_date"
+                                                                    value={toDateOnly(taskForm.end_date)}
+                                                                    onChange={(e) =>
+                                                                        setTaskForm((s) => ({
+                                                                            ...s,
+                                                                            end_date: e.target.value,
+                                                                            _endAuto: false,
+                                                                        }))
+                                                                    }
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                    ref={(el) => (taskForm._endRef = el)}
+                                                                />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={() => {
+                                                                        try {
+                                                                            taskForm._endRef?.focus();
+                                                                            taskForm._endRef?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                taskForm._endRef?.focus();
+                                                                                taskForm._endRef?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Deadline */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Deadline
+                                                            </label>
+                                                            <div className="relative mt-1">
+                                                                <input
+                                                                    type="date"
+                                                                    name="deadline"
                                                                     value={toDateOnly(taskForm.deadline)}
                                                                     onChange={(e) =>
                                                                         setTaskForm((s) => ({
@@ -4525,207 +4777,162 @@ export default function KeyAreas() {
                                                                             deadline: e.target.value,
                                                                         }))
                                                                     }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                    ref={(el) => (taskForm._dueRef = el)}
                                                                 />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={() => {
+                                                                        try {
+                                                                            taskForm._dueRef?.focus();
+                                                                            taskForm._dueRef?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                taskForm._dueRef?.focus();
+                                                                                taskForm._dueRef?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
                                                             </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    End date
-                                                                </label>
+                                                            <p className="mt-1 text-[11px] text-slate-500">
+                                                                No later than
+                                                            </p>
+                                                        </div>
+                                                        {/* Date (finish) */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Date (finish)
+                                                            </label>
+                                                            <div className="relative mt-1">
                                                                 <input
-                                                                    name="end_date"
                                                                     type="date"
-                                                                    value={toDateOnly(taskForm.end_date)}
+                                                                    name="finish_date"
+                                                                    value={toDateOnly(taskForm.finish_date)}
                                                                     onChange={(e) =>
                                                                         setTaskForm((s) => ({
                                                                             ...s,
-                                                                            end_date: e.target.value,
+                                                                            finish_date: e.target.value,
                                                                         }))
                                                                     }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                    ref={(el) => (taskForm._finishRef = el)}
                                                                 />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={() => {
+                                                                        try {
+                                                                            taskForm._finishRef?.focus();
+                                                                            taskForm._finishRef?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                taskForm._finishRef?.focus();
+                                                                                taskForm._finishRef?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
                                                             </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Recurrence
-                                                                </label>
+                                                        </div>
+                                                        {/* Duration */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Duration
+                                                            </label>
+                                                            <div className="relative mt-1">
                                                                 <input
-                                                                    name="recurrence"
-                                                                    value={taskForm.recurrence}
+                                                                    name="duration"
+                                                                    value={taskForm.duration || ""}
                                                                     onChange={(e) =>
                                                                         setTaskForm((s) => ({
                                                                             ...s,
-                                                                            recurrence: e.target.value,
+                                                                            duration: e.target.value,
                                                                         }))
                                                                     }
-                                                                    className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    placeholder='e.g., {"freq":"weekly","interval":1}'
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    placeholder="e.g., 1h, 1d"
                                                                 />
-                                                            </div>
-
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                <label className="text-sm font-semibold text-slate-900">
-                                                                    Attachments
-                                                                </label>
-                                                                <div className="mt-1">
-                                                                    <input
-                                                                        ref={(el) =>
-                                                                            (window.__composerModalFileInput = el)
-                                                                        }
-                                                                        name="attachments_files"
-                                                                        type="file"
-                                                                        multiple
-                                                                        onChange={(e) => {
-                                                                            const incoming = Array.from(
-                                                                                e.target.files || [],
-                                                                            );
-                                                                            setTaskForm((s) => {
-                                                                                const existing =
-                                                                                    s.attachmentsFiles || [];
-                                                                                const combined = [
-                                                                                    ...existing,
-                                                                                    ...incoming,
-                                                                                ];
-                                                                                const uniq = Array.from(
-                                                                                    new Map(
-                                                                                        combined.map((f) => [
-                                                                                            f.name,
-                                                                                            f,
-                                                                                        ]),
-                                                                                    ).values(),
-                                                                                );
-                                                                                return { ...s, attachmentsFiles: uniq };
-                                                                            });
-                                                                        }}
-                                                                        className="hidden"
-                                                                    />
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            window.__composerModalFileInput &&
-                                                                            window.__composerModalFileInput.click()
-                                                                        }
-                                                                        className="px-3 py-2 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                                                    >
-                                                                        Choose files
-                                                                    </button>
-                                                                </div>
-                                                                {taskForm.attachmentsFiles &&
-                                                                taskForm.attachmentsFiles.length > 0 ? (
-                                                                    <ul className="mt-2 space-y-1 text-sm">
-                                                                        {taskForm.attachmentsFiles.map((f, i) => (
-                                                                            <li
-                                                                                key={i}
-                                                                                className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"
-                                                                            >
-                                                                                <span className="truncate">
-                                                                                    {f.name}
-                                                                                </span>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        setTaskForm((s) => ({
-                                                                                            ...s,
-                                                                                            attachmentsFiles:
-                                                                                                s.attachmentsFiles.filter(
-                                                                                                    (_, idx) =>
-                                                                                                        idx !== i,
-                                                                                                ),
-                                                                                        }))
-                                                                                    }
-                                                                                    className="text-xs rounded-lg text-slate-500 ml-2"
-                                                                                >
-                                                                                    Remove
-                                                                                </button>
-                                                                            </li>
-                                                                        ))}
-                                                                    </ul>
-                                                                ) : null}
-                                                                {/* storage picker removed */}
+                                                                <span className="absolute inset-y-0 right-2 grid place-items-center text-base">
+                                                                    📅
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    {/* Right column: Meta + reordered fields per request */}
-                                                    <div className="flex flex-col gap-4">
-                                                        <div>
-                                                            <div className="grid md:grid-cols-2 gap-4">
-                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                    <label className="text-sm font-semibold text-slate-900">
-                                                                        {`List (Tab) — ${getListName(selectedKA?.id, taskForm.list_index || 1)}`}
-                                                                    </label>
-                                                                    <select
-                                                                        name="list_index"
-                                                                        value={String(taskForm.list_index || 1)}
-                                                                        onChange={(e) =>
-                                                                            setTaskForm((s) => ({
-                                                                                ...s,
-                                                                                list_index: Number(e.target.value || 1),
-                                                                            }))
-                                                                        }
-                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    >
-                                                                        {availableListNumbers.map((n) => (
-                                                                            <option key={n} value={String(n)}>
-                                                                                {getListName(selectedKA?.id, n)}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Category
-                                                            </label>
-                                                            <select
-                                                                name="category"
-                                                                value={taskForm.category}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        category: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                            >
-                                                                <option>Key Areas</option>
-                                                                <option>Don’t Forget</option>
-                                                            </select>
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Linked Goal (optional)
-                                                            </label>
-                                                            <select
-                                                                name="goal_id"
-                                                                value={taskForm.goal_id}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        goal_id: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                            >
-                                                                <option value="">— None (Activity Trap) —</option>
-                                                                {goals.map((g) => (
-                                                                    <option key={g.id} value={g.id}>
-                                                                        {g.title}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900">
-                                                                Assignee
+                                                    {/* Right column */}
+                                                    <div className="grid gap-3 content-start">
+                                                        {/* List */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                List
                                                             </label>
                                                             <input
+                                                                name="list"
+                                                                value={taskForm.list || ""}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({ ...s, list: e.target.value }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="List name"
+                                                            />
+                                                        </div>
+                                                        {/* Key Area */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Key Area
+                                                            </label>
+                                                            <select
+                                                                name="key_area_id"
+                                                                value={taskForm.key_area_id || selectedKA?.id || ""}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        key_area_id: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {/* Current selection first */}
+                                                                {selectedKA && !taskForm.key_area_id && (
+                                                                    <option value={selectedKA.id}>
+                                                                        {selectedKA.name}
+                                                                    </option>
+                                                                )}
+                                                                {/* Other KAs */}
+                                                                {keyAreas
+                                                                    .filter(
+                                                                        (ka) =>
+                                                                            !selectedKA ||
+                                                                            String(ka.id) !== String(selectedKA.id),
+                                                                    )
+                                                                    .map((ka) => (
+                                                                        <option key={ka.id} value={ka.id}>
+                                                                            {ka.title || ka.name}
+                                                                        </option>
+                                                                    ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* Respons. */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Respons.
+                                                            </label>
+                                                            <select
                                                                 name="assignee"
                                                                 value={taskForm.assignee}
                                                                 onChange={(e) =>
@@ -4734,101 +4941,517 @@ export default function KeyAreas() {
                                                                         assignee: e.target.value,
                                                                     }))
                                                                 }
-                                                                className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                placeholder="Name or ID"
-                                                            />
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="">— Unassigned —</option>
+                                                                {users?.map((u) => (
+                                                                    <option key={u.id} value={u.name}>
+                                                                        {u.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
-
-                                                        <div>
-                                                            <div className="grid md:grid-cols-2 gap-4">
-                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                    <label className="text-sm font-semibold text-slate-900">
-                                                                        Status
-                                                                    </label>
-                                                                    <select
-                                                                        name="status"
-                                                                        value={taskForm.status}
-                                                                        onChange={(e) =>
-                                                                            setTaskForm((s) => ({
-                                                                                ...s,
-                                                                                status: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    >
-                                                                        <option value="open">Open</option>
-                                                                        <option value="in_progress">In Progress</option>
-                                                                        <option value="done">Done</option>
-                                                                        <option value="cancelled">Cancelled</option>
-                                                                    </select>
-                                                                </div>
-
-                                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                                    <label className="text-sm font-semibold text-slate-900">
-                                                                        Priority
-                                                                    </label>
-                                                                    <select
-                                                                        name="priority"
-                                                                        value={taskForm.priority}
-                                                                        onChange={(e) =>
-                                                                            setTaskForm((s) => ({
-                                                                                ...s,
-                                                                                priority: e.target.value,
-                                                                            }))
-                                                                        }
-                                                                        className="mt-1 w-full rounded-md border-0 bg-transparent p-2"
-                                                                    >
-                                                                        <option value="low">Low</option>
-                                                                        <option value="med">Medium</option>
-                                                                        <option value="high">High</option>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                                                            <label className="text-sm font-semibold text-slate-900 block">
-                                                                Description
+                                                        {/* Priority */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Priority
                                                             </label>
-                                                            <textarea
-                                                                name="description"
-                                                                rows={3}
-                                                                value={taskForm.description}
+                                                            <select
+                                                                name="priority"
+                                                                value={taskForm.priority}
                                                                 onChange={(e) =>
                                                                     setTaskForm((s) => ({
                                                                         ...s,
-                                                                        description: e.target.value,
+                                                                        priority: e.target.value,
                                                                     }))
                                                                 }
-                                                                className="mt-2 w-full rounded-md border-0 bg-transparent p-2"
-                                                                placeholder="Details…"
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="high">High</option>
+                                                                <option value="normal">Normal</option>
+                                                                <option value="low">Low</option>
+                                                            </select>
+                                                        </div>
+                                                        {/* Goal */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Goal
+                                                            </label>
+                                                            <input
+                                                                name="goal"
+                                                                value={taskForm.goal || ""}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({ ...s, goal: e.target.value }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="Goal"
                                                             />
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                {/* Actions (span both columns) */}
-                                                <div className="mt-4 flex items-center gap-3 justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200">
-                                                            <FaSave /> Add Task
+                                                {/* Footer actions */}
+                                                <div className="mt-6 flex items-center justify-between">
+                                                    {showTaskHelp ? (
+                                                        <div className="text-xs text-slate-600">
+                                                            • OK saves the task • Cancel closes without saving • Dates
+                                                            use your local timezone.
+                                                        </div>
+                                                    ) : (
+                                                        <span />
+                                                    )}
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="submit"
+                                                            className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
+                                                        >
+                                                            <FaSave /> {editingTaskId ? "Save" : "OK"}
                                                         </button>
-                                                        <span className="text-xs text-slate-700 flex items-center gap-1">
-                                                            <FaExclamationCircle /> Tasks must belong to the current Key
-                                                            Area.
-                                                        </span>
-                                                    </div>
-                                                    <div>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setShowTaskComposer(false)}
-                                                            className="rounded-lg text-sm text-slate-600 hover:underline"
+                                                            onClick={() => {
+                                                                setShowTaskComposer(false);
+                                                                setEditingTaskId(null);
+                                                            }}
+                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                                         >
                                                             Cancel
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowTaskHelp((v) => !v)}
+                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                                        >
+                                                            Help
                                                         </button>
                                                     </div>
                                                 </div>
                                             </form>
+                                            {/* Close button (corner X) */}
+                                            <button
+                                                type="button"
+                                                className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                                                onClick={() => setShowTaskComposer(false)}
+                                                aria-label="Close"
+                                            >
+                                                <FaTimes />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {showActivityComposer && (
+                                    <div
+                                        className="fixed inset-0 bg-black/40 z-50 grid place-items-center"
+                                        onClick={() => setShowActivityComposer(false)}
+                                    >
+                                        <div
+                                            className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            {/* Header strip */}
+                                            <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
+                                                {editingActivityId ? "Edit Activity" : "Add Activity"}
+                                                {activityAttachTaskId && (
+                                                    <span className="ml-2 text-xs font-normal text-slate-500">(attaching to task #{activityAttachTaskId})</span>
+                                                )}
+                                            </div>
+                                            <form onSubmit={onCreateActivity} className="p-4 md:p-6">
+                                                {/* Activity name field under header */}
+                                                <div className="mb-4">
+                                                    <label className="sr-only" htmlFor="ka-activity-title">
+                                                        Activity name
+                                                    </label>
+                                                    <input
+                                                        id="ka-activity-title"
+                                                        name="title"
+                                                        required
+                                                        value={activityForm.title}
+                                                        onChange={(e) =>
+                                                            setActivityForm((s) => ({ ...s, title: e.target.value }))
+                                                        }
+                                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Activity name"
+                                                    />
+                                                </div>
+                                                {/* Two-column layout */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                                    {/* Left column */}
+                                                    <div className="grid gap-3 content-start">
+                                                        {/* Description */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Description
+                                                            </label>
+                                                            <input
+                                                                name="description"
+                                                                value={activityForm.description}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        description: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-9 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="Brief description"
+                                                            />
+                                                        </div>
+                                                        {/* Start date */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Start date
+                                                            </label>
+                                                            <div className="relative mt-1">
+                                                                <input
+                                                                    type="date"
+                                                                    name="start_date"
+                                                                    value={toDateOnly(activityForm.start_date)}
+                                                                    onChange={(e) =>
+                                                                        setActivityForm((s) => ({
+                                                                            ...s,
+                                                                            start_date: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={(e) => {
+                                                                        try {
+                                                                            const el = e.currentTarget
+                                                                                .previousElementSibling;
+                                                                            el?.focus();
+                                                                            el?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                const el = e.currentTarget
+                                                                                    .previousElementSibling;
+                                                                                el?.focus();
+                                                                                el?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* End date */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                End date
+                                                            </label>
+                                                            <div className="relative mt-1">
+                                                                <input
+                                                                    type="date"
+                                                                    name="end_date"
+                                                                    value={toDateOnly(activityForm.end_date)}
+                                                                    onChange={(e) =>
+                                                                        setActivityForm((s) => ({
+                                                                            ...s,
+                                                                            end_date: e.target.value,
+                                                                            _endAuto: false,
+                                                                        }))
+                                                                    }
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={(e) => {
+                                                                        try {
+                                                                            const el = e.currentTarget
+                                                                                .previousElementSibling;
+                                                                            el?.focus();
+                                                                            el?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                const el = e.currentTarget
+                                                                                    .previousElementSibling;
+                                                                                el?.focus();
+                                                                                el?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Deadline */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Deadline
+                                                            </label>
+                                                            <div className="relative mt-1">
+                                                                <input
+                                                                    type="date"
+                                                                    name="deadline"
+                                                                    value={toDateOnly(activityForm.deadline)}
+                                                                    onChange={(e) =>
+                                                                        setActivityForm((s) => ({
+                                                                            ...s,
+                                                                            deadline: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={(e) => {
+                                                                        try {
+                                                                            const el = e.currentTarget
+                                                                                .previousElementSibling;
+                                                                            el?.focus();
+                                                                            el?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                const el = e.currentTarget
+                                                                                    .previousElementSibling;
+                                                                                el?.focus();
+                                                                                el?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-1 text-[11px] text-slate-500">No later than</p>
+                                                        </div>
+                                                        {/* Date (finish) */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Date (finish)
+                                                            </label>
+                                                            <div className="relative mt-1">
+                                                                <input
+                                                                    type="date"
+                                                                    name="finish_date"
+                                                                    value={toDateOnly(activityForm.finish_date)}
+                                                                    onChange={(e) =>
+                                                                        setActivityForm((s) => ({
+                                                                            ...s,
+                                                                            finish_date: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
+                                                                />
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    aria-label="Open date picker"
+                                                                    onClick={(e) => {
+                                                                        try {
+                                                                            const el = e.currentTarget
+                                                                                .previousElementSibling;
+                                                                            el?.focus();
+                                                                            el?.showPicker?.();
+                                                                        } catch {}
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ") {
+                                                                            try {
+                                                                                const el = e.currentTarget
+                                                                                    .previousElementSibling;
+                                                                                el?.focus();
+                                                                                el?.showPicker?.();
+                                                                            } catch {}
+                                                                        }
+                                                                    }}
+                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
+                                                                >
+                                                                    📅
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Duration */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Duration
+                                                            </label>
+                                                            <div className="relative mt-1">
+                                                                <input
+                                                                    name="duration"
+                                                                    value={activityForm.duration || ""}
+                                                                    onChange={(e) =>
+                                                                        setActivityForm((s) => ({
+                                                                            ...s,
+                                                                            duration: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    placeholder="e.g., 1h, 1d"
+                                                                />
+                                                                <span className="absolute inset-y-0 right-2 grid place-items-center text-base">
+                                                                    📅
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {/* Right column */}
+                                                    <div className="grid gap-3 content-start">
+                                                        {/* List */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                List
+                                                            </label>
+                                                            <input
+                                                                name="list"
+                                                                value={activityForm.list || ""}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({ ...s, list: e.target.value }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="List name"
+                                                            />
+                                                        </div>
+                                                        {/* Key Area */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Key Area
+                                                            </label>
+                                                            <select
+                                                                name="key_area_id"
+                                                                value={activityForm.key_area_id || selectedKA?.id || ""}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        key_area_id: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {selectedKA && !activityForm.key_area_id && (
+                                                                    <option value={selectedKA.id}>{selectedKA.name}</option>
+                                                                )}
+                                                                {keyAreas
+                                                                    .filter((ka) => !selectedKA || String(ka.id) !== String(selectedKA.id))
+                                                                    .map((ka) => (
+                                                                        <option key={ka.id} value={ka.id}>
+                                                                            {ka.title || ka.name}
+                                                                        </option>
+                                                                    ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* Respons. */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Respons.
+                                                            </label>
+                                                            <select
+                                                                name="assignee"
+                                                                value={activityForm.assignee}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        assignee: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="">— Unassigned —</option>
+                                                                {users?.map((u) => (
+                                                                    <option key={u.id} value={u.name}>
+                                                                        {u.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* Priority */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Priority
+                                                            </label>
+                                                            <select
+                                                                name="priority"
+                                                                value={activityForm.priority}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        priority: e.target.value,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="high">High</option>
+                                                                <option value="normal">Normal</option>
+                                                                <option value="low">Low</option>
+                                                            </select>
+                                                        </div>
+                                                        {/* Goal */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Goal
+                                                            </label>
+                                                            <input
+                                                                name="goal"
+                                                                value={activityForm.goal || ""}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({ ...s, goal: e.target.value }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                placeholder="Goal"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {/* Footer actions */}
+                                                <div className="mt-6 flex items-center justify-between">
+                                                    <span />
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="submit"
+                                                            className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
+                                                        >
+                                                            <FaSave /> {editingActivityId ? "Save" : "OK"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setShowActivityComposer(false);
+                                                                setEditingActivityId(null);
+                                                                setActivityAttachTaskId(null);
+                                                            }}
+                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                                            disabled
+                                                        >
+                                                            Help
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                            {/* Close button (corner X) */}
+                                            <button
+                                                type="button"
+                                                className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                                                onClick={() => setShowActivityComposer(false)}
+                                                aria-label="Close"
+                                            >
+                                                <FaTimes />
+                                            </button>
                                         </div>
                                     </div>
                                 )}

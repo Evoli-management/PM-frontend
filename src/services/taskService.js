@@ -46,18 +46,29 @@ const base = "/tasks";
 const taskService = {
     async list({ keyAreaId, unassigned } = {}) {
         // In dev, bypass browser cache to avoid 304/Not Modified confusion after updates
-        const params = { keyAreaId };
+        const params = {};
+        if (keyAreaId) params.keyAreaId = keyAreaId;
         if (unassigned) params.unassigned = true;
         if (import.meta.env?.DEV) params._ts = Date.now();
-        const res = await apiClient.get(base, {
-            params,
-            headers: import.meta.env?.DEV ? { "Cache-Control": "no-cache" } : undefined,
-        });
-        return res.data.map((t) => ({
-            ...t,
-            status: mapStatusFromApi(t.status),
-            priority: mapPriorityFromApi(t.priority),
-        }));
+        // Note: Do NOT send custom Cache-Control request header; it triggers CORS preflight and may be disallowed by server.
+        // We use a cache-busting query param instead.
+        try {
+            const res = await apiClient.get(base, { params });
+            return res.data.map((t) => ({
+                ...t,
+                status: mapStatusFromApi(t.status),
+                priority: mapPriorityFromApi(t.priority),
+            }));
+        } catch (e) {
+            const status = e?.response?.status;
+            const data = e?.response?.data;
+            console.warn("Tasks list failed", { status, data });
+            if (status === 500) {
+                // Fallback: don’t break UI if server errors; show no tasks
+                return [];
+            }
+            throw e;
+        }
     },
     async get(id) {
         const res = await apiClient.get(`${base}/${id}`);
