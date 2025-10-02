@@ -1,7 +1,6 @@
+//src/components/goals/views/KanbanView.jsx
 import React from "react";
-import { FaEdit } from "react-icons/fa";
-import Chip from "../Chip.jsx";
-import ProgressBar from "../ProgressBar.jsx";
+import { FaEdit } from "react-icons/fa";;
 
 const KanbanView = ({ filtered, onOpen, onEdit, onDelete }) => {
     return (

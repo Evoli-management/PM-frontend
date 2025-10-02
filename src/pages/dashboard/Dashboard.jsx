@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
 // Reusable dashboard widgets
@@ -82,7 +83,7 @@ function EChart({ data = [], labels = [] }) {
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`}
-                className="w-full h-48 rounded-md"
+                className="w-full h-36 rounded-md"
                 onMouseMove={handleMove}
                 onMouseLeave={handleLeave}
             >
@@ -187,18 +188,36 @@ export default function Dashboard() {
             teamOverview: false,
             analytics: false,
         },
+        // explicit order for the top summary widgets — will be kept in localStorage
+        widgetOrder: ["myDay", "goals", "enps", "strokes", "productivity"],
         theme: "light", // or 'dark'
     };
 
     const [prefs, setPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem("pm:dashboard:prefs");
-            const stored = raw ? JSON.parse(raw) : defaultPrefs;
-            // merge to ensure new keys exist
+            const stored = raw ? JSON.parse(raw) : {};
+
+            // merge widgets
+            const widgets = { ...defaultPrefs.widgets, ...(stored.widgets || {}) };
+
+            // normalize widgetOrder: use stored if valid, otherwise fall back to defaults
+            const knownKeys = Object.keys(defaultPrefs.widgets);
+            let widgetOrder = Array.isArray(stored.widgetOrder) ? stored.widgetOrder.slice() : defaultPrefs.widgetOrder.slice();
+            // keep only known keys and ensure uniqueness
+            widgetOrder = widgetOrder.filter((k, i, arr) => knownKeys.includes(k) && arr.indexOf(k) === i);
+            // append any enabled known keys that are missing from the order
+            for (const k of knownKeys) {
+                if (widgets[k] && !widgetOrder.includes(k) && defaultPrefs.widgetOrder.includes(k)) {
+                    widgetOrder.push(k);
+                }
+            }
+
             return {
                 ...defaultPrefs,
                 ...stored,
-                widgets: { ...defaultPrefs.widgets, ...(stored.widgets || {}) },
+                widgets,
+                widgetOrder,
                 // Force light mode regardless of stored value
                 theme: "light",
             };
@@ -220,7 +239,30 @@ export default function Dashboard() {
     }, [prefs.theme]);
 
     const toggleWidget = (key) => {
-        setPrefs((p) => ({ ...p, widgets: { ...p.widgets, [key]: !p.widgets[key] } }));
+        setPrefs((p) => {
+            const enabled = !p.widgets[key];
+            const widgets = { ...p.widgets, [key]: enabled };
+            let widgetOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
+
+            if (enabled) {
+                // append to end if not present
+                if (!widgetOrder.includes(key)) widgetOrder.push(key);
+            } else {
+                // remove if present
+                widgetOrder = widgetOrder.filter((k) => k !== key);
+            }
+
+            return { ...p, widgets, widgetOrder };
+        });
+    };
+
+    // Move a widget to the top (front) of the order — useful for explicit placing
+    const moveWidgetToTop = (key) => {
+        setPrefs((p) => {
+            const widgetOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
+            const next = [key, ...widgetOrder.filter((k) => k !== key)];
+            return { ...p, widgetOrder: next };
+        });
     };
     // Dark mode disabled; keep theme as light while retaining the button UI
     const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
@@ -248,6 +290,8 @@ export default function Dashboard() {
         };
     }, []);
 
+    // (top summary layout handled below nearer the JSX so it has current prefs)
+
     // Data state
     const [activeGoals, setActiveGoals] = useState(initialActiveGoals);
     const [calendarToday, setCalendarToday] = useState(() => {
@@ -273,20 +317,7 @@ export default function Dashboard() {
         setQuickAddOpen(null);
     }
 
-    // Onboarding tip (simple walkthrough entry)
-    const [showTip, setShowTip] = useState(() => {
-        try {
-            return localStorage.getItem("pm:dashboard:seenTip") !== "1";
-        } catch {
-            return true;
-        }
-    });
-    const dismissTip = () => {
-        setShowTip(false);
-        try {
-            localStorage.setItem("pm:dashboard:seenTip", "1");
-        } catch {}
-    };
+    // Onboarding tip removed per user preference
 
     // Helpers
     const avgGoal = activeGoals.length
@@ -379,10 +410,58 @@ export default function Dashboard() {
         } catch {}
     }
 
+    // Determine which top summary widgets are visible and keep their selection order
+    const visibleTopKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
+
+    // Flexible flow styles so widgets wrap and fill space without fixed columns
+    // Use CSS Grid with auto-fit so cards expand to fill the row (avoids trailing empty space)
+    const topColsStyle = {
+        display: 'grid',
+        // denser packing: allow smaller card min width so more items fit per row
+        gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+        gap: '0.4rem',
+        marginBottom: '0.5rem',
+        width: '100%'
+    };
+
+    // Use a dense CSS Grid so sections can sit side-by-side and reduce vertical stacking
+    const dynamicGrid = {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gap: '0.5rem',
+        marginBottom: '0.5rem',
+        alignItems: 'start',
+        width: '100%'
+    };
+
+    const dynamicGridSmall = {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: '0.4rem',
+        alignItems: 'start',
+    };
+
+    const cardWrapper = {
+        minWidth: '100px',
+    };
+
+    const cardWrapperLarge = {
+        minWidth: '140px',
+    };
+
+    // Compute wrapper style dynamically based on how many top widgets are visible
+    function getWrapperStyle(key) {
+        // For grid layout we let CSS grid handle sizing. Provide a sensible minWidth
+        const isLarge = key === 'goals' || key === 'enps' || key === 'strokes';
+        const base = isLarge ? { ...cardWrapperLarge } : { ...cardWrapper };
+        return { ...base, position: 'relative', width: '100%' };
+    }
+
     return (
         <div className="flex min-h-screen bg-[Canvas]">
             <Sidebar user={{ name: "Hussein" }} />
-            <main className="flex-1 p-4 md:p-8 text-[CanvasText]">
+        <main className="flex-1 p-2 pt-1 md:p-4 md:pt-2 text-[CanvasText]">
+            <div className="w-full" style={{ marginTop: '-0.75rem' }}>
                 <div className="mb-4 flex items-start justify-between gap-4">
                     <div></div>
                     {/* Widget toggles dropdown on the right */}
@@ -391,183 +470,139 @@ export default function Dashboard() {
                             <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText]">
                                 Widgets
                             </summary>
-                            <div className="absolute right-0 mt-2 w-64 bg-[Canvas] border rounded shadow p-3 z-40 max-h-80 overflow-auto text-[CanvasText]">
-                                {Object.keys(prefs.widgets).map((k) => (
-                                    <label
-                                        key={k}
-                                        className="flex items-center justify-between gap-2 mb-2 text-sm text-[CanvasText] opacity-90"
-                                    >
-                                        <span className="capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={prefs.widgets[k]}
-                                            onChange={() => toggleWidget(k)}
-                                        />
-                                    </label>
-                                ))}
+                            <div className="absolute right-0 mt-2 w-80 bg-[Canvas] border rounded shadow p-0 z-40 max-h-96 overflow-hidden text-[CanvasText]">
+                                <div className="px-3 py-2 border-b flex items-center justify-between">
+                                    <div className="font-medium text-sm">Widgets</div>
+                                    <div className="text-xs opacity-70">Show / hide</div>
+                                </div>
+                                <div className="p-2 max-h-80 overflow-auto">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                        {Object.keys(prefs.widgets).map((k) => (
+                                            <label
+                                                key={k}
+                                                className="flex items-center justify-between px-2 py-2 rounded cursor-pointer"
+                                            >
+                                                <span className="capitalize text-sm">{k.replace(/([A-Z])/g, " $1")}</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={prefs.widgets[k]}
+                                                    onChange={() => toggleWidget(k)}
+                                                    className="h-4 w-4"
+                                                />
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    
+                                </div>
                             </div>
                         </details>
                     </div>
                 </div>
 
-                {/* Onboarding tip */}
-                {showTip && (
-                    <div className="mb-4 p-3 rounded border bg-blue-50 text-blue-900 flex items-center gap-3 dark:bg-blue-900/20 dark:text-blue-200">
-                        <span>New here? Take a 30-second tour of your dashboard.</span>
-                        <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                            onClick={() => setMessage("Tour is coming soon")}
-                        >
-                            Start Tour
-                        </button>
-                        <button className="ml-auto text-sm underline" onClick={dismissTip}>
-                            Dismiss
-                        </button>
+                {/* Onboarding tip removed */}
+
+                {/* Top Section: Summary Cards (rendered in user selection order) */}
+                {visibleTopKeys.length > 0 && (
+                    <div style={topColsStyle}>
+                        {visibleTopKeys.map((k) => {
+                            const wrapperStyle = getWrapperStyle(k);
+                            if (k === "myDay")
+                                return (
+                                    <div key={k} style={wrapperStyle}>
+                                        <button
+                                            className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
+                                            onClick={() => moveWidgetToTop(k)}
+                                            title="Move to top"
+                                        >
+                                            ↑
+                                        </button>
+                                        <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
+                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                                            <div className="text-sm font-medium opacity-80">tasks</div>
+                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                                        </StatsCard>
+                                    </div>
+                                );
+                            if (k === "goals")
+                                return (
+                                    <div key={k} style={wrapperStyle}>
+                                        <button
+                                            className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
+                                            onClick={() => moveWidgetToTop(k)}
+                                            title="Move to top"
+                                        >
+                                            ↑
+                                        </button>
+                                        <StatsCard title="Goals Progress" tooltip="Average progress across your active goals" href="#/goals">
+                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{avgGoal}%</div>
+                                            <div className="text-sm font-medium opacity-80">average</div>
+                                            <div className="w-full mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden"><div className="h-2 bg-blue-500" style={{ width: `${avgGoal}%` }} /></div>
+                                        </StatsCard>
+                                    </div>
+                                );
+                            if (k === "enps")
+                                return (
+                                    <div key={k} style={wrapperStyle}>
+                                        <button
+                                            className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
+                                            onClick={() => moveWidgetToTop(k)}
+                                            title="Move to top"
+                                        >
+                                            ↑
+                                        </button>
+                                        <StatsCard title="eNPS" tooltip="Employee Net Promoter Score (−100..+100)" href="#/enps">
+                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">0</div>
+                                            <div className="text-sm font-medium opacity-80">score</div>
+                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">Survey status: up to date</div>
+                                        </StatsCard>
+                                    </div>
+                                );
+                            if (k === "strokes")
+                                return (
+                                    <div key={k} style={wrapperStyle}>
+                                        <button
+                                            className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
+                                            onClick={() => moveWidgetToTop(k)}
+                                            title="Move to top"
+                                        >
+                                            ↑
+                                        </button>
+                                        <StatsCard title="Strokes" tooltip="Recognition received and given" href="#/recognition">
+                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{strokes.received.length}</div>
+                                            <div className="text-sm font-medium opacity-80">received</div>
+                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">{strokes.given.length} given</div>
+                                        </StatsCard>
+                                    </div>
+                                );
+                            if (k === "productivity")
+                                return (
+                                    <div key={k} style={wrapperStyle}>
+                                        <button
+                                            className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
+                                            onClick={() => moveWidgetToTop(k)}
+                                            title="Move to top"
+                                        >
+                                            ↑
+                                        </button>
+                                        <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap" href="#/analytics">
+                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
+                                            <div className="text-sm font-medium opacity-80">productive</div>
+                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
+                                            <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex"><div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} /><div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} /></div>
+                                        </StatsCard>
+                                    </div>
+                                );
+                            return null;
+                        })}
                     </div>
                 )}
 
-                {/* Top Section: Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-                    {prefs.widgets.myDay && (
-                        <StatsCard
-                            title="My Day"
-                            tooltip="Your daily schedule: appointments and tasks"
-                            href="#/calendar"
-                        >
-                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                {myDayStats.tasksDueToday} tasks
-                            </div>
-                            <div className="text-xs text-[CanvasText] opacity-80">
-                                {myDayStats.overdue} overdue • {myDayStats.appointments} appointments
-                            </div>
-                        </StatsCard>
-                    )}
-
-                    {prefs.widgets.goals && (
-                        <StatsCard
-                            title="Goals Progress"
-                            tooltip="Average progress across your active goals"
-                            href="#/goals"
-                        >
-                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{avgGoal}%</div>
-                            <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
-                                <div className="h-2 bg-blue-500" style={{ width: `${avgGoal}%` }} />
-                            </div>
-                        </StatsCard>
-                    )}
-
-                    {prefs.widgets.enps && (
-                        <StatsCard title="eNPS" tooltip="Employee Net Promoter Score (−100..+100)" href="#/enps">
-                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">0</div>
-                            <div className="text-xs text-[CanvasText] opacity-80">Survey status: up to date</div>
-                        </StatsCard>
-                    )}
-
-                    {prefs.widgets.strokes && (
-                        <StatsCard title="Strokes" tooltip="Recognition received and given" href="#/recognition">
-                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                {strokes.received.length}
-                            </div>
-                            <div className="text-xs text-[CanvasText] opacity-80">
-                                received • {strokes.given.length} given
-                            </div>
-                        </StatsCard>
-                    )}
-
-                    {prefs.widgets.productivity && (
-                        <StatsCard
-                            title="Productivity"
-                            tooltip="Hours logged this week: productive vs trap"
-                            href="#/analytics"
-                        >
-                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                                {productivity.productive}h
-                            </div>
-                            <div className="text-xs text-[CanvasText] opacity-80">
-                                productive • {productivity.trap}h trap
-                            </div>
-                            <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
-                                {(() => {
-                                    const total = productivity.productive + productivity.trap || 1;
-                                    const prodW = (productivity.productive / total) * 100;
-                                    const trapW = (productivity.trap / total) * 100;
-                                    return (
-                                        <>
-                                            <div className="h-2 bg-green-500" style={{ width: `${prodW}%` }} />
-                                            <div className="h-2 bg-red-500" style={{ width: `${trapW}%` }} />
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                            <div className="mt-2">
-                                {(() => {
-                                    const data = prodTrend;
-                                    const W = 120;
-                                    const H = 28;
-                                    const max = 10;
-                                    const pts = data
-                                        .map((v, i) => {
-                                            const x = (i / Math.max(1, data.length - 1)) * W;
-                                            const y = H - (Math.min(max, Math.max(0, v)) / max) * H;
-                                            return `${x},${y}`;
-                                        })
-                                        .join(" ");
-                                    return (
-                                        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-7">
-                                            <polyline
-                                                fill="none"
-                                                stroke="#22c55e"
-                                                strokeWidth="2"
-                                                strokeLinejoin="round"
-                                                strokeLinecap="round"
-                                                points={pts}
-                                            />
-                                        </svg>
-                                    );
-                                })()}
-                            </div>
-                            <div className="mt-2 flex justify-end gap-2">
-                                <button
-                                    className="px-2 py-1 border rounded text-xs"
-                                    title="Export productivity summary"
-                                    onClick={() => {
-                                        const total = productivity.productive + productivity.trap;
-                                        const pct = total ? (productivity.productive / total) * 100 : 0;
-                                        exportCsv("productivity-summary.csv", [
-                                            ["Metric", "Value"],
-                                            ["Productive (h)", productivity.productive],
-                                            ["Trap (h)", productivity.trap],
-                                            ["Total (h)", total],
-                                            ["Productive (%)", pct.toFixed(1)],
-                                        ]);
-                                    }}
-                                >
-                                    Export summary
-                                </button>
-                                <button
-                                    className="px-2 py-1 border rounded text-xs"
-                                    title="Export productivity trend"
-                                    onClick={() => {
-                                        const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-                                        const rows = [
-                                            ["Label", "Hours"],
-                                            ...prodTrend.map((v, i) => [labels[i] || `P${i + 1}`, v]),
-                                        ];
-                                        exportCsv("productivity-trend.csv", rows);
-                                    }}
-                                >
-                                    Export trend
-                                </button>
-                            </div>
-                        </StatsCard>
-                    )}
-                </div>
-
                 {/* Middle Section */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+                <div style={dynamicGrid} className="mb-2">
                     {/* eNPS detailed snapshot */}
                     {prefs.widgets.enps && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-start justify-between">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">
                                     eNPS Snapshot
@@ -598,7 +633,7 @@ export default function Dashboard() {
 
                     {/* Goals list */}
                     {prefs.widgets.goals && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">
                                     Your active goals
@@ -658,10 +693,10 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+                <div style={dynamicGrid} className="mb-2">
                     {/* Calendar Preview with drag-and-drop */}
                     {prefs.widgets.calendarPreview && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">
                                     Calendar Preview (Today)
@@ -698,7 +733,7 @@ export default function Dashboard() {
 
                     {/* What’s New Feed */}
                     {prefs.widgets.activity && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What’s New</h2>
                                 <div className="flex items-center gap-2">
@@ -735,10 +770,10 @@ export default function Dashboard() {
                 {/* Quick Add full-width row */}
                 {prefs.widgets.quickAdd && <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />}
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+                <div style={dynamicGrid} className="mb-2">
                     {/* Strokes detail */}
                     {prefs.widgets.strokes && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
                             </div>
@@ -748,7 +783,7 @@ export default function Dashboard() {
 
                     {/* Suggestions */}
                     {prefs.widgets.suggestions && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
                             <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                                 <li>Recommend goal: "Automate weekly reporting" (template)</li>
@@ -761,13 +796,13 @@ export default function Dashboard() {
                 </div>
 
                 {/* Manager/Analytics area — always visible */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div style={dynamicGrid} className="mb-2">
                     {prefs.widgets.teamOverview && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">
                                 Team Performance Overview
                             </h3>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div style={dynamicGridSmall} className="text-sm">
                                 <div className="p-3 border rounded">Team goals completion: 68%</div>
                                 <div className="p-3 border rounded">Avg workload: 32h/week</div>
                                 <div className="p-3 border rounded">eNPS trend: steady ↑</div>
@@ -794,7 +829,7 @@ export default function Dashboard() {
                     )}
 
                     {prefs.widgets.analytics && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-6 border text-[CanvasText]">
+                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
                             <div className="mb-3 flex items-center gap-2 text-sm">
                                 <span className="opacity-70">Period:</span>
@@ -816,7 +851,7 @@ export default function Dashboard() {
                                     <option value="Previous">Previous</option>
                                 </select>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div style={dynamicGrid}>
                                 {/* Time usage pie (Goals vs Trap) */}
                                 <div className="p-3 border rounded">
                                     <div className="font-semibold text-sm mb-2">Time usage</div>
@@ -891,6 +926,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
+                </div>
             </main>
         </div>
     );

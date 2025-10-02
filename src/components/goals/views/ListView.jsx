@@ -1,6 +1,6 @@
+// src/components/goals/views/ListView.jsx
 import React from "react";
 import { FaBullseye } from "react-icons/fa";
-import GoalCard from "../GoalCard.jsx";
 
 const ListView = ({ filtered, onOpen, onEdit, onDelete }) => {
     return (
