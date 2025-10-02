@@ -29,6 +29,7 @@ import Goals from "./pages/Goals.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
+import Teams from "./pages/Teams.jsx";
 
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -70,6 +71,7 @@ export default function App() {
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/analytics" element={<Analytics />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
+                            <Route path="/teams" element={<Teams />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
                             {/* Private routes below */}
