@@ -35,7 +35,7 @@ export default function EnpsChart({ data = [], labels = [] }) {
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`}
-                className="w-full h-48 rounded-md"
+                className="w-full h-36 rounded-md"
                 onMouseMove={handleMove}
                 onMouseLeave={() => setTooltip(null)}
             >
