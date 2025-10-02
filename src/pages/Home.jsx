@@ -195,8 +195,8 @@ const Home = () => {
                         {/* Left column: headline, copy, CTAs, stats */}
                         <div className="md:w-6/12 text-center md:text-left">
                             <h1 className="text-5xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-tight mb-2">
-                                <span className="heading-gradient">Lead with clarity.</span>
-                                <span className="heading-subtle">Deliver with confidence.</span>
+                                <span className="heading-gradient block">Lead with clarity.</span>
+                                <span className="heading-subtle block mt-3 text-3xl md:text-4xl">Deliver with confidence.</span>
                             </h1>
 
                             <p className="text-lg text-slate-600 mb-4 max-w-xl mx-auto md:mx-0">
