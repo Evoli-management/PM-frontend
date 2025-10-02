@@ -1,559 +1,369 @@
-import React, { useState, useEffect } from "react";
-import { FaBullseye, FaTimes, FaSave, FaSpinner, FaPlus, FaTrash, FaFlag } from "react-icons/fa";
-import goalService from "../../services/goalService";
-import milestoneService from "../../services/milestoneService";
-import ProgressBar from "./ProgressBar.jsx";
+import React, { useState } from "react";
+import { FaTimes, FaPlus, FaTrash, FaSave, FaRocket } from "react-icons/fa";
 
-const GoalForm = ({ initial = {}, onCancel, onSave }) => {
-    const [title, setTitle] = useState(initial.title || "");
-    const [description, setDescription] = useState(initial.description || "");
-    const [keyAreaId, setKeyAreaId] = useState(initial.keyAreaId || "");
-    const [status, setStatus] = useState(initial.status || "active");
-    const [visibility, setVisibility] = useState(initial.visibility || "private");
-    const [startDate, setStartDate] = useState(
-        initial.startDate ? new Date(initial.startDate).toISOString().split("T")[0] : "",
+const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
+    const [formData, setFormData] = useState({
+        title: goal?.title || "",
+        description: goal?.description || "",
+        startDate: goal?.startDate ? new Date(goal.startDate).toISOString().split("T")[0] : "",
+        dueDate: goal?.dueDate ? new Date(goal.dueDate).toISOString().split("T")[0] : "",
+        keyAreaId: goal?.keyAreaId || "",
+        status: goal?.status || "active",
+        visibility: goal?.visibility || "public",
+    });
+
+    const [milestones, setMilestones] = useState(
+        goal?.milestones?.length > 0
+            ? goal.milestones.map((m) => ({
+                  id: m.id,
+                  title: m.title,
+                  weight: m.weight || 1.0,
+                  dueDate: m.dueDate || "",
+              }))
+            : [{ title: "", weight: 1.0, dueDate: "" }],
     );
-    const [targetDate, setTargetDate] = useState(
-        initial.targetDate ? new Date(initial.targetDate).toISOString().split("T")[0] : "",
-    );
-    const [progressPercentage, setProgressPercentage] = useState(initial.progressPercentage || 0);
-    const [keyAreas, setKeyAreas] = useState([]);
-    const [loading, setLoading] = useState(false);
 
-    // Milestone state
-    const [milestones, setMilestones] = useState([
-        {
-            id: Date.now(), // temporary ID for new milestones
-            title: "",
-            description: "",
-            targetDate: "",
-            weight: 1,
-            isNew: true,
-        },
-    ]);
-    const [loadingMilestones, setLoadingMilestones] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errors, setErrors] = useState({});
 
-    useEffect(() => {
-        const fetchKeyAreas = async () => {
-            try {
-                const areas = await goalService.getKeyAreas();
-                setKeyAreas(areas);
-            } catch (error) {
-                console.error("Error fetching key areas:", error);
-            }
-        };
-        fetchKeyAreas();
-    }, []);
-
-    // Load existing milestones when editing
-    useEffect(() => {
-        const loadMilestones = async () => {
-            if (initial.id) {
-                try {
-                    setLoadingMilestones(true);
-                    const existingMilestones = await milestoneService.getMilestonesByGoal(initial.id);
-
-                    const formattedMilestones = existingMilestones.map((milestone) => ({
-                        ...milestone,
-                        targetDate: milestone.dueDate ? new Date(milestone.dueDate).toISOString().split("T")[0] : "",
-                        status: milestone.done ? "completed" : "active", // Map done to status
-                        isNew: false,
-                    }));
-
-                    // Ensure at least one milestone
-                    if (formattedMilestones.length === 0) {
-                        setMilestones([
-                            {
-                                id: Date.now(),
-                                title: "",
-                                description: "",
-                                targetDate: "",
-                                weight: 1,
-                                status: "active",
-                                isNew: true,
-                            },
-                        ]);
-                    } else {
-                        setMilestones(formattedMilestones);
-                    }
-                } catch (error) {
-                    console.error("Error loading milestones:", error);
-                } finally {
-                    setLoadingMilestones(false);
-                }
-            }
-        };
-
-        loadMilestones();
-    }, [initial.id]);
+    const handleInputChange = (field, value) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
+        if (errors[field]) {
+            setErrors((prev) => ({ ...prev, [field]: null }));
+        }
+    };
 
     const addMilestone = () => {
-        setMilestones((prev) => [
-            ...prev,
-            {
-                id: Date.now(),
-                title: "",
-                description: "",
-                targetDate: "",
-                weight: 1,
-                status: "active",
-                isNew: true,
-            },
-        ]);
+        setMilestones([...milestones, { title: "", weight: 1.0, dueDate: "" }]);
     };
 
     const removeMilestone = (index) => {
-        if (milestones.length <= 1) {
-            alert("At least one milestone is required for each goal.");
-            return;
+        if (milestones.length > 1) {
+            setMilestones(milestones.filter((_, i) => i !== index));
         }
-        setMilestones((prev) => prev.filter((_, i) => i !== index));
     };
 
     const updateMilestone = (index, field, value) => {
-        setMilestones((prev) =>
-            prev.map((milestone, i) => (i === index ? { ...milestone, [field]: value } : milestone)),
-        );
+        const updated = [...milestones];
+        updated[index][field] = value;
+        setMilestones(updated);
     };
 
-    const validateMilestones = () => {
-        // Check if at least one milestone exists and has a title
-        const validMilestones = milestones.filter((m) => m.title.trim());
-        if (validMilestones.length === 0) {
-            alert("At least one milestone with a title is required.");
-            return false;
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!formData.title.trim()) {
+            newErrors.title = "Title is required";
+        } else if (formData.title.length < 3) {
+            newErrors.title = "Title must be at least 3 characters";
         }
 
-        // Check for milestone dates that are after goal target date
-        const goalTargetDate = new Date(targetDate);
-        const invalidDates = milestones.filter(
-            (m) => m.title.trim() && m.targetDate && new Date(m.targetDate) > goalTargetDate,
-        );
+        if (!formData.dueDate) {
+            newErrors.dueDate = "Due date is required";
+        } else {
+            const dueDate = new Date(formData.dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-        if (targetDate && invalidDates.length > 0) {
-            alert("Milestone due dates cannot be after the goal target date.");
-            return false;
+            if (dueDate <= today && !isEditing) {
+                newErrors.dueDate = "Due date must be in the future";
+            }
         }
 
-        return true;
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = async () => {
-        if (!title.trim()) {
-            alert("Title is required");
-            return;
-        }
+    const handleSubmit = async () => {
+        if (!validateForm()) return;
 
-        if (startDate && targetDate && new Date(startDate) >= new Date(targetDate)) {
-            alert("Start date must be before target date");
-            return;
-        }
+        setIsSubmitting(true);
 
-        if (!validateMilestones()) {
-            return;
-        }
-
-        setLoading(true);
+        const goalData = {
+            title: formData.title.trim(),
+            description: formData.description.trim() || null,
+            startDate: formData.startDate || null,
+            dueDate: formData.dueDate,
+            keyAreaId: formData.keyAreaId || null,
+            visibility: formData.visibility,
+            milestones: milestones
+                .filter((m) => m.title.trim())
+                .map((m) => ({
+                    ...(m.id && { id: m.id }),
+                    title: m.title.trim(),
+                    weight: parseFloat(m.weight) || 1.0,
+                    dueDate: m.dueDate || null,
+                })),
+        };
 
         try {
-            const goalData = {
-                title: title.trim(),
-                description: description.trim() || undefined,
-                keyAreaId: keyAreaId || undefined,
-                startDate: startDate || undefined,
-                targetDate: targetDate || undefined,
-                visibility,
-                progressPercentage,
-            };
-
-            if (initial.id) {
-                goalData.status = status;
-            }
-
-            // Save the goal first
-            const savedGoal = await onSave(goalData);
-            const goalId = savedGoal?.id || initial.id;
-
-            // Handle milestones ONLY for NEW goals (not when editing)
-            if (goalId && !initial.id) {
-                console.log("Processing milestones for new goal:", goalId);
-                console.log("Current milestones:", milestones);
-
-                const validMilestones = milestones.filter((m) => m.title.trim());
-                console.log("Valid milestones:", validMilestones);
-
-                // Create milestones and collect any errors
-                const milestoneErrors = [];
-
-                console.log("Goal created, now creating milestones...");
-                console.log("Milestones to create:", validMilestones);
-
-                for (const milestone of validMilestones) {
-                    try {
-                        const milestoneToCreate = {
-                            title: milestone.title.trim(),
-                            description: milestone.description?.trim() || "",
-                            dueDate: milestone.targetDate || null, // Fix: use dueDate instead of targetDate
-                            weight: milestone.weight || 1,
-                        };
-
-                        console.log("Creating milestone:", milestoneToCreate);
-                        const createdMilestone = await milestoneService.createMilestone(goalId, milestoneToCreate);
-                        console.log("Milestone created:", createdMilestone);
-                    } catch (error) {
-                        console.error("Error creating milestone:", milestone.title, error);
-                        const errorMsg = error.response?.data?.message || error.message || "Unknown error";
-                        milestoneErrors.push(`Failed to create milestone "${milestone.title}": ${errorMsg}`);
-                    }
-                }
-
-                // If there were milestone creation errors, show them to the user
-                if (milestoneErrors.length > 0) {
-                    alert(
-                        `Goal created successfully, but there were issues creating milestones:\n\n${milestoneErrors.join("\n")}\n\nYou can add milestones later by editing the goal.`,
-                    );
-                }
-            }
-
-            // Handle milestones for EXISTING goals (when editing)
-            if (goalId && initial.id) {
-                console.log("Processing milestones for existing goal:", goalId);
-
-                const validMilestones = milestones.filter((m) => m.title.trim());
-                const milestoneErrors = [];
-
-                // Create new milestones
-                console.log("Goal created, now creating milestones...");
-                console.log(
-                    "Milestones to create:",
-                    validMilestones.filter((m) => m.isNew),
-                );
-                for (const milestone of validMilestones.filter((m) => m.isNew)) {
-                    try {
-                        const milestoneToCreate = {
-                            title: milestone.title.trim(),
-                            description: milestone.description?.trim() || "",
-                            dueDate: milestone.targetDate || null, // Fix: use dueDate
-                            weight: milestone.weight || 1,
-                        };
-
-                        console.log("Creating milestone:", milestoneToCreate);
-                        const createdMilestone = await milestoneService.createMilestone(goalId, milestoneToCreate);
-                        console.log("Milestone created:", createdMilestone);
-                    } catch (error) {
-                        console.error("Error creating milestone:", milestone.title, error);
-                        const errorMsg = error.response?.data?.message || error.message || "Unknown error";
-                        milestoneErrors.push(`Failed to create milestone "${milestone.title}": ${errorMsg}`);
-                    }
-                }
-
-                // Update existing milestones
-                console.log("Goal created, now creating milestones...");
-                console.log(
-                    "Milestones to create:",
-                    validMilestones.filter((m) => !m.isNew),
-                );
-                for (const milestone of validMilestones.filter((m) => !m.isNew)) {
-                    if (milestone.id) {
-                        try {
-                            const milestoneToUpdate = {
-                                title: milestone.title.trim(),
-                                description: milestone.description?.trim() || "",
-                                dueDate: milestone.targetDate || null, // Fix: use dueDate
-                                weight: milestone.weight || 1,
-                            };
-
-                            console.log("Updating milestone:", milestone.id, milestoneToUpdate);
-                            await milestoneService.updateMilestone(milestone.id, milestoneToUpdate);
-                        } catch (error) {
-                            console.error("Error updating milestone:", milestone.id, error);
-                            const errorMsg = error.response?.data?.message || error.message || "Unknown error";
-                            milestoneErrors.push(`Failed to update milestone "${milestone.title}": ${errorMsg}`);
-                        }
-                    }
-                }
-
-                // Show any milestone errors
-                if (milestoneErrors.length > 0) {
-                    alert(
-                        `Goal updated successfully, but there were issues with milestones:\n\n${milestoneErrors.join("\n")}`,
-                    );
-                }
-            }
-
-            // Close the form after successful save
-            onCancel();
-        } catch (error) {
-            console.error("Error saving goal:", error);
-            const errorMessage = error.response?.data?.message || error.message || "Failed to save goal";
-            alert(`Failed to save goal: ${errorMessage}. Please try again.`);
+            await onGoalCreated(goalData);
+            onClose();
+        } catch (err) {
+            setErrors({ general: err.message || "Failed to save goal. Please try again." });
         } finally {
-            setLoading(false);
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="bg-white rounded-2xl p-6 border shadow-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <FaBullseye className="text-blue-700 text-xl" />
-                    <h3 className="text-xl font-bold text-slate-900">{initial.id ? "Edit Goal" : "Create New Goal"}</h3>
-                </div>
-                <button onClick={onCancel} className="p-2 rounded-lg hover:bg-slate-100" disabled={loading}>
-                    <FaTimes />
-                </button>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-                {/* Left Column - Goal Details */}
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">Title *</label>
-                        <input
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="e.g., Launch new product line"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            disabled={loading}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">Description</label>
-                        <textarea
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[100px]"
-                            placeholder="Describe your goal in detail..."
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            disabled={loading}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">Key Area</label>
-                        <select
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            value={keyAreaId}
-                            onChange={(e) => setKeyAreaId(e.target.value)}
-                            disabled={loading}
-                        >
-                            <option value="">Select a key area (optional)</option>
-                            {keyAreas.map((area) => (
-                                <option key={area.id} value={area.id}>
-                                    {area.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Start Date</label>
-                            <input
-                                type="date"
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                disabled={loading}
-                            />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}>
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to { 
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.2s ease-out;
+                }
+                .animate-slideUp {
+                    animation: slideUp 0.3s ease-out;
+                }
+            `}</style>
+            
+            <div className="bg-white rounded-xl w-full max-w-5xl shadow-2xl flex flex-col animate-slideUp" style={{ height: '85vh', border: '1px solid #e5e7eb' }}>
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <FaRocket className="w-5 h-5 text-blue-600" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Target Date</label>
-                            <input
-                                type="date"
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                value={targetDate}
-                                onChange={(e) => setTargetDate(e.target.value)}
-                                disabled={loading}
-                            />
-                        </div>
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            {isEditing ? "Edit Goal" : "Create Goal"}
+                        </h2>
                     </div>
-
-                    {initial.id && (
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-900 mb-2">Status</label>
-                            <select
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                value={status}
-                                onChange={(e) => setStatus(e.target.value)}
-                                disabled={loading}
-                            >
-                                <option value="active">Active</option>
-                                <option value="paused">Paused</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
-                        </div>
-                    )}
-
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">Visibility</label>
-                        <select
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            value={visibility}
-                            onChange={(e) => setVisibility(e.target.value)}
-                            disabled={loading}
-                        >
-                            <option value="private">Private</option>
-                            <option value="public">Public</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">
-                            Progress ({progressPercentage}%)
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={progressPercentage}
-                            onChange={(e) => setProgressPercentage(Number(e.target.value))}
-                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                            disabled={loading}
-                        />
-                        <div className="mt-2">
-                            <ProgressBar value={progressPercentage} />
-                        </div>
-                    </div>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                    >
+                        <FaTimes className="w-4 h-4" />
+                    </button>
                 </div>
 
-                {/* Right Column - Milestones */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                            <FaFlag className="text-blue-700" />
-                            Milestones *
-                        </h4>
-                        <button
-                            type="button"
-                            onClick={addMilestone}
-                            className="inline-flex items-center gap-1 text-sm text-blue-700 font-semibold hover:text-blue-800"
-                            disabled={loading}
-                        >
-                            <FaPlus className="text-xs" />
-                            Add Milestone
-                        </button>
-                    </div>
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                    <div className="h-full">
+                        {errors.general && (
+                            <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 rounded-r text-red-700 text-sm animate-slideUp">
+                                {errors.general}
+                            </div>
+                        )}
 
-                    {loadingMilestones ? (
-                        <div className="flex items-center justify-center py-4">
-                            <FaSpinner className="animate-spin text-blue-600 mr-2" />
-                            <span className="text-sm text-slate-600">Loading milestones...</span>
-                        </div>
-                    ) : (
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {milestones.map((milestone, index) => (
-                                <div key={milestone.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <span className="text-sm font-semibold text-slate-700">
-                                            Milestone {index + 1}
-                                        </span>
-                                        {milestones.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeMilestone(index)}
-                                                className="p-1 text-red-600 hover:text-red-700"
-                                                disabled={loading}
-                                                title="Remove milestone"
-                                            >
-                                                <FaTrash className="text-xs" />
-                                            </button>
-                                        )}
+                        <div className="grid grid-cols-12 gap-6 h-full">
+                            {/* Left Column - Main Info */}
+                            <div className="col-span-7 space-y-4">
+                                {/* Title */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        Goal Title <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.title}
+                                        onChange={(e) => handleInputChange("title", e.target.value)}
+                                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                                            errors.title ? "border-red-300 bg-red-50" : "border-gray-300 hover:border-gray-400"
+                                        }`}
+                                        placeholder="Enter goal title"
+                                    />
+                                    {errors.title && <p className="text-red-600 text-xs mt-1 animate-slideUp">{errors.title}</p>}
+                                </div>
+
+                                {/* Description */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e) => handleInputChange("description", e.target.value)}
+                                        rows="3"
+                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none hover:border-gray-400 transition-all duration-200"
+                                        placeholder="Describe your goal..."
+                                    />
+                                </div>
+
+                                {/* Date Fields */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Start Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.startDate}
+                                            onChange={(e) => handleInputChange("startDate", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                        />
                                     </div>
 
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Title *
-                                            </label>
-                                            <input
-                                                className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                placeholder="Milestone title"
-                                                value={milestone.title}
-                                                onChange={(e) => updateMilestone(index, "title", e.target.value)}
-                                                disabled={loading}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Description
-                                            </label>
-                                            <textarea
-                                                className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                rows="2"
-                                                placeholder="Milestone description (optional)"
-                                                value={milestone.description}
-                                                onChange={(e) => updateMilestone(index, "description", e.target.value)}
-                                                disabled={loading}
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                    Target Date
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    value={milestone.targetDate}
-                                                    onChange={(e) =>
-                                                        updateMilestone(index, "targetDate", e.target.value)
-                                                    }
-                                                    disabled={loading}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                    Weight
-                                                </label>
-                                                <select
-                                                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    value={milestone.weight}
-                                                    onChange={(e) =>
-                                                        updateMilestone(index, "weight", Number(e.target.value))
-                                                    }
-                                                    disabled={loading}
-                                                >
-                                                    <option value={1}>1 (Low)</option>
-                                                    <option value={2}>2</option>
-                                                    <option value={3}>3</option>
-                                                    <option value={4}>4</option>
-                                                    <option value={5}>5 (High)</option>
-                                                </select>
-                                            </div>
-                                        </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Due Date <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.dueDate}
+                                            onChange={(e) => handleInputChange("dueDate", e.target.value)}
+                                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                                                errors.dueDate ? "border-red-300 bg-red-50" : "border-gray-300 hover:border-gray-400"
+                                            }`}
+                                            min={new Date().toISOString().split("T")[0]}
+                                        />
+                                        {errors.dueDate && <p className="text-red-600 text-xs mt-1 animate-slideUp">{errors.dueDate}</p>}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
 
-                    <div className="text-xs text-slate-600 bg-blue-50 p-3 rounded-lg">
-                        <strong>Note:</strong> At least one milestone is required for each goal. Milestones help break
-                        down your goal into manageable steps and track progress more effectively.
+                                {/* Select Fields */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Key Area
+                                        </label>
+                                        <select
+                                            value={formData.keyAreaId}
+                                            onChange={(e) => handleInputChange("keyAreaId", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                        >
+                                            <option value="">None</option>
+                                            {keyAreas.map((area) => (
+                                                <option key={area.id} value={area.id}>
+                                                    {area.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Status
+                                        </label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={(e) => handleInputChange("status", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                            disabled={!isEditing}
+                                        >
+                                            <option value="active">Active</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="archived">Archived</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Visibility
+                                        </label>
+                                        <select
+                                            value={formData.visibility}
+                                            onChange={(e) => handleInputChange("visibility", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                        >
+                                            <option value="public">Public</option>
+                                            <option value="private">Private</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column - Milestones */}
+                            <div className="col-span-5 border-l border-gray-200 pl-6 flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-gray-900">Milestones</h3>
+                                    <button
+                                        type="button"
+                                        onClick={addMilestone}
+                                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                                    >
+                                        <FaPlus className="w-3 h-3" />
+                                        Add
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                                    {milestones.map((milestone, index) => (
+                                        <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-sm">
+                                            <div className="flex items-start gap-2 mb-2">
+                                                <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5 shadow-sm">
+                                                    {index + 1}
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={milestone.title}
+                                                    onChange={(e) => updateMilestone(index, "title", e.target.value)}
+                                                    placeholder="Milestone title"
+                                                    className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white hover:border-gray-400 transition-all duration-200"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeMilestone(index)}
+                                                    disabled={milestones.length === 1}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm"
+                                                >
+                                                    <FaTrash className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pl-7">
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Weight</label>
+                                                    <input
+                                                        type="number"
+                                                        value={milestone.weight}
+                                                        onChange={(e) =>
+                                                            updateMilestone(index, "weight", parseFloat(e.target.value))
+                                                        }
+                                                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white hover:border-gray-400 transition-all duration-200"
+                                                        min="0.1"
+                                                        step="0.1"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Due Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={milestone.dueDate}
+                                                        onChange={(e) => updateMilestone(index, "dueDate", e.target.value)}
+                                                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white hover:border-gray-400 transition-all duration-200"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t">
-                <button
-                    onClick={onCancel}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50"
-                    disabled={loading}
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={handleSave}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
-                    disabled={loading}
-                >
-                    {loading ? <FaSpinner className="animate-spin" /> : <FaSave />}
-                    {loading ? "Saving..." : initial.id ? "Update Goal" : "Create Goal"}
-                </button>
+                {/* Footer */}
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                    >
+                        <FaSave className="w-3.5 h-3.5" />
+                        {isSubmitting ? "Saving..." : isEditing ? "Update Goal" : "Create Goal"}
+                    </button>
+                </div>
             </div>
         </div>
     );

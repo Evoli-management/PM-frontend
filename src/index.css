@@ -9,3 +9,16 @@
 .no-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
 }
+
+/* Hide native date picker icon; we provide our own 📅 trigger */
+input[type="date"].hide-native-date-icon::-webkit-calendar-picker-indicator {
+    opacity: 0;
+}
+input[type="date"].hide-native-date-icon::-webkit-inner-spin-button,
+input[type="date"].hide-native-date-icon::-webkit-clear-button {
+    display: none;
+}
+/* Firefox */
+input[type="date"].hide-native-date-icon {
+    background-image: none;
+}

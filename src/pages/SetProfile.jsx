@@ -536,7 +536,7 @@ export default function ProfileSetting() {
             showRecentActivity: true,
             showQuickActions: true,
         },
-                                        dashboardRefreshRate: "auto",
+        dashboardRefreshRate: "auto",
         // Privacy Controls for eNPS
         enpsPrivacySettings: {
             allowAnonymousScoring: true,
@@ -674,7 +674,6 @@ export default function ProfileSetting() {
     const canCreateTeams = form?.teams?.canCreateTeams ?? true;
     const canJoinTeams = form?.teams?.canJoinTeams ?? true;
     const canManageTeams = canCreateTeams; // simple gate for demo
-
     const upd = (k) => (e) => {
         const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
         setForm((s) => ({ ...s, [k]: value }));
@@ -1992,7 +1991,6 @@ export default function ProfileSetting() {
                                         {/* Dashboard Preferences removed */}
                                     </div>
                                 )}
-
                                 {activeTab === "Integrations" && (
                                     <div className="space-y-4">
                                         <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
@@ -2059,7 +2057,6 @@ export default function ProfileSetting() {
                                                             <Card logo="📅" title="Apple Calendar" color="bg-[#EA4335]" desc="Sync with Apple iCloud Calendar" provider="apple" />
                                                         </div>
                                                     </Section>
-
                                                     {/* Collaboration integrations removed in this version */}
 
                                                     <Section title="CRM / Storage">
@@ -2110,7 +2107,6 @@ export default function ProfileSetting() {
                                                 <Toggle checked={form.showInActivityFeed} onChange={(v) => setForm(s => ({ ...s, showInActivityFeed: v }))} />
                                             </div>
                                         </Section>
-
                                         <div className="flex justify-end">
                                             <button type="button" onClick={savePrivacy} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save Privacy Settings</button>
                                         </div>
@@ -2154,7 +2150,6 @@ export default function ProfileSetting() {
                                         </div>
                                     </div>
                                 )}
-
                                 {activeTab === "Security" && (
                                     <div className="space-y-4">
                                         <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
@@ -2238,7 +2233,6 @@ export default function ProfileSetting() {
                                                 </div>
                                             </div>
                                         </Section>
-
                                         <Section title="Password Management">
                                             <div className="border rounded-lg p-4 bg-white">
                                                 <div className="flex items-center gap-3">
@@ -2260,7 +2254,6 @@ export default function ProfileSetting() {
                                                 </div>
                                             </div>
                                         </Section>
-
                                         <Section title="Two-Factor Authentication Status">
                                             <div className="space-y-4">
                                                 {(() => {

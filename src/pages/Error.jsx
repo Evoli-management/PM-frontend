@@ -1,7 +1,3 @@
 export default function ErrorPage() {
-    return (
-        <>
-            Oops! Something went wrong.
-        </>
-    )
+    return <>Oops! Something went wrong.</>;
 }

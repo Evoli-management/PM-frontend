@@ -1,156 +1,307 @@
-
 import React from "react";
-import { Link } from "react-router-dom";
-
-const modules = [
-    { icon: "🎯", title: "Goals & Alignment", desc: "Set and track goals, align your team, and drive results." },
-    { icon: "⏱️", title: "Time Management", desc: "Manage tasks, deadlines, and priorities for maximum productivity." },
-    { icon: "🤝", title: "Recognition", desc: "Share recognition and feedback to foster a positive culture." },
-    { icon: "📊", title: "Engagement", desc: "Assess and improve team engagement and well-being." },
-];
-
-const values = [
-    { icon: "🤲", title: "Customer-first", desc: "We build for our users and their success." },
-    { icon: "�", title: "Continuous Improvement", desc: "We invest in research and development to deliver the best." },
-    { icon: "🔒", title: "Privacy-focused", desc: "Your data is secure and private with us." },
-];
-
-const testimonials = [
-    { quote: "Practical Manager helped us align our goals and improve team engagement by 15%.", author: "Team Lead, TechCorp" },
-    { quote: "The feedback and recognition tools make management easy and effective.", author: "HR Manager, InnovateX" },
-];
-
-const partners = [];
+import { useNavigate } from "react-router-dom";
+import ContactForm from "../components/ContactForm.jsx";
+import TestimonialCards from "../components/TestimonialCards.jsx";
+import Hero from "../components/Hero.jsx";
+import ValuesComponent from "../components/ValuesComponent.jsx";
+import FeaturedModulesComponent from "../components/FeaturedModulesComponent.jsx";
 
 const Home = () => {
+    const navigate = useNavigate();
+    const handleNavigate = (e, to) => {
+        e && e.preventDefault();
+        if (!to) return;
+        navigate(to);
+    };
+
     return (
         <main className="font-sans bg-gray-50 text-gray-900 min-h-screen">
-            {/* Navigation Bar */}
-            <nav className="flex flex-col sm:flex-row justify-between items-center px-4 py-4 bg-white shadow sticky top-0 z-10">
-                <div className="font-bold text-xl text-blue-700 mb-2 sm:mb-0">Practical Manager</div>
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-8 text-base mb-2 sm:mb-0">
-                    <a href="#modules" className="text-blue-900 hover:text-blue-700 font-medium">Modules</a>
-                    <a href="#values" className="text-blue-900 hover:text-blue-700 font-medium">Values</a>
-                    <a href="#testimonials" className="text-blue-900 hover:text-blue-700 font-medium">Testimonials</a>
-                    <a href="#contact" className="text-blue-900 hover:text-blue-700 font-medium">Contact</a>
+            {/* Tailwind CSS `style` block for custom animations and hero polish */}
+            <style>
+                {`
+                @keyframes float {
+                    0% {
+                        transform: translateY(0px) rotate(0deg);
+                        opacity: 1;
+                    }
+                    50% {
+                        transform: translateY(-18px) rotate(2deg);
+                        opacity: 0.9;
+                    }
+                    100% {
+                        transform: translateY(0px) rotate(0deg);
+                        opacity: 1;
+                    }
+                }
+                .animate-float {
+                    animation: float 6s ease-in-out infinite;
+                }
+                @keyframes fade-in-up {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                .animate-fade-in-up {
+                    animation: fade-in-up 0.8s ease-out forwards;
+                }
+                .group:hover .group-hover-scale {
+                    transform: scale(1.05);
+                }
+                .group:hover .group-hover-shadow {
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                }
+
+                /* Animated gradient headline */
+                .heading-gradient {
+                    background: linear-gradient(90deg,#0ea5e9 0%, #7c3aed 45%, #f59e0b 100%);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    color: transparent;
+                    animation: gradientShift 6s linear infinite;
+                    display: inline-block;
+                }
+                @keyframes gradientShift {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+                .heading-subtle {
+                    color: rgba(15,23,42,0.85);
+                    display: block;
+                    margin-top: 0.35rem;
+                    font-weight: 600;
+                }
+
+                /* Animated gradient button */
+                .btn-gradient {
+                    background: linear-gradient(90deg, #F59E0B 0%, #F97316 50%, #F59E0B 100%);
+                    background-size: 200% 100%;
+                    transition: background-position 0.6s ease, transform 0.12s ease, box-shadow 0.12s ease;
+                }
+                .btn-gradient:hover { background-position: 100% 0; transform: translateY(-2px) scale(1.02); }
+                .btn-glow { box-shadow: 0 8px 30px rgba(245,158,11,0.18); }
+
+                /* Glass-like stat chips under CTA */
+                .stat-chip { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.5); }
+
+                /* Floating decorative blobs */
+                .blob { position: absolute; border-radius: 9999px; filter: blur(28px); opacity: 0.9; transform: translate3d(0,0,0); }
+                .blob-1 { width: 360px; height: 360px; left: -60px; top: -40px; background: linear-gradient(135deg,#60A5FA,#7C3AED); mix-blend-mode: screen; }
+                .blob-2 { width: 420px; height: 420px; right: -80px; bottom: -80px; background: linear-gradient(135deg,#FDE68A,#FB923C); mix-blend-mode: screen; }
+
+                `}
+            </style>
+
+            {/* Slim top strip with quick links (matches site header) */}
+            <div className="bg-teal-50 border-b border-teal-100 text-sm">
+                <div className="container mx-auto px-4">
+                    <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-6">
+                            <a href="/why" className="text-teal-800 font-semibold hover:underline">
+                                WHY PRACTICAL MANAGER?
+                            </a>
+                            <a href="/how-it-works" className="text-teal-800 hover:underline">
+                                HOW IT WORKS?
+                            </a>
+
+                            <div className="relative group">
+                                <button className="flex items-center gap-2 text-teal-800 hover:underline focus:outline-none font-medium tracking-wide">
+                                    ABOUT EMPLOYEESHIP
+                                    <span className="text-xs text-teal-700">▾</span>
+                                </button>
+                                <div className="absolute left-0 mt-2 w-48 bg-white shadow-sm border-t-2 border-black z-50 opacity-0 group-hover:opacity-100 transform scale-95 group-hover:scale-100 transition-all duration-150 pointer-events-none group-hover:pointer-events-auto">
+                                    <ul className="py-3">
+                                        <li>
+                                            <a
+                                                href="/employeeship"
+                                                className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50"
+                                            >
+                                                EMPLOYEESHIP
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a
+                                                href="/leadership"
+                                                className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50"
+                                            >
+                                                LEADERSHIP
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a
+                                                href="/excellence"
+                                                className="block text-center px-6 py-3 text-sm text-gray-800 uppercase tracking-wider font-semibold hover:bg-gray-50"
+                                            >
+                                                EXCELLENCE
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <a href="/knowledge-base" className="text-teal-800 hover:underline">
+                                KNOWLEDGE BASE
+                            </a>
+                            <a href="/pricing" className="text-teal-800 hover:underline">
+                                PRICING
+                            </a>
+                            <a href="/contact" className="text-teal-800 hover:underline">
+                                CONTACT US
+                            </a>
+                            <a href="/blog" className="text-teal-800 hover:underline">
+                                BLOG
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Link to="/login" className="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold hover:bg-blue-800 transition">Login</Link>
-                    <Link to="/registration" className="bg-yellow-600 text-white rounded-lg px-4 py-2 font-semibold hover:bg-yellow-700 transition">Register</Link>
+            </div>
+
+            {/* Navigation Bar */}
+            <nav className="flex flex-col sm:flex-row justify-between items-center px-6 py-4 bg-white shadow-lg sticky top-0 z-20 transition-shadow duration-300">
+                <div className="font-bold text-2xl text-blue-700">Practical Manager</div>
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-base">
+                    <a
+                        href="#modules"
+                        className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
+                    >
+                        Modules
+                    </a>
+                    <a
+                        href="#values"
+                        className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
+                    >
+                        Values
+                    </a>
+                    <a
+                        href="/testimonials"
+                        className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
+                    >
+                        Testimonials
+                    </a>
+                </div>
+                <div className="flex gap-2 mt-4 sm:mt-0">
+                    <a
+                        href="/login"
+                        onClick={(e) => handleNavigate(e, "/login")}
+                        className="bg-blue-700 text-white rounded-full px-6 py-2 font-semibold hover:bg-blue-800 transition-transform transform hover:scale-105 shadow-md"
+                    >
+                        Login
+                    </a>
+                    <a
+                        href="/registration"
+                        onClick={(e) => handleNavigate(e, "/registration")}
+                        className="ml-2 bg-yellow-600 text-white rounded-full px-6 py-2 font-semibold hover:bg-yellow-700 transition-transform transform hover:scale-105 shadow-md"
+                    >
+                        Register
+                    </a>
                 </div>
             </nav>
 
-            {/* Hero Section */}
-            <section className="flex flex-col items-center justify-center px-2 py-10 bg-white">
-                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
-                    <img src="/public/icon.png" alt="Practical Manager" className="mb-4 w-24 h-24 rounded-full shadow-lg object-contain" />
-                    <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-blue-700 text-center">Your team's success, powered by Practical Manager</h1>
-                    <p className="text-base sm:text-lg mb-6 text-gray-700 text-center">A unique platform to transform the way you work. Built for teams of all sizes, focused on productivity, engagement, and leadership.</p>
-                    <Link to="/registration" className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 mb-2 text-center">Get Started Free</Link>
+            {/* Page links removed to avoid repetition in the top bar */}
+
+            {/* Hero Section (clean, professional two-column variant) */}
+            <Hero />
+
+            {/* New Section: Join Practical Manager with a visual element */}
+            <section className="bg-white py-16 flex flex-col md:flex-row items-center justify-center gap-12 px-4 shadow-inner">
+                <div className="md:w-1/2 flex justify-center animate-fade-in-up">
+                    <div className="relative bg-white p-2 rounded-xl shadow-md overflow-hidden">
+                        {/* Main illustration (original home.png as requested) */}
+                        <img
+                            src={`${import.meta.env.BASE_URL}home.png`}
+                            alt="Practical illustration"
+                            className="w-64 md:w-80 h-auto rounded-lg object-cover shadow-lg"
+                        />
+                        {/* Decorative SVG background - subtle, non-interactive */}
+                        <img
+                            src={`${import.meta.env.BASE_URL}home-bg.svg`}
+                            alt=""
+                            aria-hidden="true"
+                            className="hidden md:block pointer-events-none absolute -top-6 -left-8 w-36 opacity-25 transform rotate-6"
+                        />
+                    </div>
+                </div>
+                <div
+                    className="md:w-1/2 text-center md:text-left animate-fade-in-up"
+                    style={{ animationDelay: "0.6s" }}
+                >
+                    <h2 className="text-3xl md:text-4xl font-bold text-blue-700 mb-4">
+                        Start your journey to better team management today
+                    </h2>
+                    <p className="text-lg text-gray-700 mb-6 max-w-lg mx-auto md:mx-0">
+                        Join thousands of teams who are simplifying their workflows and boosting productivity with our
+                        all-in-one platform.
+                    </p>
+                    <a
+                        href="/registration"
+                        onClick={(e) => handleNavigate(e, "/registration")}
+                        className="rounded-full bg-blue-700 text-white font-bold py-4 px-10 text-lg transition-transform hover:bg-blue-800 transform hover:scale-110 shadow-lg"
+                    >
+                        Sign up for a Free Account
+                    </a>
                 </div>
             </section>
 
             {/* Featured Modules Section */}
-            <section id="modules" className="bg-gray-50 py-10">
-                <h2 className="text-center text-2xl sm:text-3xl font-bold text-blue-700 mb-8">Featured Modules</h2>
-                <div className="flex flex-wrap justify-center gap-6">
-                    {modules.map((m, i) => (
-                        <div key={i} className="bg-white rounded-2xl shadow-lg p-6 max-w-xs w-full text-center transition hover:scale-105">
-                            <div className="text-4xl mb-3">{m.icon}</div>
-                            <h3 className="text-lg font-bold text-blue-700 mb-2">{m.title}</h3>
-                            <p className="text-base text-gray-700">{m.desc}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Story/Brand Section */}
-            <section className="bg-white py-10 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-yellow-600 mb-4">It takes time to build something that lasts</h2>
-                <p className="text-base sm:text-lg text-gray-700 mb-6">We believe in long-term commitment, continuous improvement, and putting our users first.</p>
-                <Link to="/about" className="inline-block bg-yellow-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-yellow-700 transition">Read Our Story</Link>
-            </section>
-
-            {/* Platform Highlight Section */}
-            <section className="bg-yellow-200 py-10 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-4">All-in-one suite for your business</h2>
-                <p className="text-base sm:text-lg text-gray-700 mb-6">Break down silos, increase efficiency, and empower your team with Practical Manager.</p>
-                <Link to="/registration" className="inline-block bg-red-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-red-700 transition">Try Now</Link>
-            </section>
-
-            {/* Trust Signals Section */}
-            <section className="bg-gray-50 py-8 text-center border-t border-gray-200">
-                <h3 className="text-lg font-bold text-blue-700 mb-2">Trusted by teams who value results</h3>
-                <div className="text-gray-500 text-base mb-2">Practical Manager is used by organizations focused on growth, engagement, and leadership.</div>
-            </section>
+            <FeaturedModulesComponent />
 
             {/* Testimonials Section */}
-            <section id="testimonials" className="bg-white py-10 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-8">What our users say</h2>
-                <div className="flex flex-wrap justify-center gap-6">
-                    {testimonials.map((t, i) => (
-                        <blockquote key={i} className="bg-blue-50 rounded-xl p-6 max-w-xs w-full font-serif italic text-gray-700 shadow mb-4">
-                            “{t.quote}”
-                            <div className="font-bold text-blue-700 mt-2 text-base">{t.author}</div>
-                        </blockquote>
-                    ))}
-                </div>
-            </section>
+            <TestimonialCards />
 
             {/* Values Section */}
-            <section id="values" className="bg-white py-10 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-yellow-600 mb-8">Our Core Values</h2>
-                <div className="flex flex-wrap justify-center gap-6">
-                    {values.map((v, i) => (
-                        <div key={i} className="bg-gray-50 rounded-2xl shadow-lg p-6 max-w-xs w-full text-center transition hover:scale-105">
-                            <div className="text-4xl mb-3">{v.icon}</div>
-                            <h3 className="text-lg font-bold text-yellow-600 mb-2">{v.title}</h3>
-                            <p className="text-base text-gray-700">{v.desc}</p>
-                        </div>
-                    ))}
+            <ValuesComponent />
+
+            {/* CTA Section for demo */}
+            <section className="bg-blue-50 py-20 text-center relative">
+                {/* Decorative translucent background text acting like a transparent image */}
+                <div
+                    aria-hidden="true"
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                >
+                    <span
+                        className="text-[48px] md:text-[96px] lg:text-[140px] font-extrabold text-white opacity-8 select-none"
+                        style={{ transform: "translateY(-10px)", mixBlendMode: "overlay" }}
+                    >
+                        Ready to transform your team?
+                    </span>
                 </div>
-                <Link to="/about" className="inline-block bg-yellow-600 text-white rounded-full px-6 py-3 font-bold text-lg hover:bg-yellow-700 transition mt-6">Read Our Story</Link>
+
+                <div className="container mx-auto px-4 relative z-10">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
+                        <img
+                            src={`${import.meta.env.BASE_URL}graph.png`}
+                            alt="Graph"
+                            className="w-48 md:w-80 lg:w-96 h-auto rounded-md shadow-md"
+                        />
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-bold text-blue-700">
+                                Ready to transform your team?
+                            </h2>
+                            <p className="text-lg text-gray-700 mb-6 max-w-2xl mx-auto md:mx-0">
+                                Get a live demo from one of our specialists and see how Practical Manager can work for
+                                you.
+                            </p>
+                            <a
+                                href="#contact"
+                                className="inline-block bg-yellow-600 text-white rounded-full px-10 py-4 font-bold text-lg hover:bg-yellow-700 transition-transform transform hover:scale-110 shadow-xl"
+                            >
+                                Request a Demo
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             {/* Contact Form Section */}
-            <section id="contact" className="bg-blue-50 py-10 flex flex-col items-center justify-center">
-                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-blue-700 mb-6 text-center">Contact us for DEMO</h2>
-                    <form className="w-full flex flex-col items-center">
-                        <input type="text" placeholder="First Name" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
-                        <input type="text" placeholder="Last Name*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                        <input type="text" placeholder="Phone" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
-                        <input type="email" placeholder="Email*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                        <input type="text" placeholder="Company*" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                        <input type="number" placeholder="No. of Employees" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" />
-                        <div className="w-full text-left mb-4">
-                            <label className="text-sm">
-                                <input type="checkbox" required className="mr-2" /> I agree with <a href="#" className="text-blue-700 underline">terms and conditions</a> and <a href="#" className="text-blue-700 underline">privacy policy</a>.
-                            </label>
-                        </div>
-                        <input type="text" placeholder="Enter the Captcha" className="w-full p-3 mb-4 rounded-lg border border-gray-300 text-base" required />
-                        <div className="mb-4 text-blue-700 font-bold">m5yg32 <button type="button" className="ml-2 text-blue-700 underline">Reload</button></div>
-                        <div className="flex w-full gap-2">
-                            <button type="submit" className="w-1/2 rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800">Submit</button>
-                            <button type="reset" className="w-1/2 rounded-lg bg-yellow-600 text-white font-bold py-3 text-lg transition hover:bg-yellow-700">Reset</button>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            {/* Footer Section */}
-            <footer className="bg-white py-8 text-center text-gray-700 mt-8 shadow border-t border-gray-200">
-                <div className="mb-4 flex flex-wrap justify-center gap-6">
-                    <a href="#" className="text-blue-700 font-medium hover:underline">User guidelines</a>
-                    <a href="#" className="text-blue-700 font-medium hover:underline">FAQ</a>
-                    <a href="#" className="text-blue-700 font-medium hover:underline">Contact us</a>
-                    <a href="#" className="text-blue-700 font-medium hover:underline">About us</a>
-                </div>
-                <div className="mb-2 text-gray-500">
-                    <a href="#" className="text-blue-700 mr-2 hover:underline">Privacy policy</a> | <a href="#" className="text-blue-700 ml-2 hover:underline">Terms of service</a>
-                </div>
-                <div className="text-gray-400 text-sm">Copyright © 2025 Evoli management d.o.o.</div>
-            </footer>
+            <ContactForm />
         </main>
     );
 };

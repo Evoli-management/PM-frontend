@@ -1,8 +1,8 @@
-
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faLock, faEye, faEyeSlash, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import authService from "../services/authService";
 
 const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
@@ -28,13 +28,63 @@ const LoginPage = () => {
         setError("");
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError("");
         setLoading(true);
-        setTimeout(() => {
+        try {
+            const { email, password } = formData;
+            const res = await authService.login({ email, password });
+
+            // Try to get token from response
+            let token = res.token || (res.user && res.user.token);
+            if (token) {
+                console.log("Storing token in localStorage");
+                localStorage.setItem("access_token", token);
+
+                // Verify the token works by testing an authenticated endpoint
+                try {
+                    const testRes = await authService.verifyToken();
+                    console.log("Token verification successful:", testRes);
+                    navigate("/dashboard");
+                } catch (verifyError) {
+                    console.error("Token verification failed:", verifyError);
+                    setError("Authentication failed. Please try again.");
+                }
+            } else {
+                console.error("No token in response:", res);
+                setError("Login failed: No token received. Please contact support.");
+            }
+        } catch (err) {
+            console.error("Login error:", err);
+            const msg = err.response?.data?.message || "Login failed";
+            // Detect unverified user error (customize if backend uses a different message)
+            if (typeof msg === "string" && msg.toLowerCase().includes("verify your email")) {
+                setError(
+                    <span>
+                        Your email is not verified. <br />
+                        <button
+                            type="button"
+                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer"
+                            onClick={async () => {
+                                try {
+                                    await authService.resendVerification(email);
+                                    alert("Verification email resent! Please check your inbox.");
+                                } catch {
+                                    alert("Failed to resend verification email. Try again later.");
+                                }
+                            }}
+                        >
+                            Resend verification email
+                        </button>
+                    </span>,
+                );
+            } else {
+                setError(Array.isArray(msg) ? msg.join(", ") : msg);
+            }
+        } finally {
             setLoading(false);
-            navigate("/dashboard");
-        }, 500);
+        }
     };
 
     const handleSocialLogin = (provider) => {
@@ -52,17 +102,18 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
-            <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8">
-                {/* Login Box */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md mx-auto flex flex-col items-center">
-                    <img
-                        src="/PM-frontend/logo.png"
-                        alt="Practical Manager Logo"
-                        loading="lazy"
-                        className="mb-4 w-32 h-20 object-contain"
-                    />
+            <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
+                <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
+                {/* Left: form pane */}
+                <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
                     <h2 className="text-2xl font-bold text-black mb-2 text-center">LOGIN</h2>
-                    <p className="text-black font-semibold mb-4 text-base text-center">Login and Take Control of Your Workflow.</p>
+                    <p className="text-black font-semibold mb-4 text-base text-center">
+                        Login and Take Control of Your Workflow.
+                    </p>
+                    {/* Debug info for troubleshooting (opt-in via VITE_SHOW_DEBUG=true) */}
+                    {import.meta.env.VITE_SHOW_DEBUG === "true" && (
+                        <div className="text-xs text-gray-500 mb-2">API: {import.meta.env.VITE_API_BASE_URL}</div>
+                    )}
                     <form className="space-y-4 w-full" onSubmit={handleSubmit} aria-label="Login form">
                         <div className="relative w-full">
                             <input
@@ -74,6 +125,7 @@ const LoginPage = () => {
                                 className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base bg-blue-100"
                                 required
                                 aria-label="Email"
+                                autoComplete="email"
                             />
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
                                 <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
@@ -89,6 +141,7 @@ const LoginPage = () => {
                                 className="w-full p-3 pl-10 pr-10 rounded-lg border border-gray-300 text-base bg-blue-100"
                                 required
                                 aria-label="Password"
+                                autoComplete="current-password"
                             />
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
                                 <FontAwesomeIcon icon={faLock} className="text-lg" />
@@ -100,13 +153,7 @@ const LoginPage = () => {
                                 tabIndex={0}
                                 role="button"
                             >
-                                <FontAwesomeIcon
-                                    icon={showPassword ? faEye : faEyeSlash}
-                                    className="text-lg"
-                                />
-                            </span>
-                            <span className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400" title="Password must be at least 6 characters">
-                                <FontAwesomeIcon icon={faInfoCircle} />
+                                <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-lg" />
                             </span>
                         </div>
                         <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-2">
@@ -129,10 +176,14 @@ const LoginPage = () => {
                                 Forget password?
                             </Link>
                         </div>
-                        {error && <div className="w-full text-red-600 text-sm font-semibold text-center" role="alert">{error}</div>}
+                        {error && (
+                            <div className="w-full text-red-600 text-sm font-semibold text-center" role="alert">
+                                {error}
+                            </div>
+                        )}
                         <button
                             type="submit"
-                            className={`w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            className={`w-full rounded-lg bg-green-500 text-white font-bold py-3 text-lg transition hover:bg-green-600 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                             disabled={loading}
                             aria-busy={loading}
                         >
@@ -147,7 +198,7 @@ const LoginPage = () => {
                             <button
                                 type="button"
                                 onClick={() => handleSocialLogin("Google")}
-                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-white transition hover:bg-gray-50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                                 disabled={loading}
                                 aria-label="Login with Google"
                             >
@@ -162,7 +213,7 @@ const LoginPage = () => {
                             <button
                                 type="button"
                                 onClick={() => handleSocialLogin("Microsoft")}
-                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-white transition hover:bg-gray-50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                className={`flex items-center justify-center border border-gray-300 rounded-lg w-full sm:w-1/2 h-12 bg-gray-100 transition hover:bg-gray-200 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
                                 disabled={loading}
                                 aria-label="Login with Microsoft"
                             >
@@ -183,20 +234,20 @@ const LoginPage = () => {
                         </p>
                     </form>
                 </div>
-                {/* Illustration Section */}
-                <div className="hidden md:flex flex-1 items-center justify-center">
-                    <div className="text-center">
+                {/* Right: Illustration */}
+                <div className="hidden md:flex md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
+                    <div className="w-full overflow-hidden flex items-center justify-center">
                         <img
-                            src="/PM-frontend/image.png"
-                            alt="2FA Illustration"
+                            src={`${import.meta.env.BASE_URL}login.png`}
+                            alt="Login Illustration"
                             loading="lazy"
                             className="w-[300px] h-[350px] lg:w-[400px] lg:h-[470px] xl:w-[515px] xl:h-[600px] object-contain mx-auto"
                         />
-                        <p className="mt-4 text-black text-sm font-semibold mx-auto max-w-[439px] px-4">
-                            This account is protected with <br />
-                            Two factor authentication 2FA
-                        </p>
                     </div>
+                    <p className="mt-1 md:-mt-4 text-black text-sm md:text-base lg:text-lg font-semibold leading-6 mx-auto max-w-[420px] px-3 text-center">
+                        This account is protected with Two factor <br />
+                        authentication (2FA)
+                    </p>
                 </div>
             </div>
         </div>

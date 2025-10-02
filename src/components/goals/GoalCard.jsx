@@ -1,153 +1,278 @@
-import React from "react";
-import { Link } from "react-router-dom";
+// src/components/goals/GoalCard.jsx
+import React, { useState } from "react";
 import {
-    FaBullseye,
+    FaEye,
     FaEdit,
+    FaCheckCircle,
     FaTrash,
-    FaExclamationTriangle,
+    FaEllipsisH,
+    FaCalendarAlt,
+    FaEyeSlash,
+    FaArchive,
     FaClock,
-    FaTasks,
-    FaLink,
-    FaFlag,
-    FaCheck,
+    FaChevronRight,
 } from "react-icons/fa";
 
-import { getStatusColor } from "../../utils/goalUtils";
-import Chip from "./Chip.jsx";
-import ProgressBar from "./ProgressBar.jsx";
+const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onToggleVisibility }) => {
+    const [showActions, setShowActions] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-const GoalCard = ({ goal, onOpen, onEdit, onDelete }) => {
-    const statusTone = getStatusColor(goal.status);
+    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+    const totalMilestones = goal.milestones?.length || 0;
+    const progressPercent =
+        totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : goal.progressPercent || 0;
 
-    const isOverdue = goal.targetDate && new Date(goal.targetDate) < new Date() && goal.status === "active";
-    const daysUntilDue = goal.targetDate
-        ? Math.ceil((new Date(goal.targetDate) - new Date()) / (1000 * 60 * 60 * 24))
-        : null;
+    // Always calculate time-based information
+    const now = new Date();
+    const dueDate = new Date(goal.dueDate);
+    const startDate = goal.startDate ? new Date(goal.startDate) : null;
 
-    // Milestone progress calculations
-    const completedMilestones = goal.completedMilestoneCount || 0;
-    const totalMilestones = goal.milestoneCount || 0;
-    const milestoneProgress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+    const dueInDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+    const isOverdue = dueDate < now;
+    const totalDuration = startDate ? Math.ceil((dueDate - startDate) / (1000 * 60 * 60 * 24)) : null;
+    const daysPassed = startDate ? Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) : null;
+
+    // Calculate status-based display
+    const getStatusDisplay = () => {
+        if (goal.status === "completed") {
+            const completedDate = goal.completedAt ? new Date(goal.completedAt) : null;
+            if (completedDate && completedDate < dueDate) {
+                const daysEarly = Math.ceil((dueDate - completedDate) / (1000 * 60 * 60 * 24));
+                return { text: `Completed ${daysEarly} days early`, color: "text-green-600 font-medium" };
+            } else if (completedDate && completedDate > dueDate) {
+                const daysLate = Math.ceil((completedDate - dueDate) / (1000 * 60 * 60 * 24));
+                return { text: `Completed ${daysLate} days late`, color: "text-orange-600 font-medium" };
+            }
+            return { text: "Completed on time", color: "text-green-600 font-medium" };
+        }
+
+        if (goal.status === "archived") {
+            return { text: `Archived (was due ${dueDate.toLocaleDateString()})`, color: "text-gray-600" };
+        }
+
+        // Active goals
+        if (isOverdue) {
+            const daysOverdue = Math.abs(dueInDays);
+            return { text: `${daysOverdue} days overdue`, color: "text-red-600 font-medium" };
+        } else if (dueInDays === 0) {
+            return { text: "Due today", color: "text-red-600 font-medium" };
+        } else if (dueInDays === 1) {
+            return { text: "Due tomorrow", color: "text-amber-600 font-medium" };
+        } else if (dueInDays <= 7) {
+            return { text: `${dueInDays} days left`, color: "text-amber-600 font-medium" };
+        } else {
+            return { text: `${dueInDays} days left`, color: "text-gray-600" };
+        }
+    };
+
+    const statusDisplay = getStatusDisplay();
+
+    const getStatusStyle = (status) => {
+        switch (status) {
+            case "completed":
+                return "bg-green-100 text-green-700";
+            case "active":
+                return "bg-blue-100 text-blue-700";
+            case "archived":
+                return "bg-gray-100 text-gray-700";
+            default:
+                return "bg-gray-100 text-gray-700";
+        }
+    };
+
+    const getProgressColor = () => {
+        if (progressPercent >= 80) return "bg-green-500";
+        if (progressPercent >= 60) return "bg-blue-500";
+        if (progressPercent >= 40) return "bg-yellow-500";
+        return "bg-gray-400";
+    };
+
+    const handleAction = async (action, ...args) => {
+        setIsLoading(true);
+        try {
+            await action(...args);
+        } catch (error) {
+            console.error("Action failed:", error);
+        } finally {
+            setIsLoading(false);
+            setShowActions(false);
+        }
+    };
+
+    const handleEditClick = (e) => {
+        e.stopPropagation();
+        onOpen(goal, "edit");
+    };
 
     return (
-        <div
-            className={`bg-white rounded-2xl shadow-sm border hover:shadow-md transition-shadow p-4 ${
-                isOverdue ? "border-red-200 bg-red-50/30" : ""
-            }`}
-        >
-            <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-start gap-3 flex-1">
-                    <div
-                        className={`p-2 rounded-xl ${
-                            goal.status === "completed"
-                                ? "bg-green-50 text-green-700"
-                                : goal.status === "paused"
-                                  ? "bg-yellow-50 text-yellow-700"
-                                  : "bg-blue-50 text-blue-700"
-                        }`}
-                    >
-                        <FaBullseye />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-2 mb-1">
-                            <h3 className="font-bold text-slate-900 truncate" title={goal.title}>
-                                {goal.title}
-                            </h3>
-                            {isOverdue && <FaExclamationTriangle className="text-red-600 mt-1 flex-shrink-0" />}
+        <div className="group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden">
+            {/* Header Section */}
+            <div className="p-5">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <span
+                                className={`px-2 py-1 rounded-md text-xs font-medium capitalize ${getStatusStyle(goal.status)}`}
+                            >
+                                {goal.status}
+                            </span>
+                            {goal.visibility === "private" && (
+                                <div className="p-1 bg-gray-100 rounded-md">
+                                    <FaEyeSlash className="w-3 h-3 text-gray-500" />
+                                </div>
+                            )}
                         </div>
-                        {goal.keyAreaName && <Chip label={goal.keyAreaName} className="mb-2" />}
+
+                        <h3
+                            className="font-semibold text-gray-900 text-base mb-2 leading-tight cursor-pointer hover:text-blue-600 transition-colors line-clamp-2"
+                            onClick={() => onOpen(goal)}
+                        >
+                            {goal.title}
+                        </h3>
+
                         {goal.description && (
-                            <p className="text-sm text-slate-700 mb-3 line-clamp-2">{goal.description}</p>
+                            <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-4">
+                                {goal.description}
+                            </p>
                         )}
                     </div>
-                </div>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                        onClick={() => onEdit(goal)}
-                        className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        title="Edit goal"
-                    >
-                        <FaEdit className="text-xs" />
-                    </button>
-                    <button
-                        onClick={() => onDelete(goal)}
-                        className="p-1.5 rounded-lg text-slate-600 hover:bg-red-50 hover:text-red-600"
-                        title="Delete goal"
-                    >
-                        <FaTrash className="text-xs" />
-                    </button>
-                </div>
-            </div>
+                    {/* Quick Actions */}
+                    <div className="flex items-center gap-1 ml-4">
+                        <button
+                            onClick={handleEditClick}
+                            disabled={isLoading}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
+                            title="Edit Goal"
+                        >
+                            <FaEdit className="w-4 h-4" />
+                        </button>
 
-            {/* Progress Section */}
-            <div className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-slate-700">Overall Progress</span>
-                    <span className="text-xs font-semibold text-slate-900">{goal.progressPercentage || 0}%</span>
-                </div>
-                <ProgressBar value={goal.progressPercentage || 0} />
-            </div>
-
-            {/* Milestones Progress */}
-            {totalMilestones > 0 && (
-                <div className="mb-3 p-2 bg-slate-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1">
-                            <FaFlag className="text-xs text-slate-600" />
-                            <span className="text-xs font-semibold text-slate-700">Milestones</span>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-900">
-                            {completedMilestones}/{totalMilestones}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-slate-200 rounded-full h-1.5">
-                            <div
-                                className="bg-green-500 h-1.5 rounded-full transition-all duration-300"
-                                style={{ width: `${milestoneProgress}%` }}
-                            />
-                        </div>
-                        {completedMilestones === totalMilestones && totalMilestones > 0 && (
-                            <FaCheck className="text-green-600 text-xs" />
+                        {goal.status === "active" && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAction(onComplete, goal.id);
+                                }}
+                                disabled={isLoading}
+                                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors disabled:opacity-50"
+                                title="Mark Complete"
+                            >
+                                <FaCheckCircle className="w-4 h-4" />
+                            </button>
                         )}
+
+                        <div className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowActions(!showActions);
+                                }}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+                            >
+                                <FaEllipsisH className="w-4 h-4" />
+                            </button>
+
+                            {showActions && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
+                                    <div className="absolute right-0 top-10 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAction(onToggleVisibility, goal.id);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
+                                        >
+                                            {goal.visibility === "public" ? (
+                                                <FaEyeSlash className="w-4 h-4" />
+                                            ) : (
+                                                <FaEye className="w-4 h-4" />
+                                            )}
+                                            Make {goal.visibility === "public" ? "Private" : "Public"}
+                                        </button>
+
+                                        {goal.status !== "archived" && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAction(onArchive, goal.id);
+                                                }}
+                                                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
+                                            >
+                                                <FaArchive className="w-4 h-4" />
+                                                Archive
+                                            </button>
+                                        )}
+
+                                        <hr className="my-1 border-gray-100" />
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAction(onDelete, goal.id);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-3 text-sm"
+                                        >
+                                            <FaTrash className="w-4 h-4" />
+                                            Delete
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
-            )}
 
-            <div className="text-xs text-slate-600 flex items-center gap-4 flex-wrap mb-3">
-                {goal.targetDate && (
-                    <span className={`inline-flex items-center gap-1 ${isOverdue ? "text-red-600 font-semibold" : ""}`}>
-                        <FaClock />
-                        {isOverdue ? "Overdue" : daysUntilDue > 0 ? `${daysUntilDue}d left` : "Due today"}
-                    </span>
+                {/* Progress Section */}
+                <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-700">
+                                {completedMilestones}/{totalMilestones} milestones
+                            </span>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{progressPercent}%</span>
+                    </div>
+
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                            className={`h-2 rounded-full transition-all duration-500 ${getProgressColor()}`}
+                            style={{ width: `${progressPercent}%` }}
+                        />
+                    </div>
+                </div>
+
+                {/* Due Date Section */}
+                <div className="flex items-center justify-between">
+                    <div className={`flex items-center gap-2 text-sm ${statusDisplay.color}`}>
+                        <FaCalendarAlt className="w-4 h-4" />
+                        <span>{statusDisplay.text}</span>
+                    </div>
+
+                    <button
+                        onClick={() => onOpen(goal)}
+                        className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                    >
+                        <FaChevronRight className="w-3 h-3" />
+                    </button>
+                </div>
+
+                {/* Progress insights */}
+                {goal.status === "active" && totalDuration && daysPassed !== null && (
+                    <div className="mt-3 text-xs text-gray-500">
+                        Day {Math.max(1, daysPassed)} of {totalDuration} •{" "}
+                        {Math.round((daysPassed / totalDuration) * 100)}% time elapsed
+                    </div>
                 )}
-                {typeof goal.subGoalCount === "number" && (
-                    <span className="inline-flex items-center gap-1">
-                        <FaTasks /> {goal.subGoalCount} sub-goals
-                    </span>
+
+                {/* Overdue Warning - only for active overdue goals */}
+                {isOverdue && goal.status === "active" && (
+                    <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                        <FaClock className="w-4 h-4 text-red-500" />
+                        <span className="text-red-700 text-sm font-medium">Goal is overdue - needs attention</span>
+                    </div>
                 )}
-            </div>
-
-            <div className="flex items-center gap-2 mb-3">
-                {goal.status && <Chip label={goal.status} toneClass={`${statusTone} border`} />}
-                {goal.visibility && <Chip label={goal.visibility} />}
-            </div>
-
-            <div className="flex items-center justify-between">
-                <button
-                    className="text-sm font-bold text-blue-700 hover:underline inline-flex items-center gap-1"
-                    onClick={() => onOpen(goal)}
-                >
-                    <FaLink /> View Details
-                </button>
-                <Link
-                    to="/tasks?view=activity-trap"
-                    className="text-xs text-amber-700 font-semibold hover:underline"
-                    title="Link unassigned tasks from Activity Trap"
-                >
-                    Link Tasks
-                </Link>
             </div>
         </div>
     );
