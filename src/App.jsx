@@ -14,6 +14,8 @@ import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
+import Contacts from "./pages/Contacts.jsx";
+import Modules from "./pages/Modules.jsx";
 
 // Dashboard pages
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
@@ -40,7 +42,7 @@ export default function App() {
     const currentPath = window.location.hash.replace(/^#\/?/, "/");
     return (
         <Router>
-            <div className="flex flex-col min-h-screen">
+            <div className="">
                 <Navbar />
                 <main className="flex-grow">
                     <Suspense
@@ -54,6 +56,10 @@ export default function App() {
                             <Route path="/" element={<Home />} />
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/PasswordPageForget" element={<PasswordPageForget />} />
+                            {/* Recently Added */}
+                            <Route path="/modules" element={<Modules />} />
+                            <Route path="/contacts" element={<Contacts />} />
+
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />

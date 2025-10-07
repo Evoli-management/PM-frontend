@@ -5,6 +5,7 @@ import TestimonialCards from "../components/TestimonialCards.jsx";
 import Hero from "../components/Hero.jsx";
 import ValuesComponent from "../components/ValuesComponent.jsx";
 import FeaturedModulesComponent from "../components/FeaturedModulesComponent.jsx";
+import { HiMiniRectangleGroup } from "react-icons/hi2";
 
 const Home = () => {
     const navigate = useNavigate();
@@ -15,7 +16,7 @@ const Home = () => {
     };
 
     return (
-        <main className="font-sans bg-gray-50 text-gray-900 min-h-screen">
+        <main className="font-sans text-gray-900 min-h-screen">
             {/* Tailwind CSS `style` block for custom animations and hero polish */}
             <style>
                 {`
@@ -99,7 +100,7 @@ const Home = () => {
             </style>
 
             {/* Slim top strip with quick links (matches site header) */}
-            <div className="bg-teal-50 border-b border-teal-100 text-sm">
+            <div className="border-b border-teal-100 text-sm">
                 <div className="container mx-auto px-4">
                     <div className="flex items-center justify-between py-2">
                         <div className="flex items-center gap-6">
@@ -165,7 +166,7 @@ const Home = () => {
             </div>
 
             {/* Navigation Bar */}
-            <nav className="flex flex-col sm:flex-row justify-between items-center px-6 py-4 bg-white shadow-lg sticky top-0 z-20 transition-shadow duration-300">
+            <nav className="flex flex-col sm:flex-row justify-between items-center px-6 py-4 bg-white shadow-md sticky top-0 z-20 transition-shadow duration-300">
                 <div className="font-bold text-2xl text-blue-700">Practical Manager</div>
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-base">
                     <a
@@ -191,14 +192,14 @@ const Home = () => {
                     <a
                         href="/login"
                         onClick={(e) => handleNavigate(e, "/login")}
-                        className="bg-blue-700 text-white rounded-full px-6 py-2 font-semibold hover:bg-blue-800 transition-transform transform hover:scale-105 shadow-md"
+                        className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-lg px-8 py-2 text-lg font-medium hover:bg-slate-50"
                     >
                         Login
                     </a>
                     <a
                         href="/registration"
                         onClick={(e) => handleNavigate(e, "/registration")}
-                        className="ml-2 bg-yellow-600 text-white rounded-full px-6 py-2 font-semibold hover:bg-yellow-700 transition-transform transform hover:scale-105 shadow-md"
+                        className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-lg px-8 py-2 text-lg font-semibold shadow-xl"
                     >
                         Register
                     </a>
@@ -211,42 +212,28 @@ const Home = () => {
             <Hero />
 
             {/* New Section: Join Practical Manager with a visual element */}
-            <section className="bg-white py-16 flex flex-col md:flex-row items-center justify-center gap-12 px-4 shadow-inner">
-                <div className="md:w-1/2 flex justify-center animate-fade-in-up">
-                    <div className="relative bg-white p-2 rounded-xl shadow-md overflow-hidden">
-                        {/* Main illustration (original home.png as requested) */}
-                        <img
-                            src={`${import.meta.env.BASE_URL}home.png`}
-                            alt="Practical illustration"
-                            className="w-64 md:w-80 h-auto rounded-lg object-cover shadow-lg"
-                        />
-                        {/* Decorative SVG background - subtle, non-interactive */}
-                        <img
-                            src={`${import.meta.env.BASE_URL}home-bg.svg`}
-                            alt=""
-                            aria-hidden="true"
-                            className="hidden md:block pointer-events-none absolute -top-6 -left-8 w-36 opacity-25 transform rotate-6"
-                        />
-                    </div>
+            <section className="animate-fade-in-up py-16 grid grid-cols-1 md:grid-cols-2 items-center w-full max-w-6xl gap-8 mx-auto">
+                    <div className="flex justify-center items-center">
+                        <HiMiniRectangleGroup className="w-60 h-60 md:w-120 md:h-120 text-[#7C3AED]"/>
                 </div>
                 <div
-                    className="md:w-1/2 text-center md:text-left animate-fade-in-up"
+                    className="text-center md:text-left animate-fade-in-up"
                     style={{ animationDelay: "0.6s" }}
                 >
-                    <h2 className="text-3xl md:text-4xl font-bold text-blue-700 mb-4">
-                        Start your journey to better team management today
+                    <h2 className="text-3xl md:text-6xl font-bold mb-6">
+                        Start your journey <br/><span className="bg-amber-500 text-2xl md:text-3xl p-1">to better team management today</span>
                     </h2>
-                    <p className="text-lg text-gray-700 mb-6 max-w-lg mx-auto md:mx-0">
+                    <p className="md:text-lg text-gray-700 mb-4">
                         Join thousands of teams who are simplifying their workflows and boosting productivity with our
                         all-in-one platform.
                     </p>
-                    <a
+                    {/* <a
                         href="/registration"
                         onClick={(e) => handleNavigate(e, "/registration")}
                         className="rounded-full bg-blue-700 text-white font-bold py-4 px-10 text-lg transition-transform hover:bg-blue-800 transform hover:scale-110 shadow-lg"
                     >
                         Sign up for a Free Account
-                    </a>
+                    </a> */}
                 </div>
             </section>
 
@@ -260,14 +247,14 @@ const Home = () => {
             <ValuesComponent />
 
             {/* CTA Section for demo */}
-            <section className="bg-blue-50 py-20 text-center relative">
+            <section className="bg-[#17191e] py-20 text-center relative">
                 {/* Decorative translucent background text acting like a transparent image */}
                 <div
                     aria-hidden="true"
                     className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 >
                     <span
-                        className="text-[48px] md:text-[96px] lg:text-[140px] font-extrabold text-white opacity-8 select-none"
+                        className="text-[48px] md:text-[96px] lg:text-[120px] font-extrabold text-white opacity-40 select-none"
                         style={{ transform: "translateY(-10px)", mixBlendMode: "overlay" }}
                     >
                         Ready to transform your team?
@@ -275,23 +262,23 @@ const Home = () => {
                 </div>
 
                 <div className="container mx-auto px-4 relative z-10">
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-6 mb-6">
                         <img
                             src={`${import.meta.env.BASE_URL}graph.png`}
                             alt="Graph"
-                            className="w-48 md:w-80 lg:w-96 h-auto rounded-md shadow-md"
+                            className="rounded-md shadow-lg"
                         />
-                        <div>
-                            <h2 className="text-3xl md:text-4xl font-bold text-blue-700">
-                                Ready to transform your team?
-                            </h2>
-                            <p className="text-lg text-gray-700 mb-6 max-w-2xl mx-auto md:mx-0">
+                        <div className="text-white">
+                            <h2 className="text-2xl md:text-4xl font-bold mb-4">Ready to transform your team?</h2>
+                            <p className="">
                                 Get a live demo from one of our specialists and see how Practical Manager can work for
                                 you.
                             </p>
                             <a
-                                href="#contact"
-                                className="inline-block bg-yellow-600 text-white rounded-full px-10 py-4 font-bold text-lg hover:bg-yellow-700 transition-transform transform hover:scale-110 shadow-xl"
+                                href="#/contact"
+                                onClick={(e) => handleNavigate(e, "/registration")}
+                                className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-lg px-8 py-4 text-lg font-semibold shadow-xl"
+                                aria-label="Get started - it's free"
                             >
                                 Request a Demo
                             </a>

@@ -36,42 +36,42 @@ function hexToRgb(hex) {
 
 export default function Hero() {
     return (
-        <section className="relative bg-white pt-16 pb-16 px-4 text-gray-900">
-            <div className="container mx-auto">
+        <section className="relative py-16 w-full max-w-6xl mx-auto">
+            <div className="container">
                 <div className="flex flex-col-reverse md:flex-row items-center gap-10 md:gap-20">
                     {/* Left column: headline, copy, CTAs, stats */}
-                    <div className="md:w-6/12 text-center md:text-left">
-                        <h1 className="text-5xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-tight mb-2">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-2">
                             <span className="heading-gradient">Lead with clarity.</span>
                             <span className="heading-subtle">Deliver with confidence.</span>
                         </h1>
 
-                        <p className="text-lg text-slate-600 mb-4 max-w-xl mx-auto md:mx-0">
+                        <p className="text-slate-600 mb-4">
                             Practical Manager is a productivity and leadership tool for your team to excel.
                         </p>
 
-                        <div className="text-base text-slate-700 mb-4 max-w-xl mx-auto md:mx-0">
+                        {/* <div className="text-base text-slate-700 mb-4 max-w-xl mx-auto md:mx-0">
                             <div className="font-semibold mb-2">A different tool that helps your team:</div>
                             <ul className="list-disc list-inside space-y-2">
                                 <li>Goal-setting and alignment</li>
                                 <li>Share recognition and practice 1-minute management</li>
                                 <li>Manage your time and achieve results</li>
-                                <li>Develop managerial behaviour and leadership excellence</li>
+                                <li>Develop managerial behavior and leadership excellence</li>
                             </ul>
-                        </div>
+                        </div> */}
 
-                        <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start mt-2">
+                        <div className="flex justify-center md:justify-start gap-4 items-center mt-2">
                             <a
                                 href="/registration"
                                 onClick={(e) => handleNavigate(e, "/registration")}
-                                className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-full px-8 py-4 text-lg font-semibold shadow-xl"
+                                className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-lg px-8 py-4 text-lg font-semibold shadow-xl"
                                 aria-label="Get started - it's free"
                             >
                                 Get started — it's free
                             </a>
                             <a
                                 href="#contact"
-                                className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-full px-8 py-4 text-lg font-medium hover:bg-slate-50"
+                                className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-lg px-8 py-4 text-lg font-medium hover:bg-slate-50"
                                 aria-label="Request a demo"
                             >
                                 Request a demo
@@ -80,10 +80,11 @@ export default function Hero() {
                     </div>
 
                     {/* Right column: polished illustration card */}
-                    <div className="md:w-6/12 flex justify-center md:justify-end">
-                        <div className="w-full relative" style={{ minHeight: 420 }}>
+                    <div className="flex justify-center">
+                        <div className="w-full relative rounded-2xl" style={{ minHeight: 420 }}>
                             <div
                                 aria-hidden="true"
+                                className="rounded-2xl"
                                 style={{
                                     position: "absolute",
                                     inset: 0,
