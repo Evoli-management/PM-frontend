@@ -16,6 +16,7 @@ import AdminSettings from "./pages/AdminSettings.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
 import Modules from "./pages/Modules.jsx";
+import Testimonials from "./pages/Testimonials.jsx"
 
 // Dashboard pages
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
@@ -32,6 +33,7 @@ import Tasks from "./pages/Tasks.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import Teams from "./pages/Teams.jsx";
+import Pricing from "./pages/Pricing.jsx";
 
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -59,6 +61,8 @@ export default function App() {
                             {/* Recently Added */}
                             <Route path="/modules" element={<Modules />} />
                             <Route path="/contacts" element={<Contacts />} />
+                            <Route path="/testimonials" element={<Testimonials />} />
+                            <Route path="/pricing" element={<Pricing />} />
 
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/registration" element={<Registration />} />

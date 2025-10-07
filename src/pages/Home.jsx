@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import ContactForm from "../components/ContactForm.jsx";
+
 import TestimonialCards from "../components/TestimonialCards.jsx";
 import Hero from "../components/Hero.jsx";
 import ValuesComponent from "../components/ValuesComponent.jsx";
@@ -151,10 +151,10 @@ const Home = () => {
                             <a href="/knowledge-base" className="text-teal-800 hover:underline">
                                 KNOWLEDGE BASE
                             </a>
-                            <a href="/pricing" className="text-teal-800 hover:underline">
+                            <a href="#pricing" className="text-teal-800 hover:underline">
                                 PRICING
                             </a>
-                            <a href="/contact" className="text-teal-800 hover:underline">
+                            <a href="#contacts" className="text-teal-800 hover:underline">
                                 CONTACT US
                             </a>
                             <a href="/blog" className="text-teal-800 hover:underline">
@@ -182,7 +182,7 @@ const Home = () => {
                         Values
                     </a>
                     <a
-                        href="/testimonials"
+                        href="#testimonials"
                         className="text-blue-900 hover:text-blue-700 font-medium transition-colors duration-200"
                     >
                         Testimonials
@@ -275,8 +275,8 @@ const Home = () => {
                                 you.
                             </p>
                             <a
-                                href="#/contact"
-                                onClick={(e) => handleNavigate(e, "/registration")}
+                                href="#contacts"
+                                onClick={(e) => handleNavigate(e, "/contacts")}
                                 className="inline-flex items-center justify-center btn-gradient btn-glow text-white rounded-lg px-8 py-4 text-lg font-semibold shadow-xl"
                                 aria-label="Get started - it's free"
                             >
@@ -286,9 +286,6 @@ const Home = () => {
                     </div>
                 </div>
             </section>
-
-            {/* Contact Form Section */}
-            <ContactForm />
         </main>
     );
 };
