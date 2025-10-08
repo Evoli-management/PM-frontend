@@ -237,7 +237,7 @@ export default function DayView({
                                             <span>{h}</span>
                                         </td>
                                         <td
-                                            className={`border-t border-blue-100 px-2 py-1 align-top ${isBoundary ? 'pointer-events-none opacity-60' : ''}`}
+                                            className={`border-t border-blue-100 px-2 py-1 align-top ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
                                             style={{ width: "100%" }}
                                             {...(!isBoundary && {
                                                 onDoubleClick: () => {
