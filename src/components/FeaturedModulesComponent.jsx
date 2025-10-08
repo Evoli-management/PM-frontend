@@ -30,9 +30,9 @@ export default function FeaturedModulesComponent() {
     ];
 
     return(
-        <section id="modules" className="bg-gray-100 py-20">
-            <div className="container mx-auto px-4">
-                <div className="flex items-center justify-center gap-6 mb-16 animate-fade-in-up">
+        <section id="modules" className="py-12 w-full max-w-6xl mx-auto">
+            <div className="">
+                <div className="mb-4 animate-fade-in-up">
                     <h2 className="text-center text-3xl md:text-4xl font-bold">Featured Modules</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">

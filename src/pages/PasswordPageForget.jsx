@@ -53,11 +53,11 @@ const ForgotPasswordPage = () => {
     }, [cooldown]);
 
     return (
-        <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
-            <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
-                <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
+        <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto">
+            <div className="relative grid grid-cols-1 md:grid-cols-2 rounded-xl shadow-xl">
+                {/* <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" /> */}
                 {/* Left: form pane */}
-                <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
+                <div className="p-8 flex flex-col justify-center">
                     {!submitted ? (
                         <>
                             <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
@@ -73,10 +73,10 @@ const ForgotPasswordPage = () => {
                                         value={email}
                                         onChange={handleEmailChange}
                                         placeholder="Email"
-                                        className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base bg-blue-100"
+                                        className="w-full p-3 pl-10 rounded-lg border border-gray-300 text-base"
                                         required
                                     />
-                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                                         <FontAwesomeIcon icon={faEnvelope} className="text-lg" />
                                     </span>
                                 </div>
@@ -92,11 +92,11 @@ const ForgotPasswordPage = () => {
                                     <span className="text-gray-500 text-sm mb-2">Remembered your password?</span>
                                     <Link
                                         to="/login"
-                                        className="w-full rounded-lg bg-blue-700 text-white font-bold py-3 text-lg transition hover:bg-blue-800 text-center"
+                                        className="inline-flex items-center justify-center border border-slate-200 text-slate-700 rounded-lg px-8 py-2 text-lg font-medium hover:bg-slate-50 w-full"
                                     >
                                         Back to Login
                                     </Link>
-                                    <Link
+                                    {/* <Link
                                         to="/register"
                                         className="w-full rounded-lg bg-green-600 text-white font-bold py-3 text-lg transition hover:bg-green-700 text-center"
                                     >
@@ -107,7 +107,7 @@ const ForgotPasswordPage = () => {
                                         className="w-full rounded-lg bg-blue-500 text-white font-bold py-3 text-lg transition hover:bg-blue-600 text-center"
                                     >
                                         Go to Email Verification
-                                    </Link>
+                                    </Link> */}
                                 </div>
                             </form>
                         </>
@@ -145,15 +145,15 @@ const ForgotPasswordPage = () => {
                     )}
                 </div>
                 {/* Right: Illustration */}
-                <div className="hidden md:flex md:w-1/2 flex-col items-center justify-start" style={{ minHeight: 300 }}>
+                <div className="hidden p-8 md:flex flex-col items-center justify-start">
                     <div className="w-full overflow-hidden flex items-center justify-center">
                         <img
                             src={`${import.meta.env.BASE_URL}forget.png`}
                             alt="Forgot Password Illustration"
-                            className="w-[300px] h-[300px] lg:w-[350px] lg:h-[350px] object-contain mx-auto bg-white p-2 rounded-lg"
+                            className="w-[300px] h-[300px] lg:w-[350px] lg:h-[350px] object-contain mx-auto p-2"
                         />
                     </div>
-                    <p className="mt-1 md:-mt-4 text-black text-sm md:text-base lg:text-lg font-semibold leading-6 mx-auto max-w-[420px] px-3 text-center">
+                    <p className="text-sm font-semibold leading-6 text-center">
                         Your tasks won’t even notice you left.
                         <br />
                         Secure password, powered by Practical Manager.

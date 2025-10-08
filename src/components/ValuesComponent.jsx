@@ -21,7 +21,7 @@ export default function ValuesComponent() {
     ];
 
     return (
-        <section id="values" className="bg-gray-100 py-20">
+        <section id="values" className="py-20">
             <div className="container mx-auto px-4">
                 <h2 className="text-center text-3xl md:text-4xl font-bold text-blue-700 mb-16 animate-fade-in-up">
                     Our Core Values
@@ -33,10 +33,10 @@ export default function ValuesComponent() {
                             className="group bg-white rounded-3xl p-8 text-center transition-all duration-300 transform group-hover-scale group-hover-shadow flex flex-col items-center animate-fade-in-up shadow-md hover:bg-amber-50"
                             style={{ animationDelay: `${0.2 * i}s` }}
                         >
-                            <div className="text-yellow-600 mb-6 transition-transform duration-300 transform group-hover:scale-125 transition-colors duration-300 group-hover:text-amber-600">
+                            <div className="mb-6 transform group-hover:scale-125 transition-colors duration-300 group-hover:text-amber-600">
                                 {v.icon}
                             </div>
-                            <h3 className="text-xl font-bold text-blue-900 mb-2 transition-colors duration-300 group-hover:text-amber-600">
+                            <h3 className="text-xl font-bold mb-2 transition-colors duration-300 group-hover:text-amber-600">
                                 {v.title}
                             </h3>
                             <p className="text-base text-gray-700">{v.desc}</p>
