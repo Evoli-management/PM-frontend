@@ -22,6 +22,7 @@ export default function MonthView({
     onChangeView,
     filterType,
     onChangeFilter,
+    onQuickCreate, // new: open appointment creation modal
 }) {
     // Working hours: 8:00 to 18:00
     const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
@@ -405,7 +406,23 @@ export default function MonthView({
                                                     key={hIdx}
                                                     className="px-1 py-2 text-center align-top w-16 cursor-pointer border border-sky-100 hover:bg-blue-100"
                                                     style={{ minWidth: 40 }}
-                                                    onClick={() => onEventClick({ day: date, hour: h })}
+                                                    onClick={() => onEventClick && onEventClick({ day: date, hour: h })}
+                                                    onDoubleClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (typeof onQuickCreate === "function") {
+                                                            const dt = new Date(
+                                                                date.getFullYear(),
+                                                                date.getMonth(),
+                                                                date.getDate(),
+                                                                parseInt(hr, 10) || 0,
+                                                                parseInt(min, 10) || 0,
+                                                                0,
+                                                                0,
+                                                            );
+                                                            onQuickCreate(dt);
+                                                        }
+                                                    }}
+                                                    title="Double-click to add appointment"
                                                 >
                                                     {slotEvents.length > 0 &&
                                                         slotEvents.map((ev, i) => {
