@@ -24,7 +24,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
             title: item?.title || "",
             description: item?.description || "",
             date: localDate,
-            time: item?.time || "00:00",
+            time: item?.time || "08:00",
             dueDate: item?.dueDate || "",
             endDate: item?.endDate || "",
             priority: item?.priority || "medium",

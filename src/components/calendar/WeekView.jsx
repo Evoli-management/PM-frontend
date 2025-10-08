@@ -11,12 +11,14 @@ function getWeekNumber(date) {
 const defaultSlotSize = 30;
 const timeSlots = (slotSize) => {
     const slots = [];
-    // Full day: 00:00 – 23:30
-    for (let h = 0; h <= 23; h++) {
+    for (let h = 8; h <= 16; h++) {
         for (let m = 0; m < 60; m += slotSize) {
+            if (h === 16 && m > 30) continue; // last start slot 16:30
             slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
         }
     }
+    // Add a final 17:00 label row (no events start at 17:00)
+    slots.push("17:00");
     return slots;
 };
 
