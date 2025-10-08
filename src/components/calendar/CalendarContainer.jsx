@@ -16,6 +16,7 @@ import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
+import AppointmentModal from "./AppointmentModal";
 
 const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
@@ -23,6 +24,7 @@ const EVENT_CATEGORIES = {
     meeting: { color: "bg-yellow-500", icon: "📅" },
     travel: { color: "bg-purple-500", icon: "✈️" },
     elephant_bite: { color: "bg-orange-500", icon: "🐘" },
+    appointment: { color: "bg-indigo-400", icon: "📌" },
     green: { color: "bg-green-400", icon: "✔️" },
     red: { color: "bg-red-400", icon: "⛔" },
     custom: { color: "bg-gray-300", icon: "•" },
@@ -71,6 +73,8 @@ const CalendarContainer = () => {
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editItem, setEditItem] = useState(null); // { type: 'task'|'activity', id, ...fields }
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    const [appointmentModalOpen, setAppointmentModalOpen] = useState(false);
+    const [appointmentInitialStart, setAppointmentInitialStart] = useState(null);
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
@@ -445,33 +449,19 @@ const CalendarContainer = () => {
         }
     };
 
-    // Quick create event on double-click
-    const handleQuickCreate = async (date, options = {}) => {
-        try {
-            let start = new Date(date);
-            if (!withinBusinessHours(start)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Use a slot between 08:00 and 17:00",
-                    variant: "warning",
-                });
-                return;
-            }
-            const { end } = clampToBusinessHours(start, options.minutes || 60);
-            const payload = {
-                title: options.title || "New event",
-                start: start.toISOString(),
-                end: end.toISOString(),
-                allDay: false,
-                kind: options.kind || "custom",
-            };
-            const created = await calendarService.createEvent(payload);
-            setEvents((prev) => [...prev, created]);
-            addToast({ title: "Event created", description: start.toLocaleString(), variant: "success" });
-        } catch (err) {
-            console.warn("Quick create failed", err);
-            addToast({ title: "Failed to create", description: String(err?.message || err), variant: "error" });
+    // Double-click now opens appointment modal instead of auto-creating
+    const handleQuickCreate = (date) => {
+        const start = new Date(date);
+        if (!withinBusinessHours(start)) {
+            addToast({
+                title: "Outside business hours",
+                description: "Use a slot between 08:00 and 17:00",
+                variant: "warning",
+            });
+            return;
         }
+        setAppointmentInitialStart(start);
+        setAppointmentModalOpen(true);
     };
 
     // Move event (drag existing event into a new slot)
@@ -648,6 +638,7 @@ const CalendarContainer = () => {
                         categories={EVENT_CATEGORIES}
                         onEventClick={openModal}
                         onTaskClick={openEditTask}
+                        onQuickCreate={handleQuickCreate}
                     />
                 )}
                 {view === "week" && (
@@ -723,6 +714,22 @@ const CalendarContainer = () => {
                     onEventDeleted={(id) => {
                         setEvents((prev) => prev.filter((e) => e.id !== id));
                         addToast({ title: "Event deleted", variant: "success" });
+                    }}
+                />
+            )}
+            {appointmentModalOpen && appointmentInitialStart && (
+                <AppointmentModal
+                    startDate={appointmentInitialStart}
+                    defaultDurationMinutes={30}
+                    onClose={() => {
+                        setAppointmentModalOpen(false);
+                        setAppointmentInitialStart(null);
+                    }}
+                    onCreated={(created) => {
+                        setEvents((prev) => [...prev, created]);
+                        addToast({ title: "Appointment created", variant: "success" });
+                        setAppointmentModalOpen(false);
+                        setAppointmentInitialStart(null);
                     }}
                 />
             )}

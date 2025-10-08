@@ -3,14 +3,15 @@ import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icon
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 
-// Business hours display 08:00–17:00 (last row 17:00 label, no new events start there)
+// Business hours display 08:00–17:00
+// 17:00 acts as an end-of-day boundary label (non-interactive). Last start slot is 16:30.
 const hours = (() => {
     const arr = [];
     for (let h = 8; h <= 16; h++) {
         arr.push(`${h.toString().padStart(2, "0")}:00`);
-        if (h !== 16) arr.push(`${h.toString().padStart(2, "0")}:30`);
+        arr.push(`${h.toString().padStart(2, "0")}:30`); // includes 16:30
     }
-    arr.push("17:00");
+    arr.push("17:00"); // boundary label only
     return arr;
 })();
 
@@ -229,25 +230,28 @@ export default function DayView({
                         <tbody>
                             {hours.map((h, idx) => {
                                 const slotEvents = events.filter((ev) => matchesSlot(ev.start, today, h));
+                                const isBoundary = h === "17:00"; // non-interactive row
                                 return (
                                     <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
                                         <td className="border-t border-r border-blue-100 px-2 py-1 text-xs w-24 align-top">
                                             <span>{h}</span>
                                         </td>
                                         <td
-                                            className="border-t border-blue-100 px-2 py-1 align-top"
+                                            className={`border-t border-blue-100 px-2 py-1 align-top ${isBoundary ? 'pointer-events-none opacity-60' : ''}`}
                                             style={{ width: "100%" }}
-                                            onDoubleClick={() => {
-                                                const [hh, mm] = h.split(":");
-                                                const date = new Date(
-                                                    today.getFullYear(),
-                                                    today.getMonth(),
-                                                    today.getDate(),
-                                                    Number(hh),
-                                                    Number(mm),
-                                                );
-                                                onQuickCreate && onQuickCreate(date);
-                                            }}
+                                            {...(!isBoundary && {
+                                                onDoubleClick: () => {
+                                                    const [hh, mm] = h.split(":");
+                                                    const date = new Date(
+                                                        today.getFullYear(),
+                                                        today.getMonth(),
+                                                        today.getDate(),
+                                                        Number(hh),
+                                                        Number(mm),
+                                                    );
+                                                    onQuickCreate && onQuickCreate(date);
+                                                },
+                                            })}
                                         >
                                             {slotEvents.length === 0
                                                 ? null
