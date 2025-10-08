@@ -3,12 +3,16 @@ import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icon
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 
-// 00:00–23:30, half-hour increments
-const hours = Array.from({ length: 48 }, (_, i) => {
-    const h = Math.floor(i / 2);
-    const m = i % 2 === 0 ? "00" : "30";
-    return `${h.toString().padStart(2, "0")}:${m}`;
-});
+// Business hours display 08:00–17:00 (last row 17:00 label, no new events start there)
+const hours = (() => {
+    const arr = [];
+    for (let h = 8; h <= 16; h++) {
+        arr.push(`${h.toString().padStart(2, "0")}:00`);
+        if (h !== 16) arr.push(`${h.toString().padStart(2, "0")}:30`);
+    }
+    arr.push("17:00");
+    return arr;
+})();
 
 export default function DayView({
     currentDate,

@@ -15,6 +15,7 @@ import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
+import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 
 const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
@@ -43,7 +44,7 @@ const CalendarContainer = () => {
             const tasks = await elephantTaskService.getElephantTasks();
             setElephantTasks(tasks || []);
         } catch (error) {
-            console.error('Error loading elephant tasks:', error);
+            console.error("Error loading elephant tasks:", error);
         }
     };
 
@@ -161,15 +162,15 @@ const CalendarContainer = () => {
                 ]);
                 setEvents(Array.isArray(evs) ? evs : []);
                 setTodos(Array.isArray(tds) ? tds : []);
-                
+
                 // Load elephant tasks
                 try {
                     const elephantTasksData = await elephantTaskService.getElephantTasks();
                     setElephantTasks(elephantTasksData || []);
                 } catch (error) {
-                    console.warn('Failed to load elephant tasks:', error);
+                    console.warn("Failed to load elephant tasks:", error);
                 }
-                
+
                 // If Day view, also fetch activities for tasks that are dated today
                 if (view === "day") {
                     try {
@@ -263,8 +264,16 @@ const CalendarContainer = () => {
     const handleTaskDrop = async (taskOrId, date) => {
         try {
             const defaultMinutes = 60;
-            const start = new Date(date);
-            const end = new Date(start.getTime() + defaultMinutes * 60 * 1000);
+            let start = new Date(date);
+            if (!withinBusinessHours(start)) {
+                addToast({
+                    title: "Outside business hours",
+                    description: "Schedule only between 08:00 and 17:00",
+                    variant: "warning",
+                });
+                return;
+            }
+            const { end } = clampToBusinessHours(start, defaultMinutes);
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
             // Try to find a title from todos if not provided
             let title =
@@ -406,8 +415,15 @@ const CalendarContainer = () => {
                 addToast({ title: "Task added", variant: "success" });
                 // Immediately create a calendar event at the selected time for this new task
                 try {
-                    const start = new Date(when);
-                    const end = new Date(start.getTime() + 60 * 60 * 1000); // default 60 minutes
+                    let start = new Date(when);
+                    if (!withinBusinessHours(start)) {
+                        addToast({
+                            title: "Outside business hours",
+                            description: "Adjusted to 08:00",
+                            variant: "warning",
+                        });
+                    }
+                    const { end } = clampToBusinessHours(start, 60); // default 60 minutes
                     const ev = await calendarService.createEvent({
                         title: form.title,
                         start: start.toISOString(),
@@ -432,8 +448,16 @@ const CalendarContainer = () => {
     // Quick create event on double-click
     const handleQuickCreate = async (date, options = {}) => {
         try {
-            const start = new Date(date);
-            const end = new Date(start.getTime() + (options.minutes || 60) * 60 * 1000);
+            let start = new Date(date);
+            if (!withinBusinessHours(start)) {
+                addToast({
+                    title: "Outside business hours",
+                    description: "Use a slot between 08:00 and 17:00",
+                    variant: "warning",
+                });
+                return;
+            }
+            const { end } = clampToBusinessHours(start, options.minutes || 60);
             const payload = {
                 title: options.title || "New event",
                 start: start.toISOString(),
@@ -453,6 +477,14 @@ const CalendarContainer = () => {
     // Move event (drag existing event into a new slot)
     const handleEventMove = async (eventId, newStartDate, newEndDate) => {
         try {
+            if (!withinBusinessHours(newStartDate) || (newEndDate && !withinBusinessHours(newEndDate))) {
+                addToast({
+                    title: "Outside business hours",
+                    description: "Allowed window 08:00–17:00",
+                    variant: "error",
+                });
+                return;
+            }
             const payload = { start: newStartDate.toISOString() };
             if (newEndDate) payload.end = newEndDate.toISOString();
             const updated = await calendarService.updateEvent(eventId, payload);
@@ -581,7 +613,7 @@ const CalendarContainer = () => {
                         </div>
                         {elephantTasks.length > 0 && (
                             <div className="text-xs text-gray-600 mt-1">
-                                {elephantTasks.map(task => task.title).join(', ')}
+                                {elephantTasks.map((task) => task.title).join(", ")}
                             </div>
                         )}
                     </div>
