@@ -872,15 +872,8 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
-                {/* Top widgets section using unified renderWidget function */}
-                <div style={topColsStyle}>
-                    {prefs.widgetOrder.filter(key => 
-                        prefs.widgets[key] && 
-                        ['myDay', 'goals', 'keyAreas', 'milestones', 'tasks', 'activities', 'strokes', 'productivity'].includes(key)
-                    ).map((key, index) => renderWidget(key, index, 'top'))}
-                </div>
 
-                {/* Middle Section */}
+                {/* Drill-in modal for Activity */}
                 {/* Middle Section */}
                 <div style={dynamicGrid} className="mb-2">
                     {/* eNPS detailed snapshot */}
