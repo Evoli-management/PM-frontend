@@ -336,20 +336,19 @@ export default function Registration() {
                                     <p className="text-red-500 text-sm mt-1">{formErrors.agreedToTerms}</p>
                                 )}
 
-                                {/* <button
+                                /* <button
                                     type="submit"
                                     disabled={submitting}
                                     className={`w-full ${submitting ? "bg-green-300" : "bg-green-500 hover:bg-green-600"} text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center`}
                                 >
                                     {submitting ? "Registering…" : "Register"}
-                                </button> */}
+                                </button> */
 
                                 <button
-                                    type="submit"
-                                    disabled={submitting}
+                                    type="button"
+                                    onClick={() => setFormData((f) => ({ ...f }))}
                                     className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center"
                                 >
-                                    {submitting ? "Registering…" : "Register"}
                                     SIGN UP FOR FREE
                                 </button>
 
