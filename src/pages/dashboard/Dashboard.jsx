@@ -874,7 +874,7 @@ export default function Dashboard() {
                 )}
                 {/* Top widgets section using unified renderWidget function */}
                 <div style={topColsStyle}>
-                    {widgetOrder.filter(key => 
+                    {prefs.widgetOrder.filter(key => 
                         prefs.widgets[key] && 
                         ['myDay', 'goals', 'keyAreas', 'milestones', 'tasks', 'activities', 'strokes', 'productivity'].includes(key)
                     ).map((key, index) => renderWidget(key, index, 'top'))}
