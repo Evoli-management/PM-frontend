@@ -209,6 +209,15 @@ const Home = () => {
             {/* Page links removed to avoid repetition in the top bar */}
 
             {/* Hero Section (clean, professional two-column variant) */}
+            <section className="relative bg-white pt-16 pb-16 px-4 text-gray-900">
+                <div className="container mx-auto">
+                    <div className="flex flex-col-reverse md:flex-row items-center gap-10 md:gap-20">
+                        {/* Left column: headline, copy, CTAs, stats */}
+                        <div className="md:w-6/12 text-center md:text-left">
+                            <h1 className="text-5xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-tight mb-2">
+                                <span className="heading-gradient block">Lead with clarity.</span>
+                                <span className="heading-subtle block mt-3 text-3xl md:text-4xl">Deliver with confidence.</span>
+                            </h1>
             <Hero />
 
             {/* New Section: Join Practical Manager with a visual element */}
