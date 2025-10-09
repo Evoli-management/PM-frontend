@@ -29,19 +29,19 @@
 3. Install dependencies
 
 ```sh
-  npm install # pnpm install | bun install
+  pnpm install
 ```
 
 4. Start dev server
 
 ```sh
-  npm run dev # pnpm run dev | bun run dev
+  pnpm run dev
 ```
 
 ## Testing:
 
 ```sh
-  npm run test # pnpm run test | bun run test
+  pnpm run test
 ```
 
 ## To check production
@@ -49,7 +49,7 @@
 1. Build the app
 
 ```sh
-  npm run build # pnpm run build | bun run build
+  pnpm run build
 ```
 
 2. Preview the build

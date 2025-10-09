@@ -12,6 +12,7 @@ import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
+// AdminSettings removed
 import AdminSettings from "./pages/AdminSettings.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
@@ -31,8 +32,8 @@ import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
-import VerifyEmail from "./pages/VerifyEmail.jsx";
 import Teams from "./pages/Teams.jsx";
+import VerifyEmail from "./pages/VerifyEmail.jsx";
 import Pricing from "./pages/Pricing.jsx";
 
 export default function App() {
@@ -69,8 +70,7 @@ export default function App() {
                             <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
-                            <Route path="/admin-settings" element={<AdminSettings />} />
-                            <Route path="/settings" element={<AdminSettings />} />
+                            {/* Admin settings routes removed */}
                             <Route path="/dashboard" element={<Dashboard />} />
                             {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
                             <Route path="/tasks" element={<Tasks />} />

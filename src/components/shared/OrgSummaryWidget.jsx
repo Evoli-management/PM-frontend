@@ -55,14 +55,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
                 <div className="text-center text-gray-500">
                     <div className="text-4xl mb-2">⚙️</div>
                     <p className="text-sm">Organization settings not configured</p>
-                    {showQuickAccess && (
-                        <a
-                            href="#/admin-settings"
-                            className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                        >
-                            Configure Settings
-                        </a>
-                    )}
+                    {/* Admin Settings quick access removed */}
                 </div>
             </div>
         );
@@ -181,30 +174,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
             </div>
 
             {/* Quick Actions */}
-            {showQuickAccess && (
-                <div className="space-y-2">
-                    <a
-                        href="#/admin-settings"
-                        className="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                    >
-                        ⚙️ Manage Admin Settings
-                    </a>
-                    <div className="grid grid-cols-2 gap-2">
-                        <a
-                            href="#/admin-settings"
-                            className="text-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 transition-colors"
-                        >
-                            Security
-                        </a>
-                        <a
-                            href="#/admin-settings"
-                            className="text-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 transition-colors"
-                        >
-                            Policies
-                        </a>
-                    </div>
-                </div>
-            )}
+            {/* Admin Settings quick actions removed */}
 
             {/* Status Footer */}
             <div className="mt-4 pt-3 border-t text-center">

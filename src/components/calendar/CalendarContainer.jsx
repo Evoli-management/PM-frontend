@@ -9,6 +9,7 @@ import ListView from "./ListView";
 import EventModal from "./EventModal";
 import TaskActivityModal from "./TaskActivityModal";
 import ElephantTaskModal from "./ElephantTaskModal";
+import ElephantTaskInput from "./ElephantTaskInput";
 import taskService from "../../services/taskService";
 import activityService from "../../services/activityService";
 import elephantTaskService from "../../services/elephantTaskService";
@@ -578,36 +579,72 @@ const CalendarContainer = () => {
         };
     }, []);
 
+    // Helper function to get date range for current view
+    const getCurrentViewDateRange = () => {
+        const start = new Date(currentDate);
+        const end = new Date(currentDate);
+        
+        if (view === "day") {
+            // Same day
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+        } else if (view === "week") {
+            // Start Monday, end Sunday
+            start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+            start.setHours(0, 0, 0, 0);
+            end.setTime(start.getTime());
+            end.setDate(start.getDate() + 6);
+            end.setHours(23, 59, 59, 999);
+        } else if (view === "month") {
+            // First day to last day of month
+            start.setDate(1);
+            start.setHours(0, 0, 0, 0);
+            end.setMonth(start.getMonth() + 1, 0);
+            end.setHours(23, 59, 59, 999);
+        } else if (view === "quarter") {
+            // First day of quarter to last day of quarter
+            const q = Math.floor(start.getMonth() / 3);
+            start.setMonth(q * 3, 1);
+            start.setHours(0, 0, 0, 0);
+            end.setMonth(q * 3 + 3, 0);
+            end.setHours(23, 59, 59, 999);
+        } else {
+            // Default to current month for list view
+            start.setDate(1);
+            start.setHours(0, 0, 0, 0);
+            end.setMonth(start.getMonth() + 1, 0);
+            end.setHours(23, 59, 59, 999);
+        }
+        
+        return {
+            dateStart: start.toISOString(),
+            dateEnd: end.toISOString()
+        };
+    };
+
     return (
         <div className="w-full">
             {/* Unified calendar card */}
             <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
                 {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
-                {/* Elephant Tasks Section */}
-                <div className="w-full flex items-center gap-2 mb-2 bg-gradient-to-r from-orange-100 to-amber-50 border border-orange-200 px-3 py-2 rounded-lg">
-                    <span className="text-2xl" title="Elephant Tasks - Break down large tasks into manageable bites">
-                        🐘
-                    </span>
-                    <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-700">
-                                Elephant Tasks ({elephantTasks.length})
-                            </span>
-                            <button
-                                onClick={() => handleCreateElephantTask()}
-                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
-                            >
-                                Create Elephant Task
-                            </button>
+                
+                {/* New Calendar Elephant Task Input */}
+                {view !== "list" && (() => {
+                    const { dateStart, dateEnd } = getCurrentViewDateRange();
+                    return (
+                        <div className="mb-3">
+                            <ElephantTaskInput
+                                viewType={view}
+                                dateStart={dateStart}
+                                dateEnd={dateEnd}
+                                onTaskChange={() => {
+                                    // Optionally refresh calendar data when elephant task changes
+                                }}
+                            />
                         </div>
-                        {elephantTasks.length > 0 && (
-                            <div className="text-xs text-gray-600 mt-1">
-                                {elephantTasks.map((task) => task.title).join(", ")}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                    );
+                })()}
                 {/* Active view content */}
                 {view === "quarter" && (
                     <QuarterView
