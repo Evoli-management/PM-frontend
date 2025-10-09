@@ -69,8 +69,8 @@ export default function Registration() {
                 sessionStorage.setItem("recent_registration_email", email);
             } catch {}
             setIsSubmitted(true);
-            // Temporarily skip email verification: send users straight to login
-            setTimeout(() => navigate("/login"), 800);
+            // Give users more time to read the success message before redirecting
+            setTimeout(() => navigate("/verify-email"), 4000);
         } catch (err) {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
@@ -112,35 +112,30 @@ export default function Registration() {
     const strength = getPasswordStrength(password);
 
     return (
-        <div className="min-h-screen flex flex-col font-sans p-4 bg-gray-50">
-            <div className="flex flex-1 items-center justify-center">
-                <div className="relative w-full max-w-5xl flex flex-col md:flex-row rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)] overflow-hidden bg-white">
-                    <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" />
+        <div className="min-h-screen flex items-center w-full max-w-6xl mx-auto">
+                <div className="relative grid md:grid-cols-2 items-center rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
                     {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
                     <div
-                        className="flex w-full md:w-1/2 flex-col items-center justify-start"
-                        style={{ minHeight: 300 }}
+                        className="p-8 flex flex-col items-center justify-center"
                     >
-                        <div className="w-full overflow-hidden px-4 sm:px-6">
+                        <div className="">
                             <img
                                 src={`${import.meta.env.BASE_URL}register.png`}
                                 alt="Illustration"
-                                className="w-full h-40 sm:h-56 md:h-64 object-cover mx-auto"
+                                className="w-full h-40 sm:h-56 md:h-64 object-contain"
                             />
                         </div>
-                        <div className="px-3 pt-2 pb-3 text-center w-full">
-                            <p className="mt-1 mb-0 text-base leading-5 text-gray-700">
-                                <span className="font-semibold">
+                        <div className="text-center">
+                            <p className="mt-1 mb-0 leading-5 text-gray-700 font-semibold">
                                     Simplify your workflow and accomplish more with Practical Manager.
-                                </span>{" "}
-                                <span>Your data is safe with us.</span>
+                                Your data is safe with us.
                             </p>
                         </div>
                     </div>
 
                     {/* Right Form Section */}
-                    <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center bg-white">
-                        <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
+                    <div className="p-8 flex flex-col justify-center items-center w-full h-full">
+                        <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center">
                             Sign Up
                         </h2>
                         {isSubmitted ? (
@@ -148,15 +143,31 @@ export default function Registration() {
                                 <CheckCircle2 size={48} className="text-green-500 mb-4" />
                                 <h3 className="text-2xl font-bold text-green-700">Registration Successful!</h3>
                                 <p className="mt-2 text-gray-600">
-                                    Your account has been created. You can now sign in.
+                                    A verification email has been sent to your address.<br />
+                                    Please check your inbox and verify your email to continue.<br />
+                                    <span className="text-sm text-gray-500">If you don't see the email, please look in your spam or junk folder.</span>
                                 </p>
+                                <button
+                                    type="button"
+                                    className="mt-4 px-4 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white font-semibold"
+                                    onClick={async () => {
+                                        try {
+                                            await authService.resendVerification({ email: formData.email });
+                                            alert("Verification email resent! Please check your inbox.");
+                                        } catch (err) {
+                                            alert("Failed to resend verification email. Please try again later.");
+                                        }
+                                    }}
+                                >
+                                    Resend verification email
+                                </button>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <label className="relative">
                                         <span className="sr-only">First name</span>
-                                        <div className="absolute left-3 top-3 text-slate-400">
+                                        <div className="absolute left-3 top-4 text-slate-400">
                                             <User size={16} />
                                         </div>
                                         <input
@@ -166,7 +177,7 @@ export default function Registration() {
                                             placeholder="First name"
                                             value={formData.firstName}
                                             onChange={handleInputChange}
-                                            className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                                            className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.firstName ? "border-red-500" : "border-gray-200"
                                             }`}
                                         />
@@ -177,7 +188,7 @@ export default function Registration() {
 
                                     <label className="relative">
                                         <span className="sr-only">Last name</span>
-                                        <div className="absolute left-3 top-3 text-slate-400">
+                                        <div className="absolute left-3 top-4 text-slate-400">
                                             <User size={16} />
                                         </div>
                                         <input
@@ -187,7 +198,7 @@ export default function Registration() {
                                             placeholder="Last name"
                                             value={formData.lastName}
                                             onChange={handleInputChange}
-                                            className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                                            className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.lastName ? "border-red-500" : "border-gray-200"
                                             }`}
                                         />
@@ -198,7 +209,7 @@ export default function Registration() {
                                 </div>
 
                                 <label className="relative block">
-                                    <div className="absolute left-3 top-3 text-slate-400">
+                                    <div className="absolute left-3 top-4 text-slate-400">
                                         <Mail size={16} />
                                     </div>
                                     <input
@@ -208,7 +219,7 @@ export default function Registration() {
                                         placeholder="Enter your email"
                                         value={formData.email}
                                         onChange={handleInputChange}
-                                        className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                                        className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                             formErrors.email ? "border-red-500" : "border-gray-200"
                                         }`}
                                     />
@@ -219,7 +230,7 @@ export default function Registration() {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <label className="relative mb-0">
-                                        <div className="absolute left-3 top-3 text-slate-400">
+                                        <div className="absolute left-3 top-4 text-slate-400">
                                             <Lock size={16} />
                                         </div>
                                         <input
@@ -229,14 +240,14 @@ export default function Registration() {
                                             placeholder="Enter password"
                                             value={formData.password}
                                             onChange={handleInputChange}
-                                            className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                                            className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.password ? "border-red-500" : "border-gray-200"
                                             }`}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword((s) => !s)}
-                                            className="absolute right-3 top-3 text-slate-500"
+                                            className="absolute right-3 top-4 text-slate-500"
                                         >
                                             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
@@ -246,7 +257,7 @@ export default function Registration() {
                                     </label>
 
                                     <label className="relative">
-                                        <div className="absolute left-3 top-3 text-slate-400">
+                                        <div className="absolute left-3 top-4 text-slate-400">
                                             <Lock size={16} />
                                         </div>
                                         <input
@@ -256,14 +267,14 @@ export default function Registration() {
                                             placeholder="Confirm password"
                                             value={formData.confirmPassword}
                                             onChange={handleInputChange}
-                                            className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 bg-blue-100 ${
+                                            className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.confirmPassword ? "border-red-500" : "border-gray-200"
                                             }`}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowConfirm((s) => !s)}
-                                            className="absolute right-3 top-3 text-slate-500"
+                                            className="absolute right-3 top-4 text-slate-500"
                                         >
                                             {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
@@ -325,13 +336,13 @@ export default function Registration() {
                                     <p className="text-red-500 text-sm mt-1">{formErrors.agreedToTerms}</p>
                                 )}
 
-                                <button
+                                {/* <button
                                     type="submit"
                                     disabled={submitting}
                                     className={`w-full ${submitting ? "bg-green-300" : "bg-green-500 hover:bg-green-600"} text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center`}
                                 >
                                     {submitting ? "Registering…" : "Register"}
-                                </button>
+                                </button> */}
 
                                 <button
                                     type="button"
@@ -385,9 +396,9 @@ export default function Registration() {
                                     <div className="flex items-center justify-center">
                                         <Link
                                             to="/login"
-                                            className="text-blue-600 hover:text-blue-800 underline transition-colors"
+                                            className="transition-colors"
                                         >
-                                            Already have an account? <span className="font-semibold">Sign in here</span>
+                                            Already have an account? <span className="underline font-semibold text-blue-600 hover:text-blue-800">Sign in here</span>
                                         </Link>
                                     </div>
                                 </div>
@@ -396,6 +407,5 @@ export default function Registration() {
                     </div>
                 </div>
             </div>
-        </div>
     );
 }

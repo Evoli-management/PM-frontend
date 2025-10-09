@@ -1,5 +1,8 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { FaUser } from "react-icons/fa";
 
 export default function Navbar() {
@@ -18,6 +21,29 @@ export default function Navbar() {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open]);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const location = useLocation();
+    
+    // List of public routes where navbar should not be shown
+    const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
+    const isPublicRoute = publicRoutes.includes(location.pathname);
+    
+    useEffect(() => {
+        // Check if user is authenticated by looking for access token
+        const token = localStorage.getItem("access_token");
+        setIsAuthenticated(!!token);
+    }, [location]);
+    
+    // Don't render navbar on public pages
+    if (isPublicRoute) {
+        return null;
+    }
+    
+    // Only render navbar on authenticated pages
+    if (!isAuthenticated) {
+        return null;
+    }
+
     return (
         <header className="bg-blue-600 text-white">
             <div className="w-full px-2 md:px-4 py-3 flex items-center justify-between">
@@ -61,6 +87,8 @@ export default function Navbar() {
                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                 onClick={() => {
                                     setOpen(false);
+                                    // Clear auth token and redirect to login
+                                    localStorage.removeItem("access_token");
                                     try {
                                         window.location.hash = "#/login";
                                     } catch (e) {

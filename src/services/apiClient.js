@@ -1,9 +1,10 @@
 // src/services/apiClient.js
 import axios from "axios";
 
-const apiBase = import.meta.env.DEV
-    ? "/api" // use Vite proxy in development for same-origin cookies
-    : import.meta.env.VITE_API_BASE_URL || "/api";
+
+// Use VITE_API_BASE_URL from .env for all API requests
+const apiBase = import.meta.env.VITE_API_BASE_URL || 
+    (import.meta.env.DEV ? "/api" : "https://practicalmanager-4241d0bfc5ed.herokuapp.com/api");
 
 const apiClient = axios.create({
     baseURL: apiBase,
@@ -11,14 +12,48 @@ const apiClient = axios.create({
     withCredentials: true,
 });
 
-// No Authorization header injection; rely on httpOnly cookie only
+// Add Authorization header if token exists in localStorage
+apiClient.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem("access_token");
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        
+        // Debug logging
+        console.log("API Request:", {
+            method: config.method?.toUpperCase(),
+            url: config.baseURL + config.url,
+            hasToken: !!token,
+            hasAuth: !!config.headers.Authorization,
+            withCredentials: config.withCredentials
+        });
+        
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
 
 // Response interceptor to handle errors
 apiClient.interceptors.response.use(
     (response) => {
+        console.log("API Response:", {
+            status: response.status,
+            url: response.config.url,
+            success: true
+        });
         return response;
     },
     (error) => {
+        console.log("API Error:", {
+            status: error.response?.status,
+            url: error.config?.url,
+            message: error.message,
+            responseData: error.response?.data
+        });
+        
         if (error.response?.status === 401) {
             try {
                 const m = error.config?.method?.toUpperCase?.() || "GET";
@@ -28,7 +63,7 @@ apiClient.interceptors.response.use(
                 // Helpful log to pinpoint which call failed auth
                 console.warn(`401 Unauthorized: ${m} ${u}`);
             } catch {}
-            // Token expired or not logged in; rely on cookie-based auth
+            // Token expired or not logged in
             localStorage.removeItem("access_token");
             // Use HashRouter
             window.location.hash = "#/login";

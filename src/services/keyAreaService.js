@@ -37,14 +37,8 @@ const keyAreaService = {
         const items = Array.isArray(res.data) ? res.data.map(toFE) : [];
         // Sort: non-Ideas first (by position, then title), Ideas always last
         return items.sort((a, b) => {
-            const aIsIdeas =
-                String(a.title || "")
-                    .trim()
-                    .toLowerCase() === "ideas";
-            const bIsIdeas =
-                String(b.title || "")
-                    .trim()
-                    .toLowerCase() === "ideas";
+            const aIsIdeas = String(a.title || "").trim().toLowerCase() === "ideas";
+            const bIsIdeas = String(b.title || "").trim().toLowerCase() === "ideas";
             if (aIsIdeas && !bIsIdeas) return 1;
             if (!aIsIdeas && bIsIdeas) return -1;
             const ap = Number.isFinite(a.position) ? a.position : 0;
@@ -85,3 +79,9 @@ const keyAreaService = {
 };
 
 export default keyAreaService;
+
+// Temporary compatibility export for callers expecting this helper
+export async function getKeyAreas() {
+    const response = await apiClient.get("/key-areas");
+    return response.data;
+}

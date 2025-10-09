@@ -10,6 +10,9 @@ export default function ProfileSetting() {
     const [showPw, setShowPw] = useState({ old: false, new1: false, new2: false });
     const [avatarPreview, setAvatarPreview] = useState(null);
     const [avatarOriginal, setAvatarOriginal] = useState(null);
+    const [showCropper, setShowCropper] = useState(false);
+    const [cropZoom, setCropZoom] = useState(1);
+    const cropImgRef = useRef(null);
     const [errors, setErrors] = useState({});
     const [personalDraft, setPersonalDraft] = useState({ name: "", email: "", phone: "" });
     const [professionalDraft, setProfessionalDraft] = useState({ jobTitle: "", department: "", manager: "" });
@@ -317,6 +320,74 @@ export default function ProfileSetting() {
                 const map = {
                     account: "My Profile",
                     "my-profile": "My Profile",
+                    security: "Security",
+                    preferences: "Preferences",
+                    integrations: "Integrations",
+                    privacy: "Privacy",
+                    teams: "Teams & Members",
+                    "teams-members": "Teams & Members",
+                };
+                if (map[tab]) setActiveTab(map[tab]);
+            } catch (_) {
+                // ignore
+            }
+        };
+        applyFromHash();
+        window.addEventListener("hashchange", applyFromHash);
+        return () => window.removeEventListener("hashchange", applyFromHash);
+    }, []);
+
+    // Personal details edit mode + saved snapshot
+    const [savedPersonal, setSavedPersonal] = useState({
+        name: "John Doe",
+        email: "john.doe@company.com",
+        phone: "+1 555-123-4567"
+    });
+    const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+
+    // Professional details edit mode + saved snapshot
+    const [savedProfessional, setSavedProfessional] = useState({
+        jobTitle: "Lead Developer",
+        department: "Engineering",
+        manager: "Sarah Johnson"
+    });
+    const [isEditingProfessional, setIsEditingProfessional] = useState(false);
+    const [professionalSaved, setProfessionalSaved] = useState(false);
+
+    // About Me & Skills edit mode + saved snapshot
+    const [savedAbout, setSavedAbout] = useState({
+        bio: "",
+        skills: []
+    });
+    const [isEditingAbout, setIsEditingAbout] = useState(false);
+    const [aboutSaved, setAboutSaved] = useState(false);
+
+    // Team Assignment edit mode + saved snapshot
+    const [savedTeams, setSavedTeams] = useState({
+        mainTeam: {
+            name: "Product Development",
+            members: 8,
+            role: "Lead Developer",
+        },
+        otherTeams: [
+            { name: "Marketing", role: "Contributor", members: 5 },
+            { name: "Design System", role: "Reviewer", members: 3 },
+        ],
+    });
+    const [isEditingTeams, setIsEditingTeams] = useState(false);
+    const [teamsSaved, setTeamsSaved] = useState(false);
+
+    // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
+    useEffect(() => {
+        const applyFromHash = () => {
+            try {
+                const hash = window.location.hash || "";
+                const queryIndex = hash.indexOf("?");
+                if (queryIndex === -1) return;
+                const qs = new URLSearchParams(hash.substring(queryIndex + 1));
+                const tab = (qs.get("tab") || "").toLowerCase();
+                const map = {
+                    account: "Account",
                     security: "Security",
                     preferences: "Preferences",
                     integrations: "Integrations",
@@ -745,6 +816,14 @@ export default function ProfileSetting() {
     ];
 
     const [form, setForm] = useState({
+        name: "",
+        email: "",
+        phone: "",
+    jobTitle: "",
+    department: "",
+    manager: "",
+    bio: "",
+    skills: [],
         tz: "America/Los_Angeles",
         lang: "en",
         start: "09:00",
@@ -760,6 +839,11 @@ export default function ProfileSetting() {
             weeklyReports: true,
             dailyReports: false,
         },
+        oldEmail: "",
+        newEmail: "",
+        oldPw: "",
+        newPw: "",
+        confirmPw: "",
         // Dashboard Preferences
         dashboardTheme: "light",
         dashboardLayout: "default",
@@ -782,6 +866,20 @@ export default function ProfileSetting() {
         // Enhanced Privacy Controls
         strokesVisibility: "team-only", // "public", "team-only", "private"
         showInActivityFeed: true,
+        // Team Management
+        teams: {
+            mainTeam: {
+                name: "Product Development",
+                members: 8,
+                role: "Lead Developer"
+            },
+            otherTeams: [
+                { name: "Marketing", role: "Contributor", members: 5 },
+                { name: "Design System", role: "Reviewer", members: 3 }
+            ],
+            canCreateTeams: true,
+            canJoinTeams: true,
+        },
         // Security Settings
         security: {
             loginHistory: [],
@@ -789,6 +887,8 @@ export default function ProfileSetting() {
             twoFactorStatus: twoFAEnabled ? "enabled" : "disabled",
         },
     });
+    const [skillsInput, setSkillsInput] = useState("");
+
     // Load preferences from localStorage (if available)
     useEffect(() => {
         try {
@@ -837,6 +937,26 @@ export default function ProfileSetting() {
             mainTeamName: savedTeams.mainTeam?.name || "",
             otherTeams: savedTeams.otherTeams || [],
         });
+    // Initialize form fields from saved snapshots on mount (one-time initialization)
+    useEffect(() => {
+        setForm((prev) => ({
+            ...prev,
+            name: prev.name || savedPersonal.name,
+            email: prev.email || savedPersonal.email,
+            phone: prev.phone || savedPersonal.phone,
+            jobTitle: prev.jobTitle || savedProfessional.jobTitle,
+            department: prev.department || savedProfessional.department,
+            manager: prev.manager || savedProfessional.manager,
+            bio: typeof prev.bio === 'string' && prev.bio.length > 0 ? prev.bio : (savedAbout.bio || ""),
+            skills: Array.isArray(prev.skills) && prev.skills.length > 0 ? prev.skills : (savedAbout.skills || []),
+            teams: {
+                ...(prev.teams || {}),
+                mainTeam: prev.teams?.mainTeam || savedTeams.mainTeam,
+                otherTeams: prev.teams?.otherTeams || savedTeams.otherTeams,
+                canCreateTeams: typeof prev.teams?.canCreateTeams === 'boolean' ? prev.teams.canCreateTeams : true,
+                canJoinTeams: typeof prev.teams?.canJoinTeams === 'boolean' ? prev.teams.canJoinTeams : true,
+            },
+        }));
     }, []); // Only run once on mount
 
     const savePreferences = () => {
@@ -888,6 +1008,11 @@ export default function ProfileSetting() {
 
     // Optimized update function with memoization
     const upd = useCallback((k) => (e) => {
+    // Derived team permissions (scoped to this component)
+    const canCreateTeams = form?.teams?.canCreateTeams ?? true;
+    const canJoinTeams = form?.teams?.canJoinTeams ?? true;
+    const canManageTeams = canCreateTeams; // simple gate for demo
+    const upd = (k) => (e) => {
         const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
         
         setForm((s) => {
@@ -966,6 +1091,52 @@ export default function ProfileSetting() {
 
     // Keep the form's security.twoFactorStatus in sync with UI state
     useEffect(() => {
+    // Helper function for updating notification settings
+    const updateNotificationSetting = (key) => (checked) => {
+        setForm((s) => ({
+            ...s,
+            notifications: {
+                ...s.notifications,
+                [key]: checked,
+            },
+        }));
+    };
+
+    // Helper function for updating eNPS privacy settings
+    const updateEnpsPrivacySetting = (settingKey) => (checked) => {
+        setForm((s) => ({
+            ...s,
+            security: {
+                ...s.security,
+                twoFactorStatus: twoFAEnabled ? 'enabled' : (twoFASetupMode === 'verify' ? 'pending' : 'disabled'),
+            },
+        }));
+    }, [twoFAEnabled, twoFASetupMode]);
+
+    // Helper function for updating team settings
+    const updateTeamSetting = (settingKey) => (value) => {
+        setForm((s) => ({
+            ...s,
+            teams: {
+                ...s.teams,
+                [settingKey]: value,
+            },
+        }));
+    };
+
+    // Helper function for updating security settings
+    const updateSecuritySetting = (settingKey) => (value) => {
+        setForm((s) => ({
+            ...s,
+            security: {
+                ...s.security,
+                [settingKey]: value,
+            },
+        }));
+    };
+
+    // Keep the form's security.twoFactorStatus in sync with UI state
+    useEffect(() => {
         setForm((s) => ({
             ...s,
             security: {
@@ -1030,6 +1201,50 @@ export default function ProfileSetting() {
         }
     };
 
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!form.name.trim()) newErrors.name = "Name is required";
+        if (!form.email.trim()) newErrors.email = "Email is required";
+        else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = "Email is invalid";
+
+    // Mock login history data
+    const mockLoginHistory = [
+        { id: 1, device: "Windows PC - Chrome", location: "New York, US", ip: "192.168.1.100", loginTime: "2024-12-01 09:15:23", current: true },
+        { id: 2, device: "iPhone - Safari", location: "New York, US", ip: "192.168.1.101", loginTime: "2024-11-30 18:45:12", current: false },
+        { id: 3, device: "MacBook - Safari", location: "Chicago, US", ip: "10.0.1.50", loginTime: "2024-11-29 14:22:35", current: false },
+        { id: 4, device: "Android - Chrome", location: "Los Angeles, US", ip: "172.16.0.25", loginTime: "2024-11-28 11:33:47", current: false },
+    ];
+
+    // State for login history and logout modal
+    const [loginHistory, setLoginHistory] = useState(mockLoginHistory);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+    const revokeSession = (id) => {
+        setLoginHistory((list) => list.filter((s) => s.id !== id || s.current));
+    };
+
+    // Function to handle logging out of all sessions (triggered by modal confirm)
+    const handleLogoutAllSessions = async () => {
+        setIsLoading(true);
+        try {
+            // Simulate API call
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            updateSecuritySetting("sessionsToLogOut")(true);
+            // Optionally keep only the current session in history
+            setLoginHistory((list) => list.filter((s) => s.current));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            console.log("Profile updated:", form);
+            setAccountSaved(true);
+            setTimeout(() => setAccountSaved(false), 2000);
+        } catch (error) {
+            console.error("Failed to logout all sessions:", error);
+        } finally {
+            setIsLoading(false);
+            setShowLogoutModal(false);
+        }
+    };
+
     const handleAvatarChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -1052,6 +1267,9 @@ export default function ProfileSetting() {
                 setCrop({ x: 0, y: 0 });
                 setCropZoom(1);
                 setErrors((prev) => ({ ...prev, avatar: null }));
+                setAvatarOriginal(e.target.result);
+                setAvatarPreview(e.target.result);
+                setShowCropper(true);
             };
             reader.readAsDataURL(file);
             setErrors((prev) => ({ ...prev, avatar: null }));
@@ -1273,6 +1491,32 @@ export default function ProfileSetting() {
 
     // cropper removed — uploaded image is used as-is (resized client-side when saved)
 
+    // Simple center-square crop with zoom
+    const applyCrop = () => {
+        try {
+            const img = cropImgRef.current;
+            if (!img) return setShowCropper(false);
+            const canvas = document.createElement('canvas');
+            const target = 256;
+            canvas.width = target;
+            canvas.height = target;
+            const ctx = canvas.getContext('2d');
+            const w = img.naturalWidth;
+            const h = img.naturalHeight;
+            const base = Math.min(w, h);
+            const zoom = Math.max(1, Math.min(4, Number(cropZoom) || 1));
+            const cropSize = base / zoom;
+            const sx = (w - cropSize) / 2;
+            const sy = (h - cropSize) / 2;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, target, target);
+            const dataUrl = canvas.toDataURL('image/png');
+            setAvatarPreview(dataUrl);
+        } finally {
+            setShowCropper(false);
+        }
+    };
+
     // Enhanced Toggle Component
     const Toggle = ({ checked, onChange }) => (
         <button
@@ -1370,7 +1614,10 @@ export default function ProfileSetting() {
                             {/* Left tabs - horizontal on mobile, vertical on desktop */}
                             <nav className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-sm">
                                 <div className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-1 lg:gap-0">
+
                                     {["My Profile", "Security", "Preferences", "Integrations", "Privacy", "Teams & Members"].map((t) => (
+
+                               
                                         <button
                                             key={t}
                                             onClick={() => setActiveTab(t)}
@@ -1429,6 +1676,24 @@ export default function ProfileSetting() {
                                                                         👤
                                                                     </div>
                                                                 )}
+                                {activeTab === "Account" && (
+                                    <div className="space-y-6">
+                                        {/* Profile Picture Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Picture</h3>
+                                            <div className="flex items-center gap-6">
+                                                {/* Avatar with upload and crop */}
+                                                <div className="relative">
+                                                    <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden border-2 border-gray-300">
+                                                        {avatarPreview ? (
+                                                            <img
+                                                                src={avatarPreview}
+                                                                alt="Profile"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-gray-500 text-2xl">
+                                                                👤
                                                             </div>
                                                         )}
                                                     </div>
@@ -1500,6 +1765,11 @@ export default function ProfileSetting() {
                                                         </div>
                                                     )}
                                                     
+                                                        onClick={() => fileRef.current?.click()}
+                                                        className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm hover:bg-blue-700 transition-colors shadow-lg"
+                                                    >
+                                                        📷
+                                                    </button>
                                                     <input
                                                         ref={fileRef}
                                                         type="file"
@@ -1540,7 +1810,23 @@ export default function ProfileSetting() {
                                                             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                             </svg>
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => fileRef.current?.click()}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Upload Photo
                                                         </button>
+                                                        {avatarOriginal && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowCropper(true)}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Crop Photo
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -2027,6 +2313,31 @@ export default function ProfileSetting() {
                                                                     manager: savedProfessional.manager,
                                                                 });
                                                                 setIsEditingProfessional(true);
+                                                    <p className="text-sm text-gray-500 mt-2">JPG, PNG or GIF (max. 5MB)</p>
+                                                    {errors.avatar && (
+                                                        <p className="text-sm text-red-600 mt-1">{errors.avatar}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Personal Details Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">Personal Details</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingPersonal ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Ensure form shows saved values when entering edit mode
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    name: savedPersonal.name,
+                                                                    email: savedPersonal.email,
+                                                                    phone: savedPersonal.phone,
+                                                                }));
+                                                                setIsEditingPersonal(true);
                                                             }}
                                                             className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                                         >
@@ -2043,6 +2354,8 @@ export default function ProfileSetting() {
                                                                         manager: savedProfessional.manager,
                                                                     });
                                                                     setIsEditingProfessional(false);
+
+
                                                                 }}
                                                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                                                             >
@@ -2069,6 +2382,7 @@ export default function ProfileSetting() {
                                                                     setProfessionalSaved(true);
                                                                     setTimeout(() => setProfessionalSaved(false), 2500);
                                                                     showToast('Professional details saved', 'success');
+
                                                                 }}
                                                                 disabled={isLoading}
                                                                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -2471,8 +2785,6 @@ export default function ProfileSetting() {
                                                     </div>
                                                     <Toggle checked={form.notifications.dailyReports} onChange={updateNotificationSetting("dailyReports")} />
                                                 </div>
-                                            </div>
-                                        </Section>
 
                                         {/* Dashboard Preferences removed */}
                                     </div>
@@ -2680,6 +2992,1037 @@ export default function ProfileSetting() {
 
                                 {activeTab === "Security" && (
                                     <div className="space-y-4">
+                                                {/* Change Email */}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="font-medium text-gray-900">Change Email</h4>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setChangeMode(changeMode === 'email' ? null : 'email')}
+                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                        >
+                                                            {changeMode === 'email' ? 'Cancel' : 'Change'}
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {changeMode === 'email' && (
+                                                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                                            <Field label="Current Email" error={errors.oldEmail}>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">✉️</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="email" 
+                                                                        value={form.oldEmail} 
+                                                                        onChange={upd("oldEmail")} 
+                                                                        placeholder="Current email address" 
+                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.oldEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                                                    />
+                                                                </div>
+                                                            </Field>
+                                                            <Field label="New Email" error={errors.newEmail}>
+                                                                <div className="relative">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">✉️</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="email" 
+                                                                        value={form.newEmail} 
+                                                                        onChange={upd("newEmail")} 
+                                                                        placeholder="New email address" 
+                                                                        className={`w-full pl-10 pr-4 py-3 border rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors ${errors.newEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                                                    />
+                                                                </div>
+                                                            </Field>
+                                                            <div className="flex justify-end">
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" 
+                                                                    onClick={async () => {
+                                                                        const errs = {};
+                                                                        if (!form.oldEmail) errs.oldEmail = 'Current email is required';
+                                                                        if (!form.newEmail) errs.newEmail = 'New email is required';
+                                                                        else if (!/\S+@\S+\.\S+/.test(form.newEmail)) errs.newEmail = 'Email is invalid';
+                                                                        setErrors((e) => ({ ...e, ...errs }));
+                                                                        if (Object.keys(errs).length) return;
+                                                                        setIsLoading(true);
+                                                                        await new Promise(r => setTimeout(r, 1000));
+                                                                        setIsLoading(false);
+                                                                        setEmailSaved(true);
+                                                                        setTimeout(() => {
+                                                                            setEmailSaved(false);
+                                                                            setChangeMode(null);
+                                                                        }, 3000);
+                                                                    }}
+                                                                >
+                                                                    Update Email
+                                                                </button>
+                                                            </div>
+                                                            {emailSaved && (
+                                                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                                    <span className="text-green-600">✓</span>
+                                                                    <span className="text-sm font-medium">Email updated successfully!</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Professional Details Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">Professional Details</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingProfessional ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Ensure form shows saved values when entering edit mode
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    jobTitle: savedProfessional.jobTitle,
+                                                                    department: savedProfessional.department,
+                                                                    manager: savedProfessional.manager,
+                                                                }));
+                                                                setIsEditingProfessional(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert to saved and exit edit
+                                                                    setForm((prev) => ({
+                                                                        ...prev,
+                                                                        jobTitle: savedProfessional.jobTitle,
+                                                                        department: savedProfessional.department,
+                                                                        manager: savedProfessional.manager,
+                                                                    }));
+                                                                    setIsEditingProfessional(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    // Minimal validation: allow empty, but trim values
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    setSavedProfessional({
+                                                                        jobTitle: (form.jobTitle || "").trim(),
+                                                                        department: (form.department || "").trim(),
+                                                                        manager: (form.manager || "").trim(),
+                                                                    });
+                                                                    setIsEditingProfessional(false);
+                                                                    setProfessionalSaved(true);
+                                                                    setTimeout(() => setProfessionalSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingProfessional ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Job Title</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">💼</span>
+                                                            <span className="font-medium break-all">{savedProfessional.jobTitle || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Department</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">🏢</span>
+                                                            <span className="font-medium break-all">{savedProfessional.department || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Manager</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">👨‍💼</span>
+                                                            <span className="font-medium break-all">{savedProfessional.manager || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {/* Job Title */}
+                                                    <Field label="Job Title">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">💼</span>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.jobTitle}
+                                                                onChange={upd("jobTitle")}
+                                                                placeholder="e.g., Product Manager"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Department */}
+                                                    <Field label="Department">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">🏢</span>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.department}
+                                                                onChange={upd("department")}
+                                                                placeholder="e.g., Engineering"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Manager */}
+                                                    <Field label="Manager">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">👨‍💼</span>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.manager}
+                                                                onChange={upd("manager")}
+                                                                placeholder="Manager name"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+                                                </div>
+                                            )}
+
+                                            {/* Success Toast */}
+                                            {professionalSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">Professional details saved successfully!</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Bio / Skills / About Me Section (Optional) */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">About Me & Skills <span className="text-sm font-normal text-gray-500">(Optional)</span></h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingAbout ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    bio: savedAbout.bio || "",
+                                                                    skills: savedAbout.skills || [],
+                                                                }));
+                                                                setIsEditingAbout(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert and exit edit
+                                                                    setForm((prev) => ({
+                                                                        ...prev,
+                                                                        bio: savedAbout.bio || "",
+                                                                        skills: savedAbout.skills || [],
+                                                                    }));
+                                                                    setIsEditingAbout(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    setSavedAbout({ bio: form.bio || "", skills: form.skills || [] });
+                                                                    setIsEditingAbout(false);
+                                                                    setAboutSaved(true);
+                                                                    setTimeout(() => setAboutSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingAbout ? (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Bio / About Me</div>
+                                                        <div className="flex items-start gap-2 text-gray-900">
+                                                            <span className="text-lg mt-0.5">📝</span>
+                                                            <p className="text-sm whitespace-pre-wrap">{(savedAbout.bio || "").trim() || "—"}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-3">Skills</div>
+                                                        {Array.isArray(savedAbout.skills) && savedAbout.skills.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {savedAbout.skills.map((skill, idx) => (
+                                                                    <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full border border-blue-200">
+                                                                        {skill}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-500">No skills added yet</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-6">
+                                                    {/* Bio */}
+                                                    <Field label="Bio / About Me">
+                                                        <div className="relative">
+                                                            <div className="absolute top-3 left-3 pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">📝</span>
+                                                            </div>
+                                                            <textarea
+                                                                value={form.bio}
+                                                                onChange={upd("bio")}
+                                                                placeholder="Tell us a bit about yourself..."
+                                                                rows={4}
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors resize-none"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Skills */}
+                                                    <Field label="Skills">
+                                                        <div className="space-y-3">
+                                                            {/* Skills Display */}
+                                                            {form.skills.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
+                                                                    {form.skills.map((skill, idx) => (
+                                                                        <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full border border-blue-200">
+                                                                            {skill}
+                                                                            <button 
+                                                                                type="button" 
+                                                                                className="text-blue-600 hover:text-blue-800 ml-1 text-xs" 
+                                                                                onClick={() => setForm((st) => ({ ...st, skills: st.skills.filter((_, i) => i !== idx) }))}
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* Add Skills Input */}
+                                                            <div className="relative">
+                                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                    <span className="text-gray-500 text-lg">🎯</span>
+                                                                </div>
+                                                                <input
+                                                                    value={skillsInput}
+                                                                    onChange={(e) => setSkillsInput(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter' || e.key === ',') {
+                                                                            e.preventDefault();
+                                                                            const val = skillsInput.trim().replace(/,$/, '');
+                                                                            if (!val) return;
+                                                                            setForm((st) => ({ ...st, skills: Array.from(new Set([...(st.skills || []), val])) }));
+                                                                            setSkillsInput("");
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Add skills (press Enter or comma to add)"
+                                                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                                />
+                                                            </div>
+                                                            <p className="text-xs text-gray-500">Press Enter or comma to add skills. Click ✕ to remove.</p>
+                                                        </div>
+                                                    </Field>
+                                                </div>
+                                            )}
+
+                                            {/* Success Toast */}
+                                            {aboutSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">About me & skills saved successfully!</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Team Assignment Section */}
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-semibold text-gray-900">Team Assignment</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {!isEditingTeams ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Load saved into form for editing
+                                                                setForm((s) => ({
+                                                                    ...s,
+                                                                    teams: {
+                                                                        ...(s.teams || {}),
+                                                                        mainTeam: savedTeams.mainTeam,
+                                                                        otherTeams: savedTeams.otherTeams,
+                                                                        canCreateTeams: s.teams?.canCreateTeams ?? true,
+                                                                        canJoinTeams: s.teams?.canJoinTeams ?? true,
+                                                                    },
+                                                                }));
+                                                                setIsEditingTeams(true);
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            Enable Edit
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    // Revert and exit edit
+                                                                    setForm((s) => ({
+                                                                        ...s,
+                                                                        teams: {
+                                                                            ...(s.teams || {}),
+                                                                            mainTeam: savedTeams.mainTeam,
+                                                                            otherTeams: savedTeams.otherTeams,
+                                                                        },
+                                                                    }));
+                                                                    setIsEditingTeams(false);
+                                                                }}
+                                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    setIsLoading(true);
+                                                                    await new Promise((r) => setTimeout(r, 800));
+                                                                    setIsLoading(false);
+                                                                    // Commit to saved snapshot
+                                                                    setSavedTeams({
+                                                                        mainTeam: form.teams?.mainTeam || { name: "" },
+                                                                        otherTeams: form.teams?.otherTeams || [],
+                                                                    });
+                                                                    setIsEditingTeams(false);
+                                                                    setTeamsSaved(true);
+                                                                    setTimeout(() => setTeamsSaved(false), 2500);
+                                                                }}
+                                                                disabled={isLoading}
+                                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            >
+                                                                {isLoading ? "Saving..." : "Save"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Read-only view */}
+                                            {!isEditingTeams ? (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Main Team</div>
+                                                        <div className="flex items-center gap-2 text-gray-900">
+                                                            <span className="text-lg">👥</span>
+                                                            <span className="font-medium break-all">{savedTeams.mainTeam?.name || "—"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Other Teams</div>
+                                                        {Array.isArray(savedTeams.otherTeams) && savedTeams.otherTeams.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {savedTeams.otherTeams.map((t, i) => (
+                                                                    <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 text-sm rounded-full border border-gray-200">
+                                                                        {t.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-500">No additional teams</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-6">
+                                                    {/* Main Team */}
+                                                    <Field label="Main Team">
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                <span className="text-gray-500 text-lg">👥</span>
+                                                            </div>
+                                                            <input
+                                                                value={form.teams?.mainTeam?.name || ''}
+                                                                onChange={(e) => setForm((s) => ({
+                                                                    ...s,
+                                                                    teams: { ...s.teams, mainTeam: { ...(s.teams?.mainTeam || {}), name: e.target.value } }
+                                                                }))}
+                                                                placeholder="Your primary team"
+                                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                                                            />
+                                                        </div>
+                                                    </Field>
+
+                                                    {/* Other Teams */}
+                                                    <div>
+                                                        <Field label="Add Other Team">
+                                                            <div className="flex gap-3">
+                                                                <div className="relative flex-1">
+                                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                        <span className="text-gray-500 text-lg">👥</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        id="addOtherTeam" 
+                                                                        placeholder="Team name" 
+                                                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors" 
+                                                                    />
+                                                                </div>
+                                                                <button 
+                                                                    type="button" 
+                                                                    className="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0" 
+                                                                    onClick={() => {
+                                                                        const el = document.getElementById('addOtherTeam');
+                                                                        const name = el?.value?.trim();
+                                                                        if (!name) return;
+                                                                        setForm((s) => ({
+                                                                            ...s,
+                                                                            teams: { ...s.teams, otherTeams: [...(s.teams?.otherTeams || []), { name, role: 'Contributor', members: 0 }] }
+                                                                        }));
+                                                                        if (el) el.value = '';
+                                                                    }}
+                                                                >
+                                                                    Add Team
+                                                                </button>
+                                                            </div>
+                                                        </Field>
+                                                        
+                                                        {/* Other Teams List */}
+                                                        {(form.teams?.otherTeams || []).length > 0 && (
+                                                            <div className="mt-4">
+                                                                <label className="block text-sm font-medium text-gray-700 mb-3">Other Teams</label>
+                                                                <div className="space-y-2">
+                                                                    {(form.teams?.otherTeams || []).map((team, idx) => (
+                                                                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <span className="text-lg">👥</span>
+                                                                                <div>
+                                                                                    <span className="font-medium text-gray-900">{team.name}</span>
+                                                                                    <span className="text-sm text-gray-500 ml-2">• {team.role}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <button 
+                                                                                type="button" 
+                                                                                className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors" 
+                                                                                onClick={() => setForm((s) => ({
+                                                                                    ...s,
+                                                                                    teams: { ...s.teams, otherTeams: (s.teams?.otherTeams || []).filter((_, i) => i !== idx) }
+                                                                                }))}
+                                                                            >
+                                                                                Remove
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Success Toast */}
+                                            {teamsSaved && (
+                                                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800">
+                                                    <span className="text-green-600">✓</span>
+                                                    <span className="text-sm font-medium">Team assignment saved successfully!</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "Preferences" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            PREFERENCES
+                                        </div>
+
+                                        <Section title="Regional Settings">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                                <Field label="Time Zone">
+                                                    <select
+                                                        value={form.tz}
+                                                        onChange={upd("tz")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        {timezones.map((t) => (
+                                                            <option key={t.value} value={t.value}>{t.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+                                                <Field label="Language">
+                                                    <select
+                                                        value={form.lang}
+                                                        onChange={upd("lang")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        {languages.map((lang) => (
+                                                            <option key={lang.code} value={lang.code}>{lang.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+                                                <Field label="Date Format">
+                                                    <select
+                                                        value={form.dateFormat}
+                                                        onChange={upd("dateFormat")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                                    </select>
+                                                </Field>
+                                                <Field label="Time Format">
+                                                    <select
+                                                        value={form.timeFormat}
+                                                        onChange={upd("timeFormat")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    >
+                                                        <option value="12h">12-hour</option>
+                                                        <option value="24h">24-hour</option>
+                                                    </select>
+                                                </Field>
+                                            </div>
+                                        </Section>
+
+                                        {/* Work Schedule */}
+                                        <Section title="Work Schedule">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <Field label="Start Time">
+                                                    <input
+                                                        type="time"
+                                                        value={form.start}
+                                                        onChange={upd("start")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    />
+                                                </Field>
+                                                <Field label="End Time">
+                                                    <input
+                                                        type="time"
+                                                        value={form.end}
+                                                        onChange={upd("end")}
+                                                        className="h-10 w-full rounded border border-gray-400 bg-white px-3 text-sm outline-none focus:border-blue-500 sm:h-9"
+                                                    />
+                                                </Field>
+                                            </div>
+                                        </Section>
+
+                                        {/* Save button moved here under Work Schedule */}
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={savePreferences} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                                                Save Preferences
+                                            </button>
+                                        </div>
+
+                                        {/* Notification Settings */}
+                                        <Section title="Notification Settings">
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">In-app notifications</div>
+                                                        <div className="text-xs text-gray-500">Show alerts inside the app</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.inApp} onChange={updateNotificationSetting("inApp")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Email notifications</div>
+                                                        <div className="text-xs text-gray-500">Receive updates via email</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.email} onChange={updateNotificationSetting("email")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Push notifications</div>
+                                                        <div className="text-xs text-gray-500">Mobile and desktop push alerts</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.push} onChange={updateNotificationSetting("push")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Weekly reports</div>
+                                                        <div className="text-xs text-gray-500">Summary reports every week</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.weeklyReports} onChange={updateNotificationSetting("weeklyReports")} />
+                                                </div>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">Daily reports</div>
+                                                        <div className="text-xs text-gray-500">Summary reports every day</div>
+                                                    </div>
+                                                    <Toggle checked={form.notifications.dailyReports} onChange={updateNotificationSetting("dailyReports")} />
+                                                </div>
+                                            </div>
+                                        </Section>
+
+                                        {/* Dashboard Preferences removed */}
+                                    </div>
+                                )}
+                                {activeTab === "Integrations" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            INTEGRATIONS
+                                        </div>
+
+                                        {/* helper to render a provider card */}
+                                        {(() => {
+                                            const Card = ({ logo, title, color, desc, provider }) => {
+                                                const data = integrations[provider] || {};
+                                                const connected = !!data.connected;
+                                                const badgeCls = connected ? "bg-green-600 text-white" : "bg-gray-300 text-gray-800";
+                                                const btnText = connected ? "Revoke" : "Connect";
+                                                const btnAction = () => connected ? disconnectIntegration(provider) : connectIntegration(provider);
+                                                const btnStyle = connected ? "bg-gray-200 text-gray-900" : `${color} text-white`;
+                                                return (
+                                                    <div className="rounded border border-gray-300 p-3 sm:p-4">
+                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-8 h-8 rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${color}`}>
+                                                                    {logo}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${badgeCls}`}>
+                                                                            {connected ? "Connected" : "Not Connected"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-gray-600">{desc}</p>
+                                                                    {connected && (
+                                                                        <div className="mt-1 text-[11px] text-gray-600">
+                                                                            {data.account?.name} {data.account?.email && `• ${data.account.email}`}
+                                                                            {data.lastSynced && (
+                                                                                <span className="ml-1 text-gray-500">(Last synced: {formatDate(data.lastSynced)})</span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {data.syncing ? (
+                                                                    <span className="text-xs text-gray-600">Syncing...</span>
+                                                                ) : connected ? (
+                                                                    <button className="rounded border px-2 py-1 text-xs" onClick={() => syncIntegration(provider)}>
+                                                                        Sync now
+                                                                    </button>
+                                                                ) : null}
+                                                                <button className={`rounded px-3 py-1.5 text-xs font-semibold hover:brightness-95 ${btnStyle}`} onClick={btnAction}>
+                                                                    {connected && connectPending === provider ? "Revoking..." : (!connected && connectPending === provider ? "Authorizing..." : btnText)}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            };
+
+                                            return (
+                                                <>
+                                                    <Section title="Calendars">
+                                                        <div className="space-y-3 sm:space-y-4">
+                                                            <Card logo="G" title="Google Calendar" color="bg-[#4285F4]" desc="Sync your tasks and events with Google Calendar" provider="google" />
+                                                            <Card logo="O" title="Outlook Calendar" color="bg-[#0078D4]" desc="Sync with Microsoft Outlook" provider="outlook" />
+                                                            <Card logo="📅" title="Apple Calendar" color="bg-[#EA4335]" desc="Sync with Apple iCloud Calendar" provider="apple" />
+                                                        </div>
+                                                    </Section>
+                                                    {/* Collaboration integrations removed in this version */}
+
+                                                    <Section title="CRM / Storage">
+                                                        <div className="space-y-3 sm:space-y-4">
+                                                            <Card logo="Z" title="Zoho (future-ready)" color="bg-[#FF4F1F]" desc="Prepare for CRM syncing with Zoho" provider="zoho" />
+                                                        </div>
+                                                    </Section>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+
+                                {activeTab === "Privacy" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            PRIVACY
+                                        </div>
+                                        <Section title="Strokes Visibility">
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-gray-600">Control who can see the strokes you give or receive. <span title="Public: anyone in your org can see; Team-only: only members of your teams; Private: only you and admins." className="underline decoration-dotted cursor-help">What does this mean?</span></p>
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    {[
+                                                        { value: 'public', label: 'Public' },
+                                                        { value: 'team-only', label: 'Team-only' },
+                                                        { value: 'private', label: 'Private' },
+                                                    ].map(opt => (
+                                                        <label key={opt.value} className="inline-flex items-center gap-2 text-sm">
+                                                            <input
+                                                                type="radio"
+                                                                name="strokesVisibility"
+                                                                value={opt.value}
+                                                                checked={form.strokesVisibility === opt.value}
+                                                                onChange={(e) => setForm(s => ({ ...s, strokesVisibility: e.target.value }))}
+                                                            />
+                                                            <span>{opt.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </Section>
+                                        <Section title="Activity Feed Visibility">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-700">Show my activity in “What’s New”</div>
+                                                    <div className="text-xs text-gray-500">If off, your actions won’t appear in the org-wide activity feed.</div>
+                                                </div>
+                                                <Toggle checked={form.showInActivityFeed} onChange={(v) => setForm(s => ({ ...s, showInActivityFeed: v }))} />
+                                            </div>
+                                        </Section>
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={savePrivacy} className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save Privacy Settings</button>
+                                        </div>
+                                        {privacySaved && (
+                                            <div className="mt-2 rounded border border-green-300 bg-green-50 text-green-800 text-xs px-3 py-2">Privacy settings saved.</div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeTab === "Teams & Members" && (
+                                    <div className="space-y-6">
+                                        <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+                                            <div className="flex flex-col items-center space-y-4">
+                                                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <img 
+                                                        src={`${import.meta.env.BASE_URL}team.png`} 
+                                                        alt="Team" 
+                                                        className="w-8 h-8 object-contain" 
+                                                    />
+                                                </div>
+                                                
+                                                <div className="space-y-2">
+                                                    <h3 className="text-lg font-semibold text-gray-900">
+                                                        Teams & Members Management
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600 max-w-md">
+                                                        Manage your teams, invite members, assign leaders, and organize your workspace in the dedicated Teams section.
+                                                    </p>
+                                                </div>
+                                                
+                                                <a
+                                                    href="#/teams"
+                                                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                    Go to Teams Section
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === "Security" && (
+                                    <div className="space-y-4">
+                                        <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            SECURITY & SESSIONS
+                                        </div>
+
+                                        <Section title="Login History">
+                                            <div className="overflow-x-auto border rounded-lg">
+                                                <table className="min-w-full divide-y divide-gray-200">
+                                                    <thead className="bg-gray-50">
+                                                        <tr>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Device</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Location</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">IP Address</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Last Login</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Status</th>
+                                                            <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100 bg-white">
+                                                        {loginHistory.map((session) => (
+                                                            <tr key={session.id} className={session.current ? 'bg-green-50' : ''}>
+                                                                <td className="px-4 py-2 text-sm text-gray-800">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-lg">
+                                                                            {session.device.includes('Windows') ? '💻' : 
+                                                                             session.device.includes('iPhone') ? '📱' : 
+                                                                             session.device.includes('MacBook') ? '💻' : 
+                                                                             session.device.includes('Android') ? '📱' : '🖥️'}
+                                                                        </span>
+                                                                        <span className="truncate max-w-[200px]" title={session.device}>{session.device}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-2 text-sm text-gray-700">{session.location}</td>
+                                                                <td className="px-4 py-2 text-sm font-mono text-gray-700">{session.ip}</td>
+                                                                <td className="px-4 py-2 text-sm text-gray-600">{session.loginTime}</td>
+                                                                <td className="px-4 py-2 text-sm">
+                                                                    {session.current ? (
+                                                                        <span className="px-2 py-0.5 rounded-full text-xs bg-green-600 text-white">Current</span>
+                                                                    ) : (
+                                                                        <span className="px-2 py-0.5 rounded-full text-xs bg-gray-200 text-gray-700">Active</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-2 text-sm text-right">
+                                                                    {!session.current && (
+                                                                        <button onClick={() => revokeSession(session.id)} className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">
+                                                                            Revoke
+                                                                        </button>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </Section>
+
+                                        <Section title="Session Management">
+                                            <div className="space-y-4">
+                                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-2xl">⚠️</div>
+                                                        <div className="flex-1">
+                                                            <h4 className="text-sm font-semibold text-orange-800 mb-2">Security Action</h4>
+                                                            <p className="text-sm text-orange-700 mb-3">
+                                                                Log out of all sessions on all devices. You will need to log in again everywhere.
+                                                            </p>
+                                                            <button 
+                                                                onClick={() => setShowLogoutModal(true)}
+                                                                disabled={isLoading}
+                                                                className={`px-4 py-2 text-sm rounded transition-colors ${
+                                                                    isLoading 
+                                                                        ? 'bg-gray-400 cursor-not-allowed text-white' 
+                                                                        : 'bg-red-500 hover:bg-red-600 text-white'
+                                                                }`}
+                                                            >
+                                                                {isLoading ? 'Logging Out...' : 'Log Out All Sessions'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+                                        <Section title="Password Management">
+                                            <div className="border rounded-lg p-4 bg-white">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-2xl">🔒</div>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-sm font-semibold text-gray-800 mb-1">Change Password</h4>
+                                                        <p className="text-xs text-gray-600 mb-2">Update your password (current, new, and confirm).</p>
+                                                        <button
+                                                            onClick={() => { 
+                                                                setActiveTab('Account'); 
+                                                                setAccountSubTab('actions'); 
+                                                                setChangeMode('password'); 
+                                                            }}
+                                                            className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                                                        >
+                                                            Open Change Password
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+                                        <Section title="Two-Factor Authentication Status">
+                                            <div className="space-y-4">
+                                                {(() => {
+                                                    const pending = twoFASetupMode === 'verify' && !twoFAEnabled;
+                                                    const wrapper = twoFAEnabled
+                                                        ? 'bg-green-50 border-green-200'
+                                                        : pending
+                                                            ? 'bg-yellow-50 border-yellow-200'
+                                                            : 'bg-red-50 border-red-200';
+                                                    const titleColor = twoFAEnabled
+                                                        ? 'text-green-800'
+                                                        : pending
+                                                            ? 'text-yellow-800'
+                                                            : 'text-red-800';
+                                                    const textColor = twoFAEnabled
+                                                        ? 'text-green-700'
+                                                        : pending
+                                                            ? 'text-yellow-700'
+                                                            : 'text-red-700';
+                                                    const badge = twoFAEnabled
+                                                        ? { text: '2FA Enabled', cls: 'bg-green-600 text-white' }
+                                                        : pending
+                                                            ? { text: '2FA Pending', cls: 'bg-yellow-600 text-white' }
+                                                            : { text: '2FA Disabled', cls: 'bg-red-600 text-white' };
+                                                    const pill = twoFAEnabled
+                                                        ? { text: 'SECURE', cls: 'bg-green-600 text-white' }
+                                                        : pending
+                                                            ? { text: 'PENDING SETUP', cls: 'bg-yellow-600 text-white' }
+                                                            : { text: 'AT RISK', cls: 'bg-red-600 text-white' };
+                                                    return (
+                                                        <div className={`border rounded-lg p-4 ${wrapper}`}>
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="text-2xl">
+                                                                    {twoFAEnabled ? '🔐' : pending ? '⏳' : '⚠️'}
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <h4 className={`text-sm font-semibold mb-2 ${titleColor}`}>
+                                                                        Two-Factor Authentication: {twoFAEnabled ? 'ENABLED' : pending ? 'PENDING' : 'DISABLED'}
+                                                                    </h4>
+                                                                    <p className={`text-sm mb-3 ${textColor}`}>
+                                                                        {twoFAEnabled
+                                                                            ? 'Your account is protected with two-factor authentication.'
+                                                                            : pending
+                                                                                ? 'Complete the verification step to finish enabling 2FA.'
+                                                                                : 'Enable 2FA to add an extra layer of security to your account.'}
+                                                                    </p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${badge.cls}`}>
+                                                                            {badge.text}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className={`px-3 py-1 text-xs rounded-full font-semibold ${pill.cls}`}>{pill.text}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </Section>
 
                                         <Section title="Two-Factor Authentication">
                                             <div className="space-y-4">
@@ -2987,9 +4330,7 @@ export default function ProfileSetting() {
                                                             <button type="button" className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700" onClick={doneWithBackupCodes}>
                                                                 Done
                                                             </button>
-                                                        </div>
-                                                    </div>
-                                                )}
+
                                             </div>
                                         </Section>
 
@@ -3431,6 +4772,36 @@ export default function ProfileSetting() {
                     <div className={`px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-600 text-white' : toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>
                         {toast.type === 'success' ? '✓' : toast.type === 'error' ? '⚠️' : 'ℹ️'}
                         <span>{toast.message}</span>
+                </main>
+            </div>
+            {showLogoutModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                        <div className="flex items-start gap-3">
+                            <div className="text-2xl">🔒</div>
+                            <div className="flex-1">
+                                <h3 className="text-base font-semibold text-gray-800 mb-1">Log out of all sessions?</h3>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    You will be signed out on all devices and will need to log in again everywhere.
+                                </p>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        className="px-4 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300"
+                                        onClick={() => setShowLogoutModal(false)}
+                                        disabled={isLoading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className={`px-4 py-2 text-sm rounded text-white ${isLoading ? 'bg-gray-400' : 'bg-red-600 hover:bg-red-700'}`}
+                                        onClick={handleLogoutAllSessions}
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? 'Logging Out...' : 'Log Out All Sessions'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
