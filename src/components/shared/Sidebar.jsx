@@ -34,7 +34,6 @@ const navItems = [
         icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
         to: "/goals",
         section: "Main",
-        badge: 2,
     },
     {
         label: "Key Areas",
