@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
+import { FaGripVertical } from "react-icons/fa";
 // Reusable dashboard widgets
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
@@ -167,6 +168,9 @@ function EChart({ data = [], labels = [] }) {
 
 export default function Dashboard() {
     const [loading, setLoading] = useState(true);
+    const [draggedWidget, setDraggedWidget] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
+    
     useEffect(() => {
         const timer = setTimeout(() => setLoading(false), 400);
         return () => clearTimeout(timer);
@@ -271,6 +275,57 @@ export default function Dashboard() {
             const next = [key, ...widgetOrder.filter((k) => k !== key)];
             return { ...p, widgetOrder: next };
         });
+    };
+
+    // Drag and drop handlers for widget reordering
+    const handleWidgetDragStart = (e, widgetKey, index) => {
+        setDraggedWidget({ key: widgetKey, index });
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", e.target);
+        e.target.style.opacity = "0.6";
+    };
+
+    const handleWidgetDragEnd = (e) => {
+        e.target.style.opacity = "1";
+        setDraggedWidget(null);
+        setDragOverIndex(null);
+    };
+
+    const handleWidgetDragOver = (e, index) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDragOverIndex(index);
+    };
+
+    const handleWidgetDragLeave = (e) => {
+        // Only clear dragOverIndex if we're leaving the entire droppable area
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDragOverIndex(null);
+        }
+    };
+
+    const handleWidgetDrop = (e, targetIndex) => {
+        e.preventDefault();
+        setDragOverIndex(null);
+        
+        if (!draggedWidget || draggedWidget.index === targetIndex) {
+            return;
+        }
+
+        setPrefs((p) => {
+            const currentOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
+            const draggedKey = currentOrder[draggedWidget.index];
+            
+            // Remove the dragged widget
+            const newOrder = currentOrder.filter((_, i) => i !== draggedWidget.index);
+            
+            // Insert at new position
+            newOrder.splice(targetIndex, 0, draggedKey);
+            
+            return { ...p, widgetOrder: newOrder };
+        });
+        
+        setDraggedWidget(null);
     };
     // Dark mode disabled; keep theme as light while retaining the button UI
     const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
@@ -523,11 +578,33 @@ export default function Dashboard() {
                 {/* Top Section: Summary Cards (rendered in user selection order) */}
                 {visibleTopKeys.length > 0 && (
                     <div style={topColsStyle}>
-                        {visibleTopKeys.map((k) => {
+                        {visibleTopKeys.map((k, index) => {
                             const wrapperStyle = getWrapperStyle(k);
+                            const isDragging = draggedWidget?.key === k;
+                            const isDragOver = dragOverIndex === index;
+                            
+                            const dragClasses = `
+                                ${isDragging ? 'opacity-60 transform rotate-1 shadow-lg' : ''}
+                                ${isDragOver ? 'transform -translate-y-1 shadow-lg border-blue-300' : ''}
+                                transition-all duration-200 cursor-grab active:cursor-grabbing
+                            `.trim();
+
                             if (k === "myDay")
                                 return (
-                                    <div key={k} style={wrapperStyle}>
+                                    <div 
+                                        key={k} 
+                                        style={wrapperStyle}
+                                        draggable
+                                        onDragStart={(e) => handleWidgetDragStart(e, k, index)}
+                                        onDragEnd={handleWidgetDragEnd}
+                                        onDragOver={(e) => handleWidgetDragOver(e, index)}
+                                        onDragLeave={handleWidgetDragLeave}
+                                        onDrop={(e) => handleWidgetDrop(e, index)}
+                                        className={`group ${dragClasses}`}
+                                    >
+                                        <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
+                                            <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+                                        </div>
                                         <button
                                             className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
                                             onClick={() => moveWidgetToTop(k)}
@@ -544,7 +621,20 @@ export default function Dashboard() {
                                 );
                             if (k === "goals")
                                 return (
-                                    <div key={k} style={wrapperStyle}>
+                                    <div 
+                                        key={k} 
+                                        style={wrapperStyle}
+                                        draggable
+                                        onDragStart={(e) => handleWidgetDragStart(e, k, index)}
+                                        onDragEnd={handleWidgetDragEnd}
+                                        onDragOver={(e) => handleWidgetDragOver(e, index)}
+                                        onDragLeave={handleWidgetDragLeave}
+                                        onDrop={(e) => handleWidgetDrop(e, index)}
+                                        className={`group ${dragClasses}`}
+                                    >
+                                        <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
+                                            <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+                                        </div>
                                         <button
                                             className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
                                             onClick={() => moveWidgetToTop(k)}
@@ -561,7 +651,20 @@ export default function Dashboard() {
                                 );
                             if (k === "enps")
                                 return (
-                                    <div key={k} style={wrapperStyle}>
+                                    <div 
+                                        key={k} 
+                                        style={wrapperStyle}
+                                        draggable
+                                        onDragStart={(e) => handleWidgetDragStart(e, k, index)}
+                                        onDragEnd={handleWidgetDragEnd}
+                                        onDragOver={(e) => handleWidgetDragOver(e, index)}
+                                        onDragLeave={handleWidgetDragLeave}
+                                        onDrop={(e) => handleWidgetDrop(e, index)}
+                                        className={`group ${dragClasses}`}
+                                    >
+                                        <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
+                                            <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+                                        </div>
                                         <button
                                             className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
                                             onClick={() => moveWidgetToTop(k)}
@@ -578,7 +681,20 @@ export default function Dashboard() {
                                 );
                             if (k === "strokes")
                                 return (
-                                    <div key={k} style={wrapperStyle}>
+                                    <div 
+                                        key={k} 
+                                        style={wrapperStyle}
+                                        draggable
+                                        onDragStart={(e) => handleWidgetDragStart(e, k, index)}
+                                        onDragEnd={handleWidgetDragEnd}
+                                        onDragOver={(e) => handleWidgetDragOver(e, index)}
+                                        onDragLeave={handleWidgetDragLeave}
+                                        onDrop={(e) => handleWidgetDrop(e, index)}
+                                        className={`group ${dragClasses}`}
+                                    >
+                                        <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
+                                            <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+                                        </div>
                                         <button
                                             className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
                                             onClick={() => moveWidgetToTop(k)}
@@ -595,7 +711,20 @@ export default function Dashboard() {
                                 );
                             if (k === "productivity")
                                 return (
-                                    <div key={k} style={wrapperStyle}>
+                                    <div 
+                                        key={k} 
+                                        style={wrapperStyle}
+                                        draggable
+                                        onDragStart={(e) => handleWidgetDragStart(e, k, index)}
+                                        onDragEnd={handleWidgetDragEnd}
+                                        onDragOver={(e) => handleWidgetDragOver(e, index)}
+                                        onDragLeave={handleWidgetDragLeave}
+                                        onDrop={(e) => handleWidgetDrop(e, index)}
+                                        className={`group ${dragClasses}`}
+                                    >
+                                        <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
+                                            <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+                                        </div>
                                         <button
                                             className="absolute right-3 top-3 text-xs opacity-60 bg-[Canvas] rounded px-2 py-1 border"
                                             onClick={() => moveWidgetToTop(k)}
