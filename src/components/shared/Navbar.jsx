@@ -1,16 +1,30 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaUser } from "react-icons/fa";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
+    const menuRef = useRef(null);
+
+    // Close the profile/settings popover when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (!open) return;
+            const node = menuRef.current;
+            if (node && !node.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [open]);
     return (
         <header className="bg-blue-600 text-white">
             <div className="w-full px-2 md:px-4 py-3 flex items-center justify-between">
                 <Link to="/" className="font-bold tracking-wide">
                     Practical Manager
                 </Link>
-                <div className="relative">
+                <div className="relative" ref={menuRef}>
                     <button
                         onClick={() => setOpen((o) => !o)}
                         className="flex items-center gap-3 rounded-full border border-white/30 bg-blue-500/40 px-3 py-1.5 hover:bg-blue-500/60"
@@ -41,13 +55,7 @@ export default function Navbar() {
                             >
                                 👤 Profile & Settings
                             </Link>
-                            <Link
-                                to="/admin-settings"
-                                className="block px-3 py-2 text-sm hover:bg-slate-50"
-                                onClick={() => setOpen(false)}
-                            >
-                                ⚙️ Admin Settings
-                            </Link>
+                            {/* Admin Settings link removed */}
                             <div className="border-t border-gray-200 my-1"></div>
                             <button
                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"

@@ -200,9 +200,9 @@ export default function Teams() {
     };
 
     // Enhanced Section Component
-    const Section = ({ title, children }) => (
-        <section className="mt-5 border-t border-gray-200 pt-5">
-            <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2>
+    const Section = ({ title, children, divider = true }) => (
+        <section className={divider ? "mt-5 border-t border-gray-200 pt-5" : "mt-5 pt-5"}>
+            {title ? <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2> : null}
             {children}
         </section>
     );
@@ -213,13 +213,8 @@ export default function Teams() {
                 <Sidebar />
                 <main className="flex-1">
                     <div className="mx-auto max-w-5xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
-                        <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
-
                         <div className="space-y-4">
-                            <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                TEAM MANAGEMENT
-                            </div>
-                            <Section title="Teams & Members">
+                            <Section divider={false}>
                                 <div className="space-y-4">
                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                         <input

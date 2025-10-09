@@ -62,7 +62,7 @@ const navItems = [
         section: "Main",
     },
     { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
-    { label: "Settings", icon: <FaCog />, to: "/settings", section: "Main" },
+    // { label: "Settings", icon: <FaCog />, to: "/settings", section: "Main" }, // removed
 ];
 
 const quickActions = [
@@ -96,7 +96,13 @@ export default function Sidebar({
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
     // derive avatar or initials for profile display
-    const avatarSrc = (user && user.avatar) || null;
+    let avatarSrc = (user && user.avatar) || null;
+    try {
+        if (!avatarSrc) {
+            const stored = localStorage.getItem('pm:user:avatar');
+            if (stored) avatarSrc = stored;
+        }
+    } catch (e) {}
     const initials = (user && user.name)
         ? user.name
               .split(" ")

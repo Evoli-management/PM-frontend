@@ -40,9 +40,9 @@ function EChart({ data = [], labels = [] }) {
     const containerRef = useRef(null);
     const [tooltip, setTooltip] = useState(null);
 
-    const margin = { top: 8, right: 12, bottom: 26, left: 36 };
+    const margin = { top: 6, right: 10, bottom: 22, left: 30 };
     const width = 680 - margin.left - margin.right;
-    const height = 180 - margin.top - margin.bottom;
+    const height = 150 - margin.top - margin.bottom;
 
     const max = Math.max(...data, 10);
     const min = Math.min(...data, 0);
@@ -83,7 +83,7 @@ function EChart({ data = [], labels = [] }) {
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`}
-                className="w-full h-36 rounded-md"
+                className="w-full h-28 rounded-md"
                 onMouseMove={handleMove}
                 onMouseLeave={handleLeave}
             >
@@ -201,17 +201,22 @@ export default function Dashboard() {
             // merge widgets
             const widgets = { ...defaultPrefs.widgets, ...(stored.widgets || {}) };
 
-            // normalize widgetOrder: use stored if valid, otherwise fall back to defaults
+            // normalize widgetOrder: prefer stored.widgetOrder; else use stored.lastSelected ordering; else fall back to defaults
             const knownKeys = Object.keys(defaultPrefs.widgets);
-            let widgetOrder = Array.isArray(stored.widgetOrder) ? stored.widgetOrder.slice() : defaultPrefs.widgetOrder.slice();
+            const storedLast = (stored && stored.lastSelected) || {};
+            let widgetOrder = [];
+            if (Array.isArray(stored.widgetOrder) && stored.widgetOrder.length) {
+                widgetOrder = stored.widgetOrder.slice();
+            } else if (storedLast && Object.keys(storedLast).length) {
+                // sort keys by their stored timestamp (oldest first = first selected)
+                widgetOrder = Object.keys(storedLast)
+                    .filter((k) => knownKeys.includes(k))
+                    .sort((a, b) => (storedLast[a] || 0) - (storedLast[b] || 0));
+            } else {
+                widgetOrder = defaultPrefs.widgetOrder.slice();
+            }
             // keep only known keys and ensure uniqueness
             widgetOrder = widgetOrder.filter((k, i, arr) => knownKeys.includes(k) && arr.indexOf(k) === i);
-            // append any enabled known keys that are missing from the order
-            for (const k of knownKeys) {
-                if (widgets[k] && !widgetOrder.includes(k) && defaultPrefs.widgetOrder.includes(k)) {
-                    widgetOrder.push(k);
-                }
-            }
 
             return {
                 ...defaultPrefs,
@@ -244,15 +249,18 @@ export default function Dashboard() {
             const widgets = { ...p.widgets, [key]: enabled };
             let widgetOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
 
+            const lastSelected = { ...(p.lastSelected || {}) };
             if (enabled) {
-                // append to end if not present
+                // append to end if not present and record timestamp
                 if (!widgetOrder.includes(key)) widgetOrder.push(key);
+                lastSelected[key] = Date.now();
             } else {
-                // remove if present
+                // remove if present and erase timestamp
                 widgetOrder = widgetOrder.filter((k) => k !== key);
+                delete lastSelected[key];
             }
 
-            return { ...p, widgets, widgetOrder };
+            return { ...p, widgets, widgetOrder, lastSelected };
         });
     };
 
@@ -415,38 +423,48 @@ export default function Dashboard() {
 
     // Flexible flow styles so widgets wrap and fill space without fixed columns
     // Use CSS Grid with auto-fit so cards expand to fill the row (avoids trailing empty space)
+    // Responsive grid for top summary: preserves selection order (iteration order) and packs items across the screen
     const topColsStyle = {
         display: 'grid',
-        // denser packing: allow smaller card min width so more items fit per row
-        gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-        gap: '0.4rem',
-        marginBottom: '0.5rem',
-        width: '100%'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: '0.15rem',
+        marginBottom: '0.25rem',
+        width: '100%',
+        alignItems: 'stretch',
+        gridAutoRows: '1fr',
     };
 
     // Use a dense CSS Grid so sections can sit side-by-side and reduce vertical stacking
     const dynamicGrid = {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: '0.5rem',
-        marginBottom: '0.5rem',
-        alignItems: 'start',
-        width: '100%'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '0.18rem',
+        marginBottom: '0.2rem',
+        alignItems: 'stretch',
+        gridAutoRows: '1fr',
+        width: '100%',
     };
 
     const dynamicGridSmall = {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-        gap: '0.4rem',
-        alignItems: 'start',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+        gap: '0.18rem',
+        alignItems: 'stretch',
+        gridAutoRows: '1fr',
     };
 
     const cardWrapper = {
-        minWidth: '100px',
+        minWidth: '120px',
+        minHeight: '100px',
+        display: 'flex',
+        flexDirection: 'column',
     };
 
     const cardWrapperLarge = {
-        minWidth: '140px',
+        minWidth: '160px',
+        minHeight: '120px',
+        display: 'flex',
+        flexDirection: 'column',
     };
 
     // Compute wrapper style dynamically based on how many top widgets are visible
@@ -518,9 +536,9 @@ export default function Dashboard() {
                                             ↑
                                         </button>
                                         <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
-                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
-                                            <div className="text-sm font-medium opacity-80">tasks</div>
-                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                                            <div className="text-xs font-medium opacity-80">tasks</div>
+                                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
                                         </StatsCard>
                                     </div>
                                 );
@@ -535,8 +553,8 @@ export default function Dashboard() {
                                             ↑
                                         </button>
                                         <StatsCard title="Goals Progress" tooltip="Average progress across your active goals" href="#/goals">
-                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{avgGoal}%</div>
-                                            <div className="text-sm font-medium opacity-80">average</div>
+                                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{avgGoal}%</div>
+                                            <div className="text-xs font-medium opacity-80">average</div>
                                             <div className="w-full mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden"><div className="h-2 bg-blue-500" style={{ width: `${avgGoal}%` }} /></div>
                                         </StatsCard>
                                     </div>
@@ -552,9 +570,9 @@ export default function Dashboard() {
                                             ↑
                                         </button>
                                         <StatsCard title="eNPS" tooltip="Employee Net Promoter Score (−100..+100)" href="#/enps">
-                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">0</div>
-                                            <div className="text-sm font-medium opacity-80">score</div>
-                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">Survey status: up to date</div>
+                                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">0</div>
+                                            <div className="text-xs font-medium opacity-80">score</div>
+                                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">Survey status: up to date</div>
                                         </StatsCard>
                                     </div>
                                 );
@@ -569,9 +587,9 @@ export default function Dashboard() {
                                             ↑
                                         </button>
                                         <StatsCard title="Strokes" tooltip="Recognition received and given" href="#/recognition">
-                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{strokes.received.length}</div>
-                                            <div className="text-sm font-medium opacity-80">received</div>
-                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">{strokes.given.length} given</div>
+                                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{strokes.received.length}</div>
+                                            <div className="text-xs font-medium opacity-80">received</div>
+                                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{strokes.given.length} given</div>
                                         </StatsCard>
                                     </div>
                                 );
@@ -586,9 +604,9 @@ export default function Dashboard() {
                                             ↑
                                         </button>
                                         <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap" href="#/analytics">
-                                            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
-                                            <div className="text-sm font-medium opacity-80">productive</div>
-                                            <div className="text-xs text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
+                                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
+                                            <div className="text-xs font-medium opacity-80">productive</div>
+                                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
                                             <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex"><div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} /><div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} /></div>
                                         </StatsCard>
                                     </div>
@@ -602,7 +620,7 @@ export default function Dashboard() {
                 <div style={dynamicGrid} className="mb-2">
                     {/* eNPS detailed snapshot */}
                     {prefs.widgets.enps && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-start justify-between">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">
                                     eNPS Snapshot
@@ -633,7 +651,7 @@ export default function Dashboard() {
 
                     {/* Goals list */}
                     {prefs.widgets.goals && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">
                                     Your active goals
@@ -696,7 +714,7 @@ export default function Dashboard() {
                 <div style={dynamicGrid} className="mb-2">
                     {/* Calendar Preview with drag-and-drop */}
                     {prefs.widgets.calendarPreview && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">
                                     Calendar Preview (Today)
@@ -733,7 +751,7 @@ export default function Dashboard() {
 
                     {/* What’s New Feed */}
                     {prefs.widgets.activity && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What’s New</h2>
                                 <div className="flex items-center gap-2">
@@ -773,7 +791,7 @@ export default function Dashboard() {
                 <div style={dynamicGrid} className="mb-2">
                     {/* Strokes detail */}
                     {prefs.widgets.strokes && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <div className="flex items-center justify-between mb-2">
                                 <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
                             </div>
@@ -783,7 +801,7 @@ export default function Dashboard() {
 
                     {/* Suggestions */}
                     {prefs.widgets.suggestions && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
                             <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                                 <li>Recommend goal: "Automate weekly reporting" (template)</li>
@@ -798,7 +816,7 @@ export default function Dashboard() {
                 {/* Manager/Analytics area — always visible */}
                 <div style={dynamicGrid} className="mb-2">
                     {prefs.widgets.teamOverview && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">
                                 Team Performance Overview
                             </h3>
@@ -829,7 +847,7 @@ export default function Dashboard() {
                     )}
 
                     {prefs.widgets.analytics && (
-                        <section className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
                             <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
                             <div className="mb-3 flex items-center gap-2 text-sm">
                                 <span className="opacity-70">Period:</span>
