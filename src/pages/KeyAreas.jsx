@@ -23,6 +23,7 @@ import {
     FaStop,
     FaBars,
     FaEdit,
+    FaLock,
 } from "react-icons/fa";
 
 // InlineAddActivity removed per UI simplification
