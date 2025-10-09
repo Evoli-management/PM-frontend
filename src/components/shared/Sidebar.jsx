@@ -4,8 +4,9 @@ import {
     FaHome,
     FaCalendarAlt,
     FaLock,
-    FaUser,
+    FaChevronDown,
     FaCog,
+    FaSignOutAlt,
     FaPlus,
     FaSearch,
     FaClock,
@@ -28,6 +29,30 @@ const navItems = [
         to: { pathname: "/tasks", search: "?dontforget=1" },
         section: "Main",
     },
+    {
+        label: "Goals & Tracking",
+        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
+        to: "/goals",
+        section: "Main",
+        badge: 2,
+    },
+    {
+        label: "Key Areas",
+        icon: (
+            <img src={`${import.meta.env.BASE_URL}key-area.png`} alt="Key Areas" className="w-6 h-6 object-contain" />
+        ),
+        to: "/key-areas",
+        section: "Main",
+        children: [
+            {
+                label: "Ideas",
+                icon: (
+                    <img src={`${import.meta.env.BASE_URL}ideas.png`} alt="Ideas" className="w-6 h-6 object-contain" />
+                ),
+                to: { pathname: "/key-areas", search: "?select=ideas" },
+            },
+        ],
+    },
     { label: "Time Tracking", icon: <FaClock />, to: "/time-tracking", section: "Main" },
     {
         label: "Team",
@@ -36,41 +61,407 @@ const navItems = [
         section: "Main",
     },
     { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
+    { label: "Settings", icon: <FaCog />, to: "/settings", section: "Main" },
 ];
 
-export default function Sidebar() {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const [isVisible, setIsVisible] = useState(true);
+const quickActions = [
+    { label: "New Task", icon: <FaPlus />, to: "/tasks" },
+    {
+        label: "Set Goal",
+        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
+        to: "/goals",
+    },
+    {
+        label: "Invite Team",
+        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
+        to: "/teams",
+    },
+];
 
-    const handleNavigation = (item) => {
-        if (typeof item.to === 'string') {
-            navigate(item.to);
-        } else {
-            navigate(item.to);
+export default function Sidebar({
+    user,
+    collapsed: collapsedProp,
+    onCollapseToggle,
+    mobileOpen = false,
+    onMobileClose,
+}) {
+    const location = useLocation();
+    const [keyAreasList, setKeyAreasList] = useState([]);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [internalCollapsed, setInternalCollapsed] = useState(false);
+    const [search, setSearch] = useState("");
+    const [keyAreasOpen, setKeyAreasOpen] = useState(false);
+    const openFirstKARef = useRef(false);
+    const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
+
+    // derive avatar or initials for profile display
+    let avatarSrc = (user && user.avatar) || null;
+    try {
+        if (!avatarSrc) {
+            const stored = localStorage.getItem('pm:user:avatar');
+            if (stored) avatarSrc = stored;
         }
+    } catch (e) {}
+    const initials = (user && user.name)
+        ? user.name
+              .split(" ")
+              .map((p) => p[0])
+              .slice(0, 2)
+              .join("")
+              .toUpperCase()
+        : "U";
+
+    const navigate = useNavigate();
+    const calendarEnabled = isFeatureEnabled("calendar");
+
+    const handleKeyAreasClick = (e, item) => {
+        e.preventDefault();
+        const nextOpen = !keyAreasOpen;
+        let openedFirstId = null;
+        try {
+            if (nextOpen) {
+                if (keyAreasList && keyAreasList.length > 0) {
+                    const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
+                    openedFirstId = first?.id;
+                    navigate({ pathname: item.to, search: `?ka=${first.id}&openKA=1` });
+                } else {
+                    openFirstKARef.current = true;
+                    navigate({ pathname: item.to, search: "?openKA=1" });
+                }
+            } else {
+                navigate({ pathname: item.to, search: "?view=all" });
+            }
+        } catch (err) {
+            if (nextOpen) {
+                if (keyAreasList && keyAreasList.length > 0) {
+                    const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
+                    openedFirstId = first?.id;
+                    window.location.href = `${item.to}?ka=${first.id}&openKA=1`;
+                } else {
+                    openFirstKARef.current = true;
+                    window.location.href = `${item.to}?openKA=1`;
+                }
+            } else {
+                window.location.href = `${item.to}?view=all`;
+            }
+        }
+        setKeyAreasOpen(nextOpen);
+        try {
+            if (nextOpen) {
+                if (openedFirstId != null) {
+                    window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: openedFirstId } }));
+                }
+            } else {
+                window.dispatchEvent(new CustomEvent("sidebar-keyareas-click"));
+            }
+        } catch (e) {}
     };
 
-    if (!isVisible) return null;
+    // listen for key areas data emitted by the KeyAreas page
+    React.useEffect(() => {
+        const handler = (e) => {
+            const ka = e?.detail?.keyAreas || [];
+            setKeyAreasList(Array.isArray(ka) ? ka : []);
+            if (openFirstKARef.current && Array.isArray(ka) && ka.length > 0) {
+                const first = [...ka].sort((a, b) => {
+                    const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
+                    const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
+                    if (aIsIdeas && !bIsIdeas) return 1;
+                    if (!aIsIdeas && bIsIdeas) return -1;
+                    return String(a.title || "").localeCompare(String(b.title || ""));
+                })[0];
+                try {
+                    navigate({ pathname: "/key-areas", search: `?ka=${first.id}&openKA=1` });
+                } catch {
+                    window.location.href = `/key-areas?ka=${first.id}&openKA=1`;
+                }
+                try {
+                    window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: first.id } }));
+                } catch {}
+                openFirstKARef.current = false;
+            }
+        };
+        window.addEventListener("sidebar-keyareas-data", handler);
+        return () => window.removeEventListener("sidebar-keyareas-data", handler);
+    }, []);
+
+    // Derive display list: Alphabetical A→Z, Ideas last, dedupe any duplicate Ideas
+    const displayKeyAreas = React.useMemo(() => {
+        let arr = Array.isArray(keyAreasList) ? keyAreasList.slice() : [];
+        const seen = new Set();
+        arr = arr.filter((x) => {
+            const id = String(x.id || "");
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+        const ideas = arr.filter(
+            (i) =>
+                String(i.title || "")
+                    .trim()
+                    .toLowerCase() === "ideas" || i.is_default,
+        );
+        if (ideas.length > 1) {
+            const keep = ideas.find((i) => i.is_default) || ideas[0];
+            const keepId = keep.id;
+            arr = arr.filter((i) => {
+                const isIdeas =
+                    String(i.title || "")
+                        .trim()
+                        .toLowerCase() === "ideas" || i.is_default;
+                return !isIdeas || i.id === keepId;
+            });
+        }
+        return arr.sort((a, b) => {
+            const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
+            const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
+            if (aIsIdeas && !bIsIdeas) return 1;
+            if (!aIsIdeas && bIsIdeas) return -1;
+            return String(a.title || "").localeCompare(String(b.title || ""));
+        });
+    }, [keyAreasList]);
+
+    // when landing on /key-areas with openKA=1, auto-open the dropdown on first render
+    React.useEffect(() => {
+        if (location.pathname.startsWith("/key-areas")) {
+            const params = new URLSearchParams(location.search || "");
+            if (params.get("openKA") === "1" && !keyAreasOpen) {
+                setKeyAreasOpen(true);
+            }
+        }
+    }, [location.pathname, location.search]);
+
+    // mobile overlay classes
+    const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full";
 
     return (
-        <div className="w-64 bg-white border-r border-gray-200 p-4">
-            <div className="space-y-2">
-                {navItems.map((item, index) => (
-                    <button
-                        key={index}
-                        onClick={() => handleNavigation(item)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${
-                            location.pathname === (typeof item.to === 'string' ? item.to : item.to.pathname)
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'hover:bg-gray-100'
-                        }`}
-                    >
-                        {item.icon}
-                        <span>{item.label}</span>
-                    </button>
-                ))}
+        <aside
+            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} h-screen md:h-[calc(100vh-2rem)] shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-4 md:translate-x-0 md:ml-4 md:mr-2 md:my-4 hidden-mobile`}
+            aria-label="Sidebar"
+        >
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
+                <div className="mb-6 flex items-center gap-2 px-2">
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
+                    {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
+
+                    <div className="ml-auto flex items-center gap-2">
+                        {mobileOpen && (
+                            <button
+                                className="md:hidden text-blue-700 hover:text-blue-900 focus:outline-none"
+                                aria-label="Close sidebar"
+                                onClick={() => (typeof onMobileClose === "function" ? onMobileClose() : null)}
+                            >
+                                <span className="sr-only">Close</span>
+                                <svg
+                                    className="w-5 h-5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+
+                        <button
+                            className="text-blue-700 hover:text-blue-900 focus:outline-none"
+                            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                            onClick={() => {
+                                if (typeof onCollapseToggle === "function") onCollapseToggle();
+                                else setInternalCollapsed((c) => !c);
+                            }}
+                        >
+                            <svg
+                                className={`w-4 h-4 transform ${collapsed ? "rotate-90" : "rotate-0"}`}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                {!collapsed && (
+                    <div className="mb-4 px-2">
+                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow">
+                            <FaSearch className="text-blue-700 mr-2" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search..."
+                                className="bg-transparent outline-none text-sm w-full"
+                            />
+                        </div>
+                    </div>
+                )}
+                
+                <div className={`px-2`}>
+                    <div className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
+                        <nav aria-label="Sidebar navigation">
+                            {navItems
+                                .filter((item) => item.label.toLowerCase().includes(search.toLowerCase()))
+                                .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
+                                .map((item) => {
+                                    const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
+
+                                    if (isKeyAreas) {
+                                        return (
+                                            <div key={item.label} className="mb-2">
+                                                <button
+                                                    onClick={(e) => handleKeyAreasClick(e, item)}
+                                                    aria-expanded={keyAreasOpen}
+                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${location.pathname.startsWith("/key-areas") ? "bg-white text-blue-700 shadow-inner font-semibold" : "text-gray-800 hover:bg-white"}`}
+                                                >
+                                                    <span className="text-xl" title={item.label}>
+                                                        {item.icon}
+                                                    </span>
+                                                    {!collapsed && <span>{item.label}</span>}
+                                                    {item.badge && (
+                                                        <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
+                                                            {item.badge}
+                                                        </span>
+                                                    )}
+                                                    <FaChevronDown
+                                                        className={`ml-auto ${keyAreasOpen ? "rotate-180" : "rotate-0"}`}
+                                                    />
+                                                </button>
+
+                                                {!collapsed && keyAreasOpen && (
+                                                    <div className="ml-6 mt-2 space-y-1">
+                                                        {displayKeyAreas &&
+                                                            displayKeyAreas.length > 0 &&
+                                                            displayKeyAreas.map((ka) => {
+                                                                const isActive =
+                                                                    location.pathname.startsWith("/key-areas") &&
+                                                                    new URLSearchParams(location.search).get("ka") ===
+                                                                        String(ka.id);
+                                                                const itemClasses = isActive
+                                                                    ? "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-blue-700 font-semibold bg-white shadow-inner text-left w-full"
+                                                                    : "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-gray-800 hover:bg-white text-left w-full";
+                                                                const isLocked = !!ka.is_default;
+                                                                const isIdeas = /idea/i.test(ka.title || "");
+                                                                return (
+                                                                    <Link
+                                                                        key={ka.id}
+                                                                        to={{
+                                                                            pathname: "/key-areas",
+                                                                            search: `?ka=${ka.id}`,
+                                                                        }}
+                                                                        onClick={(e) => {
+                                                                            try {
+                                                                                window.dispatchEvent(
+                                                                                    new CustomEvent("sidebar-open-ka", {
+                                                                                        detail: { id: ka.id },
+                                                                                    }),
+                                                                                );
+                                                                            } catch (err) {}
+                                                                        }}
+                                                                        className={itemClasses}
+                                                                    >
+                                                                        <span className="text-sm flex items-center gap-2">
+                                                                            {ka.title}
+                                                                            {isLocked && (
+                                                                                <span className="ml-2 inline-flex items-center">
+                                                                                    {isIdeas ? (
+                                                                                        <img
+                                                                                            src={`${import.meta.env.BASE_URL}ideas.png`}
+                                                                                            alt="Ideas"
+                                                                                            className="w-4 h-4 object-contain"
+                                                                                        />
+                                                                                    ) : (
+                                                                                        <FaLock className="text-slate-500 text-xs" />
+                                                                                    )}
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                    </Link>
+                                                                );
+                                                            })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div key={item.label} className="mb-2">
+                                            <Link
+                                                to={item.to}
+                                                className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${location.pathname.startsWith(item.to) ? "bg-white text-blue-700 shadow-inner font-semibold" : "text-gray-800 hover:bg-white"}`}
+                                            >
+                                                <span className="text-xl" title={item.label}>
+                                                    {item.icon}
+                                                </span>
+                                                {!collapsed && <span>{item.label}</span>}
+                                                {item.badge && (
+                                                    <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
+                                                        {item.badge}
+                                                    </span>
+                                                )}
+                                            </Link>
+                                        </div>
+                                    );
+                                })}
+                        </nav>
+                    </div>
+                </div>
+                
+                {!collapsed && (
+                    <div className="mt-6 px-2">
+                        <div className="uppercase text-xs text-blue-700 font-bold mb-2">Quick Actions</div>
+                        {quickActions.map((action) => (
+                            <Link
+                                key={action.label}
+                                to={action.to}
+                                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 mb-2 shadow text-blue-700 font-bold hover:bg-blue-50 transition"
+                            >
+                                {action.icon} <span>{action.label}</span>
+                            </Link>
+                        ))}
+                    </div>
+                )}
             </div>
-        </div>
+            
+            <div className="mt-2 border-t border-blue-200" />
+            <div className="mt-4 px-2 relative flex-shrink-0">
+                <div className="flex items-center gap-3 px-2 py-3 bg-white rounded-lg border border-blue-200">
+                    <Link to="/profile" className="flex items-center gap-3 w-full text-left">
+                        <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-lg font-bold text-white">
+                            {avatarSrc ? (
+                                <img src={avatarSrc} alt={user?.name || "User"} className="w-full h-full object-cover" />
+                            ) : (
+                                <span>{initials}</span>
+                            )}
+                        </div>
+                        {!collapsed && <div className="text-sm font-medium text-blue-900">{user?.name || "User"}</div>}
+                    </Link>
+                </div>
+
+                <div className="mt-2">
+                    <button
+                        className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-white text-blue-900 hover:bg-blue-50 border border-blue-200 transition"
+                        onClick={() => {
+                            try {
+                                window.location.hash = "#/login";
+                            } catch (e) {
+                                window.location.href = "/login";
+                            }
+                        }}
+                        aria-label="Logout"
+                    >
+                        <FaSignOutAlt /> <span className="font-semibold">Logout</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
     );
 }
