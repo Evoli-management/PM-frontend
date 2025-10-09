@@ -339,17 +339,9 @@ export default function Registration() {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className={`w-full ${submitting ? "bg-green-300" : "bg-green-500 hover:bg-green-600"} text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center`}
+                                    className={`w-full ${submitting ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"} text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center`}
                                 >
-                                    {submitting ? "Registering…" : "Register"}
-                                </button> 
-
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData((f) => ({ ...f }))}
-                                    className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center"
-                                >
-                                    SIGN UP FOR FREE
+                                    {submitting ? "Signing up…" : "SIGN UP FOR FREE"}
                                 </button>
 
                                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
