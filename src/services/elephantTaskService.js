@@ -1,4 +1,4 @@
-import api from './api';
+import apiClient from './apiClient';
 
 const elephantTaskService = {
   // Calendar Elephant Tasks API (simple planning blocks)
@@ -8,7 +8,7 @@ const elephantTaskService = {
    */
   async getCalendarElephantTask(viewType, dateStart, dateEnd) {
     try {
-      const response = await api.get('/calendar/elephant-tasks/period', {
+      const response = await apiClient.get('/calendar/elephant-tasks/period', {
         params: { viewType, dateStart, dateEnd }
       });
       return response.data;
@@ -23,7 +23,7 @@ const elephantTaskService = {
    */
   async upsertCalendarElephantTask(elephantTask, viewType, dateStart, dateEnd) {
     try {
-      const response = await api.post('/calendar/elephant-tasks', {
+      const response = await apiClient.post('/calendar/elephant-tasks', {
         elephantTask,
         viewType,
         dateStart,
@@ -41,7 +41,7 @@ const elephantTaskService = {
    */
   async deleteCalendarElephantTask(viewType, dateStart, dateEnd) {
     try {
-      const response = await api.delete('/calendar/elephant-tasks/period', {
+      const response = await apiClient.delete('/calendar/elephant-tasks/period', {
         params: { viewType, dateStart, dateEnd }
       });
       return response.data;
@@ -59,7 +59,7 @@ const elephantTaskService = {
       const params = { fromDate, toDate };
       if (viewType) params.viewType = viewType;
       
-      const response = await api.get('/calendar/elephant-tasks/range', { params });
+      const response = await apiClient.get('/calendar/elephant-tasks/range', { params });
       return response.data;
     } catch (error) {
       console.error('Error getting calendar elephant tasks in range:', error);
@@ -70,7 +70,7 @@ const elephantTaskService = {
   // Legacy methods for backward compatibility (kept for existing elephant tasks)
   async getElephantTasks() {
     try {
-      const response = await api.get('/elephant-tasks');
+      const response = await apiClient.get('/elephant-tasks');
       return response.data;
     } catch (error) {
       console.error('Error getting elephant tasks:', error);
@@ -80,7 +80,7 @@ const elephantTaskService = {
   
   async createElephantTask(data) {
     try {
-      const response = await api.post('/elephant-tasks', data);
+      const response = await apiClient.post('/elephant-tasks', data);
       return response.data;
     } catch (error) {
       console.error('Error creating elephant task:', error);
@@ -90,7 +90,7 @@ const elephantTaskService = {
   
   async removeElephantTask(id) {
     try {
-      const response = await api.delete(`/elephant-tasks/${id}`);
+      const response = await apiClient.delete(`/elephant-tasks/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error removing elephant task:', error);

@@ -34,7 +34,6 @@ import Tasks from "./pages/Tasks.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import Teams from "./pages/Teams.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
-import Teams from "./pages/Teams.jsx";
 import Pricing from "./pages/Pricing.jsx";
 
 export default function App() {

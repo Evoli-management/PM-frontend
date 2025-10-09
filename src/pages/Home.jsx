@@ -218,12 +218,46 @@ const Home = () => {
                                 <span className="heading-gradient block">Lead with clarity.</span>
                                 <span className="heading-subtle block mt-3 text-3xl md:text-4xl">Deliver with confidence.</span>
                             </h1>
-            <Hero />
+                            <p className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed">
+                                Transform your team's productivity with our all-in-one project management platform. 
+                                Streamline workflows, track progress, and achieve your goals with clarity and confidence.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                                <a
+                                    href="/registration"
+                                    onClick={(e) => handleNavigate(e, "/registration")}
+                                    className="btn-gradient btn-glow text-white px-8 py-4 rounded-lg font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300"
+                                >
+                                    Get Started Free
+                                </a>
+                                <a
+                                    href="/login"
+                                    onClick={(e) => handleNavigate(e, "/login")}
+                                    className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-600 hover:text-white transition-all duration-300"
+                                >
+                                    Sign In
+                                </a>
+                            </div>
+                        </div>
+                        
+                        {/* Right column: hero image/illustration */}
+                        <div className="md:w-6/12 flex justify-center">
+                            <div className="relative">
+                                <img 
+                                    src="/hero-illustration.svg" 
+                                    alt="Project Management Dashboard" 
+                                    className="w-full max-w-lg"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* New Section: Join Practical Manager with a visual element */}
             <section className="animate-fade-in-up py-16 grid grid-cols-1 md:grid-cols-2 items-center w-full max-w-6xl gap-8 mx-auto">
-                    <div className="flex justify-center items-center">
-                        <HiMiniRectangleGroup className="w-60 h-60 md:w-120 md:h-120 text-[#7C3AED]"/>
+                <div className="flex justify-center items-center">
+                    <HiMiniRectangleGroup className="w-60 h-60 md:w-120 md:h-120 text-[#7C3AED]"/>
                 </div>
                 <div
                     className="text-center md:text-left animate-fade-in-up"
