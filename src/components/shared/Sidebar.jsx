@@ -11,6 +11,7 @@ import {
     FaSearch,
     FaClock,
     FaChartBar,
+    FaGripVertical,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
 
@@ -90,6 +91,8 @@ export default function Sidebar({
     const [internalCollapsed, setInternalCollapsed] = useState(false);
     const [search, setSearch] = useState("");
     const [keyAreasOpen, setKeyAreasOpen] = useState(false);
+    const [draggedItem, setDraggedItem] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
@@ -112,6 +115,71 @@ export default function Sidebar({
 
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
+
+    // Drag and drop handlers
+    const handleDragStart = (e, ka, index) => {
+        setDraggedItem({ ka, index });
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", e.target);
+        e.target.style.opacity = "0.5";
+    };
+
+    const handleDragEnd = (e) => {
+        e.target.style.opacity = "1";
+        setDraggedItem(null);
+        setDragOverIndex(null);
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDragOverIndex(index);
+    };
+
+    const handleDragLeave = (e) => {
+        // Only clear dragOverIndex if we're leaving the entire droppable area
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDragOverIndex(null);
+        }
+    };
+
+    const handleDrop = (e, targetIndex) => {
+        e.preventDefault();
+        setDragOverIndex(null);
+        
+        if (!draggedItem || draggedItem.index === targetIndex) {
+            return;
+        }
+
+        const newKeyAreasList = [...displayKeyAreas];
+        const draggedKa = newKeyAreasList[draggedItem.index];
+        
+        // Remove the dragged item
+        newKeyAreasList.splice(draggedItem.index, 1);
+        
+        // Insert at new position
+        newKeyAreasList.splice(targetIndex, 0, draggedKa);
+        
+        // Update the positions for all key areas
+        const updatedKeyAreas = newKeyAreasList.map((ka, index) => ({
+            ...ka,
+            position: index
+        }));
+        
+        // Update local state immediately for UI responsiveness
+        setKeyAreasList(updatedKeyAreas);
+        
+        // Emit custom event to notify the KeyAreas page about the reorder
+        try {
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-reorder", { 
+                detail: { keyAreas: updatedKeyAreas } 
+            }));
+        } catch (err) {
+            console.warn("Failed to emit keyareas reorder event:", err);
+        }
+        
+        setDraggedItem(null);
+    };
 
     const handleKeyAreasClick = (e, item) => {
         e.preventDefault();
@@ -184,7 +252,7 @@ export default function Sidebar({
         return () => window.removeEventListener("sidebar-keyareas-data", handler);
     }, []);
 
-    // Derive display list: Alphabetical A→Z, Ideas last, dedupe any duplicate Ideas
+    // Derive display list: Use position if available, otherwise alphabetical A→Z, Ideas last, dedupe any duplicate Ideas
     const displayKeyAreas = React.useMemo(() => {
         let arr = Array.isArray(keyAreasList) ? keyAreasList.slice() : [];
         const seen = new Set();
@@ -211,7 +279,19 @@ export default function Sidebar({
                 return !isIdeas || i.id === keepId;
             });
         }
+        
+        // Sort by position if available, otherwise by name (Ideas last)
         return arr.sort((a, b) => {
+            // If both have positions, sort by position
+            if (typeof a.position === 'number' && typeof b.position === 'number') {
+                return a.position - b.position;
+            }
+            
+            // If only one has position, prioritize it
+            if (typeof a.position === 'number') return -1;
+            if (typeof b.position === 'number') return 1;
+            
+            // Fallback to original alphabetical sorting with Ideas last
             const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
             const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
             if (aIsIdeas && !bIsIdeas) return 1;
@@ -336,53 +416,94 @@ export default function Sidebar({
 
                                                 {!collapsed && keyAreasOpen && (
                                                     <div className="ml-6 mt-2 space-y-1">
+                                                        {displayKeyAreas && displayKeyAreas.length > 1 && (
+                                                            <div className="text-xs text-gray-500 mb-2 px-3 flex items-center gap-1">
+                                                                <FaGripVertical className="text-gray-400 text-xs" />
+                                                                <span>Drag to reorder</span>
+                                                            </div>
+                                                        )}
                                                         {displayKeyAreas &&
                                                             displayKeyAreas.length > 0 &&
-                                                            displayKeyAreas.map((ka) => {
+                                                            displayKeyAreas.map((ka, index) => {
                                                                 const isActive =
                                                                     location.pathname.startsWith("/key-areas") &&
                                                                     new URLSearchParams(location.search).get("ka") ===
                                                                         String(ka.id);
-                                                                const itemClasses = isActive
-                                                                    ? "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-blue-700 font-semibold bg-white shadow-inner text-left w-full"
-                                                                    : "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-gray-800 hover:bg-white text-left w-full";
+                                                                const baseClasses = "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-left w-full";
+                                                                const activeClasses = "text-blue-700 font-semibold bg-white shadow-inner";
+                                                                const inactiveClasses = "text-gray-800 hover:bg-white";
+                                                                const dragOverClasses = dragOverIndex === index ? "bg-blue-100 border-2 border-blue-300 border-dashed" : "";
+                                                                
+                                                                const itemClasses = `${baseClasses} ${isActive ? activeClasses : inactiveClasses} ${dragOverClasses}`;
                                                                 const isLocked = !!ka.is_default;
                                                                 const isIdeas = /idea/i.test(ka.title || "");
+                                                                const isDraggable = !isLocked; // Only allow dragging non-default items
+                                                                
                                                                 return (
-                                                                    <Link
+                                                                    <div
                                                                         key={ka.id}
-                                                                        to={{
-                                                                            pathname: "/key-areas",
-                                                                            search: `?ka=${ka.id}`,
+                                                                        draggable={isDraggable}
+                                                                        onDragStart={isDraggable ? (e) => handleDragStart(e, ka, index) : undefined}
+                                                                        onDragEnd={isDraggable ? handleDragEnd : undefined}
+                                                                        onDragOver={(e) => handleDragOver(e, index)}
+                                                                        onDragLeave={handleDragLeave}
+                                                                        onDrop={(e) => handleDrop(e, index)}
+                                                                        className={`relative sidebar-key-area-item ${
+                                                                            isDraggable ? 'sidebar-draggable cursor-move' : ''
+                                                                        } ${
+                                                                            draggedItem?.ka.id === ka.id ? 'sidebar-dragging' : ''
+                                                                        } ${
+                                                                            dragOverIndex === index ? 'sidebar-drag-over' : ''
+                                                                        }`}
+                                                                        style={{
+                                                                            opacity: draggedItem?.ka.id === ka.id ? 0.7 : 1
                                                                         }}
-                                                                        onClick={(e) => {
-                                                                            try {
-                                                                                window.dispatchEvent(
-                                                                                    new CustomEvent("sidebar-open-ka", {
-                                                                                        detail: { id: ka.id },
-                                                                                    }),
-                                                                                );
-                                                                            } catch (err) {}
-                                                                        }}
-                                                                        className={itemClasses}
                                                                     >
-                                                                        <span className="text-sm flex items-center gap-2">
-                                                                            {ka.title}
-                                                                            {isLocked && (
-                                                                                <span className="ml-2 inline-flex items-center">
-                                                                                    {isIdeas ? (
-                                                                                        <img
-                                                                                            src={`${import.meta.env.BASE_URL}ideas.png`}
-                                                                                            alt="Ideas"
-                                                                                            className="w-4 h-4 object-contain"
-                                                                                        />
-                                                                                    ) : (
-                                                                                        <FaLock className="text-slate-500 text-xs" />
-                                                                                    )}
-                                                                                </span>
+                                                                        <Link
+                                                                            to={{
+                                                                                pathname: "/key-areas",
+                                                                                search: `?ka=${ka.id}`,
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                // Prevent navigation if we're dragging
+                                                                                if (draggedItem) {
+                                                                                    e.preventDefault();
+                                                                                    return;
+                                                                                }
+                                                                                try {
+                                                                                    window.dispatchEvent(
+                                                                                        new CustomEvent("sidebar-open-ka", {
+                                                                                            detail: { id: ka.id },
+                                                                                        }),
+                                                                                    );
+                                                                                } catch (err) {}
+                                                                            }}
+                                                                            className={itemClasses}
+                                                                        >
+                                                                            {isDraggable && (
+                                                                                <FaGripVertical 
+                                                                                    className="text-gray-400 hover:text-gray-600 text-xs mr-1 flex-shrink-0" 
+                                                                                    title="Drag to reorder"
+                                                                                />
                                                                             )}
-                                                                        </span>
-                                                                    </Link>
+                                                                            <span className="text-sm flex items-center gap-2 flex-1">
+                                                                                {ka.title}
+                                                                                {isLocked && (
+                                                                                    <span className="ml-2 inline-flex items-center">
+                                                                                        {isIdeas ? (
+                                                                                            <img
+                                                                                                src={`${import.meta.env.BASE_URL}ideas.png`}
+                                                                                                alt="Ideas"
+                                                                                                className="w-4 h-4 object-contain"
+                                                                                            />
+                                                                                        ) : (
+                                                                                            <FaLock className="text-slate-500 text-xs" />
+                                                                                        )}
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                        </Link>
+                                                                    </div>
                                                                 );
                                                             })}
                                                     </div>
