@@ -2088,14 +2088,23 @@ export default function KeyAreas() {
     // Sidebar sort: Alphabetical A→Z, with "Ideas" (or system default) always last
     const sortForSidebar = React.useCallback((arr) => {
         const items = Array.isArray(arr) ? arr.slice() : [];
-        return items.sort((a, b) => {
-            const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
-            const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
-            if (aIsIdeas && !bIsIdeas) return 1;
-            if (!aIsIdeas && bIsIdeas) return -1;
-            // For non-Ideas areas, sort by position instead of alphabetically
-            return (a.position || 0) - (b.position || 0);
+        
+        // Separate Ideas/default areas from regular areas
+        const regularAreas = items.filter(item => {
+            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
+            return !isIdeas;
         });
+        
+        const ideasAreas = items.filter(item => {
+            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
+            return isIdeas;
+        });
+        
+        // Sort regular areas by position
+        const sortedRegular = regularAreas.sort((a, b) => (a.position || 0) - (b.position || 0));
+        
+        // Return regular areas first, then Ideas areas at the end (unordered)
+        return [...sortedRegular, ...ideasAreas];
     }, []);
     const toggleActivitiesRow = (id) => {
         setExpandedActivityRows((prev) => {
