@@ -336,13 +336,13 @@ export default function Registration() {
                                     <p className="text-red-500 text-sm mt-1">{formErrors.agreedToTerms}</p>
                                 )}
 
-                                /* <button
+                                <button
                                     type="submit"
                                     disabled={submitting}
                                     className={`w-full ${submitting ? "bg-green-300" : "bg-green-500 hover:bg-green-600"} text-white h-10 sm:h-12 rounded-lg font-semibold transition-colors flex items-center justify-center`}
                                 >
                                     {submitting ? "Registering…" : "Register"}
-                                </button> */
+                                </button> 
 
                                 <button
                                     type="button"
