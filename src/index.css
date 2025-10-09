@@ -56,8 +56,11 @@ input[type="date"].hide-native-date-icon {
 }
 
 /* Dashboard Widget Drag and Drop Styles */
-.dashboard-widget-draggable {
+.dashboard-widget-item {
     transition: all 0.2s ease;
+}
+
+.dashboard-widget-draggable {
     cursor: grab;
 }
 

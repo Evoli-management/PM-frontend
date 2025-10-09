@@ -192,8 +192,8 @@ export default function Dashboard() {
             teamOverview: false,
             analytics: false,
         },
-        // explicit order for the top summary widgets — will be kept in localStorage
-        widgetOrder: ["myDay", "goals", "enps", "strokes", "productivity"],
+        // explicit order for all widgets — will be kept in localStorage
+        widgetOrder: ["quickAdd", "myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview", "analytics"],
         theme: "light", // or 'dark'
     };
 
@@ -219,8 +219,10 @@ export default function Dashboard() {
             } else {
                 widgetOrder = defaultPrefs.widgetOrder.slice();
             }
-            // keep only known keys and ensure uniqueness
-            widgetOrder = widgetOrder.filter((k, i, arr) => knownKeys.includes(k) && arr.indexOf(k) === i);
+            // keep only known keys and ensure uniqueness, add missing keys at end
+            const presentKeys = widgetOrder.filter((k, i, arr) => knownKeys.includes(k) && arr.indexOf(k) === i);
+            const missingKeys = knownKeys.filter(k => !presentKeys.includes(k));
+            widgetOrder = [...presentKeys, ...missingKeys];
 
             return {
                 ...defaultPrefs,
@@ -473,8 +475,267 @@ export default function Dashboard() {
         } catch {}
     }
 
-    // Determine which top summary widgets are visible and keep their selection order
-    const visibleTopKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
+    // Determine which widgets are visible and keep their selection order
+    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
+
+    // Create a unified widget renderer
+    const renderWidget = (key, index) => {
+        const isDragging = draggedWidget?.key === key;
+        const isDragOver = dragOverIndex === index;
+        
+        const dragClasses = `
+            dashboard-widget-item group relative
+            ${isDragging ? 'dashboard-widget-dragging' : 'dashboard-widget-draggable'}
+            ${isDragOver ? 'dashboard-widget-drag-over' : ''}
+        `.trim();
+
+        // Common drag props
+        const dragProps = {
+            draggable: true,
+            onDragStart: (e) => handleWidgetDragStart(e, key, index),
+            onDragEnd: handleWidgetDragEnd,
+            onDragOver: (e) => handleWidgetDragOver(e, index),
+            onDragLeave: handleWidgetDragLeave,
+            onDrop: (e) => handleWidgetDrop(e, index),
+            className: dragClasses
+        };
+
+        // Common grip icon
+        const GripIcon = () => (
+            <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
+                <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+            </div>
+        );
+
+        const isCompactWidget = ['myDay', 'goals', 'enps', 'strokes', 'productivity'].includes(key);
+        const gridClass = isCompactWidget ? 'col-span-1' : 'col-span-full md:col-span-2';
+
+        if (key === "quickAdd") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />
+                </div>
+            );
+        }
+
+        if (key === "myDay") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
+                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                        <div className="text-xs font-medium opacity-80">tasks</div>
+                        <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                    </StatsCard>
+                </div>
+            );
+        }
+
+        if (key === "goals") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">Your active goals</h2>
+                            <div className="flex items-center gap-2">
+                                <button className="px-2 py-1 border rounded text-sm" title="Export goals">Export</button>
+                                <a href="#/goals" className="text-sm text-blue-600">View all</a>
+                            </div>
+                        </div>
+                        {activeGoals.length === 0 ? (
+                            <div className="text-[CanvasText] opacity-70">No goals yet. <a href="#/goals" className="text-blue-600">Add one</a>!</div>
+                        ) : (
+                            <ul className="space-y-4">
+                                {activeGoals.map((g, i) => (
+                                    <li key={i} className="p-3 border rounded">
+                                        <div className="flex justify-between items-center">
+                                            <div className="font-semibold">{g.title}</div>
+                                            <div className="text-sm opacity-70">{g.progress}%</div>
+                                        </div>
+                                        <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
+                                            <div className="h-2 bg-blue-500" style={{ width: `${g.progress}%` }} />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "enps") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <div className="flex items-start justify-between">
+                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">eNPS Snapshot</h2>
+                            <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
+                                <span title="eNPS measures employee net promoter score; range -100 to +100">ℹ️</span>
+                                <button className="px-2 py-1 border rounded text-[CanvasText]" title="Export eNPS report">Export</button>
+                            </div>
+                        </div>
+                        <a href="#/enps">
+                            <EnpsChart data={enpsData} labels={enpsData.map((_, i) => `W${i + 1}`)} />
+                        </a>
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "strokes") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
+                        </div>
+                        <StrokesPanel strokes={strokes} />
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "productivity") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap" href="#/analytics">
+                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
+                        <div className="text-xs font-medium opacity-80">productive</div>
+                        <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
+                        <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
+                            <div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} />
+                            <div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} />
+                        </div>
+                    </StatsCard>
+                </div>
+            );
+        }
+
+        if (key === "calendarPreview") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Calendar Preview (Today)</h2>
+                            <a href="#/calendar" className="text-sm text-blue-600">Open Calendar</a>
+                        </div>
+                        {calendarToday.length === 0 ? (
+                            <div className="text-[CanvasText] opacity-70">No appointments today. <a href="#/calendar" className="text-blue-600">Add appointment</a>.</div>
+                        ) : (
+                            <CalendarPreview events={calendarToday} onReorder={(next) => { setCalendarToday(next); try { localStorage.setItem("pm:calendarPreviewOrder", JSON.stringify(next.map((e) => e.id))); } catch {} }} getCountdownBadge={getCountdownBadge} />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "activity") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What's New</h2>
+                            <div className="flex items-center gap-2">
+                                <select className="border rounded text-sm bg-[Canvas]" value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} title="Filter feed">
+                                    <option value="all">All</option>
+                                    <option value="tasks">Tasks</option>
+                                    <option value="goals">Goals</option>
+                                    <option value="recognitions">Recognitions</option>
+                                </select>
+                                <a href="#/notifications" className="text-sm text-blue-600">Open Feed</a>
+                            </div>
+                        </div>
+                        <ActivityFeed items={recentActivity.filter((it) => {
+                            if (activityFilter === "all") return true;
+                            if (activityFilter === "recognitions") return /stroke|recognition/i.test(it.desc);
+                            if (activityFilter === "goals") return /goal/i.test(it.desc);
+                            if (activityFilter === "tasks") return /task|moved/i.test(it.desc);
+                            return true;
+                        })} onItemClick={(it) => setDrillItem(it)} />
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "suggestions") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
+                        <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
+                            <li>Recommend goal: "Automate weekly reporting" (template)</li>
+                            <li>Next best action: Finish API tests before lunch</li>
+                            <li>Insight: You're most productive in the morning (9–12)</li>
+                        </ul>
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "teamOverview") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Team Performance Overview</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div className="p-3 border rounded">Team goals completion: 68%</div>
+                            <div className="p-3 border rounded">Avg workload: 32h/week</div>
+                            <div className="p-3 border rounded">eNPS trend: steady ↑</div>
+                            <div className="p-3 border rounded">Strokes leaderboard: Dana (5)</div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                            <button className="px-3 py-1 border rounded text-sm" title="Export team report">Export report</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (key === "analytics") {
+            return (
+                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
+                    <GripIcon />
+                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                        <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
+                        <div className="mb-3 flex items-center gap-2 text-sm">
+                            <span className="opacity-70">Period:</span>
+                            <select className="border rounded bg-[Canvas]" value={analyticsPeriod} onChange={(e) => setAnalyticsPeriod(e.target.value)}>
+                                <option value="Week">Week</option>
+                                <option value="Month">Month</option>
+                            </select>
+                            <span className="opacity-70 ml-3">Compare to:</span>
+                            <select className="border rounded bg-[Canvas]" value={analyticsCompare} onChange={(e) => setAnalyticsCompare(e.target.value)}>
+                                <option value="None">None</option>
+                                <option value="Previous">Previous</option>
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="p-3 border rounded">
+                                <div className="font-semibold text-sm mb-2">Time usage</div>
+                                <TimeUsagePie productive={productivity.productive} trap={productivity.trap} />
+                            </div>
+                            <div className="p-3 border rounded">
+                                <div className="font-semibold text-sm mb-2">Weekly trend</div>
+                                <WeeklyTrendBars values={analyticsPeriod === "Week" ? [8, 6, 7, 5, 9, 4, 3] : [35, 42, 38, 44]} compareValues={analyticsCompare === "Previous" ? (analyticsPeriod === "Week" ? [6, 5, 6, 4, 7, 3, 2] : [32, 39, 36, 40]) : []} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return null;
+    };
 
     // Flexible flow styles so widgets wrap and fill space without fixed columns
     // Use CSS Grid with auto-fit so cards expand to fill the row (avoids trailing empty space)
@@ -573,9 +834,44 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Onboarding tip removed */}
+                {/* Unified Widget Grid - All widgets in draggable layout */}
+                {visibleWidgetKeys.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-max">
+                        {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                    </div>
+                )}
 
-                {/* Top Section: Summary Cards (rendered in user selection order) */}
+                {/* Footer note intentionally left blank */}
+
+                {/* Quick Add inline form area */}
+                {quickAddOpen && (
+                    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 w-96 bg-[Canvas] border rounded shadow p-4 text-[CanvasText]">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="font-semibold">Quick Add — {quickAddOpen}</div>
+                            <button
+                                onClick={() => setQuickAddOpen(null)}
+                                className="text-xs text-[CanvasText] opacity-60"
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <input
+                            className="w-full border rounded p-2 mb-2 bg-[Canvas]"
+                            placeholder={`Enter ${quickAddOpen} title`}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setQuickAddOpen(null)} className="px-3 py-1 border rounded text-sm">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => doQuickAdd(quickAddOpen)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                )}
                 {visibleTopKeys.length > 0 && (
                     <div style={topColsStyle}>
                         {visibleTopKeys.map((k, index) => {
