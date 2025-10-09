@@ -416,12 +416,6 @@ export default function Sidebar({
 
                                                 {!collapsed && keyAreasOpen && (
                                                     <div className="ml-6 mt-2 space-y-1">
-                                                        {displayKeyAreas && displayKeyAreas.length > 1 && (
-                                                            <div className="text-xs text-gray-500 mb-2 px-3 flex items-center gap-1">
-                                                                <FaGripVertical className="text-gray-400 text-xs" />
-                                                                <span>Drag to reorder</span>
-                                                            </div>
-                                                        )}
                                                         {displayKeyAreas &&
                                                             displayKeyAreas.length > 0 &&
                                                             displayKeyAreas.map((ka, index) => {
@@ -478,11 +472,11 @@ export default function Sidebar({
                                                                                     );
                                                                                 } catch (err) {}
                                                                             }}
-                                                                            className={itemClasses}
+                                                                            className={`${itemClasses} group`}
                                                                         >
                                                                             {isDraggable && (
                                                                                 <FaGripVertical 
-                                                                                    className="text-gray-400 hover:text-gray-600 text-xs mr-1 flex-shrink-0" 
+                                                                                    className="text-gray-300 hover:text-gray-600 text-xs mr-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
                                                                                     title="Drag to reorder"
                                                                                 />
                                                                             )}
