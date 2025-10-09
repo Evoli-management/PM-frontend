@@ -2290,7 +2290,15 @@ export default function KeyAreas() {
         (async () => {
             try {
                 const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-                const sorted = (kas || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+                // Ensure Ideas always has position 10
+                const processedKas = (kas || []).map(ka => {
+                    const isIdeas = (ka.title || "").trim().toLowerCase() === "ideas" || !!ka.is_default;
+                    if (isIdeas) {
+                        return { ...ka, position: 10 };
+                    }
+                    return ka;
+                });
+                const sorted = processedKas.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
                 setKeyAreas(sorted);
                 // Do not persist key areas in localStorage; always rely on backend
                 // emit key areas so sidebar can populate its dropdown
