@@ -2499,8 +2499,8 @@ export default function KeyAreas() {
             return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.is_default);
         }
 
-        // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
-        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default);
+        // Modified: Include ALL key areas (including Ideas) and let the sorting handle the order
+        const base = keyAreas; // Changed from filtering out Ideas
         if (!q) return base;
         return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
@@ -4556,7 +4556,15 @@ export default function KeyAreas() {
                                         <ol className="divide-y divide-slate-200">
                                             {filteredKAs
                                                 .slice()
-                                                .sort((a, b) => (a.position || 0) - (b.position || 0))
+                                                .sort((a, b) => {
+                                                    // Ideas/default areas always go to the end
+                                                    const aIsIdeas = (a.title || "").toLowerCase() === "ideas" || a.is_default;
+                                                    const bIsIdeas = (b.title || "").toLowerCase() === "ideas" || b.is_default;
+                                                    if (aIsIdeas && !bIsIdeas) return 1;
+                                                    if (!aIsIdeas && bIsIdeas) return -1;
+                                                    // For non-Ideas areas, sort by position
+                                                    return (a.position || 0) - (b.position || 0);
+                                                })
                                                 .map((ka, idx) => (
                                                     <li
                                                         key={ka.id}
