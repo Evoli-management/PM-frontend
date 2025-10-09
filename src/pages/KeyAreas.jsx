@@ -2093,7 +2093,8 @@ export default function KeyAreas() {
             const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
             if (aIsIdeas && !bIsIdeas) return 1;
             if (!aIsIdeas && bIsIdeas) return -1;
-            return String(a.title || "").localeCompare(String(b.title || ""));
+            // For non-Ideas areas, sort by position instead of alphabetically
+            return (a.position || 0) - (b.position || 0);
         });
     }, []);
     const toggleActivitiesRow = (id) => {
