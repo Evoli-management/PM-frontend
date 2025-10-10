@@ -237,7 +237,7 @@ export default function DayView({
                                             <span>{h}</span>
                                         </td>
                                         <td
-                                            className={`border-t border-blue-100 px-2 py-1 align-top ${isBoundary ? 'pointer-events-none opacity-60' : ''}`}
+                                            className={`border-t border-blue-100 px-2 py-1 align-top ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
                                             style={{ width: "100%" }}
                                             {...(!isBoundary && {
                                                 onDoubleClick: () => {
@@ -251,6 +251,13 @@ export default function DayView({
                                                     );
                                                     onQuickCreate && onQuickCreate(date);
                                                 },
+                                                onDragOver: (e) => {
+                                                    try {
+                                                        e.preventDefault();
+                                                        e.dataTransfer.dropEffect = "copy";
+                                                    } catch {}
+                                                },
+                                                onDrop: (e) => handleDrop(e, h),
                                             })}
                                         >
                                             {slotEvents.length === 0
@@ -354,6 +361,15 @@ export default function DayView({
                                                 className="w-full px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center gap-2 text-left"
                                                 title={t.title}
                                                 onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    try {
+                                                        e.dataTransfer.setData("taskId", String(t.id));
+                                                        e.dataTransfer.setData("title", t.title || "");
+                                                        e.dataTransfer.setData("description", t.description || "");
+                                                        e.dataTransfer.effectAllowed = "copyMove";
+                                                    } catch {}
+                                                }}
                                             >
                                                 <svg
                                                     stroke="currentColor"

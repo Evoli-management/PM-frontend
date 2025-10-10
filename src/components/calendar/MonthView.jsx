@@ -23,6 +23,7 @@ export default function MonthView({
     filterType,
     onChangeFilter,
     onQuickCreate, // new: open appointment creation modal
+    onTaskDrop,
 }) {
     // Working hours: 8:00 to 18:00
     const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
@@ -255,6 +256,15 @@ export default function MonthView({
                                 className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
                                 style={{ minWidth: 36, minHeight: 28 }}
                                 onClick={() => setShowViewMenu((s) => !s)}
+                                draggable
+                                onDragStart={(e) => {
+                                    try {
+                                        e.dataTransfer.setData("taskId", String(t.id));
+                                        e.dataTransfer.setData("title", t.title || "");
+                                        e.dataTransfer.setData("description", t.description || "");
+                                        e.dataTransfer.effectAllowed = "copyMove";
+                                    } catch {}
+                                }}
                                 aria-haspopup="menu"
                                 aria-expanded={showViewMenu ? "true" : "false"}
                             >
@@ -421,6 +431,31 @@ export default function MonthView({
                                                             );
                                                             onQuickCreate(dt);
                                                         }
+                                                    }}
+                                                    onDragOver={(e) => {
+                                                        try {
+                                                            e.preventDefault();
+                                                            e.dataTransfer.dropEffect = "copy";
+                                                        } catch {}
+                                                    }}
+                                                    onDrop={(e) => {
+                                                        try {
+                                                            const taskId = e.dataTransfer.getData("taskId");
+                                                            if (!taskId || typeof onTaskDrop !== "function") return;
+                                                            const dt = new Date(
+                                                                date.getFullYear(),
+                                                                date.getMonth(),
+                                                                date.getDate(),
+                                                                parseInt(hr, 10) || 0,
+                                                                parseInt(min, 10) || 0,
+                                                                0,
+                                                                0,
+                                                            );
+                                                            const task = (todos || []).find(
+                                                                (t) => String(t.id) === String(taskId),
+                                                            );
+                                                            if (task) onTaskDrop(task, dt);
+                                                        } catch {}
                                                     }}
                                                     title="Double-click to add appointment"
                                                 >

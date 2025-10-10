@@ -29,6 +29,11 @@ const calendarService = {
         return res.data;
     },
 
+    async createAppointment(payload) {
+        const res = await apiClient.post(`${base}/appointments`, payload);
+        return res.data;
+    },
+
     async updateEvent(id, payload) {
         if (!id) throw new Error("Missing event id");
         const res = await apiClient.patch(`${base}/events/${id}`, payload);

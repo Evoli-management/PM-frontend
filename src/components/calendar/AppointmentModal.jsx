@@ -26,6 +26,21 @@ const AppointmentModal = ({ startDate, defaultDurationMinutes = 60, onClose, onC
         return new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0);
     };
 
+    const toOffsetISO = (d) => {
+        const pad = (n) => String(n).padStart(2, "0");
+        const y = d.getFullYear();
+        const m = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hh = pad(d.getHours());
+        const mm = pad(d.getMinutes());
+        const ss = "00";
+        const off = -d.getTimezoneOffset(); // minutes east of UTC
+        const sign = off >= 0 ? "+" : "-";
+        const oh = pad(Math.floor(Math.abs(off) / 60));
+        const om = pad(Math.abs(off) % 60);
+        return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
+    };
+
     const handleSave = async () => {
         try {
             if (!title.trim()) {
@@ -47,13 +62,14 @@ const AppointmentModal = ({ startDate, defaultDurationMinutes = 60, onClose, onC
                 return;
             }
             setSaving(true);
-            const created = await calendarService.createEvent({
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+            const created = await calendarService.createAppointment({
                 title: title.trim(),
                 description: description.trim() || null,
-                start: s.toISOString(),
-                end: e.toISOString(),
-                allDay: false,
-                kind: "appointment",
+                start: toOffsetISO(s),
+                end: toOffsetISO(e),
+                // server enforces appointment rules
+                timezone: tz,
             });
             onCreated && onCreated(created);
         } catch (err) {

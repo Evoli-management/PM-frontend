@@ -265,10 +265,10 @@ const CalendarContainer = () => {
         } catch {}
     };
 
-    // Drag-and-drop: create a calendar event (timebox) for a task
+    // Drag-and-drop: create an appointment for a task
     const handleTaskDrop = async (taskOrId, date) => {
         try {
-            const defaultMinutes = 60;
+            const defaultMinutes = 30;
             let start = new Date(date);
             if (!withinBusinessHours(start)) {
                 addToast({
@@ -285,15 +285,29 @@ const CalendarContainer = () => {
                 (typeof taskOrId === "object" && taskOrId?.title) ||
                 todos.find((t) => String(t.id) === String(taskId))?.title ||
                 "Task";
-            const payload = {
-                title,
-                start: start.toISOString(),
-                end: end.toISOString(),
-                allDay: false,
-                taskId: taskId || undefined,
-                kind: "custom",
+            const description = typeof taskOrId === "object" ? taskOrId.description || "" : "";
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+            const toOffsetISO = (d) => {
+                const pad = (n) => String(n).padStart(2, "0");
+                const y = d.getFullYear();
+                const m = pad(d.getMonth() + 1);
+                const day = pad(d.getDate());
+                const hh = pad(d.getHours());
+                const mm = pad(d.getMinutes());
+                const ss = "00";
+                const off = -d.getTimezoneOffset();
+                const sign = off >= 0 ? "+" : "-";
+                const oh = pad(Math.floor(Math.abs(off) / 60));
+                const om = pad(Math.abs(off) % 60);
+                return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            const created = await calendarService.createEvent(payload);
+            const created = await calendarService.createAppointment({
+                title,
+                description,
+                start: toOffsetISO(start),
+                end: toOffsetISO(end),
+                timezone: tz,
+            });
             // Optimistic merge
             setEvents((prev) => [...prev, created]);
             addToast({
@@ -476,8 +490,9 @@ const CalendarContainer = () => {
                 });
                 return;
             }
-            const payload = { start: newStartDate.toISOString() };
-            if (newEndDate) payload.end = newEndDate.toISOString();
+            // Enforce 30-minute duration when moving via grid
+            const fixedEnd = new Date(newStartDate.getTime() + 30 * 60 * 1000);
+            const payload = { start: newStartDate.toISOString(), end: fixedEnd.toISOString() };
             const updated = await calendarService.updateEvent(eventId, payload);
             setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
             addToast({
@@ -583,7 +598,7 @@ const CalendarContainer = () => {
     const getCurrentViewDateRange = () => {
         const start = new Date(currentDate);
         const end = new Date(currentDate);
-        
+
         if (view === "day") {
             // Same day
             start.setHours(0, 0, 0, 0);
@@ -615,10 +630,10 @@ const CalendarContainer = () => {
             end.setMonth(start.getMonth() + 1, 0);
             end.setHours(23, 59, 59, 999);
         }
-        
+
         return {
             dateStart: start.toISOString(),
-            dateEnd: end.toISOString()
+            dateEnd: end.toISOString(),
         };
     };
 
@@ -628,23 +643,24 @@ const CalendarContainer = () => {
             <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
                 {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
-                
+
                 {/* New Calendar Elephant Task Input */}
-                {view !== "list" && (() => {
-                    const { dateStart, dateEnd } = getCurrentViewDateRange();
-                    return (
-                        <div className="mb-3">
-                            <ElephantTaskInput
-                                viewType={view}
-                                dateStart={dateStart}
-                                dateEnd={dateEnd}
-                                onTaskChange={() => {
-                                    // Optionally refresh calendar data when elephant task changes
-                                }}
-                            />
-                        </div>
-                    );
-                })()}
+                {view !== "list" &&
+                    (() => {
+                        const { dateStart, dateEnd } = getCurrentViewDateRange();
+                        return (
+                            <div className="mb-3">
+                                <ElephantTaskInput
+                                    viewType={view}
+                                    dateStart={dateStart}
+                                    dateEnd={dateEnd}
+                                    onTaskChange={() => {
+                                        // Optionally refresh calendar data when elephant task changes
+                                    }}
+                                />
+                            </div>
+                        );
+                    })()}
                 {/* Active view content */}
                 {view === "quarter" && (
                     <QuarterView
@@ -675,6 +691,7 @@ const CalendarContainer = () => {
                         categories={EVENT_CATEGORIES}
                         onEventClick={openModal}
                         onTaskClick={openEditTask}
+                        onTaskDrop={handleTaskDrop}
                         onQuickCreate={handleQuickCreate}
                     />
                 )}
