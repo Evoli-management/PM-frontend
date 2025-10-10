@@ -12,30 +12,25 @@ import StatsCard from "../../components/dashboard/widgets/StatsCard.jsx";
 import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
 import WeeklyTrendBars from "../../components/dashboard/widgets/WeeklyTrendBars.jsx";
 
-// Real API Services
-import { getGoals } from "../../services/goalService";
-import activityService from "../../services/activityService";
-import calendarService from "../../services/calendarService";
-
-// Fallback data for when API is unavailable
-const fallbackActivity = [
+// Demo data (replace with real services later)
+const recentActivity = [
     { desc: "Alice completed task: Design header", time: "2h" },
     { desc: "Bob moved 'Payment' to In Progress", time: "1d" },
     { desc: "New member invited: Carlos", time: "3d" },
 ];
 
-const fallbackGoals = [
+const initialActiveGoals = [
     { title: "Launch MVP", progress: 72 },
     { title: "Improve onboarding", progress: 40 },
 ];
 
-const fallbackCalendar = [
+const initialCalendarToday = [
     { id: 1, title: "Daily Standup", start: "09:00", end: "09:15" },
     { id: 2, title: "Client Call", start: "11:00", end: "11:45" },
     { id: 3, title: "Focus: API integration", start: "14:00", end: "16:00" },
 ];
 
-const fallbackStrokes = {
+const initialStrokes = {
     received: [{ id: 1, from: "Dana", msg: "Great work on the release!", time: "1d" }],
     given: [{ id: 2, to: "Bob", msg: "Thanks for jumping on the bug fix.", time: "3d" }],
 };
@@ -362,272 +357,39 @@ export default function Dashboard() {
 
     // (top summary layout handled below nearer the JSX so it has current prefs)
 
-    // Data state - Real data from APIs
-    const [activeGoals, setActiveGoals] = useState([]);
-    const [recentActivity, setRecentActivity] = useState([]);
-    const [calendarToday, setCalendarToday] = useState([]);
-    const [strokes, setStrokes] = useState({ received: [], given: [] });
-    
-    // Loading and error states
-    const [dataLoading, setDataLoading] = useState({
-        goals: true,
-        activity: true,
-        calendar: true,
-        strokes: true,
+    // Data state
+    const [activeGoals, setActiveGoals] = useState(initialActiveGoals);
+    const [calendarToday, setCalendarToday] = useState(() => {
+        // restore order if any
+        try {
+            const orderRaw = localStorage.getItem("pm:calendarPreviewOrder");
+            const order = orderRaw ? JSON.parse(orderRaw) : null;
+            if (Array.isArray(order) && order.length) {
+                const byId = Object.fromEntries(initialCalendarToday.map((e) => [e.id, e]));
+                return order.map((id) => byId[id]).filter(Boolean);
+            }
+        } catch {}
+        return initialCalendarToday;
     });
-    const [dataErrors, setDataErrors] = useState({});
+    const [strokes, setStrokes] = useState(initialStrokes);
 
-    // Load real data from APIs
-    useEffect(() => {
-        const loadDashboardData = async () => {
-            // Load Goals
-            try {
-                console.log("Loading goals...");
-                const goalsData = await getGoals();
-                console.log("Goals loaded:", goalsData);
-                
-                // Transform goals data for dashboard display
-                const activeGoalsData = goalsData
-                    .filter(goal => goal.status !== 'archived' && goal.visibility !== 'archived')
-                    .map(goal => ({
-                        id: goal.id,
-                        title: goal.title,
-                        progress: goal.progressPercent || 0,
-                        status: goal.status,
-                        dueDate: goal.dueDate,
-                    }))
-                    .slice(0, 5); // Show only first 5 goals on dashboard
-                
-                setActiveGoals(activeGoalsData);
-                setDataLoading(prev => ({ ...prev, goals: false }));
-            } catch (error) {
-                console.error("Failed to load goals:", error);
-                setActiveGoals(fallbackGoals);
-                setDataErrors(prev => ({ ...prev, goals: error.message }));
-                setDataLoading(prev => ({ ...prev, goals: false }));
-            }
-
-            // Load Activity Feed
-            try {
-                console.log("Loading activities...");
-                const activitiesData = await activityService.list();
-                console.log("Activities loaded:", activitiesData);
-                
-                // Transform activity data for dashboard display
-                const recentActivityData = activitiesData
-                    .slice(0, 10) // Show only recent 10 activities
-                    .map(activity => ({
-                        id: activity.id,
-                        desc: activity.text || activity.description || "Activity update",
-                        time: formatTimeAgo(activity.createdAt || activity.timestamp),
-                        type: activity.type || "general",
-                    }));
-                
-                setRecentActivity(recentActivityData);
-                setDataLoading(prev => ({ ...prev, activity: false }));
-            } catch (error) {
-                console.error("Failed to load activities:", error);
-                setRecentActivity(fallbackActivity);
-                setDataErrors(prev => ({ ...prev, activity: error.message }));
-                setDataLoading(prev => ({ ...prev, activity: false }));
-            }
-
-            // Load Today's Calendar Events
-            try {
-                console.log("Loading calendar events...");
-                const today = new Date();
-                const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-                const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
-                
-                const eventsData = await calendarService.listEvents({
-                    from: todayStart,
-                    to: todayEnd,
-                    view: 'day'
-                });
-                console.log("Calendar events loaded:", eventsData);
-                
-                // Transform calendar data for dashboard display
-                const calendarTodayData = eventsData
-                    .slice(0, 8) // Show max 8 events for today
-                    .map(event => ({
-                        id: event.id,
-                        title: event.title || event.summary || "Untitled Event",
-                        start: formatTimeOnly(event.startTime || event.start),
-                        end: formatTimeOnly(event.endTime || event.end),
-                        type: event.type || "event",
-                    }));
-                
-                setCalendarToday(calendarTodayData);
-                setDataLoading(prev => ({ ...prev, calendar: false }));
-            } catch (error) {
-                console.error("Failed to load calendar:", error);
-                setCalendarToday(fallbackCalendar);
-                setDataErrors(prev => ({ ...prev, calendar: error.message }));
-                setDataLoading(prev => ({ ...prev, calendar: false }));
-            }
-
-            // Load Strokes (if service becomes available)
-            try {
-                // For now, use fallback data since strokes service might not be implemented yet
-                setStrokes(fallbackStrokes);
-                setDataLoading(prev => ({ ...prev, strokes: false }));
-            } catch (error) {
-                console.error("Failed to load strokes:", error);
-                setStrokes(fallbackStrokes);
-                setDataErrors(prev => ({ ...prev, strokes: error.message }));
-                setDataLoading(prev => ({ ...prev, strokes: false }));
-            }
-        };
-
-        loadDashboardData();
-    }, []); // Load once on component mount
-
-    // Helper functions for data formatting
-    const formatTimeAgo = (timestamp) => {
-        if (!timestamp) return "recently";
-        try {
-            const date = new Date(timestamp);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / (1000 * 60));
-            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            
-            if (diffMins < 60) return `${diffMins}m`;
-            if (diffHours < 24) return `${diffHours}h`;
-            return `${diffDays}d`;
-        } catch {
-            return "recently";
-        }
-    };
-
-    const formatTimeOnly = (timeString) => {
-        if (!timeString) return "00:00";
-        try {
-            const date = new Date(timeString);
-            return date.toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
-        } catch {
-            return "00:00";
-        }
-    };
-
-    // Quick Add state - Enhanced for real data creation
+    // Quick Add state
     const [quickAddOpen, setQuickAddOpen] = useState(null); // 'task'|'goal'|'stroke'|'note'|'appointment'
     const [message, setMessage] = useState("");
-    const [quickAddLoading, setQuickAddLoading] = useState(false);
-    
-    // Refresh dashboard data
-    const refreshDashboardData = async () => {
-        setDataLoading({
-            goals: true,
-            activity: true,
-            calendar: true,
-            strokes: true,
-        });
-        
-        // Trigger data reload
-        window.location.reload(); // Simple approach - could be optimized
-    };
-    
-    async function doQuickAdd(type, inputValue = "") {
-        if (!inputValue.trim()) return;
-        
-        setQuickAddLoading(true);
-        try {
-            switch (type) {
-                case 'goal':
-                    // Use real goal service
-                    const { createGoal } = await import("../../services/goalService");
-                    await createGoal({
-                        title: inputValue.trim(),
-                        description: `Quick goal created from dashboard`,
-                        visibility: "public",
-                    });
-                    setMessage(`✅ Goal "${inputValue}" created successfully!`);
-                    // Refresh goals data
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                    break;
-                    
-                case 'task':
-                    // Create activity entry for now (until task service is integrated)
-                    await activityService.create({
-                        text: `New task: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
-                    setMessage(`✅ Task "${inputValue}" added to activity feed!`);
-                    break;
-                    
-                case 'appointment':
-                    // Use real calendar service
-                    const today = new Date();
-                    const startTime = new Date(today.getTime() + 60 * 60 * 1000); // 1 hour from now
-                    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
-                    
-                    await calendarService.createEvent({
-                        title: inputValue.trim(),
-                        startTime: startTime.toISOString(),
-                        endTime: endTime.toISOString(),
-                        description: "Quick appointment created from dashboard",
-                    });
-                    setMessage(`✅ Appointment "${inputValue}" scheduled!`);
-                    break;
-                    
-                case 'note':
-                    // Create as activity for now
-                    await activityService.create({
-                        text: `Note: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
-                    setMessage(`✅ Note "${inputValue}" saved!`);
-                    break;
-                    
-                default:
-                    setMessage(`✅ ${type} "${inputValue}" added!`);
-            }
-            
-            setTimeout(() => setMessage(""), 3000);
-            setQuickAddOpen(null);
-            
-        } catch (error) {
-            console.error(`Failed to create ${type}:`, error);
-            setMessage(`❌ Failed to create ${type}. Please try again.`);
-            setTimeout(() => setMessage(""), 3000);
-        } finally {
-            setQuickAddLoading(false);
-        }
+    function doQuickAdd(type) {
+        setMessage(`Added ${type}`);
+        setTimeout(() => setMessage(""), 2500);
+        setQuickAddOpen(null);
     }
 
     // Onboarding tip removed per user preference
 
-    // Helpers - Updated to use real data
+    // Helpers
     const avgGoal = activeGoals.length
-        ? Math.round(activeGoals.reduce((s, g) => s + (g.progress || 0), 0) / activeGoals.length)
+        ? Math.round(activeGoals.reduce((s, g) => s + g.progress, 0) / activeGoals.length)
         : 0;
-    
-    // Calculate real My Day stats
-    const myDayStats = {
-        tasksDueToday: activeGoals.filter(goal => {
-            if (!goal.dueDate) return false;
-            const today = new Date().toDateString();
-            const dueDate = new Date(goal.dueDate).toDateString();
-            return dueDate === today;
-        }).length,
-        overdue: activeGoals.filter(goal => {
-            if (!goal.dueDate) return false;
-            const today = new Date();
-            const dueDate = new Date(goal.dueDate);
-            return dueDate < today && goal.status !== 'completed';
-        }).length,
-        appointments: calendarToday.length
-    };
-    
-    const productivity = { productive: 24, trap: 6 }; // TODO: Replace with real productivity tracking
+    const myDayStats = { tasksDueToday: 3, overdue: 1, appointments: calendarToday.length };
+    const productivity = { productive: 24, trap: 6 };
     const [prodTrend, setProdTrend] = useState([6, 7, 6, 8, 7, 9, 8]);
     const [analyticsPeriod, setAnalyticsPeriod] = useState("Week"); // Week | Month
     const [analyticsCompare, setAnalyticsCompare] = useState("None"); // None | Previous
@@ -778,61 +540,23 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">Your active goals</h2>
                             <div className="flex items-center gap-2">
-                                <button 
-                                    className="px-2 py-1 border rounded text-sm" 
-                                    title="Export goals"
-                                    onClick={() => {
-                                        const header = ["Title", "Progress (%)", "Status", "Due Date"];
-                                        const rows = [
-                                            header,
-                                            ...activeGoals.map((g) => [
-                                                g.title,
-                                                g.progress || 0,
-                                                g.status || "active",
-                                                g.dueDate ? new Date(g.dueDate).toLocaleDateString() : "No due date",
-                                            ]),
-                                        ];
-                                        exportCsv("dashboard-goals.csv", rows);
-                                    }}
-                                >
-                                    Export
-                                </button>
+                                <button className="px-2 py-1 border rounded text-sm" title="Export goals">Export</button>
                                 <a href="#/goals" className="text-sm text-blue-600">View all</a>
                             </div>
                         </div>
-                        
-                        {dataLoading.goals ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="text-sm text-[CanvasText] opacity-70">Loading goals...</div>
-                            </div>
-                        ) : dataErrors.goals ? (
-                            <div className="text-sm text-red-600 bg-red-50 p-3 rounded border">
-                                Failed to load goals: {dataErrors.goals}
-                                <div className="mt-2 text-xs">Using fallback data</div>
-                            </div>
-                        ) : activeGoals.length === 0 ? (
-                            <div className="text-[CanvasText] opacity-70">
-                                No active goals yet. <a href="#/goals" className="text-blue-600">Create your first goal</a>!
-                            </div>
+                        {activeGoals.length === 0 ? (
+                            <div className="text-[CanvasText] opacity-70">No goals yet. <a href="#/goals" className="text-blue-600">Add one</a>!</div>
                         ) : (
                             <ul className="space-y-4">
                                 {activeGoals.map((g, i) => (
-                                    <li key={g.id || i} className="p-3 border rounded">
+                                    <li key={i} className="p-3 border rounded">
                                         <div className="flex justify-between items-center">
                                             <div className="font-semibold">{g.title}</div>
-                                            <div className="text-sm opacity-70">{g.progress || 0}%</div>
+                                            <div className="text-sm opacity-70">{g.progress}%</div>
                                         </div>
                                         <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
-                                            <div 
-                                                className="h-2 bg-blue-500 transition-all duration-300" 
-                                                style={{ width: `${g.progress || 0}%` }} 
-                                            />
+                                            <div className="h-2 bg-blue-500" style={{ width: `${g.progress}%` }} />
                                         </div>
-                                        {g.dueDate && (
-                                            <div className="text-xs text-[CanvasText] opacity-60 mt-1">
-                                                Due: {new Date(g.dueDate).toLocaleDateString()}
-                                            </div>
-                                        )}
                                     </li>
                                 ))}
                             </ul>
@@ -902,31 +626,10 @@ export default function Dashboard() {
                             <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Calendar Preview (Today)</h2>
                             <a href="#/calendar" className="text-sm text-blue-600">Open Calendar</a>
                         </div>
-                        
-                        {dataLoading.calendar ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="text-sm text-[CanvasText] opacity-70">Loading calendar...</div>
-                            </div>
-                        ) : dataErrors.calendar ? (
-                            <div className="text-sm text-red-600 bg-red-50 p-3 rounded border mb-3">
-                                Failed to load calendar: {dataErrors.calendar}
-                                <div className="text-xs mt-1">Using fallback data</div>
-                            </div>
-                        ) : calendarToday.length === 0 ? (
-                            <div className="text-[CanvasText] opacity-70">
-                                No appointments today. <a href="#/calendar" className="text-blue-600">Add appointment</a>.
-                            </div>
+                        {calendarToday.length === 0 ? (
+                            <div className="text-[CanvasText] opacity-70">No appointments today. <a href="#/calendar" className="text-blue-600">Add appointment</a>.</div>
                         ) : (
-                            <CalendarPreview 
-                                events={calendarToday} 
-                                onReorder={(next) => { 
-                                    setCalendarToday(next); 
-                                    try { 
-                                        localStorage.setItem("pm:calendarPreviewOrder", JSON.stringify(next.map((e) => e.id))); 
-                                    } catch {} 
-                                }} 
-                                getCountdownBadge={getCountdownBadge} 
-                            />
+                            <CalendarPreview events={calendarToday} onReorder={(next) => { setCalendarToday(next); try { localStorage.setItem("pm:calendarPreviewOrder", JSON.stringify(next.map((e) => e.id))); } catch {} }} getCountdownBadge={getCountdownBadge} />
                         )}
                     </div>
                 </div>
@@ -950,34 +653,13 @@ export default function Dashboard() {
                                 <a href="#/notifications" className="text-sm text-blue-600">Open Feed</a>
                             </div>
                         </div>
-                        
-                        {dataLoading.activity ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="text-sm text-[CanvasText] opacity-70">Loading activities...</div>
-                            </div>
-                        ) : dataErrors.activity ? (
-                            <div className="text-sm text-red-600 bg-red-50 p-3 rounded border mb-3">
-                                Failed to load activities: {dataErrors.activity}
-                                <div className="text-xs mt-1">Using fallback data</div>
-                            </div>
-                        ) : null}
-                        
-                        <ActivityFeed 
-                            items={recentActivity.filter((it) => {
-                                if (activityFilter === "all") return true;
-                                if (activityFilter === "recognitions") return /stroke|recognition|praise/i.test(it.desc);
-                                if (activityFilter === "goals") return /goal|objective|milestone/i.test(it.desc);
-                                if (activityFilter === "tasks") return /task|todo|complete|moved/i.test(it.desc);
-                                return true;
-                            })} 
-                            onItemClick={(it) => setDrillItem(it)} 
-                        />
-                        
-                        {!dataLoading.activity && recentActivity.length === 0 && (
-                            <div className="text-[CanvasText] opacity-70 text-center py-4">
-                                No recent activity. Start working on your goals to see updates here!
-                            </div>
-                        )}
+                        <ActivityFeed items={recentActivity.filter((it) => {
+                            if (activityFilter === "all") return true;
+                            if (activityFilter === "recognitions") return /stroke|recognition/i.test(it.desc);
+                            if (activityFilter === "goals") return /goal/i.test(it.desc);
+                            if (activityFilter === "tasks") return /task|moved/i.test(it.desc);
+                            return true;
+                        })} onItemClick={(it) => setDrillItem(it)} />
                     </div>
                 </div>
             );
@@ -1169,47 +851,246 @@ export default function Dashboard() {
                             <button
                                 onClick={() => setQuickAddOpen(null)}
                                 className="text-xs text-[CanvasText] opacity-60"
-                                disabled={quickAddLoading}
                             >
                                 Close
                             </button>
                         </div>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const input = e.target.querySelector('input');
-                            doQuickAdd(quickAddOpen, input.value);
-                        }}>
-                            <input
-                                id="quickAddInput"
-                                className="w-full border rounded p-2 mb-2 bg-[Canvas]"
-                                placeholder={`Enter ${quickAddOpen} title`}
-                                autoFocus
-                                disabled={quickAddLoading}
-                                required
-                            />
-                            <div className="flex justify-end gap-2">
-                                <button 
-                                    type="button"
-                                    onClick={() => setQuickAddOpen(null)} 
-                                    className="px-3 py-1 border rounded text-sm"
-                                    disabled={quickAddLoading}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-50"
-                                    disabled={quickAddLoading}
-                                >
-                                    {quickAddLoading ? "Creating..." : "Add"}
-                                </button>
-                            </div>
-                        </form>
+                        <input
+                            className="w-full border rounded p-2 mb-2 bg-[Canvas]"
+                            placeholder={`Enter ${quickAddOpen} title`}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setQuickAddOpen(null)} className="px-3 py-1 border rounded text-sm">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => doQuickAdd(quickAddOpen)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                            >
+                                Add
+                            </button>
+                        </div>
                     </div>
                 )}
 
                 {/* Drill-in modal for Activity */}
 
+
+                <div style={dynamicGrid} className="mb-2">
+                    {/* Calendar Preview with drag-and-drop */}
+                    {prefs.widgets.calendarPreview && (
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <div className="flex items-center justify-between mb-2">
+                                <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">
+                                    Calendar Preview (Today)
+                                </h2>
+                                <a href="#/calendar" className="text-sm text-blue-600">
+                                    Open Calendar
+                                </a>
+                            </div>
+                            {calendarToday.length === 0 ? (
+                                <div className="text-[CanvasText] opacity-70">
+                                    No appointments today.{" "}
+                                    <a href="#/calendar" className="text-blue-600">
+                                        Add appointment
+                                    </a>
+                                    .
+                                </div>
+                            ) : (
+                                <CalendarPreview
+                                    events={calendarToday}
+                                    onReorder={(next) => {
+                                        setCalendarToday(next);
+                                        try {
+                                            localStorage.setItem(
+                                                "pm:calendarPreviewOrder",
+                                                JSON.stringify(next.map((e) => e.id)),
+                                            );
+                                        } catch {}
+                                    }}
+                                    getCountdownBadge={getCountdownBadge}
+                                />
+                            )}
+                        </section>
+                    )}
+
+                    {/* What’s New Feed */}
+                    {prefs.widgets.activity && (
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <div className="flex items-center justify-between mb-2">
+                                <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What’s New</h2>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        className="border rounded text-sm bg-[Canvas]"
+                                        value={activityFilter}
+                                        onChange={(e) => setActivityFilter(e.target.value)}
+                                        title="Filter feed"
+                                    >
+                                        <option value="all">All</option>
+                                        <option value="tasks">Tasks</option>
+                                        <option value="goals">Goals</option>
+                                        <option value="recognitions">Recognitions</option>
+                                    </select>
+                                    <a href="#/notifications" className="text-sm text-blue-600">
+                                        Open Feed
+                                    </a>
+                                </div>
+                            </div>
+                            <ActivityFeed
+                                items={recentActivity.filter((it) => {
+                                    if (activityFilter === "all") return true;
+                                    if (activityFilter === "recognitions") return /stroke|recognition/i.test(it.desc);
+                                    if (activityFilter === "goals") return /goal/i.test(it.desc);
+                                    if (activityFilter === "tasks") return /task|moved/i.test(it.desc);
+                                    return true;
+                                })}
+                                onItemClick={(it) => setDrillItem(it)}
+                            />
+                        </section>
+                    )}
+                </div>
+
+                {/* Quick Add full-width row */}
+                {prefs.widgets.quickAdd && <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />}
+
+                <div style={dynamicGrid} className="mb-2">
+                    {/* Strokes detail */}
+                    {prefs.widgets.strokes && (
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <div className="flex items-center justify-between mb-2">
+                                <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
+                            </div>
+                            <StrokesPanel strokes={strokes} />
+                        </section>
+                    )}
+
+                    {/* Suggestions */}
+                    {prefs.widgets.suggestions && (
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
+                            <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
+                                <li>Recommend goal: "Automate weekly reporting" (template)</li>
+                                <li>Next best action: Finish API tests before lunch</li>
+                                <li>Insight: You’re most productive in the morning (9–12)</li>
+                            </ul>
+                            {/* Reserved for AI-related guidance */}
+                        </section>
+                    )}
+                </div>
+
+                {/* Manager/Analytics area — always visible */}
+                <div style={dynamicGrid} className="mb-2">
+                    {prefs.widgets.teamOverview && (
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">
+                                Team Performance Overview
+                            </h3>
+                            <div style={dynamicGridSmall} className="text-sm">
+                                <div className="p-3 border rounded">Team goals completion: 68%</div>
+                                <div className="p-3 border rounded">Avg workload: 32h/week</div>
+                                <div className="p-3 border rounded">eNPS trend: steady ↑</div>
+                                <div className="p-3 border rounded">Strokes leaderboard: Dana (5)</div>
+                            </div>
+                            <div className="mt-3 flex justify-end">
+                                <button
+                                    className="px-3 py-1 border rounded text-sm"
+                                    title="Export team report"
+                                    onClick={() =>
+                                        exportCsv("team-overview.csv", [
+                                            ["Metric", "Value"],
+                                            ["Team goals completion", "68%"],
+                                            ["Avg workload", "32h/week"],
+                                            ["eNPS trend", "steady"],
+                                            ["Top recognitions", "Dana (5)"],
+                                        ])
+                                    }
+                                >
+                                    Export report
+                                </button>
+                            </div>
+                        </section>
+                    )}
+
+                    {prefs.widgets.analytics && (
+                        <section style={{height: '100%'}} className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
+                            <div className="mb-3 flex items-center gap-2 text-sm">
+                                <span className="opacity-70">Period:</span>
+                                <select
+                                    className="border rounded bg-[Canvas]"
+                                    value={analyticsPeriod}
+                                    onChange={(e) => setAnalyticsPeriod(e.target.value)}
+                                >
+                                    <option value="Week">Week</option>
+                                    <option value="Month">Month</option>
+                                </select>
+                                <span className="opacity-70 ml-3">Compare to:</span>
+                                <select
+                                    className="border rounded bg-[Canvas]"
+                                    value={analyticsCompare}
+                                    onChange={(e) => setAnalyticsCompare(e.target.value)}
+                                >
+                                    <option value="None">None</option>
+                                    <option value="Previous">Previous</option>
+                                </select>
+                            </div>
+                            <div style={dynamicGrid}>
+                                {/* Time usage pie (Goals vs Trap) */}
+                                <div className="p-3 border rounded">
+                                    <div className="font-semibold text-sm mb-2">Time usage</div>
+                                    <TimeUsagePie productive={productivity.productive} trap={productivity.trap} />
+                                </div>
+                                {/* Weekly trend bars */}
+                                <div className="p-3 border rounded">
+                                    <div className="font-semibold text-sm mb-2">Weekly trend</div>
+                                    {(() => {
+                                        const values =
+                                            analyticsPeriod === "Week" ? [8, 6, 7, 5, 9, 4, 3] : [35, 42, 38, 44];
+                                        const compareValues =
+                                            analyticsCompare === "Previous"
+                                                ? analyticsPeriod === "Week"
+                                                    ? [6, 5, 6, 4, 7, 3, 2]
+                                                    : [32, 39, 36, 40]
+                                                : [];
+                                        return <WeeklyTrendBars values={values} compareValues={compareValues} />;
+                                    })()}
+                                </div>
+                            </div>
+                        </section>
+                    )}
+                </div>
+
+                {/* Footer note intentionally left blank */}
+
+                {/* Quick Add inline form area */}
+                {quickAddOpen && (
+                    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 w-96 bg-[Canvas] border rounded shadow p-4 text-[CanvasText]">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="font-semibold">Quick Add — {quickAddOpen}</div>
+                            <button
+                                onClick={() => setQuickAddOpen(null)}
+                                className="text-xs text-[CanvasText] opacity-60"
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <input
+                            className="w-full border rounded p-2 mb-2 bg-[Canvas]"
+                            placeholder={`Enter ${quickAddOpen} title`}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setQuickAddOpen(null)} className="px-3 py-1 border rounded text-sm">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => doQuickAdd(quickAddOpen)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Drill-in modal for Activity */}
                 {drillItem && (

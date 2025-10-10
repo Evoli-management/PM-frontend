@@ -23,6 +23,7 @@ import {
     FaStop,
     FaBars,
     FaEdit,
+    FaLock,
 } from "react-icons/fa";
 
 // InlineAddActivity removed per UI simplification
@@ -2087,13 +2088,23 @@ export default function KeyAreas() {
     // Sidebar sort: Alphabetical A→Z, with "Ideas" (or system default) always last
     const sortForSidebar = React.useCallback((arr) => {
         const items = Array.isArray(arr) ? arr.slice() : [];
-        return items.sort((a, b) => {
-            const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
-            const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
-            if (aIsIdeas && !bIsIdeas) return 1;
-            if (!aIsIdeas && bIsIdeas) return -1;
-            return String(a.title || "").localeCompare(String(b.title || ""));
+        
+        // Separate Ideas/default areas from regular areas
+        const regularAreas = items.filter(item => {
+            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
+            return !isIdeas;
         });
+        
+        const ideasAreas = items.filter(item => {
+            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
+            return isIdeas;
+        });
+        
+        // Sort regular areas by position
+        const sortedRegular = regularAreas.sort((a, b) => (a.position || 0) - (b.position || 0));
+        
+        // Return regular areas first, then Ideas areas at the end (unordered)
+        return [...sortedRegular, ...ideasAreas];
     }, []);
     const toggleActivitiesRow = (id) => {
         setExpandedActivityRows((prev) => {
@@ -2279,7 +2290,15 @@ export default function KeyAreas() {
         (async () => {
             try {
                 const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-                const sorted = (kas || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+                // Ensure Ideas always has position 10
+                const processedKas = (kas || []).map(ka => {
+                    const isIdeas = (ka.title || "").trim().toLowerCase() === "ideas" || !!ka.is_default;
+                    if (isIdeas) {
+                        return { ...ka, position: 10 };
+                    }
+                    return ka;
+                });
+                const sorted = processedKas.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
                 setKeyAreas(sorted);
                 // Do not persist key areas in localStorage; always rely on backend
                 // emit key areas so sidebar can populate its dropdown
@@ -2499,8 +2518,8 @@ export default function KeyAreas() {
             return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.is_default);
         }
 
-        // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
-        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default);
+        // Modified: Include ALL key areas (including Ideas) and let the sorting handle the order
+        const base = keyAreas; // Changed from filtering out Ideas
         if (!q) return base;
         return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
@@ -4556,7 +4575,15 @@ export default function KeyAreas() {
                                         <ol className="divide-y divide-slate-200">
                                             {filteredKAs
                                                 .slice()
-                                                .sort((a, b) => (a.position || 0) - (b.position || 0))
+                                                .sort((a, b) => {
+                                                    // Ideas/default areas always go to the end
+                                                    const aIsIdeas = (a.title || "").toLowerCase() === "ideas" || a.is_default;
+                                                    const bIsIdeas = (b.title || "").toLowerCase() === "ideas" || b.is_default;
+                                                    if (aIsIdeas && !bIsIdeas) return 1;
+                                                    if (!aIsIdeas && bIsIdeas) return -1;
+                                                    // For non-Ideas areas, sort by position
+                                                    return (a.position || 0) - (b.position || 0);
+                                                })
                                                 .map((ka, idx) => (
                                                     <li
                                                         key={ka.id}

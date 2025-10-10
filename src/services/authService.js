@@ -18,12 +18,26 @@ class AuthService {
             email,
             password,
         });
-        return res.data; // { message, token }
+        const data = res.data; // { message, token }
+        
+        // Store token in localStorage for mobile compatibility
+        if (data.token) {
+            localStorage.setItem("access_token", data.token);
+        }
+        
+        return data;
     }
 
     async login({ email, password }) {
         const res = await apiClient.post("/auth/login", { email, password });
-        return res.data; // { message, user, token }
+        const data = res.data; // { message, user, token }
+        
+        // Store token in localStorage for mobile compatibility
+        if (data.token) {
+            localStorage.setItem("access_token", data.token);
+        }
+        
+        return data;
     }
 
     async verifyToken() {
