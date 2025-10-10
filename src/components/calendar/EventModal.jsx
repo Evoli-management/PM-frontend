@@ -140,7 +140,9 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
         try {
             const end = event.end ? new Date(event.end) : null;
             if (!end) return;
-            const newEnd = new Date(end.getTime() + deltaMinutes * 60 * 1000);
+            // Snap to 30-minute increments
+            const snappedDelta = Math.round(deltaMinutes / 30) * 30;
+            const newEnd = new Date(end.getTime() + snappedDelta * 60 * 1000);
             if (!withinBusinessHours(newEnd)) {
                 addToast({ title: "Outside business hours", description: "Use 08:00–17:00", variant: "warning" });
                 return;
@@ -157,6 +159,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
     };
     const remove = async () => {
         try {
+            if (!window.confirm("Delete this event?")) return;
             await calendarService.deleteEvent(event.id);
             onEventDeleted && onEventDeleted(event.id);
             onClose && onClose();
