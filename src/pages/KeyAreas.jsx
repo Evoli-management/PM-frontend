@@ -2534,14 +2534,16 @@ export default function KeyAreas() {
         const payload = {
             title: form.get("title").toString().trim(),
             description: form.get("description").toString().trim(),
+            color: form.get("color").toString().trim() || "#3B82F6",
         };
         if (!payload.title) return;
 
         if (editing) {
-            // Only update fields changed in the form (no color)
+            // Update all fields including color
             const updated = await api.updateKeyArea(editing.id, {
                 title: payload.title,
                 description: payload.description,
+                color: payload.color,
             });
             setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
             // emit updated list for sidebar (alphabetical with Ideas last)
@@ -2560,6 +2562,7 @@ export default function KeyAreas() {
                 const created = await api.createKeyArea({
                     title: payload.title,
                     description: payload.description,
+                    color: payload.color,
                     position: pos,
                     is_default: false,
                 });
@@ -3237,7 +3240,10 @@ export default function KeyAreas() {
                                                     if (e?.currentTarget) e.currentTarget.src = "/key-area.png";
                                                 }}
                                             />
-                                            <span className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1">
+                                            <span 
+                                                className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1"
+                                                style={{ color: selectedKA.color || '#1F2937' }}
+                                            >
                                                 {selectedKA.title}
                                             </span>
                                         </div>
@@ -4613,7 +4619,10 @@ export default function KeyAreas() {
                                                             </span>
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-2 min-w-0">
-                                                                    <span className="font-semibold text-slate-900 truncate">
+                                                                    <span 
+                                                                        className="font-semibold truncate"
+                                                                        style={{ color: ka.color || '#1F2937' }}
+                                                                    >
                                                                         {ka.title}
                                                                     </span>
                                                                     {ka.is_default && (
@@ -5612,7 +5621,45 @@ export default function KeyAreas() {
                                                 placeholder="What belongs to this area?"
                                             />
                                         </div>
-                                        {/* Color inputs removed per request */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-900">Color</label>
+                                            <div className="mt-2 flex items-center gap-3">
+                                                <input
+                                                    type="color"
+                                                    name="color"
+                                                    defaultValue={editing?.color || "#3B82F6"}
+                                                    className="w-12 h-10 rounded-lg border border-slate-300 cursor-pointer"
+                                                    title="Choose color for this Key Area"
+                                                />
+                                                <div className="flex flex-wrap gap-2">
+                                                    {/* Preset color options */}
+                                                    {[
+                                                        "#3B82F6", // Blue
+                                                        "#EF4444", // Red  
+                                                        "#10B981", // Green
+                                                        "#F59E0B", // Amber
+                                                        "#8B5CF6", // Purple
+                                                        "#EC4899", // Pink
+                                                        "#06B6D4", // Cyan
+                                                        "#84CC16", // Lime
+                                                        "#F97316", // Orange
+                                                        "#6B7280", // Gray
+                                                    ].map(color => (
+                                                        <button
+                                                            key={color}
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                const colorInput = e.target.closest('form').querySelector('input[name="color"]');
+                                                                if (colorInput) colorInput.value = color;
+                                                            }}
+                                                            className="w-6 h-6 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+                                                            style={{ backgroundColor: color }}
+                                                            title={`Set color to ${color}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
                                                 <FaSave /> Save

@@ -480,7 +480,10 @@ export default function Sidebar({
                                                                                     title="Drag to reorder"
                                                                                 />
                                                                             )}
-                                                                            <span className="text-sm flex items-center gap-2 flex-1">
+                                                                            <span 
+                                                                                className="text-sm flex items-center gap-2 flex-1"
+                                                                                style={{ color: ka.color || '#374151' }}
+                                                                            >
                                                                                 {ka.title}
                                                                                 {isLocked && (
                                                                                     <span className="ml-2 inline-flex items-center">
