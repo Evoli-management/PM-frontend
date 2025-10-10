@@ -7,7 +7,8 @@ import WeekView from "./WeekView";
 import DayView from "./DayView";
 import ListView from "./ListView";
 import EventModal from "./EventModal";
-import TaskActivityModal from "./TaskActivityModal";
+import CreateTaskModal from "../modals/CreateTaskModal";
+import CreateActivityModal from "../modals/CreateActivityModal";
 import ElephantTaskModal from "./ElephantTaskModal";
 import ElephantTaskInput from "./ElephantTaskInput";
 import taskService from "../../services/taskService";
@@ -67,6 +68,7 @@ const CalendarContainer = () => {
     const [todos, setTodos] = useState([]);
     const [loading, setLoading] = useState(false);
     const [activitiesByTask, setActivitiesByTask] = useState({}); // { taskId: Activity[] }
+    const [weekActivities, setWeekActivities] = useState([]); // Flat list of activities for Week view
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [addModalOpen, setAddModalOpen] = useState(false);
@@ -198,14 +200,38 @@ const CalendarContainer = () => {
                     } catch {
                         setActivitiesByTask({});
                     }
+                    setWeekActivities([]);
+                } else if (view === "week") {
+                    // For Week view, gather activities for all tasks in the selected week and flatten
+                    try {
+                        const uniqueIds = Array.from(new Set((Array.isArray(tds) ? tds : []).map((t) => String(t.id))));
+                        const lists = await Promise.all(
+                            uniqueIds.map(async (id) => {
+                                try {
+                                    const list = await activityService.list({ taskId: id });
+                                    return Array.isArray(list) ? list : [];
+                                } catch {
+                                    return [];
+                                }
+                            }),
+                        );
+                        const flat = ([]).concat(...lists).filter(Boolean);
+                        setWeekActivities(flat);
+                        setActivitiesByTask({});
+                    } catch {
+                        setWeekActivities([]);
+                        setActivitiesByTask({});
+                    }
                 } else {
                     setActivitiesByTask({});
+                    setWeekActivities([]);
                 }
             } catch (err) {
                 console.warn("Failed to load calendar data", err);
                 setEvents([]);
                 setTodos([]);
                 setActivitiesByTask({});
+                setWeekActivities([]);
             } finally {
                 setLoading(false);
             }
@@ -260,6 +286,24 @@ const CalendarContainer = () => {
                     setActivitiesByTask(map);
                 } catch {
                     setActivitiesByTask({});
+                }
+            } else if (view === "week") {
+                try {
+                    const uniqueIds = Array.from(new Set((Array.isArray(tds) ? tds : []).map((t) => String(t.id))));
+                    const lists = await Promise.all(
+                        uniqueIds.map(async (id) => {
+                            try {
+                                const list = await activityService.list({ taskId: id });
+                                return Array.isArray(list) ? list : [];
+                            } catch {
+                                return [];
+                            }
+                        }),
+                    );
+                    const flat = ([]).concat(...lists).filter(Boolean);
+                    setWeekActivities(flat);
+                } catch {
+                    setWeekActivities([]);
                 }
             }
         } catch {}
@@ -317,6 +361,54 @@ const CalendarContainer = () => {
             });
         } catch (err) {
             console.warn("Failed to create calendar event from drop", err);
+            addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
+        }
+    };
+
+    // Drag-and-drop: create an appointment for an activity
+    const handleActivityDrop = async (activityOrObj, date) => {
+        try {
+            const defaultMinutes = 30;
+            let start = new Date(date);
+            if (!withinBusinessHours(start)) {
+                addToast({
+                    title: "Outside business hours",
+                    description: "Schedule only between 08:00 and 17:00",
+                    variant: "warning",
+                });
+                return;
+            }
+            const { end } = clampToBusinessHours(start, defaultMinutes);
+            const title =
+                (typeof activityOrObj === "object" && (activityOrObj.text || activityOrObj.title)) ||
+                "Activity";
+            const description = typeof activityOrObj === "object" ? activityOrObj.description || "" : "";
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+            const toOffsetISO = (d) => {
+                const pad = (n) => String(n).padStart(2, "0");
+                const y = d.getFullYear();
+                const m = pad(d.getMonth() + 1);
+                const day = pad(d.getDate());
+                const hh = pad(d.getHours());
+                const mm = pad(d.getMinutes());
+                const ss = "00";
+                const off = -d.getTimezoneOffset();
+                const sign = off >= 0 ? "+" : "-";
+                const oh = pad(Math.floor(Math.abs(off) / 60));
+                const om = pad(Math.abs(off) % 60);
+                return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
+            };
+            const created = await calendarService.createAppointment({
+                title,
+                description,
+                start: toOffsetISO(start),
+                end: toOffsetISO(end),
+                timezone: tz,
+            });
+            setEvents((prev) => [...prev, created]);
+            addToast({ title: "Event created", description: `${title} at ${start.toLocaleTimeString()}`, variant: "success" });
+        } catch (err) {
+            console.warn("Failed to create calendar event from activity drop", err);
             addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
         }
     };
@@ -714,6 +806,7 @@ const CalendarContainer = () => {
                         onEventMove={handleEventMove}
                         onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
                         onTaskClick={openEditTask}
+                        activities={weekActivities}
                     />
                 )}
                 {view === "day" && (
@@ -733,6 +826,7 @@ const CalendarContainer = () => {
                         loading={loading}
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
+                        onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
                         onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
                         onTaskClick={openEditTask}
@@ -754,22 +848,38 @@ const CalendarContainer = () => {
                     />
                 )}
             </div>
-            {modalOpen && (
-                <EventModal
-                    event={selectedEvent}
-                    onClose={() => setModalOpen(false)}
-                    categories={EVENT_CATEGORIES}
-                    timezone={timezone}
-                    onEventUpdated={(ev) => {
-                        setEvents((prev) => prev.map((e) => (e.id === ev.id ? ev : e)));
-                        if (selectedEvent && selectedEvent.id === ev.id) setSelectedEvent(ev);
-                        addToast({ title: "Event updated", variant: "success" });
-                    }}
-                    onEventDeleted={(id) => {
-                        setEvents((prev) => prev.filter((e) => e.id !== id));
-                        addToast({ title: "Event deleted", variant: "success" });
-                    }}
-                />
+            {addModalOpen && (
+                addDefaultTab === "activity" ? (
+                    <CreateActivityModal
+                        isOpen={addModalOpen}
+                        onClose={() => setAddModalOpen(false)}
+                        onSave={async (createdActivity) => {
+                            await refreshTodosForRange();
+                            setAddModalOpen(false);
+                        }}
+                        initialData={{
+                            text: "",
+                            keyAreaId: "",
+                            taskId: "",
+                        }}
+                        attachedTaskId={null}
+                    />
+                ) : (
+                    <CreateTaskModal
+                        isOpen={addModalOpen}
+                        onClose={() => setAddModalOpen(false)}
+                        onSave={async (createdTask) => {
+                            await refreshTodosForRange();
+                            setAddModalOpen(false);
+                        }}
+                        initialData={{
+                            date: (() => {
+                                const d = addDate || new Date();
+                                return d.toISOString().slice(0, 10);
+                            })(),
+                        }}
+                    />
+                )
             )}
             {appointmentModalOpen && appointmentInitialStart && (
                 <AppointmentModal
@@ -785,28 +895,6 @@ const CalendarContainer = () => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
                     }}
-                />
-            )}
-            {addModalOpen && (
-                <TaskActivityModal
-                    item={{
-                        title: "",
-                        type: addDefaultTab,
-                        // Use local date to avoid UTC shift (off-by-one day)
-                        date: (() => {
-                            const d = addDate || new Date();
-                            const y = d.getFullYear();
-                            const m = String(d.getMonth() + 1).padStart(2, "0");
-                            const day = String(d.getDate()).padStart(2, "0");
-                            return `${y}-${m}-${day}`;
-                        })(),
-                        // Let the modal choose its default time (e.g., 08:00)
-                        time: undefined,
-                        status: "pending",
-                        description: "",
-                    }}
-                    onClose={() => setAddModalOpen(false)}
-                    onSave={handleAddSave}
                 />
             )}
             {editModalOpen && editItem && (

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import CreateTaskModal from "../modals/CreateTaskModal.jsx";
+import CreateActivityModal from "../modals/CreateActivityModal.jsx";
 
 const CalendarView = () => {
     const [view, setView] = useState("monthly");
@@ -6,7 +8,6 @@ const CalendarView = () => {
     const [items, setItems] = useState(dummyItems);
     const [filter, setFilter] = useState("both");
     const [modalOpen, setModalOpen] = useState(false);
-    const [modalItem, setModalItem] = useState(null);
     const [popupDate, setPopupDate] = useState(null);
 
     // Elephant Task state (mock)
@@ -26,6 +27,10 @@ const CalendarView = () => {
         setElephantTasks(copy);
         setElephantInput("");
     }
+
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [defaultType, setDefaultType] = useState("task");
+    const [modalItem, setModalItem] = useState(null);
 
     return (
         <div className="w-full">
@@ -84,40 +89,56 @@ const CalendarView = () => {
                             (filter === "both" || i.type === filter),
                     )}
                     onAdd={(type) => {
-                        setModalOpen(true);
-                        setModalItem({
-                            title: "",
-                            type,
-                            date: selectedDate.toISOString().slice(0, 10),
-                            time: "",
-                            status: "pending",
-                            description: "",
-                        });
-                    }}
-                    onEdit={(item) => {
-                        setModalOpen(true);
-                        setModalItem(item);
+                        if (type === "task") {
+                            setShowCreateModal(true);
+                            setDefaultType("task");
+                            setModalItem(null);
+                        } else if (type === "activity") {
+                            setShowCreateModal(true);
+                            setDefaultType("activity");
+                            setModalItem({ attachedTaskId: "10aa745e-e823-45e0-b432-b0e03b6bee6e" });
+                        }
                     }}
                 />
             )}
-            {/* TODO: Render weekly, monthly, quarterly views with markers and popups */}
-            {modalOpen && (
-                <TaskActivityModal
-                    item={modalItem}
-                    onClose={() => setModalOpen(false)}
-                    onSave={(item) => {
-                        /* TODO: API */
+
+            {/* Add Task and Add Activity buttons below task list */}
+            <div className="flex gap-3 mt-6 justify-end">
+                <button
+                    className="px-4 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700"
+                    onClick={() => {
+                        setShowCreateModal(true);
+                        setDefaultType("task");
+                        setModalItem(null);
                     }}
-                    onDelete={(id) => {
-                        /* TODO: API */
+                >
+                    Add Task
+                </button>
+                <button
+                    className="px-4 py-2 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700"
+                    onClick={() => {
+                        setShowCreateModal(true);
+                        setDefaultType("activity");
+                        setModalItem({ attachedTaskId: "10aa745e-e823-45e0-b432-b0e03b6bee6e" });
                     }}
+                >
+                    Add Activity
+                </button>
+            </div>
+
+            {/* Modals for Add Task and Add Activity */}
+            {showCreateModal && defaultType === "task" && (
+                <CreateTaskModal
+                    isOpen={showCreateModal}
+                    onClose={() => setShowCreateModal(false)}
+                    initialData={{}}
                 />
             )}
-            {popupDate && (
-                <DayPopup
-                    date={popupDate}
-                    items={items.filter((i) => i.date === popupDate)}
-                    onClose={() => setPopupDate(null)}
+            {showCreateModal && defaultType === "activity" && (
+                <CreateActivityModal
+                    isOpen={showCreateModal}
+                    onClose={() => setShowCreateModal(false)}
+                    initialData={{ attachedTaskId: modalItem?.attachedTaskId || "" }}
                 />
             )}
         </div>

@@ -22,7 +22,7 @@ const timeSlots = (slotSize) => {
     return slots;
 };
 
-import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
 const WeekView = ({
     currentDate,
@@ -42,6 +42,7 @@ const WeekView = ({
     filterType,
     onChangeFilter,
     loading = false,
+    activities = [],
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
     const [elephantTask, setElephantTask] = useState("");
@@ -404,83 +405,111 @@ const WeekView = ({
                             </FixedSizeList>
                         </div>
                     </div>
-                    {/* Dated tasks panel for drag-and-drop */}
-                    <div className="flex w-full bg-white border border-blue-100 rounded-b-lg mt-2">
-                        <div className="p-2" style={{ width: TIME_COL_PX + "px" }}>
-                            <div className="text-xs text-blue-500">Added Tasks</div>
-                        </div>
-                        <div className="p-2 min-w-0 relative" style={{ flex: "1 1 auto" }}>
-                            <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
-                                {(Array.isArray(todos) ? todos : []).map((t) => (
-                                    <div
-                                        key={t.id}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            try {
-                                                e.dataTransfer.setData("taskId", String(t.id));
-                                                e.dataTransfer.effectAllowed = "copy";
-                                            } catch {}
-                                        }}
-                                        className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
-                                        style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
-                                        title={t.title}
-                                        onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                    >
-                                        <div className="truncate font-medium">{t.title}</div>
-                                    </div>
-                                ))}
-                            </div>
-                            {/* Scroll cues and buttons */}
-                            {showTasksLeftCue && (
-                                <>
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
-                                    <button
-                                        type="button"
-                                        className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
-                                        aria-label="Scroll left"
-                                        onClick={() =>
-                                            tasksScrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })
-                                        }
-                                    >
-                                        <FaChevronLeft />
-                                    </button>
-                                </>
-                            )}
-                            {showTasksRightCue && (
-                                <>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
-                                    <button
-                                        type="button"
-                                        className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
-                                        aria-label="Scroll right"
-                                        onClick={() =>
-                                            tasksScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
-                                        }
-                                    >
-                                        <FaChevronRight />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                    {/* Add task/activity button at the very bottom of the container (outside the scroller) */}
-                    <div className="flex w-full bg-blue-50 rounded-b-lg border-t border-blue-100">
-                        <div style={{ width: TIME_COL_PX + "px" }}></div>
-                        {days.map((date, dIdx) => (
-                            <div
-                                key={dIdx}
-                                className={`px-2 py-1 text-center align-top ${dIdx === days.length - 1 ? "rounded-br-lg" : ""}`}
-                                style={{ flex: "1 1 0", minWidth: 0 }}
-                            >
+                    {/* Two rows: first for Add Task + task list, second for Add Activity + activity list */}
+                    <div className="flex flex-col w-full bg-white border border-blue-100 rounded-b-lg mt-2">
+                        {/* Row 1: Add Task + Task List */}
+                        <div className="flex w-full border-b border-blue-50">
+                            <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>
                                 <button
-                                    className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs w-full leading-tight whitespace-nowrap"
-                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(date)}
-                                    aria-label="Add task or activity"
+                                    type="button"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })}
                                 >
-                                    Add task/activity
+                                    <span style={{ fontWeight: "bold" }}>+</span>
+                                    <span>Add task</span>
                                 </button>
                             </div>
-                        ))}
+                            <div style={{ width: '16px' }} /> {/* Gap between button and list */}
+                            <div className="p-2 min-w-0 relative flex-1 flex items-center">
+                                <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
+                                    {(Array.isArray(todos) ? todos : []).map((t) => (
+                                        <div
+                                            key={t.id}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                try {
+                                                    e.dataTransfer.setData("taskId", String(t.id));
+                                                    e.dataTransfer.effectAllowed = "copy";
+                                                } catch {}
+                                            }}
+                                            className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
+                                            style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
+                                            title={t.title}
+                                            onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                        >
+                                            <div className="truncate font-medium">{t.title}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Scroll cues and buttons */}
+                                {showTasksLeftCue && (
+                                    <>
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
+                                        <button
+                                            type="button"
+                                            className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
+                                            aria-label="Scroll left"
+                                            onClick={() =>
+                                                tasksScrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })
+                                            }
+                                        >
+                                            <FaChevronLeft />
+                                        </button>
+                                    </>
+                                )}
+                                {showTasksRightCue && (
+                                    <>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
+                                        <button
+                                            type="button"
+                                            className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
+                                            aria-label="Scroll right"
+                                            onClick={() =>
+                                                tasksScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
+                                            }
+                                        >
+                                            <FaChevronRight />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        {/* Row 2: Add Activity + Activity List */}
+                        <div className="flex w-full">
+                            <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })}
+                                >
+                                    <span style={{ fontWeight: "bold" }}>+</span>
+                                    <span>Add activity</span>
+                                </button>
+                            </div>
+                            <div className="p-2 min-w-0 flex-1 flex items-center ml-8">
+                                <div className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
+                                    {(Array.isArray(activities) ? activities : []).map((a) => (
+                                        <div
+                                            key={a.id}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                try {
+                                                    e.dataTransfer.setData("activityId", String(a.id || ""));
+                                                    e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
+                                                    e.dataTransfer.effectAllowed = "copyMove";
+                                                } catch {}
+                                            }}
+                                            className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
+                                            style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
+                                            title={a.text || a.title}
+                                        >
+                                            <FaBars aria-hidden="true" />
+                                            <div className="truncate font-medium">{a.text || a.title}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
