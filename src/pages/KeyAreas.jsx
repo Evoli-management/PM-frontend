@@ -4620,7 +4620,7 @@ export default function KeyAreas() {
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <span 
-                                                                        className="font-semibold text-slate-900 truncate"
+                                                                        className="font-semibold truncate"
                                                                         style={{ color: ka.color || '#1F2937' }}
                                                                     >
                                                                         {ka.title}
