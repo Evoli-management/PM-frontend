@@ -27,6 +27,7 @@ export default function DayView({
     categories,
     onTaskDrop,
     onEventMove,
+    onActivityDrop,
     onEventClick,
     onTaskClick,
     onPlanTomorrow,
@@ -109,6 +110,15 @@ export default function DayView({
             if (taskId) {
                 const task = todos.find((t) => String(t.id) === String(taskId));
                 if (task) onTaskDrop && onTaskDrop(task, date);
+                return;
+            }
+            const activityText = e.dataTransfer.getData("activityText");
+            const activityId = e.dataTransfer.getData("activityId");
+            if (activityText || activityId) {
+                const a = activityId
+                    ? dayActivities.find((x) => String(x.id) === String(activityId)) || { id: activityId, text: activityText }
+                    : { text: activityText };
+                onActivityDrop && onActivityDrop(a, date);
             }
         } catch {}
     };
@@ -398,6 +408,14 @@ export default function DayView({
                                                 key={a.id}
                                                 className="w-full px-2 py-1 rounded bg-white border border-slate-200 text-xs text-slate-700 flex items-center gap-2"
                                                 title={a.text || a.title}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    try {
+                                                        e.dataTransfer.setData("activityId", String(a.id || ""));
+                                                        e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
+                                                        e.dataTransfer.effectAllowed = "copyMove";
+                                                    } catch {}
+                                                }}
                                             >
                                                 <svg
                                                     stroke="currentColor"
