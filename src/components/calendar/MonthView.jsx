@@ -1,11 +1,21 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
-const HOURS = Array.from({ length: 48 }, (_, i) => {
-    const h = Math.floor(i / 2);
-    const m = i % 2 === 0 ? "00" : "30";
-    return `${h}:${m}`;
-});
+const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// WeekView slot generation logic
+const HOURS = (() => {
+    const slots = [];
+    for (let h = 8; h <= 16; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            if (h === 16 && m > 30) continue; // last start slot 16:30
+            slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+        }
+    }
+    slots.push("17:00"); // final label
+    return slots;
+})();
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
@@ -25,18 +35,16 @@ export default function MonthView({
     onQuickCreate, // new: open appointment creation modal
     onTaskDrop,
 }) {
-    // Working hours: 8:00 to 18:00
-    const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
-        const h = Math.floor(i / 2);
-        const m = i % 2 === 0 ? "00" : "30";
-        return `${h}:${m}`;
-    });
-    const WORKING_HOURS = ALL_HOURS.filter((h) => {
-        const hour = Number(h.split(":")[0]);
-        return hour >= 8 && hour <= 18;
-    });
-    const [showAllHours, setShowAllHours] = useState(false);
-    const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
+    // Working hours: 09:00 to 17:00 (configurable in future)
+    const WORK_START = 8;
+    const WORK_END = 17;
+    // Generate slots from 08:00 to 16:30, then add 17:00 as the last slot
+    const HOURS = [];
+    for (let h = WORK_START; h < WORK_END; h++) {
+        HOURS.push(`${h.toString().padStart(2, "0")}:00`);
+        HOURS.push(`${h.toString().padStart(2, "0")}:30`);
+    }
+    HOURS.push("17:00");
     const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
     const today = new Date();
@@ -46,45 +54,45 @@ export default function MonthView({
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const monthDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
 
-    // Helper to round minutes to nearest 30 for slotting
+    // Map minutes down to nearest 30 for slotting (floor). Do NOT pad hour to match HOURS (e.g., "8:30").
     const toSlotKey = (d) => {
         const date = new Date(d);
         const mins = date.getMinutes();
-        const half = Math.round(mins / 30) * 30;
-        if (half === 60) {
-            date.setHours(date.getHours() + 1, 0, 0, 0);
-        } else {
-            date.setMinutes(half, 0, 0);
-        }
-        const hr = String(date.getHours()).padStart(2, "0");
+        const half = Math.floor(mins / 30) * 30; // 0 or 30
+        date.setMinutes(half, 0, 0);
+        const hr = String(date.getHours()); // no padding per request
         const mn = String(date.getMinutes()).padStart(2, "0");
-        return `${date.getDate()}-${hr}:${mn}`;
+        // Include year-month-day to avoid conflicts across months
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}-${hr}:${mn}`;
     };
 
-    // Merge events and tasks (todos) into the same slots for rendering
-    const eventsBySlot = {};
-    const eventTaskIdsBySlot = {};
-    const pushSlot = (key, item) => {
-        if (!eventsBySlot[key]) eventsBySlot[key] = [];
-        eventsBySlot[key].push(item);
+    // Helper: Convert backend UTC time to local time
+    const toLocal = (dateStr) => {
+        const d = new Date(dateStr);
+        return new Date(d.getTime() + d.getTimezoneOffset() * 60000);
     };
+
+    // Build a map of appointments for each day and slot
+    const appointmentsByDaySlot = {};
     (Array.isArray(events) ? events : []).forEach((ev) => {
-        const key = toSlotKey(ev.start);
-        pushSlot(key, ev);
-        const tid = ev.taskId;
-        if (tid) {
-            if (!eventTaskIdsBySlot[key]) eventTaskIdsBySlot[key] = new Set();
-            eventTaskIdsBySlot[key].add(String(tid));
+        if (ev.taskId || !ev.start) return;
+        const startLocal = toLocal(ev.start);
+        const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
+        // Only show appointments within working hours
+        if (startLocal.getHours() < WORK_START || endLocal.getHours() > WORK_END || (startLocal.getHours() === WORK_END && startLocal.getMinutes() > 0)) return;
+        // For each 30-min slot overlapped by the event, push into that slot
+        let cur = new Date(startLocal);
+        cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
+        while (cur < endLocal) {
+            const dayKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+            if (!appointmentsByDaySlot[dayKey]) appointmentsByDaySlot[dayKey] = {};
+            const slotKey = `${cur.getHours().toString().padStart(2, "0")}:${cur.getMinutes().toString().padStart(2, "0")}`;
+            if (!appointmentsByDaySlot[dayKey][slotKey]) appointmentsByDaySlot[dayKey][slotKey] = [];
+            appointmentsByDaySlot[dayKey][slotKey].push(ev);
+            cur = new Date(cur.getTime() + 30 * 60000);
         }
     });
-    (Array.isArray(todos) ? todos : []).forEach((t) => {
-        const when = t.startDate || t.dueDate || t.endDate;
-        if (!when) return;
-        const key = toSlotKey(when);
-        const hasEventForThisTask = eventTaskIdsBySlot[key]?.has(String(t.id));
-        if (hasEventForThisTask) return; // avoid duplicates when a task already has a calendar event at this time
-        pushSlot(key, { id: `todo-${t.id}`, title: t.title, kind: "custom" });
-    });
+    // Note: tasks (todos) are no longer added to calendar slots - they stay in task lists only
 
     // Helpers for date-only comparisons
     const parseDateOnly = (iso) => {
@@ -179,7 +187,7 @@ export default function MonthView({
         const colLeft = fr.left - crect.left + container.scrollLeft;
         const colWidth = fr.width;
         setOverlayMetrics({ colLeft, colWidth, rows });
-    }, [year, month, daysInMonth, todos, showAllHours]);
+    }, [year, month, daysInMonth, todos]);
     useEffect(() => {
         const measure = () => {
             const container = gridRef.current;
@@ -326,26 +334,17 @@ export default function MonthView({
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center justify-end mb-2">
-                    <label className="mr-2 text-sm text-gray-600">
-                        <input
-                            type="checkbox"
-                            checked={showAllHours}
-                            onChange={(e) => setShowAllHours(e.target.checked)}
-                            className="mr-1"
-                        />
-                        Show all hours
-                    </label>
-                </div>
+                {/* Removed Show all hours toggle */}
                 <div
                     ref={gridRef}
-                    className="relative overflow-x-auto px-2 pb-6"
-                    style={{ maxWidth: "100vw", maxHeight: "60vh", overflowY: "auto" }}
+                    className="relative pb-6"
+                    style={{ maxWidth: `${(HOURS.length + 2) * 110}px`, maxHeight: "60vh", overflowX: "hidden", overflowY: "auto" }}
                 >
                     <table
                         className="min-w-full border border-sky-100 rounded-lg"
                         style={{
                             minWidth: `${(HOURS.length + 2) * 110}px`,
+                            maxWidth: `${(HOURS.length + 2) * 110}px`, // restrict horizontal scroll to working hours
                             borderCollapse: "separate",
                             borderSpacing: 0,
                         }}
@@ -393,12 +392,21 @@ export default function MonthView({
                                                 : "middle";
                                         return { lane: r.lane, task: r.task, segType };
                                     });
+                                // Find all events for this day  
+                                const dayKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                                const eventsForDay = (Array.isArray(events) ? events : []).filter(ev => {
+                                    if (!ev.start) return false;
+                                    const evDate = toLocal(ev.start);
+                                    return evDate.getFullYear() === date.getFullYear() &&
+                                        evDate.getMonth() === date.getMonth() &&
+                                        evDate.getDate() === date.getDate();
+                                });
                                 return (
-                                    <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
+                                    <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"} style={{ position: "relative" }}>
                                         <td
                                             className={`sticky left-0 bg-white px-2 py-2 text-sm font-semibold w-24 z-10 ${isWeekend ? "text-red-500" : "text-gray-700"} ${isToday ? "text-blue-600" : ""}`}
                                         >
-                                            {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+                                            {new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", timeZone: userTimeZone }).format(date)}
                                         </td>
                                         <td
                                             ref={(el) => (allDayRefs.current[idx] = el)}
@@ -407,98 +415,106 @@ export default function MonthView({
                                             {/* overlay draws continuous poles; cell content intentionally minimal */}
                                             <span className="sr-only">all day</span>
                                         </td>
-                                        {HOURS.map((h, hIdx) => {
-                                            const [hr, min] = h.split(":");
-                                            const key = `${date.getDate()}-${hr}:${min}`;
-                                            const slotEvents = eventsBySlot[key] || [];
-                                            return (
-                                                <td
-                                                    key={hIdx}
-                                                    className="px-1 py-2 text-center align-top w-16 cursor-pointer border border-sky-100 hover:bg-blue-100"
-                                                    style={{ minWidth: 40 }}
-                                                    onClick={() => onEventClick && onEventClick({ day: date, hour: h })}
-                                                    onDoubleClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (typeof onQuickCreate === "function") {
-                                                            const dt = new Date(
-                                                                date.getFullYear(),
-                                                                date.getMonth(),
-                                                                date.getDate(),
-                                                                parseInt(hr, 10) || 0,
-                                                                parseInt(min, 10) || 0,
-                                                                0,
-                                                                0,
-                                                            );
-                                                            onQuickCreate(dt);
-                                                        }
-                                                    }}
-                                                    onDragOver={(e) => {
-                                                        try {
-                                                            e.preventDefault();
-                                                            e.dataTransfer.dropEffect = "copy";
-                                                        } catch {}
-                                                    }}
-                                                    onDrop={(e) => {
-                                                        try {
-                                                            const taskId = e.dataTransfer.getData("taskId");
-                                                            if (!taskId || typeof onTaskDrop !== "function") return;
-                                                            const dt = new Date(
-                                                                date.getFullYear(),
-                                                                date.getMonth(),
-                                                                date.getDate(),
-                                                                parseInt(hr, 10) || 0,
-                                                                parseInt(min, 10) || 0,
-                                                                0,
-                                                                0,
-                                                            );
-                                                            const task = (todos || []).find(
-                                                                (t) => String(t.id) === String(taskId),
-                                                            );
-                                                            if (task) onTaskDrop(task, dt);
-                                                        } catch {}
-                                                    }}
-                                                    title="Double-click to add appointment"
-                                                >
-                                                    {slotEvents.length > 0 &&
-                                                        slotEvents.map((ev, i) => {
-                                                            const color = categories[ev.kind]?.color || "bg-gray-200";
-                                                            const isTaskBox =
-                                                                Boolean(ev.taskId) ||
-                                                                (typeof ev.id === "string" &&
-                                                                    ev.id.startsWith("todo-"));
-                                                            const handleClick = (e) => {
+                                        {/* Render time slots as empty cells */}
+                                        {HOURS.map((h, hIdx) => (
+                                            <td
+                                                key={hIdx}
+                                                className="relative px-1 py-2 text-center align-top w-16 cursor-pointer border border-sky-100 hover:bg-blue-100"
+                                                style={{ minWidth: 40, borderColor: "rgba(56,189,248,0.25)" }}
+                                                onClick={() => onEventClick && onEventClick({ day: date, hour: h })}
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (typeof onQuickCreate === "function") {
+                                                        const [hr, min] = h.split(":");
+                                                        const dt = new Date(
+                                                            date.getFullYear(),
+                                                            date.getMonth(),
+                                                            date.getDate(),
+                                                            parseInt(hr, 10) || 0,
+                                                            parseInt(min, 10) || 0,
+                                                            0,
+                                                            0,
+                                                        );
+                                                        // Default appointment duration: 30 minutes
+                                                        const endDt = new Date(dt.getTime() + 30 * 60000);
+                                                        onQuickCreate({ start: dt, end: endDt });
+                                                    }
+                                                }}
+                                                onDragOver={(e) => {
+                                                    try {
+                                                        e.preventDefault();
+                                                        e.dataTransfer.dropEffect = "copy";
+                                                    } catch {}
+                                                }}
+                                                onDrop={(e) => {
+                                                    try {
+                                                        const taskId = e.dataTransfer.getData("taskId");
+                                                        if (!taskId || typeof onTaskDrop !== "function") return;
+                                                        const [hr, min] = h.split(":");
+                                                        const dt = new Date(
+                                                            date.getFullYear(),
+                                                            date.getMonth(),
+                                                            date.getDate(),
+                                                            parseInt(hr, 10) || 0,
+                                                            parseInt(min, 10) || 0,
+                                                            0,
+                                                            0,
+                                                        );
+                                                        const task = (todos || []).find(
+                                                            (t) => String(t.id) === String(taskId),
+                                                        );
+                                                        if (task) onTaskDrop(task, dt);
+                                                    } catch {}
+                                                }}
+                                                title="Double-click to add appointment"
+                                            >
+                                                {/* Display appointment bar if exists for this day/slot */}
+                                                {appointmentsByDaySlot[dayKey]?.[h] && appointmentsByDaySlot[dayKey][h].map((ev, appIdx) => {
+                                                    const color = categories[ev.kind]?.color || "bg-gray-200";
+                                                    const icon = categories[ev.kind]?.icon || "";
+                                                    return (
+                                                        <div
+                                                            key={appIdx}
+                                                            className={`absolute inset-0 mx-1 my-1 px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${color}`}
+                                                            style={{ zIndex: 20 }}
+                                                            title={ev.title}
+                                                            onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                if (typeof onTaskClick !== "function") return;
-                                                                if (ev.taskId) return onTaskClick(ev.taskId);
-                                                                if (
-                                                                    typeof ev.id === "string" &&
-                                                                    ev.id.startsWith("todo-")
-                                                                ) {
-                                                                    const tid = ev.id.slice(5);
-                                                                    if (tid) return onTaskClick(tid);
-                                                                }
-                                                            };
-                                                            return (
-                                                                <span
-                                                                    key={i}
-                                                                    className={`block px-2 py-1 rounded text-xs mb-1 ${isTaskBox ? "" : color} cursor-pointer w-full max-w-full overflow-hidden`}
-                                                                    onClick={handleClick}
-                                                                    title={ev.title}
-                                                                    style={
-                                                                        isTaskBox
-                                                                            ? { backgroundColor: "#7ED4E3" }
-                                                                            : undefined
-                                                                    }
+                                                                onEventClick && onEventClick(ev, 'edit');
+                                                            }}
+                                                        >
+                                                            <span className="shrink-0 text-xs">{icon}</span>
+                                                            <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1">
+                                                                {ev.title}
+                                                            </span>
+                                                            {/* Action Icons */}
+                                                            <div className="hidden group-hover:flex items-center gap-1">
+                                                                <button
+                                                                    className="p-1 rounded hover:bg-black/10"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onEventClick && onEventClick(ev, 'edit');
+                                                                    }}
+                                                                    title="Edit appointment"
                                                                 >
-                                                                    <span className="truncate whitespace-nowrap min-w-0 block">
-                                                                        {ev.title}
-                                                                    </span>
-                                                                </span>
-                                                            );
-                                                        })}
-                                                </td>
-                                            );
-                                        })}
+                                                                    <FaEdit className="w-2 h-2 text-blue-600" />
+                                                                </button>
+                                                                <button
+                                                                    className="p-1 rounded hover:bg-black/10"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onEventClick && onEventClick(ev, 'delete');
+                                                                    }}
+                                                                    title="Delete appointment"
+                                                                >
+                                                                    <FaTrash className="w-2 h-2 text-red-600" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </td>
+                                        ))}
                                     </tr>
                                 );
                             })}

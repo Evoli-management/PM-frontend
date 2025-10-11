@@ -19,6 +19,8 @@ import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 import AppointmentModal from "./AppointmentModal";
+import DebugEventModal from "./DebugEventModal";
+import TaskActivityModal from "./TaskActivityModal";
 
 const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
@@ -414,9 +416,38 @@ const CalendarContainer = () => {
     };
 
     // Event modal logic
-    const openModal = (event = null) => {
-        setSelectedEvent(event);
-        setModalOpen(true);
+    // Event modal logic
+    const openModal = (event = null, action = null) => {
+        if (action === 'delete') {
+            handleDeleteEvent(event);
+        } else if (action === 'edit') {
+            setSelectedEvent(event);
+            setModalOpen(true);
+        } else {
+            // Default behavior (legacy support)
+            setSelectedEvent(event);
+            setModalOpen(true);
+        }
+    };
+
+    const handleDeleteEvent = async (event) => {
+        if (!event?.id) return;
+        
+        const confirmed = window.confirm(`Are you sure you want to delete "${event.title}"?`);
+        if (!confirmed) return;
+        
+        try {
+            await calendarService.deleteEvent(event.id);
+            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            addToast({ title: "Appointment deleted", variant: "success" });
+        } catch (error) {
+            console.error("Delete error:", error);
+            addToast({ 
+                title: "Failed to delete appointment", 
+                message: error.message,
+                variant: "error" 
+            });
+        }
     };
 
     const [addDefaultTab, setAddDefaultTab] = useState("task");
@@ -574,7 +605,7 @@ const CalendarContainer = () => {
     // Move event (drag existing event into a new slot)
     const handleEventMove = async (eventId, newStartDate, newEndDate) => {
         try {
-            if (!withinBusinessHours(newStartDate) || (newEndDate && !withinBusinessHours(newEndDate))) {
+            if (!withinBusinessHours(newStartDate)) {
                 addToast({
                     title: "Outside business hours",
                     description: "Allowed window 08:00–17:00",
@@ -582,14 +613,27 @@ const CalendarContainer = () => {
                 });
                 return;
             }
-            // Enforce 30-minute duration when moving via grid
-            const fixedEnd = new Date(newStartDate.getTime() + 30 * 60 * 1000);
-            const payload = { start: newStartDate.toISOString(), end: fixedEnd.toISOString() };
-            const updated = await calendarService.updateEvent(eventId, payload);
+            // Determine end time: use provided newEndDate (resize) or default 30 minutes (move)
+            const targetEnd = newEndDate ? newEndDate : new Date(newStartDate.getTime() + 30 * 60 * 1000);
+            if (!withinBusinessHours(targetEnd)) {
+                addToast({
+                    title: "Outside business hours",
+                    description: "Allowed window 08:00–17:00",
+                    variant: "error",
+                });
+                return;
+            }
+            const payload = { start: newStartDate.toISOString(), end: targetEnd.toISOString() };
+            // Decide endpoint based on event kind in current state
+            const current = events.find((e) => e.id === eventId);
+            const isAppointment = current?.kind === "appointment";
+            const updated = await (isAppointment
+                ? calendarService.updateAppointment(eventId, payload)
+                : calendarService.updateEvent(eventId, payload));
             setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
             addToast({
                 title: "Event updated",
-                description: `Moved to ${newStartDate.toLocaleString()}`,
+                description: `Moved to ${newStartDate.toLocaleString()}${targetEnd ? ` - ${targetEnd.toLocaleTimeString()}` : ""}`,
                 variant: "success",
             });
         } catch (err) {
@@ -781,7 +825,7 @@ const CalendarContainer = () => {
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         todos={todos}
                         categories={EVENT_CATEGORIES}
-                        onEventClick={openModal}
+                        onEventClick={(ev, action) => openModal(ev, action)}
                         onTaskClick={openEditTask}
                         onTaskDrop={handleTaskDrop}
                         onQuickCreate={handleQuickCreate}
@@ -804,7 +848,7 @@ const CalendarContainer = () => {
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
                         onEventMove={handleEventMove}
-                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onTaskClick={openEditTask}
                         activities={weekActivities}
                     />
@@ -828,7 +872,7 @@ const CalendarContainer = () => {
                         onTaskDrop={handleTaskDrop}
                         onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
-                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onTaskClick={openEditTask}
                         onPlanTomorrow={() => {}}
                     />
@@ -843,7 +887,7 @@ const CalendarContainer = () => {
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         todos={todos}
-                        onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
+                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onTaskClick={openEditTask}
                     />
                 )}
@@ -895,6 +939,25 @@ const CalendarContainer = () => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
                     }}
+                />
+            )}
+            {/* Unified AppointmentModal: also used for editing */}
+            {modalOpen && selectedEvent && (
+                <AppointmentModal
+                    event={selectedEvent}
+                    onClose={() => {
+                        setModalOpen(false);
+                        setSelectedEvent(null);
+                    }}
+                    onUpdated={(updated) => {
+                        if (updated && updated.id) {
+                            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+                        }
+                        setModalOpen(false);
+                        setSelectedEvent(null);
+                        addToast({ title: "Appointment updated", variant: "success" });
+                    }}
+                    defaultDurationMinutes={30}
                 />
             )}
             {editModalOpen && editItem && (

@@ -40,6 +40,12 @@ const calendarService = {
         return res.data;
     },
 
+    async updateAppointment(id, payload) {
+        if (!id) throw new Error("Missing appointment id");
+        const res = await apiClient.patch(`${base}/appointments/${id}`, payload);
+        return res.data;
+    },
+
     async deleteEvent(id) {
         if (!id) throw new Error("Missing event id");
         await apiClient.delete(`${base}/events/${id}`);
