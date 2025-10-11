@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Field, Section, LoadingButton } from './UIComponents';
 import { AvatarManager } from './AvatarManager';
+import userProfileService from '../../services/userProfileService';
 
 export const PersonalInformation = ({ showToast }) => {
     const [isEditingPersonal, setIsEditingPersonal] = useState(false);
     const [isEditingProfessional, setIsEditingProfessional] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
     const [errors, setErrors] = useState({});
     const [avatarPreview, setAvatarPreview] = useState(null);
     
@@ -24,34 +26,72 @@ export const PersonalInformation = ({ showToast }) => {
     });
     
     const [savedPersonal, setSavedPersonal] = useState({
-        name: "John Doe",
-        email: "john.doe@company.com",
-        phone: "+1 555-123-4567"
+        name: "",
+        email: "",
+        phone: ""
     });
     
     const [savedProfessional, setSavedProfessional] = useState({
-        jobTitle: "Lead Developer",
-        department: "Engineering",
-        manager: "Sarah Johnson",
-        bio: "Passionate software developer with 5+ years of experience in full-stack development.",
-        skills: ["React", "Node.js", "TypeScript", "Python", "AWS"]
+        jobTitle: "",
+        department: "",
+        manager: "",
+        bio: "",
+        skills: []
     });
 
     const [skillsInput, setSkillsInput] = useState("");
 
-    // Initialize drafts from saved data
+    // Load user profile data on component mount
+    useEffect(() => {
+        loadUserProfile();
+    }, []);
+
+    // Initialize drafts from saved data when saved data changes
     useEffect(() => {
         setPersonalDraft(savedPersonal);
-        setProfessionalDraft(savedProfessional);
-    }, [savedPersonal, savedProfessional]);
+    }, [savedPersonal]);
 
-    // Load stored avatar
     useEffect(() => {
-        const storedAvatar = localStorage.getItem('pm:avatar');
-        if (storedAvatar) {
-            setAvatarPreview(storedAvatar);
+        setProfessionalDraft(savedProfessional);
+    }, [savedProfessional]);
+
+    const loadUserProfile = async () => {
+        try {
+            setInitialLoading(true);
+            const profileData = await userProfileService.getProfile();
+            const formattedData = userProfileService.formatProfileData(profileData);
+            
+            // Set personal information
+            setSavedPersonal({
+                name: formattedData.name || '',
+                email: formattedData.email || '',
+                phone: formattedData.phone || ''
+            });
+
+            // Set professional information
+            const skillsArray = formattedData.skills ? 
+                formattedData.skills.split(',').map(s => s.trim()).filter(s => s) : [];
+            
+            setSavedProfessional({
+                jobTitle: formattedData.jobTitle || '',
+                department: formattedData.department || '',
+                manager: formattedData.manager || '',
+                bio: formattedData.bio || '',
+                skills: skillsArray
+            });
+
+            // Set avatar if available
+            if (formattedData.avatarUrl) {
+                setAvatarPreview(formattedData.avatarUrl);
+            }
+
+        } catch (error) {
+            console.error('Failed to load user profile:', error);
+            showToast('Failed to load profile information', 'error');
+        } finally {
+            setInitialLoading(false);
         }
-    }, []);
+    };
 
     const clearError = (key) => {
         setErrors(prev => {
@@ -72,24 +112,42 @@ export const PersonalInformation = ({ showToast }) => {
     };
 
     const validatePersonalForm = () => {
+        const validation = userProfileService.validateProfileData({
+            firstName: personalDraft.name.split(' ')[0] || '',
+            lastName: personalDraft.name.split(' ').slice(1).join(' ') || '',
+            email: personalDraft.email,
+            phone: personalDraft.phone
+        });
+
         const newErrors = {};
         
         if (!personalDraft.name.trim()) {
             newErrors.name = "Name is required";
         }
         
-        if (!personalDraft.email.trim()) {
-            newErrors.email = "Email is required";
-        } else if (!/\S+@\S+\.\S+/.test(personalDraft.email)) {
-            newErrors.email = "Email is invalid";
+        if (validation.errors.email) {
+            newErrors.email = validation.errors.email;
         }
         
-        if (personalDraft.phone && !/^\+?[\d\s\-\(\)]+$/.test(personalDraft.phone)) {
-            newErrors.phone = "Phone number is invalid";
+        if (validation.errors.phone) {
+            newErrors.phone = validation.errors.phone;
         }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
+    };
+
+    const validateProfessionalForm = () => {
+        const validation = userProfileService.validateProfileData({
+            jobTitle: professionalDraft.jobTitle,
+            department: professionalDraft.department,
+            manager: professionalDraft.manager,
+            bio: professionalDraft.bio,
+            skills: professionalDraft.skills.join(', ')
+        });
+
+        setErrors(validation.errors);
+        return validation.isValid;
     };
 
     const savePersonalInfo = async () => {
@@ -97,9 +155,15 @@ export const PersonalInformation = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setSavedPersonal(personalDraft);
+            const updatedProfile = await userProfileService.updatePersonalInfo(personalDraft);
+            const formattedData = userProfileService.formatProfileData(updatedProfile);
+            
+            setSavedPersonal({
+                name: formattedData.name || '',
+                email: formattedData.email || '',
+                phone: formattedData.phone || ''
+            });
+            
             setIsEditingPersonal(false);
             showToast('Personal information updated successfully!');
         } catch (error) {
@@ -111,11 +175,29 @@ export const PersonalInformation = ({ showToast }) => {
     };
 
     const saveProfessionalInfo = async () => {
+        if (!validateProfessionalForm()) return;
+        
         setIsLoading(true);
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setSavedProfessional(professionalDraft);
+            const professionalData = {
+                ...professionalDraft,
+                skills: professionalDraft.skills.join(', ')
+            };
+            
+            const updatedProfile = await userProfileService.updateProfessionalInfo(professionalData);
+            const formattedData = userProfileService.formatProfileData(updatedProfile);
+            
+            const skillsArray = formattedData.skills ? 
+                formattedData.skills.split(',').map(s => s.trim()).filter(s => s) : [];
+            
+            setSavedProfessional({
+                jobTitle: formattedData.jobTitle || '',
+                department: formattedData.department || '',
+                manager: formattedData.manager || '',
+                bio: formattedData.bio || '',
+                skills: skillsArray
+            });
+            
             setIsEditingProfessional(false);
             showToast('Professional information updated successfully!');
         } catch (error) {
@@ -156,265 +238,256 @@ export const PersonalInformation = ({ showToast }) => {
         }));
     };
 
-    const handleSkillKeyDown = (e) => {
-        if (e.key === 'Enter' || e.key === ',') {
+    const handleSkillKeyPress = (e) => {
+        if (e.key === 'Enter') {
             e.preventDefault();
             addSkill();
         }
     };
 
+    const handleAvatarUpdate = async (avatarData) => {
+        try {
+            setIsLoading(true);
+            
+            if (avatarData instanceof File) {
+                const updatedProfile = await userProfileService.uploadAvatar(avatarData);
+                setAvatarPreview(updatedProfile.avatarUrl);
+            } else {
+                const updatedProfile = await userProfileService.updateAvatar(avatarData);
+                setAvatarPreview(updatedProfile.avatarUrl);
+            }
+            
+            showToast('Avatar updated successfully!');
+        } catch (error) {
+            console.error('Failed to update avatar:', error);
+            showToast('Failed to update avatar', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (initialLoading) {
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-sm text-muted-foreground">Loading profile information...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             {/* Avatar Section */}
-            <div className="text-center">
-                <AvatarManager
-                    avatarPreview={avatarPreview}
-                    setAvatarPreview={setAvatarPreview}
-                    showToast={showToast}
+            <Section title="Profile Picture" icon="👤">
+                <AvatarManager 
+                    currentAvatar={avatarPreview}
+                    onAvatarUpdate={handleAvatarUpdate}
+                    isLoading={isLoading}
                 />
-            </div>
+            </Section>
 
-            {/* Personal Information */}
-            <Section 
-                title="Personal Information" 
-                description="Basic personal details and contact information"
-            >
+            {/* Personal Information Section */}
+            <Section title="Personal Information" icon="👤">
                 <div className="space-y-4">
+                    <Field 
+                        label="Full Name" 
+                        value={isEditingPersonal ? personalDraft.name : savedPersonal.name}
+                        isEditing={isEditingPersonal}
+                        onChange={handlePersonalChange('name')}
+                        error={errors.name}
+                        placeholder="Enter your full name"
+                        required
+                    />
+                    
+                    <Field 
+                        label="Email Address" 
+                        value={isEditingPersonal ? personalDraft.email : savedPersonal.email}
+                        isEditing={isEditingPersonal}
+                        onChange={handlePersonalChange('email')}
+                        error={errors.email}
+                        type="email"
+                        placeholder="Enter your email address"
+                        required
+                    />
+                    
+                    <Field 
+                        label="Phone Number" 
+                        value={isEditingPersonal ? personalDraft.phone : savedPersonal.phone}
+                        isEditing={isEditingPersonal}
+                        onChange={handlePersonalChange('phone')}
+                        error={errors.phone}
+                        placeholder="Enter your phone number"
+                    />
+                </div>
+
+                <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">
                     {isEditingPersonal ? (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Field label="Full Name" error={errors.name} required>
-                                    <input
-                                        type="text"
-                                        value={personalDraft.name}
-                                        onChange={handlePersonalChange('name')}
-                                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.name ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        placeholder="Enter your full name"
-                                    />
-                                </Field>
-                                
-                                <Field label="Email Address" error={errors.email} required>
-                                    <input
-                                        type="email"
-                                        value={personalDraft.email}
-                                        onChange={handlePersonalChange('email')}
-                                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.email ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        placeholder="Enter your email address"
-                                    />
-                                </Field>
-                            </div>
-                            
-                            <Field label="Phone Number" error={errors.phone}>
-                                <input
-                                    type="tel"
-                                    value={personalDraft.phone}
-                                    onChange={handlePersonalChange('phone')}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                        errors.phone ? 'border-red-500' : 'border-gray-300'
-                                    }`}
-                                    placeholder="Enter your phone number"
-                                />
-                            </Field>
-                            
-                            <div className="flex gap-2">
-                                <LoadingButton
-                                    onClick={savePersonalInfo}
-                                    loading={isLoading}
-                                    variant="primary"
-                                >
-                                    Save Changes
-                                </LoadingButton>
-                                <button
-                                    onClick={cancelPersonalEdit}
-                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                                    disabled={isLoading}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+                            <LoadingButton
+                                variant="outline"
+                                onClick={cancelPersonalEdit}
+                                disabled={isLoading}
+                            >
+                                Cancel
+                            </LoadingButton>
+                            <LoadingButton
+                                onClick={savePersonalInfo}
+                                isLoading={isLoading}
+                                loadingText="Saving..."
+                            >
+                                Save Changes
+                            </LoadingButton>
                         </>
                     ) : (
-                        <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                    <p className="text-gray-900">{savedPersonal.name}</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                                    <p className="text-gray-900">{savedPersonal.email}</p>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                                <p className="text-gray-900">{savedPersonal.phone || 'Not provided'}</p>
-                            </div>
-                            <button
-                                onClick={() => setIsEditingPersonal(true)}
-                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                                Edit Personal Info
-                            </button>
-                        </>
+                        <LoadingButton
+                            variant="outline"
+                            onClick={() => setIsEditingPersonal(true)}
+                        >
+                            Edit Personal Info
+                        </LoadingButton>
                     )}
                 </div>
             </Section>
 
-            {/* Professional Information */}
-            <Section 
-                title="Professional Information" 
-                description="Work-related details and professional background"
-            >
+            {/* Professional Information Section */}
+            <Section title="Professional Information" icon="💼">
                 <div className="space-y-4">
+                    <Field 
+                        label="Job Title" 
+                        value={isEditingProfessional ? professionalDraft.jobTitle : savedProfessional.jobTitle}
+                        isEditing={isEditingProfessional}
+                        onChange={handleProfessionalChange('jobTitle')}
+                        error={errors.jobTitle}
+                        placeholder="e.g., Senior Software Engineer"
+                    />
+                    
+                    <Field 
+                        label="Department" 
+                        value={isEditingProfessional ? professionalDraft.department : savedProfessional.department}
+                        isEditing={isEditingProfessional}
+                        onChange={handleProfessionalChange('department')}
+                        error={errors.department}
+                        placeholder="e.g., Engineering"
+                    />
+                    
+                    <Field 
+                        label="Manager" 
+                        value={isEditingProfessional ? professionalDraft.manager : savedProfessional.manager}
+                        isEditing={isEditingProfessional}
+                        onChange={handleProfessionalChange('manager')}
+                        error={errors.manager}
+                        placeholder="e.g., Sarah Johnson"
+                    />
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Bio</label>
+                        {isEditingProfessional ? (
+                            <textarea
+                                value={professionalDraft.bio}
+                                onChange={handleProfessionalChange('bio')}
+                                className="w-full p-3 border rounded-lg resize-none"
+                                rows={4}
+                                placeholder="Tell us about yourself..."
+                                maxLength={1000}
+                            />
+                        ) : (
+                            <p className="p-3 bg-muted rounded-lg min-h-[100px] text-sm">
+                                {savedProfessional.bio || "No bio provided"}
+                            </p>
+                        )}
+                        {errors.bio && (
+                            <p className="text-sm text-destructive mt-1">{errors.bio}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Skills</label>
+                        {isEditingProfessional ? (
+                            <div className="space-y-2">
+                                <div className="flex space-x-2">
+                                    <input
+                                        type="text"
+                                        value={skillsInput}
+                                        onChange={(e) => setSkillsInput(e.target.value)}
+                                        onKeyPress={handleSkillKeyPress}
+                                        className="flex-1 p-2 border rounded-lg"
+                                        placeholder="Add a skill..."
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addSkill}
+                                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {professionalDraft.skills.map((skill, index) => (
+                                        <span
+                                            key={index}
+                                            className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-secondary text-secondary-foreground"
+                                        >
+                                            {skill}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeSkill(skill)}
+                                                className="ml-2 text-muted-foreground hover:text-destructive"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap gap-2">
+                                {savedProfessional.skills.length > 0 ? (
+                                    savedProfessional.skills.map((skill, index) => (
+                                        <span
+                                            key={index}
+                                            className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-secondary text-secondary-foreground"
+                                        >
+                                            {skill}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">No skills added</p>
+                                )}
+                            </div>
+                        )}
+                        {errors.skills && (
+                            <p className="text-sm text-destructive mt-1">{errors.skills}</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">
                     {isEditingProfessional ? (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <Field label="Job Title">
-                                    <input
-                                        type="text"
-                                        value={professionalDraft.jobTitle}
-                                        onChange={handleProfessionalChange('jobTitle')}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="e.g., Product Manager"
-                                    />
-                                </Field>
-                                
-                                <Field label="Department">
-                                    <input
-                                        type="text"
-                                        value={professionalDraft.department}
-                                        onChange={handleProfessionalChange('department')}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="e.g., Engineering"
-                                    />
-                                </Field>
-                                
-                                <Field label="Manager">
-                                    <input
-                                        type="text"
-                                        value={professionalDraft.manager}
-                                        onChange={handleProfessionalChange('manager')}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Manager name"
-                                    />
-                                </Field>
-                            </div>
-                            
-                            <Field label="Bio / About Me">
-                                <textarea
-                                    value={professionalDraft.bio}
-                                    onChange={handleProfessionalChange('bio')}
-                                    rows={4}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="Tell us about yourself, your experience, and what you do..."
-                                />
-                            </Field>
-                            
-                            <Field label="Skills">
-                                <div className="space-y-2">
-                                    <div className="flex flex-wrap gap-2">
-                                        {professionalDraft.skills.map((skill, index) => (
-                                            <span
-                                                key={index}
-                                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                                            >
-                                                {skill}
-                                                <button
-                                                    onClick={() => removeSkill(skill)}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                >
-                                                    ×
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={skillsInput}
-                                            onChange={(e) => setSkillsInput(e.target.value)}
-                                            onKeyDown={handleSkillKeyDown}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="Type a skill and press Enter"
-                                        />
-                                        <button
-                                            onClick={addSkill}
-                                            className="px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                                        >
-                                            Add
-                                        </button>
-                                    </div>
-                                </div>
-                            </Field>
-                            
-                            <div className="flex gap-2">
-                                <LoadingButton
-                                    onClick={saveProfessionalInfo}
-                                    loading={isLoading}
-                                    variant="primary"
-                                >
-                                    Save Changes
-                                </LoadingButton>
-                                <button
-                                    onClick={cancelProfessionalEdit}
-                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                                    disabled={isLoading}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+                            <LoadingButton
+                                variant="outline"
+                                onClick={cancelProfessionalEdit}
+                                disabled={isLoading}
+                            >
+                                Cancel
+                            </LoadingButton>
+                            <LoadingButton
+                                onClick={saveProfessionalInfo}
+                                isLoading={isLoading}
+                                loadingText="Saving..."
+                            >
+                                Save Changes
+                            </LoadingButton>
                         </>
                     ) : (
-                        <>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-                                    <p className="text-gray-900">{savedProfessional.jobTitle || 'Not specified'}</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                                    <p className="text-gray-900">{savedProfessional.department || 'Not specified'}</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
-                                    <p className="text-gray-900">{savedProfessional.manager || 'Not specified'}</p>
-                                </div>
-                            </div>
-                            
-                            {savedProfessional.bio && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                                    <p className="text-gray-900">{savedProfessional.bio}</p>
-                                </div>
-                            )}
-                            
-                            {savedProfessional.skills.length > 0 && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {savedProfessional.skills.map((skill, index) => (
-                                            <span
-                                                key={index}
-                                                className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
-                                            >
-                                                {skill}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            
-                            <button
-                                onClick={() => setIsEditingProfessional(true)}
-                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                                Edit Professional Info
-                            </button>
-                        </>
+                        <LoadingButton
+                            variant="outline"
+                            onClick={() => setIsEditingProfessional(true)}
+                        >
+                            Edit Professional Info
+                        </LoadingButton>
                     )}
                 </div>
             </Section>
