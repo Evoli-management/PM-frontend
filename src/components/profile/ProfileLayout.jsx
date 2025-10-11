@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
     const tabs = [
         "My Profile",
-        "Account Settings", 
         "Security",
         "Preferences",
         "Integrations",
@@ -22,7 +21,6 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                 const tab = (qs.get("tab") || "").toLowerCase();
                 const map = {
                     "my-profile": "My Profile",
-                    "account": "Account Settings",
                     "security": "Security",
                     "preferences": "Preferences",
                     "integrations": "Integrations",

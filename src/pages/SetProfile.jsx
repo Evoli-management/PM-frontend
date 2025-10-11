@@ -73,8 +73,6 @@ export default function ProfileSetting() {
         switch (activeTab) {
             case "My Profile":
                 return <PersonalInformation showToast={showToast} />;
-            case "Account Settings":
-                return <PersonalInformation showToast={showToast} />;
             case "Security":
                 return <SecuritySettings showToast={showToast} />;
             case "Preferences":
