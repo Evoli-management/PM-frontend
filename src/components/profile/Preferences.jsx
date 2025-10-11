@@ -1,34 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import userPreferencesService from '../../services/userPreferencesService';
+
+// Simple Toggle component for nested preferences
+const SimpleToggle = ({ checked, onChange, disabled = false }) => (
+    <button
+        type="button"
+        onClick={() => !disabled && onChange(!checked)}
+        disabled={disabled}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+            disabled ? "bg-gray-200 cursor-not-allowed" : checked ? "bg-blue-600" : "bg-gray-300"
+        }`}
+    >
+        <span
+            className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition ${
+                checked ? "translate-x-5" : "translate-x-1"
+            }`}
+        />
+    </button>
+);
 
 export const Preferences = ({ showToast }) => {
     const [preferences, setPreferences] = useState({
-        // Notification Preferences
+        // Work Hours (mapped to backend fields)
+        workStartTime: '09:00',
+        workEndTime: '17:00',
+        
+        // Goal Reminders (mapped to backend fields)
+        goalRemindersEmail: true,
+        goalRemindersDesktop: true,
+        goalReminderTiming: '1hour',
+        
+        // PracticalManager Reminders (mapped to backend fields)
+        pmRemindersEmail: true,
+        pmRemindersDesktop: true,
+        pmReminderTiming: '30min',
+        
+        // Legacy preferences (keep for backward compatibility)
         emailNotifications: true,
         browserNotifications: true,
         mobileNotifications: true,
         taskReminders: true,
         projectUpdates: true,
         deadlineAlerts: true,
-        
-        // Theme & Display
         theme: 'light',
         compactMode: false,
         showCompletedTasks: false,
         animationsEnabled: true,
-        
-        // Language & Region
         language: 'en',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         dateFormat: 'MM/dd/yyyy',
         timeFormat: '12h',
-        
-        // Productivity
         autoSave: true,
         quickCapture: true,
         showKeyboardShortcuts: true,
-        
-        // Privacy
         trackAnalytics: true,
         shareUsageData: false,
         allowCookies: true
@@ -44,13 +69,32 @@ export const Preferences = ({ showToast }) => {
     const loadPreferences = async () => {
         setLoading(true);
         try {
-            // Load from localStorage for now - replace with API call
-            const saved = localStorage.getItem('userPreferences');
-            if (saved) {
-                setPreferences(prev => ({ ...prev, ...JSON.parse(saved) }));
-            }
+            // Load from API first
+            const apiPreferences = await userPreferencesService.getPreferences();
+            
+            // Load legacy preferences from localStorage for backward compatibility
+            const localPreferences = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+            
+            // Merge API preferences with local ones, prioritizing API
+            setPreferences(prev => ({
+                ...prev,
+                ...localPreferences,
+                ...apiPreferences,
+                // Map API fields to component fields
+                workStartTime: apiPreferences.workStartTime || prev.workStartTime,
+                workEndTime: apiPreferences.workEndTime || prev.workEndTime,
+            }));
         } catch (error) {
-            showToast('Failed to load preferences', 'error');
+            console.error('Error loading preferences:', error);
+            // Fallback to localStorage if API fails
+            try {
+                const saved = localStorage.getItem('userPreferences');
+                if (saved) {
+                    setPreferences(prev => ({ ...prev, ...JSON.parse(saved) }));
+                }
+            } catch (localError) {
+                showToast('Failed to load preferences', 'error');
+            }
         } finally {
             setLoading(false);
         }
@@ -59,10 +103,35 @@ export const Preferences = ({ showToast }) => {
     const savePreferences = async () => {
         setSaving(true);
         try {
-            // Save to localStorage for now - replace with API call
+            // Validate preferences
+            const validation = userPreferencesService.validatePreferences(preferences);
+            if (!validation.isValid) {
+                const firstError = Object.values(validation.errors)[0];
+                showToast(firstError, 'error');
+                return;
+            }
+
+            // Prepare API data - only send backend-supported fields
+            const apiData = {
+                workStartTime: preferences.workStartTime,
+                workEndTime: preferences.workEndTime,
+                goalRemindersEmail: preferences.goalRemindersEmail,
+                goalRemindersDesktop: preferences.goalRemindersDesktop,
+                goalReminderTiming: preferences.goalReminderTiming,
+                pmRemindersEmail: preferences.pmRemindersEmail,
+                pmRemindersDesktop: preferences.pmRemindersDesktop,
+                pmReminderTiming: preferences.pmReminderTiming,
+            };
+
+            // Save to API
+            await userPreferencesService.updatePreferences(apiData);
+            
+            // Also save all preferences to localStorage for legacy support
             localStorage.setItem('userPreferences', JSON.stringify(preferences));
+            
             showToast('Preferences saved successfully');
         } catch (error) {
+            console.error('Error saving preferences:', error);
             showToast('Failed to save preferences', 'error');
         } finally {
             setSaving(false);
@@ -73,30 +142,46 @@ export const Preferences = ({ showToast }) => {
         setPreferences(prev => ({ ...prev, [key]: value }));
     };
     
-    const resetToDefaults = () => {
-        setPreferences({
-            emailNotifications: true,
-            browserNotifications: true,
-            mobileNotifications: true,
-            taskReminders: true,
-            projectUpdates: true,
-            deadlineAlerts: true,
-            theme: 'light',
-            compactMode: false,
-            showCompletedTasks: false,
-            animationsEnabled: true,
-            language: 'en',
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            dateFormat: 'MM/dd/yyyy',
-            timeFormat: '12h',
-            autoSave: true,
-            quickCapture: true,
-            showKeyboardShortcuts: true,
-            trackAnalytics: true,
-            shareUsageData: false,
-            allowCookies: true
-        });
-        showToast('Preferences reset to defaults');
+    const resetToDefaults = async () => {
+        setSaving(true);
+        try {
+            // Reset via API
+            const defaultPreferences = await userPreferencesService.resetPreferences();
+            
+            // Update state with API defaults plus local defaults for other fields
+            setPreferences(prev => ({
+                // Keep local defaults for non-API fields
+                emailNotifications: true,
+                browserNotifications: true,
+                mobileNotifications: true,
+                taskReminders: true,
+                projectUpdates: true,
+                deadlineAlerts: true,
+                theme: 'light',
+                compactMode: false,
+                showCompletedTasks: false,
+                animationsEnabled: true,
+                language: 'en',
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                dateFormat: 'MM/dd/yyyy',
+                timeFormat: '12h',
+                autoSave: true,
+                quickCapture: true,
+                showKeyboardShortcuts: true,
+                trackAnalytics: true,
+                shareUsageData: false,
+                allowCookies: true,
+                // Apply API defaults
+                ...defaultPreferences,
+            }));
+            
+            showToast('Preferences reset to defaults');
+        } catch (error) {
+            console.error('Error resetting preferences:', error);
+            showToast('Failed to reset preferences', 'error');
+        } finally {
+            setSaving(false);
+        }
     };
     
     if (loading) {
@@ -109,10 +194,125 @@ export const Preferences = ({ showToast }) => {
     
     return (
         <div className="space-y-6">
-            {/* Notifications */}
+            {/* Work Hours Preferences */}
             <Section 
-                title="Notifications" 
-                description="Manage how you receive updates and alerts"
+                title="Work Hours Preferences" 
+                description="Set your preferred working hours"
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field label="Start Time">
+                        <input
+                            type="time"
+                            value={preferences.workStartTime}
+                            onChange={(e) => updatePreference('workStartTime', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </Field>
+                    <Field label="End Time">
+                        <input
+                            type="time"
+                            value={preferences.workEndTime}
+                            onChange={(e) => updatePreference('workEndTime', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </Field>
+                </div>
+            </Section>
+            
+            {/* PracticalManager Reminders */}
+            <Section 
+                title="PracticalManager Reminders" 
+                description="Manage system-wide reminder notifications"
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                            <h4 className="font-medium text-gray-800">PracticalManager Notifications</h4>
+                            <p className="text-sm text-gray-600 mt-1">System reminders and notifications</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                <SimpleToggle
+                                    checked={preferences.pmRemindersEmail}
+                                    onChange={(checked) => updatePreference('pmRemindersEmail', checked)}
+                                />
+                            </div>
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                <SimpleToggle
+                                    checked={preferences.pmRemindersDesktop}
+                                    onChange={(checked) => updatePreference('pmRemindersDesktop', checked)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <Field label="Reminder Timing">
+                        <select
+                            value={preferences.pmReminderTiming}
+                            onChange={(e) => updatePreference('pmReminderTiming', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="5min">5 minutes before</option>
+                            <option value="15min">15 minutes before</option>
+                            <option value="30min">30 minutes before</option>
+                            <option value="1hour">1 hour before</option>
+                            <option value="2hours">2 hours before</option>
+                            <option value="1day">1 day before</option>
+                        </select>
+                    </Field>
+                </div>
+            </Section>
+            
+            {/* Goal Reminders */}
+            <Section 
+                title="Goal Reminders" 
+                description="Configure goal-related reminder notifications"
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                            <h4 className="font-medium text-gray-800">Goal Reminder Notifications</h4>
+                            <p className="text-sm text-gray-600 mt-1">Reminders for goals and deadlines</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                <SimpleToggle
+                                    checked={preferences.goalRemindersEmail}
+                                    onChange={(checked) => updatePreference('goalRemindersEmail', checked)}
+                                />
+                            </div>
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                <SimpleToggle
+                                    checked={preferences.goalRemindersDesktop}
+                                    onChange={(checked) => updatePreference('goalRemindersDesktop', checked)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <Field label="Reminder Timing">
+                        <select
+                            value={preferences.goalReminderTiming}
+                            onChange={(e) => updatePreference('goalReminderTiming', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="5min">5 minutes before</option>
+                            <option value="15min">15 minutes before</option>
+                            <option value="30min">30 minutes before</option>
+                            <option value="1hour">1 hour before</option>
+                            <option value="2hours">2 hours before</option>
+                            <option value="1day">1 day before</option>
+                        </select>
+                    </Field>
+                </div>
+            </Section>
+
+            {/* Basic Notifications */}
+            <Section 
+                title="General Notifications" 
+                description="Manage basic notification preferences"
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Toggle
