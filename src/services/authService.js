@@ -65,6 +65,36 @@ class AuthService {
             localStorage.removeItem("access_token");
         }
     }
+
+    // Secure password change methods
+    async requestPasswordChange(currentPassword, newPassword) {
+        const res = await apiClient.post("/auth/request-password-change", {
+            currentPassword,
+            newPassword
+        });
+        return res.data; // { message }
+    }
+
+    async confirmPasswordChange(token) {
+        // Use GET to match backend convenience endpoint
+        const res = await apiClient.get(`/auth/confirm-password-change`, { params: { token } });
+        return res.data; // { message }
+    }
+
+    // Secure email change methods
+    async requestEmailChange(newEmail, currentPassword) {
+        const res = await apiClient.post("/auth/request-email-change", {
+            newEmail,
+            currentPassword
+        });
+        return res.data; // { message }
+    }
+
+    async confirmEmailChange(token) {
+        // Use GET to match backend convenience endpoint
+        const res = await apiClient.get(`/auth/confirm-email-change`, { params: { token } });
+        return res.data; // { message }
+    }
 }
 
 export default new AuthService();

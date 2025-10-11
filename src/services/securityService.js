@@ -3,25 +3,15 @@ import apiClient from "./apiClient";
 
 class SecurityService {
     /**
-     * Change user password
+     * Request secure password change via email verification
      * @param {Object} passwordData - { currentPassword, newPassword }
      * @returns {Promise<Object>} - { message }
      */
-    async changePassword({ currentPassword, newPassword }) {
-        const res = await apiClient.patch("/auth/change-password", {
+    async requestPasswordChange({ currentPassword, newPassword }) {
+        const res = await apiClient.post("/auth/request-password-change", {
             currentPassword,
             newPassword
         });
-        return res.data;
-    }
-
-    /**
-     * Request password change via email verification
-     * @param {string} email - User's email
-     * @returns {Promise<Object>} - { message }
-     */
-    async requestPasswordChange(email) {
-        const res = await apiClient.post("/auth/request-password-change", { email });
         return res.data;
     }
 
@@ -139,26 +129,16 @@ class SecurityService {
     // === EMAIL VERIFICATION ===
 
     /**
-     * Request email change
+     * Request secure email change via email verification
      * @param {string} newEmail - New email address
-     * @param {string} password - Current password for verification
+     * @param {string} currentPassword - Current password for verification
      * @returns {Promise<Object>} - { message }
      */
-    async requestEmailChange(newEmail, password) {
-        const res = await apiClient.post("/auth/change-email", {
+    async requestEmailChange(newEmail, currentPassword) {
+        const res = await apiClient.post("/auth/request-email-change", {
             newEmail,
-            password
+            currentPassword
         });
-        return res.data;
-    }
-
-    /**
-     * Verify email change with token
-     * @param {string} token - Email verification token
-     * @returns {Promise<Object>} - { message }
-     */
-    async verifyEmailChange(token) {
-        const res = await apiClient.post("/auth/verify-email-change", { token });
         return res.data;
     }
 

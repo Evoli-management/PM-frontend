@@ -292,17 +292,17 @@ export const SecuritySettings = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            await securityService.changePassword({
+            await securityService.requestPasswordChange({
                 currentPassword: passwordDraft.current,
                 newPassword: passwordDraft.next
             });
             
             setPasswordDraft({ current: "", next: "", confirm: "" });
             setChangeMode(null);
-            showToast('Password changed successfully!');
+            showToast('Password change verification email sent! Please check your email to confirm the change.');
         } catch (error) {
-            console.error('Failed to change password:', error);
-            const errorMessage = error.response?.data?.message || 'Failed to change password';
+            console.error('Failed to request password change:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to request password change';
             showToast(errorMessage, 'error');
         } finally {
             setIsLoading(false);
@@ -314,15 +314,15 @@ export const SecuritySettings = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            await securityService.requestEmailChange({
-                newEmail: emailDraft.next,
-                password: emailDraft.current
-            });
+            await securityService.requestEmailChange(
+                emailDraft.next,
+                emailDraft.current
+            );
             
             setChangeMode(null);
             setEmailDraft({ current: "", next: "" });
             setErrors({});
-            showToast('Email change requested! Please check your new email for verification link.');
+            showToast('Email change verification sent to your new email address! Please check and confirm.');
         } catch (error) {
             console.error('Failed to request email change:', error);
             const errorMessage = error.response?.data?.message || 'Failed to request email change';
