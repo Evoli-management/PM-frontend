@@ -115,6 +115,7 @@ export const Preferences = ({ showToast }) => {
             const apiData = {
                 workStartTime: preferences.workStartTime,
                 workEndTime: preferences.workEndTime,
+                timeFormat: preferences.timeFormat,
                 goalRemindersEmail: preferences.goalRemindersEmail,
                 goalRemindersDesktop: preferences.goalRemindersDesktop,
                 goalReminderTiming: preferences.goalReminderTiming,
@@ -129,12 +130,20 @@ export const Preferences = ({ showToast }) => {
             // Also save all preferences to localStorage for legacy support
             localStorage.setItem('userPreferences', JSON.stringify(preferences));
             
-            // Trigger a custom event to notify calendar components of working hours change
+            // Trigger custom events to notify calendar components of changes
             if (apiData.workStartTime || apiData.workEndTime) {
                 window.dispatchEvent(new CustomEvent('workingHoursChanged', {
                     detail: {
                         startTime: apiData.workStartTime || preferences.workStartTime,
                         endTime: apiData.workEndTime || preferences.workEndTime
+                    }
+                }));
+            }
+            
+            if (apiData.timeFormat) {
+                window.dispatchEvent(new CustomEvent('timeFormatChanged', {
+                    detail: {
+                        timeFormat: apiData.timeFormat
                     }
                 }));
             }

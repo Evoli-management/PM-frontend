@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
-import { useWorkingHours } from "../../hooks/useWorkingHours";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
 
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
@@ -22,7 +22,12 @@ export default function MonthView({
     onQuickCreate, // new: open appointment creation modal
     onTaskDrop,
 }) {
-    const { timeSlots, workingHours, loading: hoursLoading } = useWorkingHours(30);
+    const { 
+        timeSlots, 
+        workingHours, 
+        formatTime, 
+        loading: prefsLoading 
+    } = useCalendarPreferences(30);
     
     // Generate all possible hours (24-hour format)
     const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
@@ -303,14 +308,14 @@ export default function MonthView({
                     </div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         {baseDate.toLocaleString("default", { month: "long", year: "numeric" })}
-                        {hoursLoading && (
+                        {prefsLoading && (
                             <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                                 Loading
                             </span>
                         )}
                         {workingHours.startTime && workingHours.endTime && !showAllHours && (
                             <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
-                                {workingHours.startTime} - {workingHours.endTime}
+                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
                             </span>
                         )}
                     </h2>
@@ -342,7 +347,7 @@ export default function MonthView({
                     <div className="text-sm text-gray-600">
                         {!showAllHours && (
                             <span>
-                                Showing working hours ({workingHours.startTime || '8:00'} - {workingHours.endTime || '18:00'})
+                                Showing working hours ({formatTime(workingHours.startTime) || '8:00 AM'} - {formatTime(workingHours.endTime) || '6:00 PM'})
                             </span>
                         )}
                         {showAllHours && (
@@ -386,7 +391,7 @@ export default function MonthView({
                                         className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16"
                                         style={{ minWidth: 40 }}
                                     >
-                                        {h}
+                                        {formatTime(h)}
                                     </th>
                                 ))}
                             </tr>
