@@ -3,6 +3,7 @@ import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 function getWeekNumber(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -168,6 +169,7 @@ const WeekView = ({
     };
 
     return (
+        <>
         <div className="p-0" style={{ overflow: "hidden" }}>
             {/* Header with navigation inside the view */}
             <div className="flex items-center justify-between mb-2">
@@ -332,7 +334,7 @@ const WeekView = ({
                                     return (
                                         <div
                                             key={index}
-                                            style={style}
+                                            style={{ ...style, overflow: "visible" }}
                                             className={`flex w-full ${index % 2 === 0 ? "bg-blue-50" : "bg-white"}`}
                                         >
                                             <div
@@ -343,13 +345,13 @@ const WeekView = ({
                                             </div>
                                             {days.map((date, dIdx) => {
                                                 const slotEvents = events.filter((ev) =>
-                                                    eventMatchesSlot(ev.start, date, slot, slotSize),
+                                                    eventMatchesSlot(ev.start, date, slot, slotSize) && !ev.taskId
                                                 );
                                                 return (
                                                     <div
                                                         key={dIdx}
-                                                        className="border-r border-blue-100 px-2 py-1 h-8 align-top group flex items-center"
-                                                        style={{ flex: "1 1 0", minWidth: 0 }}
+                                                        className="border-r border-blue-100 px-2 py-1 align-top group flex items-center relative overflow-visible"
+                                                        style={{ flex: "1 1 0", minWidth: 0, height: ITEM_SIZE }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => handleDrop(e, date, slot)}
                                                         onDoubleClick={() => {
@@ -367,16 +369,28 @@ const WeekView = ({
                                                         {slotEvents.length === 0
                                                             ? null
                                                             : slotEvents.map((ev, i) => {
-                                                                  const isTaskBox = !!ev.taskId;
+                                                                  const evStart = ev.start ? new Date(ev.start) : null;
+                                                                  const evEnd = ev.end ? new Date(ev.end) : null;
+                                                                  const startMs = evStart ? evStart.getTime() : 0;
+                                                                  const endMs = evEnd ? evEnd.getTime() : 0;
+                                                                  const durMs = endMs > startMs ? endMs - startMs : slotSize * 60000;
+                                                                  const heightPx = Math.max(ITEM_SIZE * (durMs / (slotSize * 60000)) - 4, ITEM_SIZE - 4);
+                                                                  const [sh, sm] = slot.split(":");
+                                                                  const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number(sh), Number(sm));
+                                                                  const withinSlotMin = evStart ? Math.max(0, Math.min(slotSize, (evStart.getTime() - slotStart.getTime()) / 60000)) : 0;
+                                                                  const withinSlotTop = (withinSlotMin / slotSize) * ITEM_SIZE;
                                                                   return (
                                                                       <div
                                                                           key={i}
-                                                                          className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden ${isTaskBox ? "" : categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                                          style={
-                                                                              isTaskBox
-                                                                                  ? { backgroundColor: "#7ED4E3" }
-                                                                                  : undefined
-                                                                          }
+                                                                          className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${categories[ev.kind]?.color || "bg-gray-200"}`}
+                                                                          style={{
+                                                                              position: "absolute",
+                                                                              left: 2,
+                                                                              right: 2,
+                                                                              top: 2 + withinSlotTop,
+                                                                              height: heightPx,
+                                                                              zIndex: 5,
+                                                                          }}
                                                                           draggable
                                                                           onDragStart={(e) => {
                                                                               try {
@@ -395,16 +409,43 @@ const WeekView = ({
                                                                                   e.dataTransfer.effectAllowed = "move";
                                                                               } catch {}
                                                                           }}
-                                                                          onClick={() => onEventClick(ev)}
                                                                       >
-                                                                          {!isTaskBox && (
-                                                                              <span className="shrink-0">
-                                                                                  {categories[ev.kind]?.icon || ""}
-                                                                              </span>
-                                                                          )}
-                                                                          <span className="truncate whitespace-nowrap text-xs min-w-0">
+                                                                          <span className="shrink-0">
+                                                                              {categories[ev.kind]?.icon || ""}
+                                                                          </span>
+                                                                          <span
+                                                                              className="truncate whitespace-nowrap text-xs min-w-0 flex-1"
+                                                                              tabIndex={0}
+                                                                              aria-label={ev.title}
+                                                                          >
                                                                               {ev.title}
                                                                           </span>
+                                                                          
+                                                                          {/* Action Icons - shown on hover */}
+                                                                          <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                                                                              <button
+                                                                                  className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                                  onClick={(e) => {
+                                                                                      e.stopPropagation();
+                                                                                      onEventClick && onEventClick(ev, 'edit');
+                                                                                  }}
+                                                                                  aria-label={`Edit ${ev.title}`}
+                                                                                  title="Edit appointment"
+                                                                              >
+                                                                                  <FaEdit className="w-3 h-3 text-blue-600" />
+                                                                              </button>
+                                                                              <button
+                                                                                  className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                                  onClick={(e) => {
+                                                                                      e.stopPropagation();
+                                                                                      onEventClick && onEventClick(ev, 'delete');
+                                                                                  }}
+                                                                                  aria-label={`Delete ${ev.title}`}
+                                                                                  title="Delete appointment"
+                                                                              >
+                                                                                  <FaTrash className="w-3 h-3 text-red-600" />
+                                                                              </button>
+                                                                          </div>
                                                                       </div>
                                                                   );
                                                               })}
@@ -527,6 +568,7 @@ const WeekView = ({
             </div>
             {/* Removed To-Do List Panel per request */}
         </div>
+        </>
     );
 };
 

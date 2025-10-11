@@ -1,5 +1,5 @@
 import React from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
@@ -51,6 +51,32 @@ export default function DayView({
     
     const today = currentDate || new Date();
     const slotSizeMin = 30;
+    const SLOT_ROW_PX = 38; // visual height per 30-min slot, aligns with WeekView
+    const overlapsSlot = (ev, refDate, slot) => {
+        try {
+            if (!ev?.start || !ev?.end) return matchesSlot(ev?.start, refDate, slot); // fallback to start-only
+            const [sh, sm] = slot.split(":");
+            const slotStart = new Date(
+                refDate.getFullYear(),
+                refDate.getMonth(),
+                refDate.getDate(),
+                Number(sh),
+                Number(sm),
+            );
+            const slotEnd = new Date(slotStart.getTime() + slotSizeMin * 60000);
+            const start = new Date(ev.start);
+            const end = new Date(ev.end);
+            if (
+                start.getFullYear() !== refDate.getFullYear() ||
+                start.getMonth() !== refDate.getMonth() ||
+                start.getDate() !== refDate.getDate()
+            )
+                return false;
+            return start < slotEnd && end > slotStart; // overlap
+        } catch {
+            return false;
+        }
+    };
     // Build date-only value for comparisons and filter todos to those spanning today
     const toDateOnly = (iso) => {
         if (!iso) return null;
