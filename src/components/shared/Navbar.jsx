@@ -2,9 +2,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FaUser } from "react-icons/fa";
+import userProfileService from "../../services/userProfileService";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
+    const [userProfile, setUserProfile] = useState(null);
     const menuRef = useRef(null);
 
     // Close the profile/settings popover when clicking outside
@@ -30,7 +32,31 @@ export default function Navbar() {
         // Check if user is authenticated by looking for access token
         const token = localStorage.getItem("access_token");
         setIsAuthenticated(!!token);
+        
+        // Fetch user profile for avatar if authenticated
+        if (token) {
+            fetchUserProfile();
+        }
     }, [location]);
+    
+    // Listen for profile updates to refresh avatar
+    useEffect(() => {
+        const handleProfileUpdate = () => {
+            fetchUserProfile();
+        };
+        
+        window.addEventListener('profileUpdated', handleProfileUpdate);
+        return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
+    }, []);
+    
+    const fetchUserProfile = async () => {
+        try {
+            const profile = await userProfileService.getProfile();
+            setUserProfile(profile);
+        } catch (error) {
+            console.error('Failed to fetch user profile:', error);
+        }
+    };
     
     // Don't render navbar on public pages
     if (isPublicRoute) {
@@ -55,8 +81,22 @@ export default function Navbar() {
                         aria-haspopup="menu"
                         aria-expanded={open ? "true" : "false"}
                     >
-                        <span className="w-9 h-9 rounded-full bg-white/30 text-white flex items-center justify-center">
-                            <FaUser className="w-6 h-6" />
+                        <span className="w-9 h-9 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
+                            {userProfile?.avatarUrl ? (
+                                <img 
+                                    src={userProfile.avatarUrl} 
+                                    alt="Profile Avatar"
+                                    className="w-full h-full object-cover rounded-full"
+                                    onError={(e) => {
+                                        // Fallback to icon if image fails to load
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                />
+                            ) : null}
+                            <FaUser 
+                                className={`w-6 h-6 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
+                            />
                         </span>
                         <svg
                             className="w-5 h-5"

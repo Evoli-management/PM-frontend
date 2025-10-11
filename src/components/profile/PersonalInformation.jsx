@@ -258,6 +258,9 @@ export const PersonalInformation = ({ showToast }) => {
             }
             
             showToast('Avatar updated successfully!');
+            
+            // Dispatch event to notify other components (like Navbar) of profile update
+            window.dispatchEvent(new CustomEvent('profileUpdated'));
         } catch (error) {
             console.error('Failed to update avatar:', error);
             showToast('Failed to update avatar', 'error');
