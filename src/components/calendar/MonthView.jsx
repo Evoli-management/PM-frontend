@@ -1,21 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import { generateTimeSlots } from "../../utils/timeUtils";
 
-const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-// WeekView slot generation logic
-const HOURS = (() => {
-    const slots = [];
-    for (let h = 8; h <= 16; h++) {
-        for (let m = 0; m < 60; m += 30) {
-            if (h === 16 && m > 30) continue; // last start slot 16:30
-            slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-        }
-    }
-    slots.push("17:00"); // final label
-    return slots;
-})();
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
@@ -35,16 +22,29 @@ export default function MonthView({
     onQuickCreate, // new: open appointment creation modal
     onTaskDrop,
 }) {
-    // Working hours: 09:00 to 17:00 (configurable in future)
-    const WORK_START = 8;
-    const WORK_END = 17;
-    // Generate slots from 08:00 to 16:30, then add 17:00 as the last slot
-    const HOURS = [];
-    for (let h = WORK_START; h < WORK_END; h++) {
-        HOURS.push(`${h.toString().padStart(2, "0")}:00`);
-        HOURS.push(`${h.toString().padStart(2, "0")}:30`);
-    }
-    HOURS.push("17:00");
+    const { 
+        timeSlots, 
+        workingHours, 
+        formatTime, 
+        formatDate,
+        loading: prefsLoading 
+    } = useCalendarPreferences(30);
+    
+    // Generate all possible hours (24-hour format)
+    const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
+        const h = Math.floor(i / 2);
+        const m = i % 2 === 0 ? "00" : "30";
+        return `${h.toString().padStart(2, '0')}:${m}`;
+    });
+    
+    // Dynamic working hours based on user preferences
+    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS.filter((h) => {
+        const hour = Number(h.split(":")[0]);
+        return hour >= 8 && hour <= 18;
+    });
+    
+    const [showAllHours, setShowAllHours] = useState(false);
+    const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
     const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
     const today = new Date();
@@ -307,8 +307,18 @@ export default function MonthView({
                             )}
                         </div>
                     </div>
-                    <h2 className="text-xl font-bold">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
                         {baseDate.toLocaleString("default", { month: "long", year: "numeric" })}
+                        {prefsLoading && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                                Loading
+                            </span>
+                        )}
+                        {workingHours.startTime && workingHours.endTime && !showAllHours && (
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
+                            </span>
+                        )}
                     </h2>
                     <div className="flex items-center gap-2">
                         <select
@@ -334,7 +344,27 @@ export default function MonthView({
                         </button>
                     </div>
                 </div>
-                {/* Removed Show all hours toggle */}
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-600">
+                        {!showAllHours && (
+                            <span>
+                                Showing working hours ({formatTime(workingHours.startTime) || '8:00 AM'} - {formatTime(workingHours.endTime) || '6:00 PM'})
+                            </span>
+                        )}
+                        {showAllHours && (
+                            <span>Showing all 24 hours</span>
+                        )}
+                    </div>
+                    <label className="text-sm text-gray-600 cursor-pointer flex items-center">
+                        <input
+                            type="checkbox"
+                            checked={showAllHours}
+                            onChange={(e) => setShowAllHours(e.target.checked)}
+                            className="mr-2"
+                        />
+                        Show all hours (24h)
+                    </label>
+                </div>
                 <div
                     ref={gridRef}
                     className="relative pb-6"
@@ -363,7 +393,7 @@ export default function MonthView({
                                         className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16"
                                         style={{ minWidth: 40 }}
                                     >
-                                        {h}
+                                        {formatTime(h)}
                                     </th>
                                 ))}
                             </tr>

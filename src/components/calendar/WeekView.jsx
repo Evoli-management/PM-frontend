@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import { generateTimeSlots } from "../../utils/timeUtils";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 function getWeekNumber(date) {
@@ -10,18 +12,6 @@ function getWeekNumber(date) {
 }
 
 const defaultSlotSize = 30;
-const timeSlots = (slotSize) => {
-    const slots = [];
-    for (let h = 8; h <= 16; h++) {
-        for (let m = 0; m < 60; m += slotSize) {
-            if (h === 16 && m > 30) continue; // last start slot 16:30
-            slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-        }
-    }
-    // Add a final 17:00 label row (no events start at 17:00)
-    slots.push("17:00");
-    return slots;
-};
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
@@ -46,6 +36,15 @@ const WeekView = ({
     activities = [],
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
+    const { 
+        timeSlots, 
+        formattedTimeSlots, 
+        workingHours, 
+        formatTime,
+        formatDate,
+        loading: prefsLoading,
+        updateSlotSize 
+    } = useCalendarPreferences(slotSize);
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
     // Fixed time column width; day columns will flex to fill available space
@@ -62,14 +61,22 @@ const WeekView = ({
         { length: 7 },
         (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
     );
-    const slots = timeSlots(slotSize);
+    
+    // Use dynamic time slots from working hours, fallback to default if still loading
+    const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("08:00", "17:00", slotSize);
+    
     const ITEM_SIZE = 38; // px per time slot row
     const LIST_HEIGHT_PX = 400; // fixed viewport height for grid scroll
     const weekNum = getWeekNumber(weekStart);
 
     // No explicit width calculations; columns will flex to fit container
 
-    // Map vertical wheel to horizontal scroll on tasks scroller for better UX
+    // Update time slots when slot size changes
+    useEffect(() => {
+        if (updateSlotSize) {
+            updateSlotSize(slotSize);
+        }
+    }, [slotSize, updateSlotSize]);
     useEffect(() => {
         const el = tasksScrollRef.current;
         if (!el) return;
@@ -130,7 +137,7 @@ const WeekView = ({
     // Range label for the week
     const endOfWeek = new Date(weekStart);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
-    const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${endOfWeek.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+    const weekLabel = `${formatDate(weekStart)} — ${formatDate(endOfWeek)}`;
 
     // Helper: does event start match this slot (rounded to nearest slot size)?
     const eventMatchesSlot = (startIso, day, slot, sizeMin) => {
@@ -217,9 +224,14 @@ const WeekView = ({
                 </div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
                     {weekLabel}
-                    {loading && (
+                    {(loading || prefsLoading) && (
                         <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                             Loading
+                        </span>
+                    )}
+                    {workingHours.startTime && workingHours.endTime && (
+                        <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                            {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
                         </span>
                     )}
                 </h2>
@@ -284,7 +296,7 @@ const WeekView = ({
                                             key={dIdx}
                                             className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${dIdx === days.length - 1 ? "rounded-tr-lg" : ""}`}
                                         >
-                                            {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+                                            {formatDate(date, { includeWeekday: true, shortWeekday: true })}
                                         </th>
                                     ))}
                                 </tr>
@@ -329,7 +341,7 @@ const WeekView = ({
                                                 className="border-r border-blue-100 px-2 py-1 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center"
                                                 style={{ width: TIME_COL_PX + "px" }}
                                             >
-                                                {slot}
+                                                {formatTime(slot)}
                                             </div>
                                             {days.map((date, dIdx) => {
                                                 const slotEvents = events.filter((ev) =>

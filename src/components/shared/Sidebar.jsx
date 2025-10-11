@@ -6,7 +6,6 @@ import {
     FaLock,
     FaChevronDown,
     FaCog,
-    FaSignOutAlt,
     FaPlus,
     FaSearch,
     FaClock,
@@ -87,7 +86,6 @@ export default function Sidebar({
 }) {
     const location = useLocation();
     const [keyAreasList, setKeyAreasList] = useState([]);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [internalCollapsed, setInternalCollapsed] = useState(false);
     const [search, setSearch] = useState("");
     const [keyAreasOpen, setKeyAreasOpen] = useState(false);
@@ -95,23 +93,6 @@ export default function Sidebar({
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
-
-    // derive avatar or initials for profile display
-    let avatarSrc = (user && user.avatar) || null;
-    try {
-        if (!avatarSrc) {
-            const stored = localStorage.getItem('pm:user:avatar');
-            if (stored) avatarSrc = stored;
-        }
-    } catch (e) {}
-    const initials = (user && user.name)
-        ? user.name
-              .split(" ")
-              .map((p) => p[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase()
-        : "U";
 
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -546,38 +527,6 @@ export default function Sidebar({
                         ))}
                     </div>
                 )}
-            </div>
-            
-            <div className="mt-2 border-t border-blue-200" />
-            <div className="mt-4 px-2 relative flex-shrink-0">
-                <div className="flex items-center gap-3 px-2 py-3 bg-white rounded-lg border border-blue-200">
-                    <Link to="/profile" className="flex items-center gap-3 w-full text-left">
-                        <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-lg font-bold text-white">
-                            {avatarSrc ? (
-                                <img src={avatarSrc} alt={user?.name || "User"} className="w-full h-full object-cover" />
-                            ) : (
-                                <span>{initials}</span>
-                            )}
-                        </div>
-                        {!collapsed && <div className="text-sm font-medium text-blue-900">{user?.name || "User"}</div>}
-                    </Link>
-                </div>
-
-                <div className="mt-2">
-                    <button
-                        className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-white text-blue-900 hover:bg-blue-50 border border-blue-200 transition"
-                        onClick={() => {
-                            try {
-                                window.location.hash = "#/login";
-                            } catch (e) {
-                                window.location.href = "/login";
-                            }
-                        }}
-                        aria-label="Logout"
-                    >
-                        <FaSignOutAlt /> <span className="font-semibold">Logout</span>
-                    </button>
-                </div>
             </div>
         </aside>
     );
