@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
+import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
 
 // Simple Toggle component for nested preferences
 const SimpleToggle = ({ checked, onChange, disabled = false }) => (
@@ -21,6 +23,13 @@ const SimpleToggle = ({ checked, onChange, disabled = false }) => (
 );
 
 export const Preferences = ({ showToast }) => {
+    // Use calendar preferences hook to get current time format
+    const { 
+        preferences: calendarPrefs, 
+        use24Hour, 
+        loading: calendarLoading 
+    } = useCalendarPreferences();
+
     const [preferences, setPreferences] = useState({
         // Work Hours (mapped to backend fields)
         workStartTime: '09:00',
@@ -229,19 +238,21 @@ export const Preferences = ({ showToast }) => {
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="Start Time">
-                        <input
-                            type="time"
+                        <TimePicker
                             value={preferences.workStartTime}
-                            onChange={(e) => updatePreference('workStartTime', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(value) => updatePreference('workStartTime', value)}
+                            use24Hour={use24Hour}
+                            className="w-full"
+                            label="Work Start Time"
                         />
                     </Field>
                     <Field label="End Time">
-                        <input
-                            type="time"
+                        <TimePicker
                             value={preferences.workEndTime}
-                            onChange={(e) => updatePreference('workEndTime', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(value) => updatePreference('workEndTime', value)}
+                            use24Hour={use24Hour}
+                            className="w-full"
+                            label="Work End Time"
                         />
                     </Field>
                 </div>
