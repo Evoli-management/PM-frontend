@@ -1,7 +1,14 @@
 // src/hooks/useCalendarPreferences.js
 import { useState, useEffect } from 'react';
 import userPreferencesService from '../services/userPreferencesService';
-import { generateTimeSlots, getDefaultTimeSlots, formatTimeForDisplay } from '../utils/timeUtils';
+import { 
+    generateTimeSlots, 
+    getDefaultTimeSlots, 
+    formatTimeForDisplay,
+    formatDateForDisplay,
+    formatDateWithOptions,
+    getRelativeDateString
+} from '../utils/timeUtils';
 
 /**
  * Comprehensive hook for calendar preferences including working hours and time format
@@ -16,6 +23,7 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
             endTime: '17:00'
         },
         timeFormat: '12h', // '12h' or '24h'
+        dateFormat: 'MM/dd/yyyy', // 'MM/dd/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd', 'MMM dd, yyyy'
         timezone: 'UTC'
     });
     
@@ -38,6 +46,7 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
                     endTime: userPrefs.workEndTime || '17:00'
                 },
                 timeFormat: userPrefs.timeFormat || '12h',
+                dateFormat: userPrefs.dateFormat || 'MM/dd/yyyy',
                 timezone: userPrefs.timezone || 'UTC'
             };
             
@@ -73,6 +82,7 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
             const defaultPrefs = {
                 workingHours: { startTime: '08:00', endTime: '17:00' },
                 timeFormat: '12h',
+                dateFormat: 'MM/dd/yyyy',
                 timezone: 'UTC'
             };
             setPreferences(defaultPrefs);
@@ -95,6 +105,17 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
     const formatTime = (timeStr) => {
         const use24Hour = preferences.timeFormat === '24h';
         return formatTimeForDisplay(timeStr, use24Hour);
+    };
+
+    // Format a date according to user preference
+    const formatDate = (date, options = {}) => {
+        if (options.relative) {
+            return getRelativeDateString(date, preferences.dateFormat);
+        }
+        if (options.includeWeekday || options.longMonth) {
+            return formatDateWithOptions(date, preferences.dateFormat, options);
+        }
+        return formatDateForDisplay(date, preferences.dateFormat);
     };
 
     // Update time slots when preferences change
@@ -150,6 +171,22 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
         }
     };
 
+    // Update date format
+    const updateDateFormat = (newDateFormat) => {
+        const newPreferences = {
+            ...preferences,
+            dateFormat: newDateFormat
+        };
+        
+        setPreferences(newPreferences);
+        const { slots, formatted } = updateTimeSlots(preferences.workingHours, preferences.timeFormat);
+        
+        // Trigger callback if provided
+        if (onPreferencesChange) {
+            onPreferencesChange(newPreferences, slots, formatted);
+        }
+    };
+
     // Update all preferences at once
     const updateAllPreferences = (newPrefs) => {
         setPreferences(newPrefs);
@@ -178,6 +215,11 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
             updateTimeFormat(timeFormat);
         };
 
+        const handleDateFormatChanged = (event) => {
+            const { dateFormat } = event.detail;
+            updateDateFormat(dateFormat);
+        };
+
         const handlePreferencesChanged = (event) => {
             const { preferences: newPrefs } = event.detail;
             updateAllPreferences(newPrefs);
@@ -185,11 +227,13 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
 
         window.addEventListener('workingHoursChanged', handleWorkingHoursChanged);
         window.addEventListener('timeFormatChanged', handleTimeFormatChanged);
+        window.addEventListener('dateFormatChanged', handleDateFormatChanged);
         window.addEventListener('calendarPreferencesChanged', handlePreferencesChanged);
         
         return () => {
             window.removeEventListener('workingHoursChanged', handleWorkingHoursChanged);
             window.removeEventListener('timeFormatChanged', handleTimeFormatChanged);
+            window.removeEventListener('dateFormatChanged', handleDateFormatChanged);
             window.removeEventListener('calendarPreferencesChanged', handlePreferencesChanged);
         };
     }, [onPreferencesChange]);
@@ -212,14 +256,17 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
         // Specific preferences
         workingHours: preferences.workingHours,
         timeFormat: preferences.timeFormat,
+        dateFormat: preferences.dateFormat,
         timezone: preferences.timezone,
         use24Hour: preferences.timeFormat === '24h',
         
         // Utility functions
         formatTime,
+        formatDate,
         refreshPreferences: loadPreferences,
         updateWorkingHours,
         updateTimeFormat,
+        updateDateFormat,
         updateAllPreferences,
         
         // Working time checker

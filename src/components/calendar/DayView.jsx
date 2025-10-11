@@ -31,6 +31,7 @@ export default function DayView({
         formattedTimeSlots, 
         workingHours, 
         formatTime,
+        formatDate,
         loading: prefsLoading 
     } = useCalendarPreferences(30);
     const [showViewMenu, setShowViewMenu] = React.useState(false);
@@ -187,12 +188,7 @@ export default function DayView({
                         </div>
                     </div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        {today.toLocaleDateString(undefined, {
-                            weekday: "long",
-                            month: "long",
-                            day: "numeric",
-                            year: "numeric",
-                        })}
+                        {formatDate(today, { includeWeekday: true, longMonth: true })}
                         {(loading || prefsLoading) && (
                             <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                                 Loading

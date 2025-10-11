@@ -116,6 +116,7 @@ export const Preferences = ({ showToast }) => {
                 workStartTime: preferences.workStartTime,
                 workEndTime: preferences.workEndTime,
                 timeFormat: preferences.timeFormat,
+                dateFormat: preferences.dateFormat,
                 goalRemindersEmail: preferences.goalRemindersEmail,
                 goalRemindersDesktop: preferences.goalRemindersDesktop,
                 goalReminderTiming: preferences.goalReminderTiming,
@@ -144,6 +145,14 @@ export const Preferences = ({ showToast }) => {
                 window.dispatchEvent(new CustomEvent('timeFormatChanged', {
                     detail: {
                         timeFormat: apiData.timeFormat
+                    }
+                }));
+            }
+            
+            if (apiData.dateFormat) {
+                window.dispatchEvent(new CustomEvent('dateFormatChanged', {
+                    detail: {
+                        dateFormat: apiData.dateFormat
                     }
                 }));
             }

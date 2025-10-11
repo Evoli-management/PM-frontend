@@ -26,6 +26,7 @@ export default function MonthView({
         timeSlots, 
         workingHours, 
         formatTime, 
+        formatDate,
         loading: prefsLoading 
     } = useCalendarPreferences(30);
     

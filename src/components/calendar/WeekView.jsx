@@ -40,6 +40,7 @@ const WeekView = ({
         formattedTimeSlots, 
         workingHours, 
         formatTime,
+        formatDate,
         loading: prefsLoading,
         updateSlotSize 
     } = useCalendarPreferences(slotSize);
@@ -135,7 +136,7 @@ const WeekView = ({
     // Range label for the week
     const endOfWeek = new Date(weekStart);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
-    const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${endOfWeek.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+    const weekLabel = `${formatDate(weekStart)} — ${formatDate(endOfWeek)}`;
 
     // Helper: does event start match this slot (rounded to nearest slot size)?
     const eventMatchesSlot = (startIso, day, slot, sizeMin) => {
@@ -293,7 +294,7 @@ const WeekView = ({
                                             key={dIdx}
                                             className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${dIdx === days.length - 1 ? "rounded-tr-lg" : ""}`}
                                         >
-                                            {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+                                            {formatDate(date, { includeWeekday: true, shortWeekday: true })}
                                         </th>
                                     ))}
                                 </tr>
