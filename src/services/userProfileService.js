@@ -22,11 +22,11 @@ class UserProfileService {
     }
 
     /**
-     * Update personal information (name, email, phone)
-     * @param {Object} personalData - { firstName, lastName, email, phone }
+     * Update personal information (name and phone only)
+     * @param {Object} personalData - { name, phone }
      * @returns {Promise<Object>} - Updated profile data
      */
-    async updatePersonalInfo({ name, email, phone }) {
+    async updatePersonalInfo({ name, phone }) {
         // Split name into firstName and lastName
         const nameParts = name.trim().split(' ');
         const firstName = nameParts[0] || '';
@@ -35,7 +35,6 @@ class UserProfileService {
         const profileData = {
             firstName,
             lastName,
-            email,
             phone
         };
 

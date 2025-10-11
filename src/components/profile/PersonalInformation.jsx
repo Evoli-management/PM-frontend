@@ -115,7 +115,6 @@ export const PersonalInformation = ({ showToast }) => {
         const validation = userProfileService.validateProfileData({
             firstName: personalDraft.name.split(' ')[0] || '',
             lastName: personalDraft.name.split(' ').slice(1).join(' ') || '',
-            email: personalDraft.email,
             phone: personalDraft.phone
         });
 
@@ -123,10 +122,6 @@ export const PersonalInformation = ({ showToast }) => {
         
         if (!personalDraft.name.trim()) {
             newErrors.name = "Name is required";
-        }
-        
-        if (validation.errors.email) {
-            newErrors.email = validation.errors.email;
         }
         
         if (validation.errors.phone) {
@@ -155,12 +150,18 @@ export const PersonalInformation = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            const updatedProfile = await userProfileService.updatePersonalInfo(personalDraft);
+            // Only update name and phone, not email (email is managed in Security settings)
+            const personalData = {
+                name: personalDraft.name,
+                phone: personalDraft.phone
+            };
+            
+            const updatedProfile = await userProfileService.updatePersonalInfo(personalData);
             const formattedData = userProfileService.formatProfileData(updatedProfile);
             
             setSavedPersonal({
                 name: formattedData.name || '',
-                email: formattedData.email || '',
+                email: formattedData.email || '', // Keep existing email
                 phone: formattedData.phone || ''
             });
             
@@ -301,16 +302,23 @@ export const PersonalInformation = ({ showToast }) => {
                         required
                     />
                     
-                    <Field 
-                        label="Email Address" 
-                        value={isEditingPersonal ? personalDraft.email : savedPersonal.email}
-                        isEditing={isEditingPersonal}
-                        onChange={handlePersonalChange('email')}
-                        error={errors.email}
-                        type="email"
-                        placeholder="Enter your email address"
-                        required
-                    />
+                    {/* Email Address - Read Only (editable in Security settings) */}
+                    <div>
+                        <label className="block text-sm font-medium mb-2">
+                            Email Address <span className="text-destructive">*</span>
+                            <span className="ml-2 text-xs text-muted-foreground">(Change in Security settings)</span>
+                        </label>
+                        <input
+                            type="email"
+                            value={savedPersonal.email}
+                            className="w-full p-3 border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
+                            disabled
+                            readOnly
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Email cannot be changed here as it's used for login. Use Security settings to change email.
+                        </p>
+                    </div>
                     
                     <Field 
                         label="Phone Number" 

@@ -270,6 +270,23 @@ export const SecuritySettings = ({ showToast }) => {
         return Object.keys(newErrors).length === 0;
     };
 
+    const validateEmailChange = () => {
+        const newErrors = {};
+        
+        if (!emailDraft.current) {
+            newErrors.currentPassword = "Current password is required";
+        }
+        
+        if (!emailDraft.next) {
+            newErrors.newEmail = "New email is required";
+        } else if (!/\S+@\S+\.\S+/.test(emailDraft.next)) {
+            newErrors.newEmail = "Invalid email format";
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const savePasswordChange = async () => {
         if (!validatePasswordChange()) return;
         
@@ -286,6 +303,29 @@ export const SecuritySettings = ({ showToast }) => {
         } catch (error) {
             console.error('Failed to change password:', error);
             const errorMessage = error.response?.data?.message || 'Failed to change password';
+            showToast(errorMessage, 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const saveEmailChange = async () => {
+        if (!validateEmailChange()) return;
+        
+        setIsLoading(true);
+        try {
+            await securityService.requestEmailChange({
+                newEmail: emailDraft.next,
+                password: emailDraft.current
+            });
+            
+            setChangeMode(null);
+            setEmailDraft({ current: "", next: "" });
+            setErrors({});
+            showToast('Email change requested! Please check your new email for verification link.');
+        } catch (error) {
+            console.error('Failed to request email change:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to request email change';
             showToast(errorMessage, 'error');
         } finally {
             setIsLoading(false);
@@ -396,6 +436,74 @@ export const SecuritySettings = ({ showToast }) => {
                             className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
                             Change Password
+                        </button>
+                    )}
+                </div>
+            </Section>
+
+            {/* Email Change */}
+            <Section 
+                title="Email Address" 
+                description="Change your email address used for login"
+            >
+                <div className="space-y-4">
+                    {changeMode === 'email' ? (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Current Password</label>
+                                <input
+                                    type="password"
+                                    value={emailDraft.current}
+                                    onChange={handleEmailChange('current')}
+                                    className="w-full p-3 border rounded-lg"
+                                    placeholder="Enter your current password"
+                                />
+                                {errors.currentPassword && (
+                                    <p className="text-sm text-red-600 mt-1">{errors.currentPassword}</p>
+                                )}
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium mb-2">New Email Address</label>
+                                <input
+                                    type="email"
+                                    value={emailDraft.next}
+                                    onChange={handleEmailChange('next')}
+                                    className="w-full p-3 border rounded-lg"
+                                    placeholder="Enter your new email address"
+                                />
+                                {errors.newEmail && (
+                                    <p className="text-sm text-red-600 mt-1">{errors.newEmail}</p>
+                                )}
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                <LoadingButton
+                                    onClick={saveEmailChange}
+                                    loading={isLoading}
+                                    variant="primary"
+                                >
+                                    Change Email
+                                </LoadingButton>
+                                <button
+                                    onClick={() => {
+                                        setChangeMode(null);
+                                        setEmailDraft({ current: "", next: "" });
+                                        setErrors({});
+                                    }}
+                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                                    disabled={isLoading}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setChangeMode('email')}
+                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                            Change Email
                         </button>
                     )}
                 </div>
