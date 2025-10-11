@@ -1,11 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import { generateTimeSlots } from "../../utils/timeUtils";
 
-const HOURS = Array.from({ length: 48 }, (_, i) => {
-    const h = Math.floor(i / 2);
-    const m = i % 2 === 0 ? "00" : "30";
-    return `${h}:${m}`;
-});
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
@@ -14,23 +11,38 @@ export default function MonthView({
     currentDate,
     onShiftDate,
     events,
+    todos = [],
     categories,
     onEventClick,
+    onTaskClick,
     view,
     onChangeView,
     filterType,
     onChangeFilter,
+    onQuickCreate, // new: open appointment creation modal
+    onTaskDrop,
 }) {
-    // Working hours: 8:00 to 18:00
+    const { 
+        timeSlots, 
+        workingHours, 
+        formatTime, 
+        formatDate,
+        loading: prefsLoading 
+    } = useCalendarPreferences(30);
+    
+    // Generate all possible hours (24-hour format)
     const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
         const h = Math.floor(i / 2);
         const m = i % 2 === 0 ? "00" : "30";
-        return `${h}:${m}`;
+        return `${h.toString().padStart(2, '0')}:${m}`;
     });
-    const WORKING_HOURS = ALL_HOURS.filter((h) => {
+    
+    // Dynamic working hours based on user preferences
+    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS.filter((h) => {
         const hour = Number(h.split(":")[0]);
         return hour >= 8 && hour <= 18;
     });
+    
     const [showAllHours, setShowAllHours] = useState(false);
     const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
     const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
@@ -42,17 +54,171 @@ export default function MonthView({
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const monthDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
 
-    // Map events to day/hour
+    // Helper to round minutes to nearest 30 for slotting
+    const toSlotKey = (d) => {
+        const date = new Date(d);
+        const mins = date.getMinutes();
+        const half = Math.round(mins / 30) * 30;
+        if (half === 60) {
+            date.setHours(date.getHours() + 1, 0, 0, 0);
+        } else {
+            date.setMinutes(half, 0, 0);
+        }
+        const hr = String(date.getHours()).padStart(2, "0");
+        const mn = String(date.getMinutes()).padStart(2, "0");
+        return `${date.getDate()}-${hr}:${mn}`;
+    };
+
+    // Merge events and tasks (todos) into the same slots for rendering
     const eventsBySlot = {};
-    events.forEach((ev) => {
-        const evDate = new Date(ev.start);
-        const key = `${evDate.getDate()}-${evDate.getHours()}:${evDate.getMinutes()}`;
+    const eventTaskIdsBySlot = {};
+    const pushSlot = (key, item) => {
         if (!eventsBySlot[key]) eventsBySlot[key] = [];
-        eventsBySlot[key].push(ev);
+        eventsBySlot[key].push(item);
+    };
+    (Array.isArray(events) ? events : []).forEach((ev) => {
+        const key = toSlotKey(ev.start);
+        pushSlot(key, ev);
+        const tid = ev.taskId;
+        if (tid) {
+            if (!eventTaskIdsBySlot[key]) eventTaskIdsBySlot[key] = new Set();
+            eventTaskIdsBySlot[key].add(String(tid));
+        }
+    });
+    (Array.isArray(todos) ? todos : []).forEach((t) => {
+        const when = t.startDate || t.dueDate || t.endDate;
+        if (!when) return;
+        const key = toSlotKey(when);
+        const hasEventForThisTask = eventTaskIdsBySlot[key]?.has(String(t.id));
+        if (hasEventForThisTask) return; // avoid duplicates when a task already has a calendar event at this time
+        pushSlot(key, { id: `todo-${t.id}`, title: t.title, kind: "custom" });
     });
 
-    // Red line for current time
+    // Helpers for date-only comparisons
+    const parseDateOnly = (iso) => {
+        if (!iso) return null;
+        const d = new Date(iso);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    };
+    const clampToMonth = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    // Build range tasks (multi-day or all-day single-day) and assign lanes with grouping:
+    // 1) Start with max range to min range overall (by group max span)
+    // 2) Tasks with the same start date must be consecutive regardless of their span
+    const buildRangeTasks = () => {
+        const ranges = [];
+        (Array.isArray(todos) ? todos : []).forEach((t) => {
+            let s = parseDateOnly(t.startDate) || parseDateOnly(t.dueDate) || parseDateOnly(t.endDate);
+            let e = parseDateOnly(t.endDate) || parseDateOnly(t.dueDate) || parseDateOnly(t.startDate);
+            if (!s && !e) return;
+            if (s && e && s > e) {
+                const tmp = s;
+                s = e;
+                e = tmp;
+            }
+            if (!s) s = e;
+            if (!e) e = s;
+            const isSingleDay = s.getTime() === e.getTime();
+            const hasStartTime = !!t.startDate; // treat as timed
+            if (isSingleDay && hasStartTime) return; // exclude timed single-day from all-day histogram
+            const spanDays = Math.max(1, Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1);
+            const startKey = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
+            ranges.push({ task: t, start: s, end: e, spanDays, startKey });
+        });
+        // Group by start date to keep tasks with the same start date consecutive
+        const groupsMap = new Map();
+        for (const r of ranges) {
+            if (!groupsMap.has(r.startKey)) groupsMap.set(r.startKey, []);
+            groupsMap.get(r.startKey).push(r);
+        }
+        const groups = Array.from(groupsMap.values()).map((items) => {
+            const maxSpan = items.reduce((m, it) => Math.max(m, it.spanDays), 1);
+            // items share the same date-only start; use first's start for tie-breaking
+            const startDate = items[0].start;
+            // Sort within group by span desc, then title for deterministic order
+            items.sort((a, b) => {
+                if (b.spanDays !== a.spanDays) return b.spanDays - a.spanDays;
+                return String(a.task.title || "").localeCompare(String(b.task.title || ""));
+            });
+            return { items, maxSpan, startDate };
+        });
+        // Sort groups by their max span descending; tie-break by earlier start date
+        groups.sort((ga, gb) => {
+            if (gb.maxSpan !== ga.maxSpan) return gb.maxSpan - ga.maxSpan;
+            return ga.startDate - gb.startDate;
+        });
+        // Flatten groups assigning lanes consecutively per group
+        const out = [];
+        let lane = 0;
+        for (const g of groups) {
+            for (const it of g.items) {
+                out.push({ ...it, lane });
+                lane += 1;
+            }
+        }
+        return out;
+    };
+    const rangeTasks = buildRangeTasks();
+    const lanesCount = Math.min(rangeTasks.length, 20); // cap lanes for readability
+    // Scroll container ref (used by overlay/red-line measurements)
     const gridRef = useRef(null);
+
+    // Measure all-day column positions to draw continuous overlay bars
+    const allDayRefs = useRef([]);
+    const [overlayMetrics, setOverlayMetrics] = useState({ colLeft: 0, colWidth: 0, rows: [] });
+    useLayoutEffect(() => {
+        const container = gridRef.current;
+        if (!container) return;
+        const crect = container.getBoundingClientRect();
+        const rows = allDayRefs.current.filter(Boolean).map((el) => {
+            const r = el.getBoundingClientRect();
+            return {
+                top: r.top - crect.top + container.scrollTop,
+                bottom: r.bottom - crect.top + container.scrollTop,
+                height: r.height,
+            };
+        });
+        const first = allDayRefs.current.find(Boolean);
+        if (!first) {
+            setOverlayMetrics({ colLeft: 0, colWidth: 0, rows });
+            return;
+        }
+        const fr = first.getBoundingClientRect();
+        const colLeft = fr.left - crect.left + container.scrollLeft;
+        const colWidth = fr.width;
+        setOverlayMetrics({ colLeft, colWidth, rows });
+    }, [year, month, daysInMonth, todos, showAllHours]);
+    useEffect(() => {
+        const measure = () => {
+            const container = gridRef.current;
+            if (!container) return;
+            const crect = container.getBoundingClientRect();
+            const rows = allDayRefs.current.filter(Boolean).map((el) => {
+                const r = el.getBoundingClientRect();
+                return {
+                    top: r.top - crect.top + container.scrollTop,
+                    bottom: r.bottom - crect.top + container.scrollTop,
+                    height: r.height,
+                };
+            });
+            const first = allDayRefs.current.find(Boolean);
+            if (!first) return;
+            const fr = first.getBoundingClientRect();
+            const colLeft = fr.left - crect.left + container.scrollLeft;
+            const colWidth = fr.width;
+            setOverlayMetrics({ colLeft, colWidth, rows });
+        };
+        const onResize = () => measure();
+        const el = gridRef.current;
+        window.addEventListener("resize", onResize);
+        el?.addEventListener("scroll", measure);
+        return () => {
+            window.removeEventListener("resize", onResize);
+            el?.removeEventListener("scroll", measure);
+        };
+    }, []);
+
+    // Red line for current time
     useEffect(() => {
         const interval = setInterval(() => {
             if (!gridRef.current) return;
@@ -98,6 +264,15 @@ export default function MonthView({
                                 className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
                                 style={{ minWidth: 36, minHeight: 28 }}
                                 onClick={() => setShowViewMenu((s) => !s)}
+                                draggable
+                                onDragStart={(e) => {
+                                    try {
+                                        e.dataTransfer.setData("taskId", String(t.id));
+                                        e.dataTransfer.setData("title", t.title || "");
+                                        e.dataTransfer.setData("description", t.description || "");
+                                        e.dataTransfer.effectAllowed = "copyMove";
+                                    } catch {}
+                                }}
                                 aria-haspopup="menu"
                                 aria-expanded={showViewMenu ? "true" : "false"}
                             >
@@ -132,8 +307,18 @@ export default function MonthView({
                             )}
                         </div>
                     </div>
-                    <h2 className="text-xl font-bold">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
                         {baseDate.toLocaleString("default", { month: "long", year: "numeric" })}
+                        {prefsLoading && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                                Loading
+                            </span>
+                        )}
+                        {workingHours.startTime && workingHours.endTime && !showAllHours && (
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
+                            </span>
+                        )}
                     </h2>
                     <div className="flex items-center gap-2">
                         <select
@@ -159,15 +344,25 @@ export default function MonthView({
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center justify-end mb-2">
-                    <label className="mr-2 text-sm text-gray-600">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-600">
+                        {!showAllHours && (
+                            <span>
+                                Showing working hours ({formatTime(workingHours.startTime) || '8:00 AM'} - {formatTime(workingHours.endTime) || '6:00 PM'})
+                            </span>
+                        )}
+                        {showAllHours && (
+                            <span>Showing all 24 hours</span>
+                        )}
+                    </div>
+                    <label className="text-sm text-gray-600 cursor-pointer flex items-center">
                         <input
                             type="checkbox"
                             checked={showAllHours}
                             onChange={(e) => setShowAllHours(e.target.checked)}
-                            className="mr-1"
+                            className="mr-2"
                         />
-                        Show all hours
+                        Show all hours (24h)
                     </label>
                 </div>
                 <div
@@ -188,7 +383,7 @@ export default function MonthView({
                                 <th className="sticky left-0 bg-sky-50 text-left px-2 py-2 text-xs font-semibold text-gray-400 w-24 z-10">
                                     &nbsp;
                                 </th>
-                                <th className="sticky left-24 bg-sky-50 text-center px-2 py-2 text-xs font-semibold text-gray-400 w-24 z-10">
+                                <th className="sticky left-24 bg-sky-50 text-center px-2 py-2 text-xs font-semibold text-gray-400 w-40 z-10">
                                     all day
                                 </th>
                                 {HOURS.map((h, idx) => (
@@ -197,7 +392,7 @@ export default function MonthView({
                                         className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16"
                                         style={{ minWidth: 40 }}
                                     >
-                                        {h}
+                                        {formatTime(h)}
                                     </th>
                                 ))}
                             </tr>
@@ -209,6 +404,23 @@ export default function MonthView({
                                     date.getDate() === (currentDate || today).getDate() &&
                                     date.getMonth() === (currentDate || today).getMonth() &&
                                     date.getFullYear() === (currentDate || today).getFullYear();
+                                // Active segments for histogram lanes on this date
+                                const dayOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                const segments = rangeTasks
+                                    .filter((r) => r.start <= dayOnly && dayOnly <= r.end)
+                                    .map((r) => {
+                                        const isSingle = r.start.getTime() === r.end.getTime();
+                                        const isStart = dayOnly.getTime() === r.start.getTime();
+                                        const isEnd = dayOnly.getTime() === r.end.getTime();
+                                        const segType = isSingle
+                                            ? "single"
+                                            : isStart
+                                              ? "start"
+                                              : isEnd
+                                                ? "end"
+                                                : "middle";
+                                        return { lane: r.lane, task: r.task, segType };
+                                    });
                                 return (
                                     <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
                                         <td
@@ -216,8 +428,12 @@ export default function MonthView({
                                         >
                                             {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
                                         </td>
-                                        <td className="sticky left-24 bg-white px-2 py-2 text-center align-top w-24 z-10 cursor-pointer border border-sky-100 hover:bg-blue-100">
-                                            {/* all day slot */}
+                                        <td
+                                            ref={(el) => (allDayRefs.current[idx] = el)}
+                                            className="sticky left-24 bg-white px-1 py-0 text-left align-top w-40 z-10 border-x border-sky-100"
+                                        >
+                                            {/* overlay draws continuous poles; cell content intentionally minimal */}
+                                            <span className="sr-only">all day</span>
                                         </td>
                                         {HOURS.map((h, hIdx) => {
                                             const [hr, min] = h.split(":");
@@ -228,20 +444,86 @@ export default function MonthView({
                                                     key={hIdx}
                                                     className="px-1 py-2 text-center align-top w-16 cursor-pointer border border-sky-100 hover:bg-blue-100"
                                                     style={{ minWidth: 40 }}
-                                                    onClick={() => onEventClick({ day: date, hour: h })}
+                                                    onClick={() => onEventClick && onEventClick({ day: date, hour: h })}
+                                                    onDoubleClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (typeof onQuickCreate === "function") {
+                                                            const dt = new Date(
+                                                                date.getFullYear(),
+                                                                date.getMonth(),
+                                                                date.getDate(),
+                                                                parseInt(hr, 10) || 0,
+                                                                parseInt(min, 10) || 0,
+                                                                0,
+                                                                0,
+                                                            );
+                                                            onQuickCreate(dt);
+                                                        }
+                                                    }}
+                                                    onDragOver={(e) => {
+                                                        try {
+                                                            e.preventDefault();
+                                                            e.dataTransfer.dropEffect = "copy";
+                                                        } catch {}
+                                                    }}
+                                                    onDrop={(e) => {
+                                                        try {
+                                                            const taskId = e.dataTransfer.getData("taskId");
+                                                            if (!taskId || typeof onTaskDrop !== "function") return;
+                                                            const dt = new Date(
+                                                                date.getFullYear(),
+                                                                date.getMonth(),
+                                                                date.getDate(),
+                                                                parseInt(hr, 10) || 0,
+                                                                parseInt(min, 10) || 0,
+                                                                0,
+                                                                0,
+                                                            );
+                                                            const task = (todos || []).find(
+                                                                (t) => String(t.id) === String(taskId),
+                                                            );
+                                                            if (task) onTaskDrop(task, dt);
+                                                        } catch {}
+                                                    }}
+                                                    title="Double-click to add appointment"
                                                 >
-                                                    {slotEvents.length === 0 ? (
-                                                        <span className="block text-xs text-gray-400">No events</span>
-                                                    ) : (
-                                                        slotEvents.map((ev, i) => (
-                                                            <span
-                                                                key={i}
-                                                                className={`block px-2 py-1 rounded text-xs mb-1 ${categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                            >
-                                                                {ev.title}
-                                                            </span>
-                                                        ))
-                                                    )}
+                                                    {slotEvents.length > 0 &&
+                                                        slotEvents.map((ev, i) => {
+                                                            const color = categories[ev.kind]?.color || "bg-gray-200";
+                                                            const isTaskBox =
+                                                                Boolean(ev.taskId) ||
+                                                                (typeof ev.id === "string" &&
+                                                                    ev.id.startsWith("todo-"));
+                                                            const handleClick = (e) => {
+                                                                e.stopPropagation();
+                                                                if (typeof onTaskClick !== "function") return;
+                                                                if (ev.taskId) return onTaskClick(ev.taskId);
+                                                                if (
+                                                                    typeof ev.id === "string" &&
+                                                                    ev.id.startsWith("todo-")
+                                                                ) {
+                                                                    const tid = ev.id.slice(5);
+                                                                    if (tid) return onTaskClick(tid);
+                                                                }
+                                                            };
+                                                            return (
+                                                                <span
+                                                                    key={i}
+                                                                    className={`block px-2 py-1 rounded text-xs mb-1 ${isTaskBox ? "" : color} cursor-pointer w-full max-w-full overflow-hidden`}
+                                                                    onClick={handleClick}
+                                                                    title={ev.title}
+                                                                    style={
+                                                                        isTaskBox
+                                                                            ? { backgroundColor: "#7ED4E3" }
+                                                                            : undefined
+                                                                    }
+                                                                >
+                                                                    <span className="truncate whitespace-nowrap min-w-0 block">
+                                                                        {ev.title}
+                                                                    </span>
+                                                                </span>
+                                                            );
+                                                        })}
                                                 </td>
                                             );
                                         })}
@@ -262,6 +544,71 @@ export default function MonthView({
                             zIndex: 10,
                         }}
                     ></div>
+                    {/* Continuous all-day poles overlay (inside scroll container) */}
+                    {overlayMetrics.rows.length > 0 && lanesCount > 0 && (
+                        <div
+                            className="absolute"
+                            style={{
+                                left: overlayMetrics.colLeft,
+                                width: overlayMetrics.colWidth,
+                                top: 0,
+                                bottom: 0,
+                                zIndex: 20,
+                            }}
+                        >
+                            {(() => {
+                                const laneWidth = 28; // wider bars for horizontal labels
+                                const gap = 6; // small gap between bars
+                                const maxLanes = Math.max(
+                                    1,
+                                    Math.floor((overlayMetrics.colWidth + gap) / (laneWidth + gap)),
+                                );
+                                return rangeTasks.map((r) => {
+                                    if (r.lane >= lanesCount) return null;
+                                    if (r.lane >= maxLanes) return null;
+                                    // Clamp to visible month rows
+                                    const startIdx = Math.max(
+                                        0,
+                                        r.start.getMonth() === month ? r.start.getDate() - 1 : 0,
+                                    );
+                                    const endIdx = Math.min(
+                                        overlayMetrics.rows.length - 1,
+                                        r.end.getMonth() === month
+                                            ? r.end.getDate() - 1
+                                            : overlayMetrics.rows.length - 1,
+                                    );
+                                    if (startIdx > endIdx) return null;
+                                    const top = overlayMetrics.rows[startIdx]?.top ?? 0;
+                                    const bottom = overlayMetrics.rows[endIdx]?.bottom ?? top;
+                                    const height = Math.max(0, bottom - top);
+                                    const left = r.lane * (laneWidth + gap);
+                                    return (
+                                        <div
+                                            key={`ov-${r.task.id}`}
+                                            className="rounded text-[10px] font-medium text-blue-900 flex items-start pointer-events-auto cursor-default"
+                                            style={{
+                                                position: "absolute",
+                                                top,
+                                                left,
+                                                width: laneWidth,
+                                                height,
+                                                overflow: "hidden",
+                                                backgroundColor: "#7ED4E3",
+                                                border: "1px solid #7ED4E3",
+                                            }}
+                                            title={r.task.title}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (typeof onTaskClick === "function") onTaskClick(r.task);
+                                            }}
+                                        >
+                                            <span className="px-1 pt-1 truncate">{r.task.title}</span>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    )}
                 </div>
             </div>
         </>

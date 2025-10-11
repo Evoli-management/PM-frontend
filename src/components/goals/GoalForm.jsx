@@ -1,392 +1,372 @@
-// src/components/goals/GoalForm.jsx
-import React, { useState } from 'react';
-import { FaTrash, FaTimes, FaPlus, FaRocket, FaFlag, FaBullseye } from "react-icons/fa";
+import React, { useState } from "react";
+import { FaTimes, FaPlus, FaTrash, FaSave, FaRocket } from "react-icons/fa";
 
-const GoalForm = ({ onClose, onGoalCreated }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    dueDate: '',
-  });
-  const [milestones, setMilestones] = useState([{ title: '', weight: 1.0 }]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [currentStep, setCurrentStep] = useState(1);
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
-    }
-  };
-
-  const handleMilestoneChange = (index, field, value) => {
-    const updatedMilestones = [...milestones];
-    updatedMilestones[index][field] = value;
-    setMilestones(updatedMilestones);
-  };
-
-  const addMilestone = () => {
-    setMilestones([...milestones, { title: '', weight: 1.0 }]);
-  };
-
-  const removeMilestone = (index) => {
-    if (milestones.length > 1) {
-      const updatedMilestones = milestones.filter((_, i) => i !== index);
-      setMilestones(updatedMilestones);
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.title.trim()) newErrors.title = 'Title is required';
-    if (!formData.dueDate) newErrors.dueDate = 'Due date is required';
-    
-    milestones.forEach((milestone, index) => {
-      if (!milestone.title.trim()) {
-        newErrors[`milestone_${index}`] = 'Milestone title is required';
-      }
-      if (!milestone.weight || milestone.weight <= 0) {
-        newErrors[`weight_${index}`] = 'Weight must be greater than 0';
-      }
+const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
+    const [formData, setFormData] = useState({
+        title: goal?.title || "",
+        description: goal?.description || "",
+        startDate: goal?.startDate ? new Date(goal.startDate).toISOString().split("T")[0] : "",
+        dueDate: goal?.dueDate ? new Date(goal.dueDate).toISOString().split("T")[0] : "",
+        keyAreaId: goal?.keyAreaId || "",
+        status: goal?.status || "active",
+        visibility: goal?.visibility || "public",
     });
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    const [milestones, setMilestones] = useState(
+        goal?.milestones?.length > 0
+            ? goal.milestones.map((m) => ({
+                  id: m.id,
+                  title: m.title,
+                  weight: m.weight || 1.0,
+                  dueDate: m.dueDate || "",
+              }))
+            : [{ title: "", weight: 1.0, dueDate: "" }],
+    );
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errors, setErrors] = useState({});
 
-    setIsSubmitting(true);
-
-    const goalData = {
-      title: formData.title.trim(),
-      description: formData.description.trim() || null,
-      dueDate: formData.dueDate,
-      milestones: milestones.map(m => ({
-        title: m.title.trim(),
-        weight: parseFloat(m.weight) || 1.0,
-      })),
+    const handleInputChange = (field, value) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
+        if (errors[field]) {
+            setErrors((prev) => ({ ...prev, [field]: null }));
+        }
     };
 
-    try {
-      await onGoalCreated(goalData);
-      onClose();
-    } catch (err) {
-      setErrors({ general: err.message || 'Failed to create goal. Please try again.' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    const addMilestone = () => {
+        setMilestones([...milestones, { title: "", weight: 1.0, dueDate: "" }]);
+    };
 
-  const nextStep = () => {
-    if (currentStep === 1) {
-      const stepErrors = {};
-      if (!formData.title.trim()) stepErrors.title = 'Title is required';
-      if (!formData.dueDate) stepErrors.dueDate = 'Due date is required';
-      
-      setErrors(stepErrors);
-      if (Object.keys(stepErrors).length === 0) {
-        setCurrentStep(2);
-      }
-    }
-  };
+    const removeMilestone = (index) => {
+        if (milestones.length > 1) {
+            setMilestones(milestones.filter((_, i) => i !== index));
+        }
+    };
 
-  const prevStep = () => {
-    if (currentStep === 2) {
-      setCurrentStep(1);
-    }
-  };
+    const updateMilestone = (index, field, value) => {
+        const updated = [...milestones];
+        updated[index][field] = value;
+        setMilestones(updated);
+    };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl border border-slate-200 animate-[modalSlideIn_0.3s_ease-out]" onClick={(e) => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                <FaRocket className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold">Create New Goal</h2>
-                <p className="text-blue-100">Define your objective and break it into milestones</p>
-              </div>
-            </div>
-            <button 
-              onClick={onClose} 
-              className="p-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              <FaTimes className="w-5 h-5" />
-            </button>
-          </div>
+    const validateForm = () => {
+        const newErrors = {};
 
-          {/* Progress indicator */}
-          <div className="mt-6 flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                currentStep >= 1 ? 'bg-white text-blue-600' : 'bg-white/30 text-white'
-              }`}>
-                {currentStep > 1 ? '✓' : '1'}
-              </div>
-              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-white' : 'text-blue-200'}`}>
-                Goal Details
-              </span>
-            </div>
-            <div className={`flex-1 h-0.5 ${currentStep >= 2 ? 'bg-white' : 'bg-white/30'} transition-all`}></div>
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                currentStep >= 2 ? 'bg-white text-blue-600' : 'bg-white/30 text-white'
-              }`}>
-                2
-              </div>
-              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-white' : 'text-blue-200'}`}>
-                Milestones
-              </span>
-            </div>
-          </div>
-        </div>
+        if (!formData.title.trim()) {
+            newErrors.title = "Title is required";
+        } else if (formData.title.length < 3) {
+            newErrors.title = "Title must be at least 3 characters";
+        }
 
-        <form onSubmit={handleSubmit}>
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-            {/* General error */}
-            {errors.general && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                <p className="text-red-800 font-medium">{errors.general}</p>
-              </div>
-            )}
+        if (!formData.dueDate) {
+            newErrors.dueDate = "Due date is required";
+        } else {
+            const dueDate = new Date(formData.dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-            {/* Step 1: Goal Details */}
-            {currentStep === 1 && (
-              <div className="space-y-6 animate-[slideIn_0.3s_ease-out]">
-                <div className="flex items-center gap-3 mb-6">
-                  <FaBullseye className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-xl font-bold text-slate-900">Goal Details</h3>
-                </div>
+            if (dueDate <= today && !isEditing) {
+                newErrors.dueDate = "Due date must be in the future";
+            }
+        }
 
-                {/* Title */}
-                <div className="space-y-2">
-                  <label htmlFor="title" className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    Goal Title <span className="text-red-500">*</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    id="title" 
-                    value={formData.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                      errors.title ? 'border-red-300 bg-red-50' : 'border-slate-300'
-                    }`}
-                    placeholder="e.g., Launch my online business, Learn Spanish, Get fit"
-                  />
-                  {errors.title && <p className="text-red-600 text-sm font-medium">{errors.title}</p>}
-                </div>
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <label htmlFor="description" className="text-sm font-semibold text-slate-900">
-                    Description (Optional)
-                  </label>
-                  <textarea 
-                    id="description" 
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    rows="4"
-                    className="w-full p-4 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
-                    placeholder="Provide context and details about what you want to achieve..."
-                  />
-                </div>
+    const handleSubmit = async () => {
+        if (!validateForm()) return;
 
-                {/* Due Date */}
-                <div className="space-y-2">
-                  <label htmlFor="dueDate" className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    Target Completion Date <span className="text-red-500">*</span>
-                  </label>
-                  <input 
-                    type="date" 
-                    id="dueDate" 
-                    value={formData.dueDate}
-                    onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                      errors.dueDate ? 'border-red-300 bg-red-50' : 'border-slate-300'
-                    }`}
-                  />
-                  {errors.dueDate && <p className="text-red-600 text-sm font-medium">{errors.dueDate}</p>}
-                </div>
-              </div>
-            )}
+        setIsSubmitting(true);
 
-            {/* Step 2: Milestones */}
-            {currentStep === 2 && (
-              <div className="space-y-6 animate-[slideIn_0.3s_ease-out]">
-                <div className="flex items-center gap-3 mb-6">
-                  <FaFlag className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900">Milestones</h3>
-                    <p className="text-slate-600 text-sm">Break your goal into smaller, manageable steps</p>
-                  </div>
-                </div>
+        const goalData = {
+            title: formData.title.trim(),
+            description: formData.description.trim() || null,
+            startDate: formData.startDate || null,
+            dueDate: formData.dueDate,
+            keyAreaId: formData.keyAreaId || null,
+            visibility: formData.visibility,
+            milestones: milestones
+                .filter((m) => m.title.trim())
+                .map((m) => ({
+                    ...(m.id && { id: m.id }),
+                    title: m.title.trim(),
+                    weight: parseFloat(m.weight) || 1.0,
+                    dueDate: m.dueDate || null,
+                })),
+        };
 
-                <div className="space-y-4">
-                  {milestones.map((milestone, index) => (
-                    <div key={index} className="p-4 border-2 border-slate-200 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center font-bold text-blue-600 text-sm">
-                          {index + 1}
+        try {
+            await onGoalCreated(goalData);
+            onClose();
+        } catch (err) {
+            setErrors({ general: err.message || "Failed to save goal. Please try again." });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}>
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to { 
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.2s ease-out;
+                }
+                .animate-slideUp {
+                    animation: slideUp 0.3s ease-out;
+                }
+            `}</style>
+            
+            <div className="bg-white rounded-xl w-full max-w-5xl shadow-2xl flex flex-col animate-slideUp" style={{ height: '85vh', border: '1px solid #e5e7eb' }}>
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <FaRocket className="w-5 h-5 text-blue-600" />
                         </div>
-                        
-                        <div className="flex-1 space-y-3">
-                          <div>
-                            <input 
-                              type="text" 
-                              placeholder="Milestone description"
-                              value={milestone.title}
-                              onChange={(e) => handleMilestoneChange(index, 'title', e.target.value)}
-                              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                                errors[`milestone_${index}`] ? 'border-red-300 bg-red-50' : 'border-slate-300'
-                              }`}
-                            />
-                            {errors[`milestone_${index}`] && (
-                              <p className="text-red-600 text-sm font-medium mt-1">{errors[`milestone_${index}`]}</p>
-                            )}
-                          </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1">
-                              <label className="text-xs font-semibold text-slate-700 mb-1 block">
-                                Weight (importance)
-                              </label>
-                              <input 
-                                type="number" 
-                                placeholder="1.0"
-                                value={milestone.weight}
-                                onChange={(e) => handleMilestoneChange(index, 'weight', e.target.value)}
-                                min="0.1"
-                                step="0.1"
-                                className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                                  errors[`weight_${index}`] ? 'border-red-300 bg-red-50' : 'border-slate-300'
-                                }`}
-                              />
-                              {errors[`weight_${index}`] && (
-                                <p className="text-red-600 text-sm font-medium mt-1">{errors[`weight_${index}`]}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeMilestone(index)}
-                          disabled={milestones.length === 1}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <FaTrash className="w-4 h-4" />
-                        </button>
-                      </div>
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            {isEditing ? "Edit Goal" : "Create Goal"}
+                        </h2>
                     </div>
-                  ))}
-                  
-                  <button
-                    type="button"
-                    onClick={addMilestone}
-                    className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
-                  >
-                    <FaPlus className="w-4 h-4" />
-                    Add Another Milestone
-                  </button>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                    >
+                        <FaTimes className="w-4 h-4" />
+                    </button>
                 </div>
-              </div>
-            )}
-          </div>
 
-          {/* Footer */}
-          <div className="p-6 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4">
-            <div className="flex gap-3">
-              {currentStep === 2 && (
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  className="px-6 py-3 font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  Previous
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-3 font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                    <div className="h-full">
+                        {errors.general && (
+                            <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 rounded-r text-red-700 text-sm animate-slideUp">
+                                {errors.general}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-12 gap-6 h-full">
+                            {/* Left Column - Main Info */}
+                            <div className="col-span-7 space-y-4">
+                                {/* Title */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        Goal Title <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.title}
+                                        onChange={(e) => handleInputChange("title", e.target.value)}
+                                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                                            errors.title ? "border-red-300 bg-red-50" : "border-gray-300 hover:border-gray-400"
+                                        }`}
+                                        placeholder="Enter goal title"
+                                    />
+                                    {errors.title && <p className="text-red-600 text-xs mt-1 animate-slideUp">{errors.title}</p>}
+                                </div>
+
+                                {/* Description */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e) => handleInputChange("description", e.target.value)}
+                                        rows="3"
+                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none hover:border-gray-400 transition-all duration-200"
+                                        placeholder="Describe your goal..."
+                                    />
+                                </div>
+
+                                {/* Date Fields */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Start Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.startDate}
+                                            onChange={(e) => handleInputChange("startDate", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Due Date <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.dueDate}
+                                            onChange={(e) => handleInputChange("dueDate", e.target.value)}
+                                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                                                errors.dueDate ? "border-red-300 bg-red-50" : "border-gray-300 hover:border-gray-400"
+                                            }`}
+                                            min={new Date().toISOString().split("T")[0]}
+                                        />
+                                        {errors.dueDate && <p className="text-red-600 text-xs mt-1 animate-slideUp">{errors.dueDate}</p>}
+                                    </div>
+                                </div>
+
+                                {/* Select Fields */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Key Area
+                                        </label>
+                                        <select
+                                            value={formData.keyAreaId}
+                                            onChange={(e) => handleInputChange("keyAreaId", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                        >
+                                            <option value="">None</option>
+                                            {keyAreas.map((area) => (
+                                                <option key={area.id} value={area.id}>
+                                                    {area.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Status
+                                        </label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={(e) => handleInputChange("status", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                            disabled={!isEditing}
+                                        >
+                                            <option value="active">Active</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="archived">Archived</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Visibility
+                                        </label>
+                                        <select
+                                            value={formData.visibility}
+                                            onChange={(e) => handleInputChange("visibility", e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                        >
+                                            <option value="public">Public</option>
+                                            <option value="private">Private</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column - Milestones */}
+                            <div className="col-span-5 border-l border-gray-200 pl-6 flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-gray-900">Milestones</h3>
+                                    <button
+                                        type="button"
+                                        onClick={addMilestone}
+                                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                                    >
+                                        <FaPlus className="w-3 h-3" />
+                                        Add
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                                    {milestones.map((milestone, index) => (
+                                        <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-sm">
+                                            <div className="flex items-start gap-2 mb-2">
+                                                <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 mt-0.5 shadow-sm">
+                                                    {index + 1}
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={milestone.title}
+                                                    onChange={(e) => updateMilestone(index, "title", e.target.value)}
+                                                    placeholder="Milestone title"
+                                                    className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white hover:border-gray-400 transition-all duration-200"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeMilestone(index)}
+                                                    disabled={milestones.length === 1}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm"
+                                                >
+                                                    <FaTrash className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pl-7">
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Weight</label>
+                                                    <input
+                                                        type="number"
+                                                        value={milestone.weight}
+                                                        onChange={(e) =>
+                                                            updateMilestone(index, "weight", parseFloat(e.target.value))
+                                                        }
+                                                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white hover:border-gray-400 transition-all duration-200"
+                                                        min="0.1"
+                                                        step="0.1"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Due Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={milestone.dueDate}
+                                                        onChange={(e) => updateMilestone(index, "dueDate", e.target.value)}
+                                                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white hover:border-gray-400 transition-all duration-200"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                    >
+                        <FaSave className="w-3.5 h-3.5" />
+                        {isSubmitting ? "Saving..." : isEditing ? "Update Goal" : "Create Goal"}
+                    </button>
+                </div>
             </div>
-
-            <div className="flex gap-3">
-              {currentStep === 1 ? (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className="px-8 py-3 font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
-                >
-                  Next: Add Milestones
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-8 py-3 font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl disabled:from-blue-400 disabled:to-indigo-400 disabled:cursor-wait flex items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Creating Goal...
-                    </>
-                  ) : (
-                    <>
-                      <FaRocket className="w-4 h-4" />
-                      Create Goal
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Custom animations */}
-      <style jsx>{`
-        @keyframes modalSlideIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9) translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-      `}</style>
-    </div>
-  );
+        </div>
+    );
 };
 
 export default GoalForm;

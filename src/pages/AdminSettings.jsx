@@ -23,7 +23,7 @@ export default function AdminSettings() {
         workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         workHoursStart: "09:00",
         workHoursEnd: "17:00",
-        
+
         // System Policies
         passwordPolicy: {
             minLength: 8,
@@ -33,7 +33,7 @@ export default function AdminSettings() {
             requireSpecialChars: true,
             passwordExpiry: 90,
         },
-        
+
         // Data Management
         dataRetention: {
             userActivityLogs: 365,
@@ -41,7 +41,7 @@ export default function AdminSettings() {
             temporaryFiles: 30,
             deletedItems: 30,
         },
-        
+
         // Security Settings
         security: {
             enableSingleSignOn: false,
@@ -52,7 +52,7 @@ export default function AdminSettings() {
             enable2FAForAdmins: true,
             allowPublicRegistration: false,
         },
-        
+
         // Notification Settings
         notifications: {
             systemMaintenanceNotices: true,
@@ -62,7 +62,7 @@ export default function AdminSettings() {
             weeklyReports: true,
             monthlyReports: true,
         },
-        
+
         // Integration Settings
         integrations: {
             emailProvider: "smtp",
@@ -75,37 +75,37 @@ export default function AdminSettings() {
     });
 
     const updateOrgSetting = (section, key, value) => {
-        setOrgSettings(prev => ({
+        setOrgSettings((prev) => ({
             ...prev,
             [section]: {
                 ...prev[section],
-                [key]: value
-            }
+                [key]: value,
+            },
         }));
     };
 
     const updateTopLevelSetting = (key, value) => {
-        setOrgSettings(prev => ({
+        setOrgSettings((prev) => ({
             ...prev,
-            [key]: value
+            [key]: value,
         }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        
+
         try {
             // Simulate API call to save org settings
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
             // In real implementation, save to backend
-            localStorage.setItem('pm:org:settings', JSON.stringify(orgSettings));
-            
-            alert('Organization settings saved successfully!');
+            localStorage.setItem("pm:org:settings", JSON.stringify(orgSettings));
+
+            alert("Organization settings saved successfully!");
         } catch (error) {
-            console.error('Failed to save settings:', error);
-            alert('Failed to save settings. Please try again.');
+            console.error("Failed to save settings:", error);
+            alert("Failed to save settings. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -114,12 +114,12 @@ export default function AdminSettings() {
     // Load settings on component mount
     useEffect(() => {
         try {
-            const saved = localStorage.getItem('pm:org:settings');
+            const saved = localStorage.getItem("pm:org:settings");
             if (saved) {
-                setOrgSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
+                setOrgSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
             }
         } catch (error) {
-            console.error('Failed to load settings:', error);
+            console.error("Failed to load settings:", error);
         }
     }, []);
 
@@ -148,11 +148,7 @@ export default function AdminSettings() {
             onClick={() => !disabled && onChange(!checked)}
             disabled={disabled}
             className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
-                disabled 
-                    ? 'bg-gray-200 cursor-not-allowed' 
-                    : checked 
-                    ? "bg-blue-600" 
-                    : "bg-gray-300"
+                disabled ? "bg-gray-200 cursor-not-allowed" : checked ? "bg-blue-600" : "bg-gray-300"
             }`}
         >
             <span
@@ -171,7 +167,9 @@ export default function AdminSettings() {
                     <div className="mx-auto max-w-6xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
                         <div className="mb-6">
                             <h1 className="text-xl font-semibold text-gray-600 sm:text-2xl">Admin Settings</h1>
-                            <p className="text-sm text-gray-500 mt-1">Organization-wide administrative settings and system configuration</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Organization-wide administrative settings and system configuration
+                            </p>
                         </div>
 
                         <div className="grid gap-4 lg:grid-cols-[240px_auto]">
@@ -203,8 +201,8 @@ export default function AdminSettings() {
                                                 ORGANIZATION SETTINGS
                                             </div>
 
-                                            <Section 
-                                                title="Organization Information" 
+                                            <Section
+                                                title="Organization Information"
                                                 description="Basic information about your organization"
                                             >
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -212,7 +210,12 @@ export default function AdminSettings() {
                                                         <input
                                                             type="text"
                                                             value={orgSettings.organizationName}
-                                                            onChange={(e) => updateTopLevelSetting("organizationName", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting(
+                                                                    "organizationName",
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         />
                                                     </Field>
@@ -220,7 +223,12 @@ export default function AdminSettings() {
                                                         <input
                                                             type="text"
                                                             value={orgSettings.organizationCode}
-                                                            onChange={(e) => updateTopLevelSetting("organizationCode", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting(
+                                                                    "organizationCode",
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             placeholder="e.g., ABC001"
                                                         />
@@ -228,7 +236,9 @@ export default function AdminSettings() {
                                                     <Field label="Industry">
                                                         <select
                                                             value={orgSettings.industry}
-                                                            onChange={(e) => updateTopLevelSetting("industry", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting("industry", e.target.value)
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         >
                                                             <option value="technology">Technology</option>
@@ -243,7 +253,9 @@ export default function AdminSettings() {
                                                     <Field label="Country">
                                                         <select
                                                             value={orgSettings.country}
-                                                            onChange={(e) => updateTopLevelSetting("country", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting("country", e.target.value)
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         >
                                                             <option value="United States">United States</option>
@@ -258,20 +270,24 @@ export default function AdminSettings() {
                                                 </div>
                                             </Section>
 
-                                            <Section 
-                                                title="Working Hours & Calendar" 
+                                            <Section
+                                                title="Working Hours & Calendar"
                                                 description="Define organization working hours and policies"
                                             >
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                                     <Field label="Timezone">
                                                         <select
                                                             value={orgSettings.timezone}
-                                                            onChange={(e) => updateTopLevelSetting("timezone", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting("timezone", e.target.value)
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         >
                                                             <option value="America/New_York">Eastern Time (US)</option>
                                                             <option value="America/Chicago">Central Time (US)</option>
-                                                            <option value="America/Los_Angeles">Pacific Time (US)</option>
+                                                            <option value="America/Los_Angeles">
+                                                                Pacific Time (US)
+                                                            </option>
                                                             <option value="Europe/London">London</option>
                                                             <option value="Europe/Berlin">Berlin</option>
                                                             <option value="Africa/Nairobi">Nairobi</option>
@@ -280,7 +296,9 @@ export default function AdminSettings() {
                                                     <Field label="Currency">
                                                         <select
                                                             value={orgSettings.currency}
-                                                            onChange={(e) => updateTopLevelSetting("currency", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting("currency", e.target.value)
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         >
                                                             <option value="USD">USD - US Dollar</option>
@@ -291,13 +309,15 @@ export default function AdminSettings() {
                                                         </select>
                                                     </Field>
                                                 </div>
-                                                
+
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     <Field label="Work Hours Start">
                                                         <input
                                                             type="time"
                                                             value={orgSettings.workHoursStart}
-                                                            onChange={(e) => updateTopLevelSetting("workHoursStart", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting("workHoursStart", e.target.value)
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         />
                                                     </Field>
@@ -305,15 +325,17 @@ export default function AdminSettings() {
                                                         <input
                                                             type="time"
                                                             value={orgSettings.workHoursEnd}
-                                                            onChange={(e) => updateTopLevelSetting("workHoursEnd", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateTopLevelSetting("workHoursEnd", e.target.value)
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         />
                                                     </Field>
                                                 </div>
                                             </Section>
 
-                                            <Section 
-                                                title="Data Management" 
+                                            <Section
+                                                title="Data Management"
                                                 description="Configure data retention and cleanup policies"
                                             >
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -321,7 +343,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="number"
                                                             value={orgSettings.dataRetention.userActivityLogs}
-                                                            onChange={(e) => updateOrgSetting("dataRetention", "userActivityLogs", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "dataRetention",
+                                                                    "userActivityLogs",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="30"
                                                             max="2555"
@@ -331,7 +359,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="number"
                                                             value={orgSettings.dataRetention.auditLogs}
-                                                            onChange={(e) => updateOrgSetting("dataRetention", "auditLogs", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "dataRetention",
+                                                                    "auditLogs",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="365"
                                                             max="3650"
@@ -341,7 +375,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="number"
                                                             value={orgSettings.dataRetention.temporaryFiles}
-                                                            onChange={(e) => updateOrgSetting("dataRetention", "temporaryFiles", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "dataRetention",
+                                                                    "temporaryFiles",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="1"
                                                             max="90"
@@ -351,7 +391,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="number"
                                                             value={orgSettings.dataRetention.deletedItems}
-                                                            onChange={(e) => updateOrgSetting("dataRetention", "deletedItems", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "dataRetention",
+                                                                    "deletedItems",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="7"
                                                             max="90"
@@ -368,73 +414,129 @@ export default function AdminSettings() {
                                                 SECURITY SETTINGS
                                             </div>
 
-                                            <Section 
-                                                title="Authentication & Access" 
+                                            <Section
+                                                title="Authentication & Access"
                                                 description="Configure login security and access controls"
                                             >
                                                 <div className="space-y-4">
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Enable Single Sign-On (SSO)</span>
-                                                            <p className="text-xs text-gray-500 mt-1">Allow users to login with external identity providers</p>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Enable Single Sign-On (SSO)
+                                                            </span>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Allow users to login with external identity providers
+                                                            </p>
                                                         </div>
                                                         <Toggle
                                                             checked={orgSettings.security.enableSingleSignOn}
-                                                            onChange={(checked) => updateOrgSetting("security", "enableSingleSignOn", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "enableSingleSignOn",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
-                                                    
+
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Enforce Secure Passwords</span>
-                                                            <p className="text-xs text-gray-500 mt-1">Require complex passwords meeting security standards</p>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Enforce Secure Passwords
+                                                            </span>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Require complex passwords meeting security standards
+                                                            </p>
                                                         </div>
                                                         <Toggle
                                                             checked={orgSettings.security.enforceSecurePasswords}
-                                                            onChange={(checked) => updateOrgSetting("security", "enforceSecurePasswords", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "enforceSecurePasswords",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
-                                                    
+
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Login Attempt Limits</span>
-                                                            <p className="text-xs text-gray-500 mt-1">Lock accounts after failed login attempts</p>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Login Attempt Limits
+                                                            </span>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Lock accounts after failed login attempts
+                                                            </p>
                                                         </div>
                                                         <Toggle
                                                             checked={orgSettings.security.enableLoginAttemptLimits}
-                                                            onChange={(checked) => updateOrgSetting("security", "enableLoginAttemptLimits", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "enableLoginAttemptLimits",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
-                                                    
+
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Require 2FA for Admins</span>
-                                                            <p className="text-xs text-gray-500 mt-1">Force two-factor authentication for administrative users</p>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Require 2FA for Admins
+                                                            </span>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Force two-factor authentication for administrative users
+                                                            </p>
                                                         </div>
                                                         <Toggle
                                                             checked={orgSettings.security.enable2FAForAdmins}
-                                                            onChange={(checked) => updateOrgSetting("security", "enable2FAForAdmins", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "enable2FAForAdmins",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
-                                                    
+
                                                     <div className="flex items-center justify-between py-2">
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Allow Public Registration</span>
-                                                            <p className="text-xs text-gray-500 mt-1">Allow users to create accounts without admin approval</p>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Allow Public Registration
+                                                            </span>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Allow users to create accounts without admin approval
+                                                            </p>
                                                         </div>
                                                         <Toggle
                                                             checked={orgSettings.security.allowPublicRegistration}
-                                                            onChange={(checked) => updateOrgSetting("security", "allowPublicRegistration", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "allowPublicRegistration",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                                                     <Field label="Max Login Attempts">
                                                         <input
                                                             type="number"
                                                             value={orgSettings.security.maxLoginAttempts}
-                                                            onChange={(e) => updateOrgSetting("security", "maxLoginAttempts", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "maxLoginAttempts",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="3"
                                                             max="10"
@@ -444,7 +546,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="number"
                                                             value={orgSettings.security.sessionTimeout}
-                                                            onChange={(e) => updateOrgSetting("security", "sessionTimeout", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "security",
+                                                                    "sessionTimeout",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="15"
                                                             max="1440"
@@ -461,8 +569,8 @@ export default function AdminSettings() {
                                                 ORGANIZATIONAL POLICIES
                                             </div>
 
-                                            <Section 
-                                                title="Password Policy" 
+                                            <Section
+                                                title="Password Policy"
                                                 description="Define password requirements for all users"
                                             >
                                                 <div className="space-y-4">
@@ -471,7 +579,13 @@ export default function AdminSettings() {
                                                             <input
                                                                 type="number"
                                                                 value={orgSettings.passwordPolicy.minLength}
-                                                                onChange={(e) => updateOrgSetting("passwordPolicy", "minLength", parseInt(e.target.value))}
+                                                                onChange={(e) =>
+                                                                    updateOrgSetting(
+                                                                        "passwordPolicy",
+                                                                        "minLength",
+                                                                        parseInt(e.target.value),
+                                                                    )
+                                                                }
                                                                 className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                                 min="6"
                                                                 max="32"
@@ -481,41 +595,79 @@ export default function AdminSettings() {
                                                             <input
                                                                 type="number"
                                                                 value={orgSettings.passwordPolicy.passwordExpiry}
-                                                                onChange={(e) => updateOrgSetting("passwordPolicy", "passwordExpiry", parseInt(e.target.value))}
+                                                                onChange={(e) =>
+                                                                    updateOrgSetting(
+                                                                        "passwordPolicy",
+                                                                        "passwordExpiry",
+                                                                        parseInt(e.target.value),
+                                                                    )
+                                                                }
                                                                 className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                                 min="30"
                                                                 max="365"
                                                             />
                                                         </Field>
                                                     </div>
-                                                    
+
                                                     <div className="space-y-3">
                                                         <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                            <span className="text-sm font-medium text-gray-700">Require Uppercase Letters</span>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Require Uppercase Letters
+                                                            </span>
                                                             <Toggle
                                                                 checked={orgSettings.passwordPolicy.requireUppercase}
-                                                                onChange={(checked) => updateOrgSetting("passwordPolicy", "requireUppercase", checked)}
+                                                                onChange={(checked) =>
+                                                                    updateOrgSetting(
+                                                                        "passwordPolicy",
+                                                                        "requireUppercase",
+                                                                        checked,
+                                                                    )
+                                                                }
                                                             />
                                                         </div>
                                                         <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                            <span className="text-sm font-medium text-gray-700">Require Lowercase Letters</span>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Require Lowercase Letters
+                                                            </span>
                                                             <Toggle
                                                                 checked={orgSettings.passwordPolicy.requireLowercase}
-                                                                onChange={(checked) => updateOrgSetting("passwordPolicy", "requireLowercase", checked)}
+                                                                onChange={(checked) =>
+                                                                    updateOrgSetting(
+                                                                        "passwordPolicy",
+                                                                        "requireLowercase",
+                                                                        checked,
+                                                                    )
+                                                                }
                                                             />
                                                         </div>
                                                         <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                            <span className="text-sm font-medium text-gray-700">Require Numbers</span>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Require Numbers
+                                                            </span>
                                                             <Toggle
                                                                 checked={orgSettings.passwordPolicy.requireNumbers}
-                                                                onChange={(checked) => updateOrgSetting("passwordPolicy", "requireNumbers", checked)}
+                                                                onChange={(checked) =>
+                                                                    updateOrgSetting(
+                                                                        "passwordPolicy",
+                                                                        "requireNumbers",
+                                                                        checked,
+                                                                    )
+                                                                }
                                                             />
                                                         </div>
                                                         <div className="flex items-center justify-between py-2">
-                                                            <span className="text-sm font-medium text-gray-700">Require Special Characters</span>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Require Special Characters
+                                                            </span>
                                                             <Toggle
                                                                 checked={orgSettings.passwordPolicy.requireSpecialChars}
-                                                                onChange={(checked) => updateOrgSetting("passwordPolicy", "requireSpecialChars", checked)}
+                                                                onChange={(checked) =>
+                                                                    updateOrgSetting(
+                                                                        "passwordPolicy",
+                                                                        "requireSpecialChars",
+                                                                        checked,
+                                                                    )
+                                                                }
                                                             />
                                                         </div>
                                                     </div>
@@ -530,15 +682,21 @@ export default function AdminSettings() {
                                                 SYSTEM INTEGRATIONS
                                             </div>
 
-                                            <Section 
-                                                title="Email Configuration" 
+                                            <Section
+                                                title="Email Configuration"
                                                 description="Configure email service for system notifications"
                                             >
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     <Field label="Email Provider">
                                                         <select
                                                             value={orgSettings.integrations.emailProvider}
-                                                            onChange={(e) => updateOrgSetting("integrations", "emailProvider", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "integrations",
+                                                                    "emailProvider",
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                         >
                                                             <option value="smtp">SMTP</option>
@@ -551,7 +709,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="text"
                                                             value={orgSettings.integrations.emailHost}
-                                                            onChange={(e) => updateOrgSetting("integrations", "emailHost", e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "integrations",
+                                                                    "emailHost",
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             placeholder="smtp.gmail.com"
                                                         />
@@ -560,7 +724,13 @@ export default function AdminSettings() {
                                                         <input
                                                             type="number"
                                                             value={orgSettings.integrations.emailPort}
-                                                            onChange={(e) => updateOrgSetting("integrations", "emailPort", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "integrations",
+                                                                    "emailPort",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             placeholder="587"
                                                         />
@@ -568,27 +738,43 @@ export default function AdminSettings() {
                                                 </div>
                                             </Section>
 
-                                            <Section 
-                                                title="API Access" 
+                                            <Section
+                                                title="API Access"
                                                 description="Configure API access and rate limiting"
                                             >
                                                 <div className="space-y-4">
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Enable API Access</span>
-                                                            <p className="text-xs text-gray-500 mt-1">Allow external applications to access the API</p>
+                                                            <span className="text-sm font-medium text-gray-700">
+                                                                Enable API Access
+                                                            </span>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Allow external applications to access the API
+                                                            </p>
                                                         </div>
                                                         <Toggle
                                                             checked={orgSettings.integrations.enableAPIAccess}
-                                                            onChange={(checked) => updateOrgSetting("integrations", "enableAPIAccess", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "integrations",
+                                                                    "enableAPIAccess",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
-                                                    
+
                                                     <Field label="API Rate Limit (requests/hour)">
                                                         <input
                                                             type="number"
                                                             value={orgSettings.integrations.apiRateLimit}
-                                                            onChange={(e) => updateOrgSetting("integrations", "apiRateLimit", parseInt(e.target.value))}
+                                                            onChange={(e) =>
+                                                                updateOrgSetting(
+                                                                    "integrations",
+                                                                    "apiRateLimit",
+                                                                    parseInt(e.target.value),
+                                                                )
+                                                            }
                                                             className="w-full h-10 px-3 border border-gray-400 rounded text-sm focus:border-blue-500 focus:outline-none"
                                                             min="100"
                                                             max="10000"
@@ -605,51 +791,99 @@ export default function AdminSettings() {
                                                 REPORTING & NOTIFICATIONS
                                             </div>
 
-                                            <Section 
-                                                title="System Notifications" 
+                                            <Section
+                                                title="System Notifications"
                                                 description="Configure which notifications to send to administrators"
                                             >
                                                 <div className="space-y-3">
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                        <span className="text-sm font-medium text-gray-700">System Maintenance Notices</span>
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            System Maintenance Notices
+                                                        </span>
                                                         <Toggle
                                                             checked={orgSettings.notifications.systemMaintenanceNotices}
-                                                            onChange={(checked) => updateOrgSetting("notifications", "systemMaintenanceNotices", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "notifications",
+                                                                    "systemMaintenanceNotices",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                        <span className="text-sm font-medium text-gray-700">Security Alerts</span>
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            Security Alerts
+                                                        </span>
                                                         <Toggle
                                                             checked={orgSettings.notifications.securityAlerts}
-                                                            onChange={(checked) => updateOrgSetting("notifications", "securityAlerts", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "notifications",
+                                                                    "securityAlerts",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                        <span className="text-sm font-medium text-gray-700">User Registration Notices</span>
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            User Registration Notices
+                                                        </span>
                                                         <Toggle
                                                             checked={orgSettings.notifications.userRegistrationNotices}
-                                                            onChange={(checked) => updateOrgSetting("notifications", "userRegistrationNotices", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "notifications",
+                                                                    "userRegistrationNotices",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                        <span className="text-sm font-medium text-gray-700">Daily Reports</span>
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            Daily Reports
+                                                        </span>
                                                         <Toggle
                                                             checked={orgSettings.notifications.dailyReports}
-                                                            onChange={(checked) => updateOrgSetting("notifications", "dailyReports", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "notifications",
+                                                                    "dailyReports",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                                                        <span className="text-sm font-medium text-gray-700">Weekly Reports</span>
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            Weekly Reports
+                                                        </span>
                                                         <Toggle
                                                             checked={orgSettings.notifications.weeklyReports}
-                                                            onChange={(checked) => updateOrgSetting("notifications", "weeklyReports", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "notifications",
+                                                                    "weeklyReports",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between py-2">
-                                                        <span className="text-sm font-medium text-gray-700">Monthly Reports</span>
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            Monthly Reports
+                                                        </span>
                                                         <Toggle
                                                             checked={orgSettings.notifications.monthlyReports}
-                                                            onChange={(checked) => updateOrgSetting("notifications", "monthlyReports", checked)}
+                                                            onChange={(checked) =>
+                                                                updateOrgSetting(
+                                                                    "notifications",
+                                                                    "monthlyReports",
+                                                                    checked,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                 </div>
@@ -665,11 +899,11 @@ export default function AdminSettings() {
                                                 disabled={isLoading}
                                                 className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                                                     isLoading
-                                                        ? 'bg-gray-400 cursor-not-allowed'
-                                                        : 'bg-[#00E676] hover:bg-[#00C853] text-white shadow-sm'
+                                                        ? "bg-gray-400 cursor-not-allowed"
+                                                        : "bg-[#00E676] hover:bg-[#00C853] text-white shadow-sm"
                                                 }`}
                                             >
-                                                {isLoading ? 'Saving...' : 'Save Admin Settings'}
+                                                {isLoading ? "Saving..." : "Save Admin Settings"}
                                             </button>
                                         </div>
                                     </div>

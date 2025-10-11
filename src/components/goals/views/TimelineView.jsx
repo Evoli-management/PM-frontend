@@ -1,78 +1,199 @@
-import React from "react";
-import { FaStream, FaCheck, FaExclamationTriangle } from "react-icons/fa";
+import React, { useState } from "react";
+import {
+    FaEdit,
+    FaCheckCircle,
+    FaTrash,
+    FaEllipsisH,
+    FaCalendarAlt,
+    FaFlag,
+    FaEyeSlash,
+    FaArchive,
+    FaClock,
+} from "react-icons/fa";
 
-const TimelineView = ({ filtered, onOpen }) => {
-    return (
-        <div className="bg-white rounded-2xl border p-6">
-            <div className="flex items-center gap-2 mb-6">
-                <FaStream className="text-blue-700" />
-                <h4 className="font-bold text-slate-900">Goals Timeline</h4>
+const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
+    const [actionGoal, setActionGoal] = useState(null);
+
+    // Sort goals by due date
+    const sortedGoals = [...goals].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+    const handleComplete = async (goalId) => {
+        try {
+            const { completeGoal } = await import("../../../services/goalService");
+            await completeGoal(goalId);
+            window.location.reload();
+        } catch (error) {
+            console.error("Failed to complete goal:", error);
+            alert(`Failed to complete goal: ${error.message}`);
+        }
+    };
+
+    const handleArchive = async (goalId) => {
+        if (onUpdate) {
+            try {
+                await onUpdate(goalId, { status: "archived" });
+            } catch (error) {
+                console.error("Failed to archive goal:", error);
+            }
+        }
+    };
+
+    const handleToggleVisibility = async (goalId) => {
+        const goal = goals.find((g) => g.id === goalId);
+        if (goal && onUpdate) {
+            try {
+                await onUpdate(goalId, { visibility: goal.visibility === "public" ? "private" : "public" });
+            } catch (error) {
+                console.error("Failed to toggle visibility:", error);
+            }
+        }
+    };
+
+    const handleDelete = async (goalId) => {
+        if (window.confirm("Are you sure you want to delete this goal?")) {
+            if (onDelete) {
+                try {
+                    await onDelete(goalId);
+                } catch (error) {
+                    console.error("Failed to delete goal:", error);
+                }
+            }
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "completed":
+                return "bg-emerald-500";
+            case "active":
+                return "bg-blue-500";
+            case "archived":
+                return "bg-gray-500";
+            default:
+                return "bg-gray-500";
+        }
+    };
+
+    if (!goals || goals.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-gray-500">No goals found</p>
             </div>
-            <div className="relative">
-                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200"></div>
-                <div className="space-y-6">
-                    {filtered
-                        .slice()
-                        .sort((a, b) =>
-                            (a.dueDate || a.targetDate || "9999-12-31").localeCompare(
-                                b.dueDate || b.targetDate || "9999-12-31",
-                            ),
-                        )
-                        .map((g, index) => {
-                            const d = g.dueDate || g.targetDate;
-                            const isOverdue = d && new Date(d) < new Date() && g.status === "active";
-                            return (
-                                <div key={g.id} className="relative flex items-start gap-4">
-                                    <div
-                                        className={`absolute left-0 w-8 h-8 rounded-full border-4 border-white shadow-sm flex items-center justify-center ${
-                                            g.status === "completed"
-                                                ? "bg-green-500"
-                                                : isOverdue
-                                                  ? "bg-red-500"
-                                                  : g.status === "active"
-                                                    ? "bg-blue-500"
-                                                    : "bg-gray-400"
-                                        }`}
-                                    >
-                                        {g.status === "completed" && <FaCheck className="text-white text-xs" />}
-                                        {isOverdue && <FaExclamationTriangle className="text-white text-xs" />}
-                                    </div>
-                                    <div className="ml-12 flex-1 bg-white border rounded-xl p-4 hover:shadow-sm transition-shadow">
-                                        <div className="flex items-start justify-between gap-3 mb-2">
-                                            <div>
-                                                <h5 className="font-semibold text-slate-900">{g.title}</h5>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    {d && (
-                                                        <Chip
-                                                            label={`Due ${new Date(d).toLocaleDateString()}`}
-                                                            toneClass={
-                                                                isOverdue ? "bg-red-50 text-red-700 border-red-200" : ""
-                                                            }
-                                                        />
-                                                    )}
-                                                    {g.keyAreaName && <Chip label={g.keyAreaName} />}
-                                                    <Chip label={`${g.progressPercentage || 0}% complete`} />
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => onOpen(g)}
-                                                className="text-blue-600 hover:underline text-sm font-semibold"
-                                            >
-                                                View Details
-                                            </button>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div className="space-y-6">
+                {sortedGoals.map((goal, index) => {
+                    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+                    const totalMilestones = goal.milestones?.length || 0;
+                    const progressPercent =
+                        totalMilestones > 0
+                            ? Math.round((completedMilestones / totalMilestones) * 100)
+                            : goal.progressPercent || 0;
+
+                    const now = new Date();
+                    const dueDate = new Date(goal.dueDate);
+                    const startDate = goal.startDate ? new Date(goal.startDate) : null;
+
+                    const isOverdue = dueDate < now && goal.status === "active";
+                    const dueInDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+                    // Calculate timeline position and progress insights
+                    const totalDuration = startDate ? Math.ceil((dueDate - startDate) / (1000 * 60 * 60 * 24)) : null;
+                    const daysPassed = startDate
+                        ? Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)))
+                        : null;
+                    const timeProgressPercent =
+                        totalDuration && daysPassed !== null
+                            ? Math.min(100, Math.round((daysPassed / totalDuration) * 100))
+                            : null;
+
+                    const getTimelineStatus = () => {
+                        if (goal.status === "completed") {
+                            const completedDate = goal.completedAt ? new Date(goal.completedAt) : dueDate;
+                            if (completedDate < dueDate) {
+                                const daysEarly = Math.ceil((dueDate - completedDate) / (1000 * 60 * 60 * 24));
+                                return `Completed ${daysEarly} days early`;
+                            } else if (completedDate > dueDate) {
+                                const daysLate = Math.ceil((completedDate - dueDate) / (1000 * 60 * 60 * 24));
+                                return `Completed ${daysLate} days late`;
+                            }
+                            return "Completed on time";
+                        }
+
+                        if (goal.status === "archived") return `Archived (was due ${dueDate.toLocaleDateString()})`;
+                        if (isOverdue) return `${Math.abs(dueInDays)} days overdue`;
+                        if (dueInDays === 0) return "Due today";
+                        if (dueInDays === 1) return "Due tomorrow";
+                        return `${dueInDays} days left`;
+                    };
+
+                    return (
+                        <div key={goal.id} className="relative flex items-start gap-4">
+                            {/* Timeline indicator */}
+                            <div className="flex flex-col items-center">
+                                <div className={`w-4 h-4 rounded-full ${getStatusColor(goal.status)} shadow-lg`}></div>
+                                {index < sortedGoals.length - 1 && <div className="w-0.5 h-16 bg-gray-200 mt-2"></div>}
+                            </div>
+
+                            {/* Goal content */}
+                            <div
+                                className="flex-1 bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => onGoalClick(goal)}
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-gray-900 mb-2">{goal.title}</h3>
+                                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                                            <span>{dueDate.toLocaleDateString()}</span>
+                                            <span>
+                                                {completedMilestones}/{totalMilestones} milestones
+                                            </span>
+                                            <span>{progressPercent}% complete</span>
+                                            {timeProgressPercent !== null && (
+                                                <span>• {timeProgressPercent}% time elapsed</span>
+                                            )}
                                         </div>
-                                        {g.description && (
-                                            <p className="text-sm text-slate-700 mb-2 line-clamp-2">{g.description}</p>
-                                        )}
-                                        <ProgressBar value={g.progressPercentage || 0} />
+
+                                        {/* Timeline status */}
+                                        <div
+                                            className={`text-sm font-medium mb-3 ${
+                                                goal.status === "completed"
+                                                    ? "text-green-600"
+                                                    : goal.status === "archived"
+                                                      ? "text-gray-600"
+                                                      : isOverdue
+                                                        ? "text-red-600"
+                                                        : dueInDays <= 3
+                                                          ? "text-amber-600"
+                                                          : "text-blue-600"
+                                            }`}
+                                        >
+                                            {getTimelineStatus()}
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div
+                                                className="h-2 rounded-full bg-blue-500 transition-all"
+                                                style={{ width: `${progressPercent}%` }}
+                                            />
+                                        </div>
                                     </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onGoalClick(goal, "edit");
+                                        }}
+                                        className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
+                                    >
+                                        <FaEdit className="w-4 h-4" />
+                                    </button>
                                 </div>
-                            );
-                        })}
-                    {filtered.length === 0 && (
-                        <div className="text-center text-slate-500 py-8">No goals to display in timeline</div>
-                    )}
-                </div>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

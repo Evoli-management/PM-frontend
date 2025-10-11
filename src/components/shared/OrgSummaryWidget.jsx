@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
 /**
  * Organization Summary Widget for Admin Dashboard
@@ -11,7 +11,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
     useEffect(() => {
         // Load organization settings from localStorage
         try {
-            const saved = localStorage.getItem('pm:org:settings');
+            const saved = localStorage.getItem("pm:org:settings");
             if (saved) {
                 setOrgSettings(JSON.parse(saved));
             } else {
@@ -25,12 +25,12 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
                     security: {
                         enforceSecurePasswords: true,
                         enable2FAForAdmins: true,
-                        enableLoginAttemptLimits: true
-                    }
+                        enableLoginAttemptLimits: true,
+                    },
                 });
             }
         } catch (error) {
-            console.error('Failed to load organization settings:', error);
+            console.error("Failed to load organization settings:", error);
         } finally {
             setLoading(false);
         }
@@ -55,14 +55,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
                 <div className="text-center text-gray-500">
                     <div className="text-4xl mb-2">⚙️</div>
                     <p className="text-sm">Organization settings not configured</p>
-                    {showQuickAccess && (
-                        <a
-                            href="#/admin-settings"
-                            className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                        >
-                            Configure Settings
-                        </a>
-                    )}
+                    {/* Admin Settings quick access removed */}
                 </div>
             </div>
         );
@@ -76,7 +69,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
             education: "🎓",
             manufacturing: "🏭",
             retail: "🏪",
-            other: "🏢"
+            other: "🏢",
         };
         return icons[industry] || "🏢";
     };
@@ -87,13 +80,13 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
             orgSettings.security?.enforceSecurePasswords,
             orgSettings.security?.enable2FAForAdmins,
             orgSettings.security?.enableLoginAttemptLimits,
-            !orgSettings.security?.allowPublicRegistration
+            !orgSettings.security?.allowPublicRegistration,
         ];
-        
-        checks.forEach(check => {
+
+        checks.forEach((check) => {
             if (check) score += 25;
         });
-        
+
         return score;
     };
 
@@ -128,7 +121,7 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
                 </div>
                 <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Timezone:</span>
-                    <span className="text-sm font-medium text-gray-800">{orgSettings.timezone?.replace('_', ' ')}</span>
+                    <span className="text-sm font-medium text-gray-800">{orgSettings.timezone?.replace("_", " ")}</span>
                 </div>
                 <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Currency:</span>
@@ -140,72 +133,52 @@ const OrgSummaryWidget = ({ showQuickAccess = true }) => {
             <div className="border-t pt-4 mb-6">
                 <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-gray-700">Security Score</span>
-                    <span className={`text-lg font-bold ${getSecurityColor(securityScore)}`}>
-                        {securityScore}%
-                    </span>
+                    <span className={`text-lg font-bold ${getSecurityColor(securityScore)}`}>{securityScore}%</span>
                 </div>
-                
+
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
+                    <div
                         className={`h-2 rounded-full transition-all duration-300 ${
-                            securityScore >= 75 ? 'bg-green-500' : 
-                            securityScore >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                            securityScore >= 75 ? "bg-green-500" : securityScore >= 50 ? "bg-yellow-500" : "bg-red-500"
                         }`}
                         style={{ width: `${securityScore}%` }}
                     ></div>
                 </div>
-                
+
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                    <div className={`flex items-center gap-1 ${orgSettings.security?.enforceSecurePasswords ? 'text-green-600' : 'text-red-600'}`}>
-                        <span>{orgSettings.security?.enforceSecurePasswords ? '✅' : '❌'}</span>
+                    <div
+                        className={`flex items-center gap-1 ${orgSettings.security?.enforceSecurePasswords ? "text-green-600" : "text-red-600"}`}
+                    >
+                        <span>{orgSettings.security?.enforceSecurePasswords ? "✅" : "❌"}</span>
                         <span>Secure Passwords</span>
                     </div>
-                    <div className={`flex items-center gap-1 ${orgSettings.security?.enable2FAForAdmins ? 'text-green-600' : 'text-red-600'}`}>
-                        <span>{orgSettings.security?.enable2FAForAdmins ? '✅' : '❌'}</span>
+                    <div
+                        className={`flex items-center gap-1 ${orgSettings.security?.enable2FAForAdmins ? "text-green-600" : "text-red-600"}`}
+                    >
+                        <span>{orgSettings.security?.enable2FAForAdmins ? "✅" : "❌"}</span>
                         <span>Admin 2FA</span>
                     </div>
-                    <div className={`flex items-center gap-1 ${orgSettings.security?.enableLoginAttemptLimits ? 'text-green-600' : 'text-red-600'}`}>
-                        <span>{orgSettings.security?.enableLoginAttemptLimits ? '✅' : '❌'}</span>
+                    <div
+                        className={`flex items-center gap-1 ${orgSettings.security?.enableLoginAttemptLimits ? "text-green-600" : "text-red-600"}`}
+                    >
+                        <span>{orgSettings.security?.enableLoginAttemptLimits ? "✅" : "❌"}</span>
                         <span>Login Limits</span>
                     </div>
-                    <div className={`flex items-center gap-1 ${!orgSettings.security?.allowPublicRegistration ? 'text-green-600' : 'text-yellow-600'}`}>
-                        <span>{!orgSettings.security?.allowPublicRegistration ? '✅' : '⚠️'}</span>
+                    <div
+                        className={`flex items-center gap-1 ${!orgSettings.security?.allowPublicRegistration ? "text-green-600" : "text-yellow-600"}`}
+                    >
+                        <span>{!orgSettings.security?.allowPublicRegistration ? "✅" : "⚠️"}</span>
                         <span>Registration Control</span>
                     </div>
                 </div>
             </div>
 
             {/* Quick Actions */}
-            {showQuickAccess && (
-                <div className="space-y-2">
-                    <a
-                        href="#/admin-settings"
-                        className="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                    >
-                        ⚙️ Manage Admin Settings
-                    </a>
-                    <div className="grid grid-cols-2 gap-2">
-                        <a
-                            href="#/admin-settings"
-                            className="text-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 transition-colors"
-                        >
-                            Security
-                        </a>
-                        <a
-                            href="#/admin-settings"
-                            className="text-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 transition-colors"
-                        >
-                            Policies
-                        </a>
-                    </div>
-                </div>
-            )}
+            {/* Admin Settings quick actions removed */}
 
             {/* Status Footer */}
             <div className="mt-4 pt-3 border-t text-center">
-                <p className="text-xs text-gray-500">
-                    Last updated: {new Date().toLocaleDateString()}
-                </p>
+                <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleDateString()}</p>
             </div>
         </div>
     );
