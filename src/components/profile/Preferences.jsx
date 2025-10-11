@@ -129,6 +129,16 @@ export const Preferences = ({ showToast }) => {
             // Also save all preferences to localStorage for legacy support
             localStorage.setItem('userPreferences', JSON.stringify(preferences));
             
+            // Trigger a custom event to notify calendar components of working hours change
+            if (apiData.workStartTime || apiData.workEndTime) {
+                window.dispatchEvent(new CustomEvent('workingHoursChanged', {
+                    detail: {
+                        startTime: apiData.workStartTime || preferences.workStartTime,
+                        endTime: apiData.workEndTime || preferences.workEndTime
+                    }
+                }));
+            }
+            
             showToast('Preferences saved successfully');
         } catch (error) {
             console.error('Error saving preferences:', error);
@@ -197,7 +207,7 @@ export const Preferences = ({ showToast }) => {
             {/* Work Hours Preferences */}
             <Section 
                 title="Work Hours Preferences" 
-                description="Set your preferred working hours"
+                description="Set your preferred working hours. These hours will be used to customize calendar views to show only your working time."
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="Start Time">
@@ -216,6 +226,20 @@ export const Preferences = ({ showToast }) => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </Field>
+                </div>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <div>
+                            <p className="text-sm font-medium text-blue-800">Calendar Integration</p>
+                            <p className="text-sm text-blue-700 mt-1">
+                                Your working hours will automatically adjust the time range shown in daily and weekly calendar views. 
+                                Instead of showing all 24 hours, the calendar will focus on your working period for a cleaner, more relevant view.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </Section>
             

@@ -1,11 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
+import { useWorkingHours } from "../../hooks/useWorkingHours";
+import { generateTimeSlots } from "../../utils/timeUtils";
 
-const HOURS = Array.from({ length: 48 }, (_, i) => {
-    const h = Math.floor(i / 2);
-    const m = i % 2 === 0 ? "00" : "30";
-    return `${h}:${m}`;
-});
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
@@ -25,16 +22,21 @@ export default function MonthView({
     onQuickCreate, // new: open appointment creation modal
     onTaskDrop,
 }) {
-    // Working hours: 8:00 to 18:00
+    const { timeSlots, workingHours, loading: hoursLoading } = useWorkingHours(30);
+    
+    // Generate all possible hours (24-hour format)
     const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
         const h = Math.floor(i / 2);
         const m = i % 2 === 0 ? "00" : "30";
-        return `${h}:${m}`;
+        return `${h.toString().padStart(2, '0')}:${m}`;
     });
-    const WORKING_HOURS = ALL_HOURS.filter((h) => {
+    
+    // Dynamic working hours based on user preferences
+    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS.filter((h) => {
         const hour = Number(h.split(":")[0]);
         return hour >= 8 && hour <= 18;
     });
+    
     const [showAllHours, setShowAllHours] = useState(false);
     const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
     const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
@@ -299,8 +301,18 @@ export default function MonthView({
                             )}
                         </div>
                     </div>
-                    <h2 className="text-xl font-bold">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
                         {baseDate.toLocaleString("default", { month: "long", year: "numeric" })}
+                        {hoursLoading && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                                Loading
+                            </span>
+                        )}
+                        {workingHours.startTime && workingHours.endTime && !showAllHours && (
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                                {workingHours.startTime} - {workingHours.endTime}
+                            </span>
+                        )}
                     </h2>
                     <div className="flex items-center gap-2">
                         <select
@@ -326,15 +338,25 @@ export default function MonthView({
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center justify-end mb-2">
-                    <label className="mr-2 text-sm text-gray-600">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-600">
+                        {!showAllHours && (
+                            <span>
+                                Showing working hours ({workingHours.startTime || '8:00'} - {workingHours.endTime || '18:00'})
+                            </span>
+                        )}
+                        {showAllHours && (
+                            <span>Showing all 24 hours</span>
+                        )}
+                    </div>
+                    <label className="text-sm text-gray-600 cursor-pointer flex items-center">
                         <input
                             type="checkbox"
                             checked={showAllHours}
                             onChange={(e) => setShowAllHours(e.target.checked)}
-                            className="mr-1"
+                            className="mr-2"
                         />
-                        Show all hours
+                        Show all hours (24h)
                     </label>
                 </div>
                 <div

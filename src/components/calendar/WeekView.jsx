@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
+import { useWorkingHours } from "../../hooks/useWorkingHours";
+import { generateTimeSlots } from "../../utils/timeUtils";
 
 function getWeekNumber(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -9,18 +11,6 @@ function getWeekNumber(date) {
 }
 
 const defaultSlotSize = 30;
-const timeSlots = (slotSize) => {
-    const slots = [];
-    for (let h = 8; h <= 16; h++) {
-        for (let m = 0; m < 60; m += slotSize) {
-            if (h === 16 && m > 30) continue; // last start slot 16:30
-            slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-        }
-    }
-    // Add a final 17:00 label row (no events start at 17:00)
-    slots.push("17:00");
-    return slots;
-};
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
@@ -45,6 +35,7 @@ const WeekView = ({
     activities = [],
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
+    const { timeSlots, workingHours, loading: hoursLoading, updateSlotSize } = useWorkingHours(slotSize);
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
     // Fixed time column width; day columns will flex to fill available space
@@ -61,14 +52,22 @@ const WeekView = ({
         { length: 7 },
         (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
     );
-    const slots = timeSlots(slotSize);
+    
+    // Use dynamic time slots from working hours, fallback to default if still loading
+    const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("08:00", "17:00", slotSize);
+    
     const ITEM_SIZE = 38; // px per time slot row
     const LIST_HEIGHT_PX = 400; // fixed viewport height for grid scroll
     const weekNum = getWeekNumber(weekStart);
 
     // No explicit width calculations; columns will flex to fit container
 
-    // Map vertical wheel to horizontal scroll on tasks scroller for better UX
+    // Update time slots when slot size changes
+    useEffect(() => {
+        if (updateSlotSize) {
+            updateSlotSize(slotSize);
+        }
+    }, [slotSize, updateSlotSize]);
     useEffect(() => {
         const el = tasksScrollRef.current;
         if (!el) return;
@@ -215,9 +214,14 @@ const WeekView = ({
                 </div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
                     {weekLabel}
-                    {loading && (
+                    {(loading || hoursLoading) && (
                         <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                             Loading
+                        </span>
+                    )}
+                    {workingHours.startTime && workingHours.endTime && (
+                        <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                            {workingHours.startTime} - {workingHours.endTime}
                         </span>
                     )}
                 </h2>

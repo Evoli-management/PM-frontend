@@ -2,18 +2,7 @@ import React from "react";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
-
-// Business hours display 08:00–17:00
-// 17:00 acts as an end-of-day boundary label (non-interactive). Last start slot is 16:30.
-const hours = (() => {
-    const arr = [];
-    for (let h = 8; h <= 16; h++) {
-        arr.push(`${h.toString().padStart(2, "0")}:00`);
-        arr.push(`${h.toString().padStart(2, "0")}:30`); // includes 16:30
-    }
-    arr.push("17:00"); // boundary label only
-    return arr;
-})();
+import { useWorkingHours } from "../../hooks/useWorkingHours";
 
 export default function DayView({
     currentDate,
@@ -37,7 +26,16 @@ export default function DayView({
     onAddTaskOrActivity,
     loading = false,
 }) {
+    const { timeSlots, workingHours, loading: hoursLoading } = useWorkingHours(30);
     const [showViewMenu, setShowViewMenu] = React.useState(false);
+    
+    // Use dynamic hours from working preferences, fallback to default if still loading
+    const hours = timeSlots.length > 0 ? timeSlots : [
+        "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00"
+    ];
+    
     const today = currentDate || new Date();
     const slotSizeMin = 30;
     // Build date-only value for comparisons and filter todos to those spanning today
@@ -183,9 +181,14 @@ export default function DayView({
                             day: "numeric",
                             year: "numeric",
                         })}
-                        {loading && (
+                        {(loading || hoursLoading) && (
                             <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                                 Loading
+                            </span>
+                        )}
+                        {workingHours.startTime && workingHours.endTime && (
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                                {workingHours.startTime} - {workingHours.endTime}
                             </span>
                         )}
                     </h2>
@@ -240,7 +243,7 @@ export default function DayView({
                         <tbody>
                             {hours.map((h, idx) => {
                                 const slotEvents = events.filter((ev) => matchesSlot(ev.start, today, h));
-                                const isBoundary = h === "17:00"; // non-interactive row
+                                const isBoundary = h === workingHours.endTime; // non-interactive row
                                 return (
                                     <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
                                         <td className="border-t border-r border-blue-100 px-2 py-1 text-xs w-24 align-top">
