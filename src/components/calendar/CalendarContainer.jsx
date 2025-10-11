@@ -165,11 +165,15 @@ const CalendarContainer = () => {
 
             try {
                 setLoading(true);
-                const [evs, tds] = await Promise.all([
+                const [evs, tds, appointments] = await Promise.all([
                     calendarService.listEvents({ from: fromISO, to: toISO, view }),
                     calendarService.listTodos({ from: fromISO, to: toISO }),
+                    calendarService.listAppointments({ from: fromISO, to: toISO }),
                 ]);
-                setEvents(Array.isArray(evs) ? evs : []);
+                
+                // Merge events and appointments
+                const allEvents = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
+                setEvents(allEvents);
                 setTodos(Array.isArray(tds) ? tds : []);
 
                 // Load elephant tasks
