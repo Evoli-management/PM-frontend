@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Section, Toggle, PasswordField, LoadingButton } from './UIComponents';
+import securityService from '../../services/securityService';
 
 export const SecuritySettings = ({ showToast }) => {
     const [changeMode, setChangeMode] = useState(null); // 'password' | 'email' | null
@@ -31,16 +32,48 @@ export const SecuritySettings = ({ showToast }) => {
     const twoFAInputsRef = useRef([]);
     const twoFADisableInputsRef = useRef([]);
 
-    // Login history
-    const [loginHistory, setLoginHistory] = useState([
-        { id: 1, device: "Windows PC - Chrome", location: "New York, US", ip: "192.168.1.100", loginTime: "2024-12-01 09:15:23", current: true },
-        { id: 2, device: "iPhone - Safari", location: "New York, US", ip: "192.168.1.101", loginTime: "2024-11-30 18:45:12", current: false },
-        { id: 3, device: "MacBook - Safari", location: "Chicago, US", ip: "10.0.1.50", loginTime: "2024-11-29 14:22:35", current: false },
-        { id: 4, device: "Android - Chrome", location: "Los Angeles, US", ip: "172.16.0.25", loginTime: "2024-11-28 11:33:47", current: false },
-    ]);
+    // Login history - will be loaded from API
+    const [loginHistory, setLoginHistory] = useState([]);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-    const ALLOW_ANY_CODE_FOR_TEST = true; // Set to false in production
+    // Load initial data
+    useEffect(() => {
+        loadSecurityData();
+    }, []);
+
+    const loadSecurityData = async () => {
+        try {
+            setIsLoading(true);
+            
+            // Load 2FA status
+            const twoFAStatus = await securityService.get2FAStatus();
+            setTwoFAEnabled(twoFAStatus.enabled);
+            
+            // Load login history
+            const historyData = await securityService.getLoginHistory(20);
+            setLoginHistory(historyData.history || []);
+            
+            // Load active sessions for current session detection
+            const sessionsData = await securityService.getActiveSessions();
+            // Mark current session in login history
+            if (sessionsData.sessions && sessionsData.sessions.length > 0) {
+                const currentSession = sessionsData.sessions.find(s => s.isCurrent);
+                if (currentSession && historyData.history) {
+                    const updatedHistory = historyData.history.map(entry => ({
+                        ...entry,
+                        device: entry.browser && entry.os ? `${entry.device} - ${entry.browser}` : entry.device || 'Unknown Device',
+                        current: entry.ipAddress === currentSession.ipAddress && entry.browser === currentSession.deviceInfo?.browser
+                    }));
+                    setLoginHistory(updatedHistory);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load security data:', error);
+            showToast('Failed to load security settings', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const clearError = (key) => {
         setErrors(prev => {
@@ -87,51 +120,88 @@ export const SecuritySettings = ({ showToast }) => {
         });
     };
 
-    // 2FA Functions
-    const generateMockSecret = () => {
-        return Math.random().toString(36).slice(2, 14).toUpperCase();
+    // 2FA Functions - Real API integration
+    const startTwoFASetup = async () => {
+        try {
+            setIsLoading(true);
+            const response = await securityService.start2FASetup();
+            setTwoFASecret(response.secret);
+            setTwoFASetupMode("verify");
+            showToast('2FA setup started. Scan the QR code with your authenticator app.');
+        } catch (error) {
+            console.error('Failed to start 2FA setup:', error);
+            showToast('Failed to start 2FA setup', 'error');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const generateBackupCodes = () => {
-        const codes = Array.from({ length: 6 }).map(() => 
-            Math.random().toString(36).slice(2, 10).toUpperCase()
-        );
-        setBackupCodes(codes);
-        return codes;
-    };
-
-    const startTwoFASetup = () => {
-        const secret = generateMockSecret();
-        setTwoFASecret(secret);
-        setTwoFASetupMode("verify");
-    };
-
-    const verifyTwoFACode = () => {
+    const verifyTwoFACode = async () => {
         const code = twoFACodeInput.replace(/\s+/g, "");
-        if (!code || code.length !== 6) return false;
-        
-        if (ALLOW_ANY_CODE_FOR_TEST) {
+        if (!code || code.length !== 6) {
+            showToast('Please enter a valid 6-digit code', 'error');
+            return false;
+        }
+
+        try {
+            setIsLoading(true);
+            const response = await securityService.verify2FASetup(code);
             setTwoFAEnabled(true);
             setTwoFASetupMode("done");
-            generateBackupCodes();
+            setBackupCodes(response.backupCodes || []);
             setCodeDigits(Array(6).fill(""));
             setTwoFACodeInput("");
             showToast('Two-factor authentication enabled successfully!');
             return true;
+        } catch (error) {
+            console.error('Failed to verify 2FA code:', error);
+            showToast('Invalid verification code. Please try again.', 'error');
+            return false;
+        } finally {
+            setIsLoading(false);
         }
-        return false;
     };
 
-    const disableTwoFA = () => {
-        setTwoFAEnabled(false);
-        setTwoFASecret(null);
-        setBackupCodes([]);
-        setTwoFASetupMode(null);
-        setTwoFACodeInput("");
-        setTwoFADisableMode(false);
-        showToast('Two-factor authentication disabled');
+    const disableTwoFA = async () => {
+        const code = twoFADisableDigits.join('');
+        if (!code || code.length !== 6) {
+            showToast('Please enter a valid 6-digit code', 'error');
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            await securityService.disable2FA(code);
+            setTwoFAEnabled(false);
+            setTwoFASecret(null);
+            setBackupCodes([]);
+            setTwoFASetupMode(null);
+            setTwoFACodeInput("");
+            setTwoFADisableMode(false);
+            setTwoFADisableDigits(Array(6).fill(""));
+            showToast('Two-factor authentication disabled successfully');
+        } catch (error) {
+            console.error('Failed to disable 2FA:', error);
+            showToast('Failed to disable 2FA. Please check your code.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
+    const generateBackupCodes = async () => {
+        try {
+            // For generating new backup codes, we need a TOTP verification
+            // This should be called from a separate flow with TOTP input
+            const response = await securityService.generateBackupCodes("000000"); // This needs proper TOTP
+            setBackupCodes(response.backupCodes || []);
+            showToast('New backup codes generated successfully');
+        } catch (error) {
+            console.error('Failed to generate backup codes:', error);
+            showToast('Failed to generate new backup codes', 'error');
+        }
+    };
+
+    // Download the current backup codes as a plain text file.
     const downloadBackupCodes = () => {
         if (!backupCodes || backupCodes.length === 0) return;
         const content = backupCodes.join("\n");
@@ -144,6 +214,39 @@ export const SecuritySettings = ({ showToast }) => {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
+    };
+
+    // Copy backup codes to the clipboard (fallback if Clipboard API unavailable)
+    const copyBackupCodes = async () => {
+        if (!backupCodes || backupCodes.length === 0) return;
+        const text = backupCodes.join("\n");
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                showToast('Backup codes copied to clipboard');
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+                showToast('Backup codes copied to clipboard');
+            }
+        } catch (err) {
+            console.error('Failed to copy backup codes:', err);
+            showToast('Failed to copy backup codes', 'error');
+        }
+    };
+
+    // Hide backup codes from the UI after user is done (security hygiene)
+    const doneWithBackupCodes = () => {
+        setBackupCodes([]);
     };
 
     const validatePasswordChange = () => {
@@ -172,29 +275,40 @@ export const SecuritySettings = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await securityService.changePassword({
+                currentPassword: passwordDraft.current,
+                newPassword: passwordDraft.next
+            });
+            
             setPasswordDraft({ current: "", next: "", confirm: "" });
             setChangeMode(null);
             showToast('Password changed successfully!');
         } catch (error) {
             console.error('Failed to change password:', error);
-            showToast('Failed to change password', 'error');
+            const errorMessage = error.response?.data?.message || 'Failed to change password';
+            showToast(errorMessage, 'error');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const revokeSession = (id) => {
-        setLoginHistory(prev => prev.filter(session => session.id !== id || session.current));
-        showToast('Session revoked successfully');
+    const revokeSession = async (sessionId) => {
+        try {
+            await securityService.revokeSession(sessionId);
+            setLoginHistory(prev => prev.filter(session => session.id !== sessionId || session.current));
+            showToast('Session revoked successfully');
+        } catch (error) {
+            console.error('Failed to revoke session:', error);
+            showToast('Failed to revoke session', 'error');
+        }
     };
 
     const handleLogoutAllSessions = async () => {
         setIsLoading(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            setLoginHistory(prev => prev.filter(session => session.current));
+            await securityService.logoutAllSessions();
+            // Reload login history to reflect changes
+            await loadSecurityData();
             showToast('All sessions logged out successfully');
         } catch (error) {
             console.error('Failed to logout all sessions:', error);
@@ -417,10 +531,22 @@ export const SecuritySettings = ({ showToast }) => {
                                     Download Codes
                                 </button>
                                 <button
+                                    onClick={copyBackupCodes}
+                                    className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                                >
+                                    Copy Codes
+                                </button>
+                                <button
                                     onClick={generateBackupCodes}
                                     className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                                 >
                                     Regenerate
+                                </button>
+                                <button
+                                    onClick={doneWithBackupCodes}
+                                    className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800"
+                                >
+                                    Done
                                 </button>
                             </div>
                         </div>
@@ -511,7 +637,7 @@ export const SecuritySettings = ({ showToast }) => {
                                         )}
                                     </div>
                                     <p className="text-xs text-gray-600">
-                                        {session.location} • {session.ip} • {session.loginTime}
+                                        {session.location} • {session.ipAddress || session.ip} • {new Date(session.loginTime).toLocaleString()}
                                     </p>
                                 </div>
                                 {!session.current && (
