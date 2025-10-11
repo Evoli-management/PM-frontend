@@ -60,23 +60,6 @@ class UserProfileService {
     }
 
     /**
-     * Upload avatar file
-     * @param {File} file - Avatar image file
-     * @returns {Promise<Object>} - Updated profile data with new avatar URL
-     */
-    async uploadAvatar(file) {
-        const formData = new FormData();
-        formData.append('avatar', file);
-
-        const res = await apiClient.post("/user/profile/avatar", formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        return res.data;
-    }
-
-    /**
      * Get user preferences
      * @returns {Promise<Object>} - User preferences
      */

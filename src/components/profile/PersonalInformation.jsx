@@ -250,12 +250,11 @@ export const PersonalInformation = ({ showToast }) => {
         try {
             setIsLoading(true);
             
-            if (avatarData instanceof File) {
-                const updatedProfile = await userProfileService.uploadAvatar(avatarData);
-                setAvatarPreview(updatedProfile.avatarUrl);
-            } else {
+            // AvatarManager passes base64 data strings, not File objects
+            if (typeof avatarData === 'string') {
                 const updatedProfile = await userProfileService.updateAvatar(avatarData);
-                setAvatarPreview(updatedProfile.avatarUrl);
+                setAvatarPreview(updatedProfile.avatarUrl || avatarData);
+                setSavedPersonal(prev => ({ ...prev, avatarUrl: updatedProfile.avatarUrl || avatarData }));
             }
             
             showToast('Avatar updated successfully!');
@@ -283,9 +282,10 @@ export const PersonalInformation = ({ showToast }) => {
             {/* Avatar Section */}
             <Section title="Profile Picture" icon="👤">
                 <AvatarManager 
-                    currentAvatar={avatarPreview}
-                    onAvatarUpdate={handleAvatarUpdate}
-                    isLoading={isLoading}
+                    avatarPreview={avatarPreview}
+                    setAvatarPreview={setAvatarPreview}
+                    onAvatarChange={handleAvatarUpdate}
+                    showToast={showToast}
                 />
             </Section>
 
