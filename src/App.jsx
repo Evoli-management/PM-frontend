@@ -22,7 +22,6 @@ import Dashboard from "./pages/dashboard/Dashboard.jsx";
 import ENPS from "./pages/dashboard/ENPS.jsx";
 import Recognition from "./pages/dashboard/Recognition.jsx";
 import Notifications from "./pages/dashboard/Notifications.jsx";
-import Analytics from "./pages/dashboard/Analytics.jsx";
 import TeamDashboard from "./pages/dashboard/TeamDashboard.jsx";
 
 // Main feature pages
@@ -81,7 +80,6 @@ export default function App() {
                             <Route path="/enps" element={<ENPS />} />
                             <Route path="/recognition" element={<Recognition />} />
                             <Route path="/notifications" element={<Notifications />} />
-                            <Route path="/analytics" element={<Analytics />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/teams" element={<Teams />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
@@ -97,7 +95,6 @@ export default function App() {
                             <Route path="/enps" element={<PrivateRoute><ENPS /></PrivateRoute>} />
                             <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-                            <Route path="/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
                             <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
                         </Routes>

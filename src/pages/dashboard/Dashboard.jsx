@@ -195,10 +195,9 @@ export default function Dashboard() {
             activity: true,
             suggestions: false,
             teamOverview: false,
-            analytics: false,
         },
         // explicit order for all widgets — will be kept in localStorage
-        widgetOrder: ["quickAdd", "myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview", "analytics"],
+        widgetOrder: ["quickAdd", "myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview"],
         theme: "light", // or 'dark'
     };
 
@@ -629,8 +628,6 @@ export default function Dashboard() {
     
     const productivity = { productive: 24, trap: 6 }; // TODO: Replace with real productivity tracking
     const [prodTrend, setProdTrend] = useState([6, 7, 6, 8, 7, 9, 8]);
-    const [analyticsPeriod, setAnalyticsPeriod] = useState("Week"); // Week | Month
-    const [analyticsCompare, setAnalyticsCompare] = useState("None"); // None | Previous
 
     // Activity filter + drill modal
     const [activityFilter, setActivityFilter] = useState("all"); // all|tasks|goals|recognitions
@@ -880,7 +877,7 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap" href="#/analytics">
+                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
                         <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
                         <div className="text-xs font-medium opacity-80">productive</div>
                         <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
@@ -1013,39 +1010,6 @@ export default function Dashboard() {
                         </div>
                         <div className="mt-3 flex justify-end">
                             <button className="px-3 py-1 border rounded text-sm" title="Export team report">Export report</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        if (key === "analytics") {
-            return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
-                        <div className="mb-3 flex items-center gap-2 text-sm">
-                            <span className="opacity-70">Period:</span>
-                            <select className="border rounded bg-[Canvas]" value={analyticsPeriod} onChange={(e) => setAnalyticsPeriod(e.target.value)}>
-                                <option value="Week">Week</option>
-                                <option value="Month">Month</option>
-                            </select>
-                            <span className="opacity-70 ml-3">Compare to:</span>
-                            <select className="border rounded bg-[Canvas]" value={analyticsCompare} onChange={(e) => setAnalyticsCompare(e.target.value)}>
-                                <option value="None">None</option>
-                                <option value="Previous">Previous</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="p-3 border rounded">
-                                <div className="font-semibold text-sm mb-2">Time usage</div>
-                                <TimeUsagePie productive={productivity.productive} trap={productivity.trap} />
-                            </div>
-                            <div className="p-3 border rounded">
-                                <div className="font-semibold text-sm mb-2">Weekly trend</div>
-                                <WeeklyTrendBars values={analyticsPeriod === "Week" ? [8, 6, 7, 5, 9, 4, 3] : [35, 42, 38, 44]} compareValues={analyticsCompare === "Previous" ? (analyticsPeriod === "Week" ? [6, 5, 6, 4, 7, 3, 2] : [32, 39, 36, 40]) : []} />
-                            </div>
                         </div>
                     </div>
                 </div>

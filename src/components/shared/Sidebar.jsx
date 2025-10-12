@@ -8,7 +8,6 @@ import {
     FaPlus,
     FaSearch,
     FaClock,
-    FaChartBar,
     FaGripVertical,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
@@ -58,7 +57,6 @@ const navItems = [
         to: "/teams",
         section: "Main",
     },
-    { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
 ];
 
 const quickActions = [

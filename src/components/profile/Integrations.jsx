@@ -25,10 +25,7 @@ export const Integrations = ({ showToast }) => {
         
         // Development
         github: { connected: false, username: '', syncRepos: false },
-        gitlab: { connected: false, username: '', syncRepos: false },
-        
-        // Analytics
-        googleAnalytics: { connected: false, propertyId: '', enabled: false }
+        gitlab: { connected: false, username: '', syncRepos: false }
     });
     
     const [loading, setLoading] = useState(false);
