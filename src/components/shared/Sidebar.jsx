@@ -7,7 +7,6 @@ import {
     FaChevronDown,
     FaPlus,
     FaSearch,
-    FaClock,
     FaGripVertical,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
@@ -50,7 +49,6 @@ const navItems = [
             },
         ],
     },
-    { label: "Time Tracking", icon: <FaClock />, to: "/time-tracking", section: "Main" },
     {
         label: "Team",
         icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
