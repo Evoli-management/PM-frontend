@@ -58,10 +58,12 @@ export const PersonalInformation = ({ showToast }) => {
     const loadUserProfile = async () => {
         try {
             console.log('🚀 STARTING TO LOAD USER PROFILE...');
+            alert('DEBUG: Starting to load user profile'); // Temporary debug alert
             setInitialLoading(true);
             const profileData = await userProfileService.getProfile();
             console.log('🔥 RAW PROFILE DATA FROM API:', profileData);
             console.log('🔥 RAW PROFILE DATA STRINGIFIED:', JSON.stringify(profileData, null, 2));
+            alert('DEBUG: Got profile data - check console for details'); // Temporary debug alert
             const formattedData = userProfileService.formatProfileData(profileData);
             console.log('✅ FORMATTED PROFILE DATA:', formattedData);
             console.log('✅ FORMATTED PROFILE DATA STRINGIFIED:', JSON.stringify(formattedData, null, 2));
