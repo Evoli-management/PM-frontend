@@ -8,6 +8,7 @@ class UserProfileService {
      */
     async getProfile() {
         const res = await apiClient.get("/user/profile");
+        console.log('Raw API response from /user/profile:', res.data);
         return res.data;
     }
 
@@ -57,23 +58,6 @@ class UserProfileService {
      */
     async updateAvatar(avatarUrl) {
         return this.updateProfile({ avatarUrl });
-    }
-
-    /**
-     * Upload avatar file
-     * @param {File} file - Avatar image file
-     * @returns {Promise<Object>} - Updated profile data with new avatar URL
-     */
-    async uploadAvatar(file) {
-        const formData = new FormData();
-        formData.append('avatar', file);
-
-        const res = await apiClient.post("/user/profile/avatar", formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        return res.data;
     }
 
     /**
@@ -149,15 +133,37 @@ class UserProfileService {
      * @returns {Object} - Formatted profile data
      */
     formatProfileData(profileData) {
-        const { firstName, lastName, ...rest } = profileData;
+        console.log('🎯 FORMAT PROFILE DATA - INPUT:', profileData);
+        console.log('🎯 FORMAT PROFILE DATA - INPUT STRINGIFIED:', JSON.stringify(profileData, null, 2));
+        const { firstName, lastName, fullName, ...rest } = profileData;
         
-        return {
+        console.log('🎯 EXTRACTED VALUES:');
+        console.log('   - firstName:', firstName);
+        console.log('   - lastName:', lastName);
+        console.log('   - fullName:', fullName);
+        
+        // Priority: Use fullName from API if available, otherwise construct from firstName/lastName
+        let displayName = fullName;
+        if (!displayName) {
+            displayName = `${firstName || ''} ${lastName || ''}`.trim();
+        }
+        if (!displayName) {
+            displayName = '';
+        }
+        
+        console.log('🎯 CALCULATED DISPLAY NAME:', displayName);
+        
+        const result = {
             ...rest,
-            name: `${firstName || ''} ${lastName || ''}`.trim() || '',
+            name: displayName,
+            fullName: displayName,
             firstName,
-            lastName,
-            fullName: `${firstName || ''} ${lastName || ''}`.trim() || 'Anonymous User'
+            lastName
         };
+        
+        console.log('🎯 FORMAT PROFILE DATA - RESULT:', result);
+        console.log('🎯 FORMAT PROFILE DATA - RESULT STRINGIFIED:', JSON.stringify(result, null, 2));
+        return result;
     }
 
     /**

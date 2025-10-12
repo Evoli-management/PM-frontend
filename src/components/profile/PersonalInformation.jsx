@@ -57,13 +57,21 @@ export const PersonalInformation = ({ showToast }) => {
 
     const loadUserProfile = async () => {
         try {
+            console.log('🚀 Loading user profile...');
             setInitialLoading(true);
             const profileData = await userProfileService.getProfile();
+            console.log('🔥 Raw profile data from API:', profileData);
+            
             const formattedData = userProfileService.formatProfileData(profileData);
+            console.log('✅ Formatted profile data:', formattedData);
             
             // Set personal information
+            // Use fullName from API response first, then fall back to formatted name
+            const displayName = profileData.fullName || formattedData.fullName || formattedData.name || '';
+            console.log('🎯 Setting display name:', displayName);
+            
             setSavedPersonal({
-                name: formattedData.name || '',
+                name: displayName,
                 email: formattedData.email || '',
                 phone: formattedData.phone || ''
             });
@@ -250,15 +258,17 @@ export const PersonalInformation = ({ showToast }) => {
         try {
             setIsLoading(true);
             
-            if (avatarData instanceof File) {
-                const updatedProfile = await userProfileService.uploadAvatar(avatarData);
-                setAvatarPreview(updatedProfile.avatarUrl);
-            } else {
+            // AvatarManager passes base64 data strings, not File objects
+            if (typeof avatarData === 'string') {
                 const updatedProfile = await userProfileService.updateAvatar(avatarData);
-                setAvatarPreview(updatedProfile.avatarUrl);
+                setAvatarPreview(updatedProfile.avatarUrl || avatarData);
+                setSavedPersonal(prev => ({ ...prev, avatarUrl: updatedProfile.avatarUrl || avatarData }));
             }
             
             showToast('Avatar updated successfully!');
+            
+            // Dispatch event to notify other components (like Navbar) of profile update
+            window.dispatchEvent(new CustomEvent('profileUpdated'));
         } catch (error) {
             console.error('Failed to update avatar:', error);
             showToast('Failed to update avatar', 'error');
@@ -283,9 +293,10 @@ export const PersonalInformation = ({ showToast }) => {
             {/* Avatar Section */}
             <Section title="Profile Picture" icon="👤">
                 <AvatarManager 
-                    currentAvatar={avatarPreview}
-                    onAvatarUpdate={handleAvatarUpdate}
-                    isLoading={isLoading}
+                    avatarPreview={avatarPreview}
+                    setAvatarPreview={setAvatarPreview}
+                    onAvatarChange={handleAvatarUpdate}
+                    showToast={showToast}
                 />
             </Section>
 

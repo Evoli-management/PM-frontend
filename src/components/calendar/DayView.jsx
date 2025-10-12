@@ -276,7 +276,18 @@ export default function DayView({
                         </thead>
                         <tbody>
                             {hours.map((h, idx) => {
-                                const slotEvents = events.filter((ev) => matchesSlot(ev.start, today, h));
+                                // Calculate slot start/end
+                                const [hh, mm] = h.split(":");
+                                const slotStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm));
+                                const nextSlot = hours[idx + 1];
+                                const slotEnd = nextSlot
+                                    ? new Date(today.getFullYear(), today.getMonth(), today.getDate(), ...nextSlot.split(":").map(Number))
+                                    : new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm) + 30);
+                                // Only render bars in the slot where the event starts
+                                const renderEvents = events.filter((ev) => {
+                                    const evStart = new Date(ev.start);
+                                    return evStart.getHours() === slotStart.getHours() && evStart.getMinutes() === slotStart.getMinutes();
+                                });
                                 const isBoundary = h === workingHours.endTime; // non-interactive row
                                 const formattedHour = formattedHours.find(fh => fh.value === h);
                                 return (
@@ -285,8 +296,8 @@ export default function DayView({
                                             <span>{formattedHour ? formattedHour.display : h}</span>
                                         </td>
                                         <td
-                                            className={`border-t border-blue-100 px-2 py-1 align-top ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
-                                            style={{ width: "100%" }}
+                                            className={`border-t border-blue-100 px-2 py-1 align-top relative ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
+                                            style={{ width: "100%", minHeight: 32 }}
                                             {...(!isBoundary && {
                                                 onDoubleClick: () => {
                                                     const [hh, mm] = h.split(":");
@@ -308,49 +319,115 @@ export default function DayView({
                                                 onDrop: (e) => handleDrop(e, h),
                                             })}
                                         >
-                                            {slotEvents.length === 0
-                                                ? null
-                                                : slotEvents.map((ev, i) => {
-                                                      const isTaskBox = !!ev.taskId;
-                                                      return (
-                                                          <div
-                                                              key={i}
-                                                              className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden ${
-                                                                  isTaskBox
-                                                                      ? ""
-                                                                      : categories[ev.kind]?.color || "bg-gray-200"
-                                                              }`}
-                                                              style={
-                                                                  isTaskBox ? { backgroundColor: "#7ED4E3" } : undefined
-                                                              }
-                                                              draggable
-                                                              onDragStart={(e) => {
-                                                                  try {
-                                                                      e.dataTransfer.setData("eventId", String(ev.id));
-                                                                      const dur = ev.end
-                                                                          ? new Date(ev.end).getTime() -
-                                                                            new Date(ev.start).getTime()
-                                                                          : 60 * 60 * 1000;
-                                                                      e.dataTransfer.setData(
-                                                                          "durationMs",
-                                                                          String(Math.max(dur, 0)),
-                                                                      );
-                                                                      e.dataTransfer.effectAllowed = "move";
-                                                                  } catch {}
-                                                              }}
-                                                              onClick={() => onEventClick(ev)}
-                                                          >
-                                                              {!isTaskBox && (
-                                                                  <span className="shrink-0">
-                                                                      {categories[ev.kind]?.icon || ""}
-                                                                  </span>
-                                                              )}
-                                                              <span className="truncate whitespace-nowrap text-xs min-w-0">
-                                                                  {ev.title}
-                                                              </span>
-                                                          </div>
-                                                      );
-                                                  })}
+                                            <div style={{ position: "relative", minHeight: 32 }}>
+                                                {renderEvents.map((ev, i) => {
+                                                    const isTaskBox = !!ev.taskId;
+                                                    // Calculate bar height to span all overlapping slots
+                                                    const evStart = new Date(ev.start);
+                                                    const evEnd = ev.end ? new Date(ev.end) : new Date(evStart.getTime() + 30 * 60000);
+                                                    const slotIdx = idx;
+                                                    // Find which slot index the event ends in
+                                                    let endIdx = slotIdx;
+                                                    for (let j = slotIdx + 1; j < hours.length; j++) {
+                                                        const [ehh, emm] = hours[j].split(":");
+                                                        const slotEndTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(ehh), Number(emm));
+                                                        if (slotEndTime > evEnd) break;
+                                                        endIdx = j;
+                                                    }
+                                                    const barHeight = (endIdx - slotIdx + 1) * 32 - 4; // 32px per slot, minus small gap
+                                                    // Check if next event starts at the end of this event
+                                                    let showBoundary = false;
+                                                    if (i < renderEvents.length - 1) {
+                                                        const nextEv = renderEvents[i + 1];
+                                                        const evEndTime = ev.end ? new Date(ev.end) : new Date(evStart.getTime() + 30 * 60000);
+                                                        const nextEvStartTime = new Date(nextEv.start);
+                                                        if (evEndTime.getTime() === nextEvStartTime.getTime()) {
+                                                            showBoundary = true;
+                                                        }
+                                                    }
+                                                    return (
+                                                        <>
+                                                            <div
+                                                                key={i}
+                                                                className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden group ${
+                                                                    isTaskBox
+                                                                        ? ""
+                                                                        : categories[ev.kind]?.color || "bg-gray-200"
+                                                                }`}
+                                                                style={{
+                                                                    position: "absolute",
+                                                                    left: 0,
+                                                                    right: 0,
+                                                                    top: 0,
+                                                                    height: barHeight,
+                                                                    backgroundColor: isTaskBox ? "#7ED4E3" : undefined,
+                                                                    zIndex: 2,
+                                                                    boxShadow: "0 2px 8px -2px rgba(0,0,0,0.08)",
+                                                                    border: "1.5px solid #2563eb",
+                                                                }}
+                                                                draggable
+                                                                onDragStart={(e) => {
+                                                                    try {
+                                                                        e.dataTransfer.setData("eventId", String(ev.id));
+                                                                        const dur = ev.end
+                                                                            ? new Date(ev.end).getTime() - new Date(ev.start).getTime()
+                                                                            : 60 * 60 * 1000;
+                                                                        e.dataTransfer.setData("durationMs", String(Math.max(dur, 0)));
+                                                                        e.dataTransfer.effectAllowed = "move";
+                                                                    } catch {}
+                                                                }}
+                                                                onClick={() => onEventClick(ev)}
+                                                            >
+                                                                {!isTaskBox && (
+                                                                    <span className="shrink-0">
+                                                                        {categories[ev.kind]?.icon || ""}
+                                                                    </span>
+                                                                )}
+                                                                <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1">
+                                                                    {ev.title}
+                                                                </span>
+                                                                {!isTaskBox && (
+                                                                    <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                                                                        <button
+                                                                            className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onEventClick && onEventClick(ev, 'edit');
+                                                                            }}
+                                                                            aria-label={`Edit ${ev.title}`}
+                                                                            title="Edit appointment"
+                                                                        >
+                                                                            <FaEdit className="w-3 h-3 text-blue-600" />
+                                                                        </button>
+                                                                        <button
+                                                                            className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onEventClick && onEventClick(ev, 'delete');
+                                                                            }}
+                                                                            aria-label={`Delete ${ev.title}`}
+                                                                            title="Delete appointment"
+                                                                        >
+                                                                            <FaTrash className="w-3 h-3 text-red-600" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {showBoundary && (
+                                                                <div style={{
+                                                                    position: "absolute",
+                                                                    left: 0,
+                                                                    right: 0,
+                                                                    top: barHeight - 2,
+                                                                    height: 4,
+                                                                    background: "#fff",
+                                                                    zIndex: 3,
+                                                                }} />
+                                                            )}
+                                                        </>
+                                                    );
+                                                })}
+                                            </div>
                                         </td>
                                     </tr>
                                 );

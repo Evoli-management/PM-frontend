@@ -6,6 +6,7 @@ import { generateTimeSlots } from "../../utils/timeUtils";
 const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
 
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 export default function MonthView({
     currentDate,
@@ -22,6 +23,8 @@ export default function MonthView({
     onQuickCreate, // new: open appointment creation modal
     onTaskDrop,
 }) {
+    // Get user's timezone
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const { 
         timeSlots, 
         workingHours, 
@@ -36,13 +39,17 @@ export default function MonthView({
         const m = i % 2 === 0 ? "00" : "30";
         return `${h.toString().padStart(2, '0')}:${m}`;
     });
-    
+
     // Dynamic working hours based on user preferences
     const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS.filter((h) => {
         const hour = Number(h.split(":")[0]);
         return hour >= 8 && hour <= 18;
     });
-    
+
+    // Use workingHours for start/end hour
+    const WORK_START = workingHours?.startTime ? Number(workingHours.startTime.split(":")[0]) : 8;
+    const WORK_END = workingHours?.endTime ? Number(workingHours.endTime.split(":")[0]) : 17;
+
     const [showAllHours, setShowAllHours] = useState(false);
     const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
     const WEEKDAYS = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
