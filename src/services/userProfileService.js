@@ -142,14 +142,21 @@ class UserProfileService {
         console.log('   - lastName:', lastName);
         console.log('   - fullName:', fullName);
         
-        // Use fullName from backend if available, otherwise construct from firstName/lastName
-        const displayName = fullName || `${firstName || ''} ${lastName || ''}`.trim() || '';
+        // Priority: Use fullName from API if available, otherwise construct from firstName/lastName
+        let displayName = fullName;
+        if (!displayName) {
+            displayName = `${firstName || ''} ${lastName || ''}`.trim();
+        }
+        if (!displayName) {
+            displayName = '';
+        }
+        
         console.log('🎯 CALCULATED DISPLAY NAME:', displayName);
         
         const result = {
             ...rest,
             name: displayName,
-            fullName: displayName || 'Anonymous User',
+            fullName: displayName,
             firstName,
             lastName
         };
