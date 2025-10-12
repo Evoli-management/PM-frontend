@@ -456,52 +456,7 @@ export const Preferences = ({ showToast }) => {
                 </div>
             </Section>
 
-            {/* General Notifications - FIFTH */}
-            <Section 
-                title="General Notifications" 
-                description="Manage basic notification preferences"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Email Notifications"
-                        description="Receive updates via email"
-                        checked={preferences.emailNotifications}
-                        onChange={(checked) => updatePreference('emailNotifications', checked)}
-                    />
-                    <Toggle
-                        label="Browser Notifications"
-                        description="Show desktop notifications"
-                        checked={preferences.browserNotifications}
-                        onChange={(checked) => updatePreference('browserNotifications', checked)}
-                    />
-                    <Toggle
-                        label="Mobile Notifications"
-                        description="Push notifications on mobile"
-                        checked={preferences.mobileNotifications}
-                        onChange={(checked) => updatePreference('mobileNotifications', checked)}
-                    />
-                    <Toggle
-                        label="Task Reminders"
-                        description="Alerts for upcoming tasks"
-                        checked={preferences.taskReminders}
-                        onChange={(checked) => updatePreference('taskReminders', checked)}
-                    />
-                    <Toggle
-                        label="Project Updates"
-                        description="Notifications about project changes"
-                        checked={preferences.projectUpdates}
-                        onChange={(checked) => updatePreference('projectUpdates', checked)}
-                    />
-                    <Toggle
-                        label="Deadline Alerts"
-                        description="Warnings for approaching deadlines"
-                        checked={preferences.deadlineAlerts}
-                        onChange={(checked) => updatePreference('deadlineAlerts', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Theme & Display - SIXTH */}
+            {/* Theme & Display - FIFTH (was SIXTH) */}
             <Section 
                 title="Theme & Display" 
                 description="Customize the appearance of your workspace"
