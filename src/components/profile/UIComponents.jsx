@@ -74,16 +74,59 @@ export const PasswordField = ({ value, onChange, placeholder, open, toggle, erro
 );
 
 // Enhanced Field Component
-export const Field = ({ label, children, error, required = false }) => (
-    <label className="block text-sm text-slate-700 dark:text-slate-200">
-        <span className="mb-1 block font-medium text-gray-700 dark:text-slate-200">
-            {label}
-            {required && <span className="text-red-500 ml-1">*</span>}
-        </span>
-        {children}
-        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-300">{error}</p>}
-    </label>
-);
+export const Field = ({ 
+    label, 
+    children, 
+    value,
+    isEditing,
+    onChange,
+    type = "text",
+    placeholder,
+    error, 
+    required = false 
+}) => {
+    // If value, isEditing, onChange are provided, render input directly
+    if (value !== undefined && isEditing !== undefined && onChange) {
+        return (
+            <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200">
+                    {label}
+                    {required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                {isEditing ? (
+                    <input
+                        type={type}
+                        value={value}
+                        onChange={onChange}
+                        placeholder={placeholder}
+                        className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                            error
+                                ? "border-red-500 bg-red-50 text-red-900"
+                                : "border-gray-300 bg-white text-gray-900"
+                        }`}
+                    />
+                ) : (
+                    <p className="p-3 bg-gray-50 rounded-lg text-sm text-gray-900 min-h-[48px] flex items-center">
+                        {value || "Not provided"}
+                    </p>
+                )}
+                {error && <p className="text-sm text-red-600">{error}</p>}
+            </div>
+        );
+    }
+
+    // Otherwise, render as wrapper for children (backward compatibility)
+    return (
+        <label className="block text-sm text-slate-700 dark:text-slate-200">
+            <span className="mb-1 block font-medium text-gray-700 dark:text-slate-200">
+                {label}
+                {required && <span className="text-red-500 ml-1">*</span>}
+            </span>
+            {children}
+            {error && <p className="mt-1 text-xs text-red-600 dark:text-red-300">{error}</p>}
+        </label>
+    );
+};
 
 // Enhanced Section Component
 export const Section = ({ title, children, description = "" }) => (
