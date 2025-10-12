@@ -63,25 +63,28 @@ export const PersonalInformation = ({ showToast }) => {
             setInitialLoading(true);
             const profileData = await userProfileService.getProfile();
             console.log('🔥 Raw profile data from API:', profileData);
+            console.log('🔥 Raw profile data KEYS:', Object.keys(profileData));
+            console.log('🔥 firstName from API:', profileData.firstName);
+            console.log('🔥 lastName from API:', profileData.lastName);
+            console.log('🔥 fullName from API:', profileData.fullName);
+            console.log('🔥 name from API:', profileData.name);
             
             const formattedData = userProfileService.formatProfileData(profileData);
             console.log('✅ Formatted profile data:', formattedData);
             
             // Set personal information
-            // Use fullName from API response first, then fall back to formatted name
-            const displayName = profileData.fullName || formattedData.fullName || formattedData.name || '';
-            console.log('🎯 Setting display name:', displayName);
+            // Use direct firstName/lastName from API response
+            const firstName = profileData.firstName || formattedData.firstName || '';
+            const lastName = profileData.lastName || formattedData.lastName || '';
             
-            // Split the full name into first and last name
-            const nameParts = displayName.split(' ');
-            const firstName = nameParts[0] || '';
-            const lastName = nameParts.slice(1).join(' ') || '';
+            console.log('🎯 Setting firstName:', firstName);
+            console.log('🎯 Setting lastName:', lastName);
             
             setSavedPersonal({
                 firstName: firstName,
                 lastName: lastName,
-                email: formattedData.email || '',
-                phone: formattedData.phone || ''
+                email: formattedData.email || profileData.email || '',
+                phone: formattedData.phone || profileData.phone || ''
             });
 
             // Set professional information

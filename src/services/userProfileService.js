@@ -23,19 +23,14 @@ class UserProfileService {
     }
 
     /**
-     * Update personal information (name and phone only)
-     * @param {Object} personalData - { name, phone }
+     * Update personal information (firstName, lastName and phone)
+     * @param {Object} personalData - { firstName, lastName, phone }
      * @returns {Promise<Object>} - Updated profile data
      */
-    async updatePersonalInfo({ name, phone }) {
-        // Split name into firstName and lastName
-        const nameParts = name.trim().split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-
+    async updatePersonalInfo({ firstName, lastName, phone }) {
         const profileData = {
-            firstName,
-            lastName,
+            firstName: firstName || '',
+            lastName: lastName || '',
             phone
         };
 
