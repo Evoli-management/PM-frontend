@@ -83,32 +83,63 @@ export const Field = ({
     type = "text",
     placeholder,
     error, 
-    required = false 
+    required = false,
+    inline = false
 }) => {
     // If value, isEditing, onChange are provided, render input directly
     if (value !== undefined && isEditing !== undefined && onChange) {
         return (
             <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200">
-                    {label}
-                    {required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                {isEditing ? (
-                    <input
-                        type={type}
-                        value={value}
-                        onChange={onChange}
-                        placeholder={placeholder}
-                        className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            error
-                                ? "border-red-500 bg-red-50 text-red-900"
-                                : "border-gray-300 bg-white text-gray-900"
-                        }`}
-                    />
+                {inline ? (
+                    // Inline layout - label and value/input on same line
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-slate-200 flex-shrink-0">
+                            {label}
+                            {required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        {isEditing ? (
+                            <input
+                                type={type}
+                                value={value}
+                                onChange={onChange}
+                                placeholder={placeholder}
+                                className={`flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                    error
+                                        ? "border-red-500 bg-red-50 text-red-900"
+                                        : "border-gray-300 bg-white text-gray-900"
+                                }`}
+                            />
+                        ) : (
+                            <p className="text-sm text-gray-900 font-medium">
+                                {value || "Not provided"}
+                            </p>
+                        )}
+                    </div>
                 ) : (
-                    <p className="p-3 bg-gray-50 rounded-lg text-sm text-gray-900 min-h-[48px] flex items-center">
-                        {value || "Not provided"}
-                    </p>
+                    // Vertical layout - label above value/input
+                    <>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-200">
+                            {label}
+                            {required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        {isEditing ? (
+                            <input
+                                type={type}
+                                value={value}
+                                onChange={onChange}
+                                placeholder={placeholder}
+                                className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                    error
+                                        ? "border-red-500 bg-red-50 text-red-900"
+                                        : "border-gray-300 bg-white text-gray-900"
+                                }`}
+                            />
+                        ) : (
+                            <p className="p-3 bg-gray-50 rounded-lg text-sm text-gray-900 min-h-[48px] flex items-center">
+                                {value || "Not provided"}
+                            </p>
+                        )}
+                    </>
                 )}
                 {error && <p className="text-sm text-red-600">{error}</p>}
             </div>

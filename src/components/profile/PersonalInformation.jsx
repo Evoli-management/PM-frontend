@@ -334,6 +334,7 @@ export const PersonalInformation = ({ showToast }) => {
                                 error={errors.firstName}
                                 placeholder="Enter your first name"
                                 required
+                                inline={true}
                             />
                             
                             <Field 
@@ -343,6 +344,7 @@ export const PersonalInformation = ({ showToast }) => {
                                 onChange={handlePersonalChange('lastName')}
                                 error={errors.lastName}
                                 placeholder="Enter your last name"
+                                inline={true}
                             />
                         </div>
                     </div>
