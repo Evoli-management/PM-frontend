@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
 import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
+import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
 
 // Simple Toggle component for nested preferences
@@ -27,7 +28,8 @@ export const Preferences = ({ showToast }) => {
     const { 
         preferences: calendarPrefs, 
         use24Hour, 
-        loading: calendarLoading 
+        loading: calendarLoading,
+        refreshPreferences 
     } = useCalendarPreferences();
 
     const [preferences, setPreferences] = useState({
@@ -112,6 +114,8 @@ export const Preferences = ({ showToast }) => {
     const savePreferences = async () => {
         setSaving(true);
         try {
+            console.log('Current preferences state:', preferences);
+            
             // Validate preferences
             const validation = userPreferencesService.validatePreferences(preferences);
             if (!validation.isValid) {
@@ -120,25 +124,61 @@ export const Preferences = ({ showToast }) => {
                 return;
             }
 
+            // Extra client-side validation for working hours ordering
+            if (preferences.workStartTime && preferences.workEndTime) {
+                const startMin = timeToMinutes(preferences.workStartTime);
+                const endMin = timeToMinutes(preferences.workEndTime);
+                if (!(startMin < endMin)) {
+                    showToast('Work start time must be before end time', 'error');
+                    return;
+                }
+            }
+
+            // Validate time format before sending to API
+            const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            if (preferences.workStartTime && !timeRegex.test(preferences.workStartTime)) {
+                showToast('Work start time must be in HH:MM format', 'error');
+                return;
+            }
+            if (preferences.workEndTime && !timeRegex.test(preferences.workEndTime)) {
+                showToast('Work end time must be in HH:MM format', 'error');
+                return;
+            }
+
             // Prepare API data - only send backend-supported fields
-            const apiData = {
-                workStartTime: preferences.workStartTime,
-                workEndTime: preferences.workEndTime,
-                timeFormat: preferences.timeFormat,
-                dateFormat: preferences.dateFormat,
-                goalRemindersEmail: preferences.goalRemindersEmail,
-                goalRemindersDesktop: preferences.goalRemindersDesktop,
-                goalReminderTiming: preferences.goalReminderTiming,
-                pmRemindersEmail: preferences.pmRemindersEmail,
-                pmRemindersDesktop: preferences.pmRemindersDesktop,
-                pmReminderTiming: preferences.pmReminderTiming,
-            };
+            const apiData = {};
+            
+            // Only include time fields if they're properly formatted
+            if (preferences.workStartTime && timeRegex.test(preferences.workStartTime)) {
+                apiData.workStartTime = preferences.workStartTime;
+            }
+            if (preferences.workEndTime && timeRegex.test(preferences.workEndTime)) {
+                apiData.workEndTime = preferences.workEndTime;
+            }
+            
+            // Add other supported fields
+            if (preferences.timeFormat) apiData.timeFormat = preferences.timeFormat;
+            if (preferences.dateFormat) apiData.dateFormat = preferences.dateFormat;
+            if (preferences.goalRemindersEmail !== undefined) apiData.goalRemindersEmail = preferences.goalRemindersEmail;
+            if (preferences.goalRemindersDesktop !== undefined) apiData.goalRemindersDesktop = preferences.goalRemindersDesktop;
+            if (preferences.goalReminderTiming) apiData.goalReminderTiming = preferences.goalReminderTiming;
+            if (preferences.pmRemindersEmail !== undefined) apiData.pmRemindersEmail = preferences.pmRemindersEmail;
+            if (preferences.pmRemindersDesktop !== undefined) apiData.pmRemindersDesktop = preferences.pmRemindersDesktop;
+            if (preferences.pmReminderTiming) apiData.pmReminderTiming = preferences.pmReminderTiming;
+
+            // Debug: Log the data being sent to help diagnose format issues
+            console.log('Saving preferences - API data:', JSON.stringify(apiData, null, 2));
 
             // Save to API
             await userPreferencesService.updatePreferences(apiData);
             
             // Also save all preferences to localStorage for legacy support
             localStorage.setItem('userPreferences', JSON.stringify(preferences));
+            
+            // Refresh calendar preferences to pick up the changes immediately
+            if (refreshPreferences) {
+                await refreshPreferences();
+            }
             
             // Trigger custom events to notify calendar components of changes
             if (apiData.workStartTime || apiData.workEndTime) {
@@ -169,13 +209,16 @@ export const Preferences = ({ showToast }) => {
             showToast('Preferences saved successfully');
         } catch (error) {
             console.error('Error saving preferences:', error);
-            showToast('Failed to save preferences', 'error');
+            const apiMsg = error?.response?.data?.message;
+            const msg = Array.isArray(apiMsg) ? apiMsg.join(', ') : (apiMsg || 'Failed to save preferences');
+            showToast(msg, 'error');
         } finally {
             setSaving(false);
         }
     };
     
     const updatePreference = (key, value) => {
+        console.log(`Updating preference ${key} to:`, value, typeof value);
         setPreferences(prev => ({ ...prev, [key]: value }));
     };
     
