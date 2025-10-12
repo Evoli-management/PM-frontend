@@ -132,14 +132,17 @@ class UserProfileService {
      * @returns {Object} - Formatted profile data
      */
     formatProfileData(profileData) {
-        const { firstName, lastName, ...rest } = profileData;
+        const { firstName, lastName, fullName, ...rest } = profileData;
+        
+        // Use fullName from backend if available, otherwise construct from firstName/lastName
+        const displayName = fullName || `${firstName || ''} ${lastName || ''}`.trim() || '';
         
         return {
             ...rest,
-            name: `${firstName || ''} ${lastName || ''}`.trim() || '',
+            name: displayName,
+            fullName: displayName || 'Anonymous User',
             firstName,
-            lastName,
-            fullName: `${firstName || ''} ${lastName || ''}`.trim() || 'Anonymous User'
+            lastName
         };
     }
 

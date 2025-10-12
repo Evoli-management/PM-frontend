@@ -63,7 +63,7 @@ export const PersonalInformation = ({ showToast }) => {
             
             // Set personal information
             setSavedPersonal({
-                name: formattedData.name || '',
+                name: formattedData.fullName || formattedData.name || '',
                 email: formattedData.email || '',
                 phone: formattedData.phone || ''
             });
