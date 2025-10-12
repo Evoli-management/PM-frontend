@@ -12,7 +12,8 @@ export const PersonalInformation = ({ showToast }) => {
     const [avatarPreview, setAvatarPreview] = useState(null);
     
     const [personalDraft, setPersonalDraft] = useState({
-        name: "",
+        firstName: "",
+        lastName: "",
         email: "",
         phone: ""
     });
@@ -26,7 +27,8 @@ export const PersonalInformation = ({ showToast }) => {
     });
     
     const [savedPersonal, setSavedPersonal] = useState({
-        name: "",
+        firstName: "",
+        lastName: "",
         email: "",
         phone: ""
     });
@@ -70,8 +72,14 @@ export const PersonalInformation = ({ showToast }) => {
             const displayName = profileData.fullName || formattedData.fullName || formattedData.name || '';
             console.log('🎯 Setting display name:', displayName);
             
+            // Split the full name into first and last name
+            const nameParts = displayName.split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
             setSavedPersonal({
-                name: displayName,
+                firstName: firstName,
+                lastName: lastName,
                 email: formattedData.email || '',
                 phone: formattedData.phone || ''
             });
@@ -120,18 +128,15 @@ export const PersonalInformation = ({ showToast }) => {
     };
 
     const validatePersonalForm = () => {
-        const firstName = personalDraft.name.split(' ')[0] || '';
-        const lastName = personalDraft.name.split(' ').slice(1).join(' ') || '';
-        
         const validation = userProfileService.validateProfileData({
-            firstName: firstName,
-            lastName: lastName,
+            firstName: personalDraft.firstName,
+            lastName: personalDraft.lastName,
             phone: personalDraft.phone
         });
 
         const newErrors = {};
         
-        if (!firstName.trim()) {
+        if (!personalDraft.firstName.trim()) {
             newErrors.firstName = "First name is required";
         }
         
@@ -161,17 +166,25 @@ export const PersonalInformation = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            // Only update name and phone, not email (email is managed in Security settings)
+            // Send first name and last name separately, plus phone
             const personalData = {
-                name: personalDraft.name,
+                firstName: personalDraft.firstName,
+                lastName: personalDraft.lastName,
                 phone: personalDraft.phone
             };
             
             const updatedProfile = await userProfileService.updatePersonalInfo(personalData);
             const formattedData = userProfileService.formatProfileData(updatedProfile);
             
+            // Extract names from response
+            const displayName = updatedProfile.fullName || formattedData.fullName || formattedData.name || '';
+            const nameParts = displayName.split(' ');
+            const firstName = nameParts[0] || personalDraft.firstName;
+            const lastName = nameParts.slice(1).join(' ') || personalDraft.lastName;
+            
             setSavedPersonal({
-                name: formattedData.name || '',
+                firstName: firstName,
+                lastName: lastName,
                 email: formattedData.email || '', // Keep existing email
                 phone: formattedData.phone || ''
             });
@@ -312,14 +325,9 @@ export const PersonalInformation = ({ showToast }) => {
                         <div className="flex-1 space-y-4">
                             <Field 
                                 label="Name" 
-                                value={isEditingPersonal ? personalDraft.name.split(' ')[0] || '' : savedPersonal.name.split(' ')[0] || ''}
+                                value={isEditingPersonal ? personalDraft.firstName : savedPersonal.firstName}
                                 isEditing={isEditingPersonal}
-                                onChange={(e) => {
-                                    const firstName = e.target.value;
-                                    const lastName = personalDraft.name.split(' ').slice(1).join(' ') || '';
-                                    const fullName = firstName + (lastName ? ' ' + lastName : '');
-                                    handlePersonalChange('name')({ target: { value: fullName } });
-                                }}
+                                onChange={handlePersonalChange('firstName')}
                                 error={errors.firstName}
                                 placeholder="Enter your first name"
                                 required
@@ -327,14 +335,9 @@ export const PersonalInformation = ({ showToast }) => {
                             
                             <Field 
                                 label="Last name" 
-                                value={isEditingPersonal ? personalDraft.name.split(' ').slice(1).join(' ') || '' : savedPersonal.name.split(' ').slice(1).join(' ') || ''}
+                                value={isEditingPersonal ? personalDraft.lastName : savedPersonal.lastName}
                                 isEditing={isEditingPersonal}
-                                onChange={(e) => {
-                                    const lastName = e.target.value;
-                                    const firstName = personalDraft.name.split(' ')[0] || '';
-                                    const fullName = firstName + (lastName ? ' ' + lastName : '');
-                                    handlePersonalChange('name')({ target: { value: fullName } });
-                                }}
+                                onChange={handlePersonalChange('lastName')}
                                 error={errors.lastName}
                                 placeholder="Enter your last name"
                             />
