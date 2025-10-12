@@ -50,12 +50,10 @@ export const PersonalInformation = ({ showToast }) => {
 
     // Initialize drafts from saved data when saved data changes
     useEffect(() => {
-        console.log('🔄 useEffect: Setting personalDraft from savedPersonal:', savedPersonal);
         setPersonalDraft(savedPersonal);
     }, [savedPersonal]);
 
     useEffect(() => {
-        console.log('🔄 useEffect: Setting professionalDraft from savedProfessional:', savedProfessional);
         setProfessionalDraft(savedProfessional);
     }, [savedProfessional]);
 
@@ -82,15 +80,12 @@ export const PersonalInformation = ({ showToast }) => {
             console.log('🎯 Setting firstName:', firstName);
             console.log('🎯 Setting lastName:', lastName);
             
-            const newSavedPersonal = {
+            setSavedPersonal({
                 firstName: firstName,
                 lastName: lastName,
                 email: formattedData.email || profileData.email || '',
                 phone: formattedData.phone || profileData.phone || ''
-            };
-            
-            console.log('🎯 About to call setSavedPersonal with:', newSavedPersonal);
-            setSavedPersonal(newSavedPersonal);
+            });
 
             // Set professional information
             const skillsArray = formattedData.skills ? 
@@ -340,12 +335,6 @@ export const PersonalInformation = ({ showToast }) => {
                                 placeholder="Enter your first name"
                                 required
                             />
-                            {console.log('🎯 First Name Field Values:', {
-                                isEditingPersonal,
-                                'personalDraft.firstName': personalDraft.firstName,
-                                'savedPersonal.firstName': savedPersonal.firstName,
-                                'value being passed': isEditingPersonal ? personalDraft.firstName : savedPersonal.firstName
-                            })}
                             
                             <Field 
                                 label="Last name" 
@@ -355,12 +344,6 @@ export const PersonalInformation = ({ showToast }) => {
                                 error={errors.lastName}
                                 placeholder="Enter your last name"
                             />
-                            {console.log('🎯 Last Name Field Values:', {
-                                isEditingPersonal,
-                                'personalDraft.lastName': personalDraft.lastName,
-                                'savedPersonal.lastName': savedPersonal.lastName,
-                                'value being passed': isEditingPersonal ? personalDraft.lastName : savedPersonal.lastName
-                            })}
                         </div>
                     </div>
                     
