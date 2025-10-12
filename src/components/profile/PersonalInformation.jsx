@@ -295,22 +295,23 @@ export const PersonalInformation = ({ showToast }) => {
         <div className="space-y-6">
             {/* Profile Picture and Basic Info - Horizontal Layout */}
             <Section title="Personal Details" icon="👤">
-                <div className="flex flex-col md:flex-row gap-6 items-start">
-                    {/* Profile Picture on the left */}
-                    <div className="flex-shrink-0">
-                        <AvatarManager 
-                            avatarPreview={avatarPreview}
-                            setAvatarPreview={setAvatarPreview}
-                            onAvatarChange={handleAvatarUpdate}
-                            showToast={showToast}
-                        />
-                    </div>
-                    
-                    {/* Name fields on the right */}
-                    <div className="flex-1 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                    {/* Profile Picture and Name Fields Row */}
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
+                        {/* Profile Picture on the left */}
+                        <div className="flex-shrink-0">
+                            <AvatarManager 
+                                avatarPreview={avatarPreview}
+                                setAvatarPreview={setAvatarPreview}
+                                onAvatarChange={handleAvatarUpdate}
+                                showToast={showToast}
+                            />
+                        </div>
+                        
+                        {/* Name fields stacked vertically on the right */}
+                        <div className="flex-1 space-y-4">
                             <Field 
-                                label="First Name" 
+                                label="Name" 
                                 value={isEditingPersonal ? personalDraft.name.split(' ')[0] || '' : savedPersonal.name.split(' ')[0] || ''}
                                 isEditing={isEditingPersonal}
                                 onChange={(e) => {
@@ -325,7 +326,7 @@ export const PersonalInformation = ({ showToast }) => {
                             />
                             
                             <Field 
-                                label="Last Name" 
+                                label="Last name" 
                                 value={isEditingPersonal ? personalDraft.name.split(' ').slice(1).join(' ') || '' : savedPersonal.name.split(' ').slice(1).join(' ') || ''}
                                 isEditing={isEditingPersonal}
                                 onChange={(e) => {
@@ -338,7 +339,10 @@ export const PersonalInformation = ({ showToast }) => {
                                 placeholder="Enter your last name"
                             />
                         </div>
-                        
+                    </div>
+                    
+                    {/* Email and Phone fields below - separate section */}
+                    <div className="space-y-4">
                         {/* Email Address - Read Only */}
                         <div>
                             <label className="block text-sm font-medium mb-2">
