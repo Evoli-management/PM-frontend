@@ -61,13 +61,7 @@ export const Preferences = ({ showToast }) => {
         language: 'en',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         dateFormat: 'MM/dd/yyyy',
-        timeFormat: '12h',
-        autoSave: true,
-        quickCapture: true,
-        showKeyboardShortcuts: true,
-        trackAnalytics: true,
-        shareUsageData: false,
-        allowCookies: true
+        timeFormat: '12h'
     });
     
     const [loading, setLoading] = useState(false);
@@ -245,12 +239,6 @@ export const Preferences = ({ showToast }) => {
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 dateFormat: 'MM/dd/yyyy',
                 timeFormat: '12h',
-                autoSave: true,
-                quickCapture: true,
-                showKeyboardShortcuts: true,
-                trackAnalytics: true,
-                shareUsageData: false,
-                allowCookies: true,
                 // Apply API defaults
                 ...defaultPreferences,
             }));
@@ -551,60 +539,6 @@ export const Preferences = ({ showToast }) => {
                             <option value="24h">24 Hour</option>
                         </select>
                     </Field>
-                </div>
-            </Section>
-            
-            {/* Productivity */}
-            <Section 
-                title="Productivity" 
-                description="Features to help you work more efficiently"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Auto Save"
-                        description="Automatically save changes"
-                        checked={preferences.autoSave}
-                        onChange={(checked) => updatePreference('autoSave', checked)}
-                    />
-                    <Toggle
-                        label="Quick Capture"
-                        description="Enable quick task creation"
-                        checked={preferences.quickCapture}
-                        onChange={(checked) => updatePreference('quickCapture', checked)}
-                    />
-                    <Toggle
-                        label="Keyboard Shortcuts"
-                        description="Show keyboard shortcut hints"
-                        checked={preferences.showKeyboardShortcuts}
-                        onChange={(checked) => updatePreference('showKeyboardShortcuts', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Privacy */}
-            <Section 
-                title="Privacy" 
-                description="Control data collection and usage"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Analytics Tracking"
-                        description="Help improve the app with usage data"
-                        checked={preferences.trackAnalytics}
-                        onChange={(checked) => updatePreference('trackAnalytics', checked)}
-                    />
-                    <Toggle
-                        label="Share Usage Data"
-                        description="Share anonymized usage statistics"
-                        checked={preferences.shareUsageData}
-                        onChange={(checked) => updatePreference('shareUsageData', checked)}
-                    />
-                    <Toggle
-                        label="Allow Cookies"
-                        description="Enable cookies for better experience"
-                        checked={preferences.allowCookies}
-                        onChange={(checked) => updatePreference('allowCookies', checked)}
-                    />
                 </div>
             </Section>
             
