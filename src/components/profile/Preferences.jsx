@@ -473,27 +473,6 @@ export const Preferences = ({ showToast }) => {
                             <option value="auto">Auto (System)</option>
                         </select>
                     </Field>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Toggle
-                            label="Compact Mode"
-                            description="Reduce spacing for more content"
-                            checked={preferences.compactMode}
-                            onChange={(checked) => updatePreference('compactMode', checked)}
-                        />
-                        <Toggle
-                            label="Show Completed Tasks"
-                            description="Display completed items in lists"
-                            checked={preferences.showCompletedTasks}
-                            onChange={(checked) => updatePreference('showCompletedTasks', checked)}
-                        />
-                        <Toggle
-                            label="Animations"
-                            description="Enable smooth transitions"
-                            checked={preferences.animationsEnabled}
-                            onChange={(checked) => updatePreference('animationsEnabled', checked)}
-                        />
-                    </div>
                 </div>
             </Section>
             

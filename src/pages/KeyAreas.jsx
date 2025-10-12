@@ -5690,5 +5690,5 @@ export default function KeyAreas() {
                 </main>
             </div>
         </div>
-    );
+    ); and
 }
