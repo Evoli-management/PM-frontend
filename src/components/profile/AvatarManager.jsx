@@ -10,14 +10,6 @@ export const AvatarManager = ({
     const [avatarOriginal, setAvatarOriginal] = useState(null);
     const [showCropper, setShowCropper] = useState(false);
     const [cropZoom, setCropZoom] = useState(1);
-    const [cameraActive, setCameraActive] = useState(false);
-    const [cameraPermission, setCameraPermission] = useState(null);
-    const [facingMode, setFacingMode] = useState('user');
-    const [zoom, setZoom] = useState(1);
-    const [showPermissionDialog, setShowPermissionDialog] = useState(false);
-    const [capturedImage, setCapturedImage] = useState(null);
-    const [showImagePreview, setShowImagePreview] = useState(false);
-    const [showCameraOptions, setShowCameraOptions] = useState(false);
     const [showAvatarModal, setShowAvatarModal] = useState(false);
     
     // Avatar customization
@@ -28,11 +20,7 @@ export const AvatarManager = ({
     const [avatarPalette, setAvatarPalette] = useState(0);
     
     const fileRef = useRef(null);
-    const videoRef = useRef(null);
-    const streamRef = useRef(null);
     const cropImgRef = useRef(null);
-    const cameraOptionsRef = useRef(null);
-    const cameraButtonRef = useRef(null);
 
     const avatarFilterPresets = useMemo(() => ({
         normal: 'none',
@@ -78,79 +66,6 @@ export const AvatarManager = ({
     }, []);
 
     const getAvatarFilterCss = useCallback((key) => avatarFilterPresets[key] || 'none', [avatarFilterPresets]);
-
-    // Camera functions
-    const checkCameraPermission = async () => {
-        try {
-            const result = await navigator.permissions.query({ name: 'camera' });
-            setCameraPermission(result.state);
-            return result.state === 'granted';
-        } catch (error) {
-            console.warn('Permission API not supported', error);
-            return false;
-        }
-    };
-
-    const openCamera = async () => {
-        try {
-            const hasPermission = await checkCameraPermission();
-            if (!hasPermission) {
-                setShowPermissionDialog(true);
-                return;
-            }
-
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode }
-            });
-            
-            streamRef.current = stream;
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
-            setCameraActive(true);
-            setShowCameraOptions(false);
-        } catch (error) {
-            console.error('Camera access error:', error);
-            showToast('Camera access denied or not available', 'error');
-        }
-    };
-
-    const closeCamera = () => {
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
-        setCameraActive(false);
-        setCapturedImage(null);
-        setShowImagePreview(false);
-    };
-
-    const capturePhoto = () => {
-        if (!videoRef.current) return;
-
-        const canvas = document.createElement('canvas');
-        const video = videoRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        
-        const dataUrl = canvas.toDataURL('image/png');
-        setCapturedImage(dataUrl);
-        setShowImagePreview(true);
-    };
-
-    const saveImage = async () => {
-        if (capturedImage) {
-            setAvatarPreview(capturedImage);
-            setAvatarOriginal(capturedImage);
-            localStorage.setItem('pm:avatar', capturedImage);
-            showToast('Avatar updated successfully!');
-            closeCamera();
-            if (onAvatarChange) onAvatarChange(capturedImage);
-        }
-    };
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
@@ -200,22 +115,6 @@ export const AvatarManager = ({
         }
     };
 
-    // Close camera options dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (showCameraOptions && 
-                cameraOptionsRef.current && 
-                !cameraOptionsRef.current.contains(e.target) &&
-                cameraButtonRef.current && 
-                !cameraButtonRef.current.contains(e.target)) {
-                setShowCameraOptions(false);
-            }
-        };
-        
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showCameraOptions]);
-
     return (
         <div className="flex flex-col items-center space-y-4">
             {/* Avatar Display */}
@@ -243,31 +142,6 @@ export const AvatarManager = ({
                 >
                     📁 Upload
                 </button>
-                
-                <div className="relative">
-                    <button
-                        ref={cameraButtonRef}
-                        type="button"
-                        onClick={() => setShowCameraOptions(!showCameraOptions)}
-                        className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                        📷 Camera
-                    </button>
-                    
-                    {showCameraOptions && (
-                        <div 
-                            ref={cameraOptionsRef}
-                            className="absolute top-full left-0 mt-1 bg-white border rounded shadow-lg z-10 p-2 space-y-1"
-                        >
-                            <button
-                                onClick={openCamera}
-                                className="block w-full text-left px-2 py-1 text-xs hover:bg-gray-100 rounded"
-                            >
-                                Take Photo
-                            </button>
-                        </div>
-                    )}
-                </div>
 
                 <button
                     type="button"
@@ -286,106 +160,6 @@ export const AvatarManager = ({
                 onChange={handleFileUpload}
                 className="hidden"
             />
-
-            {/* Permission Dialog */}
-            {showPermissionDialog && (
-                <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold">Camera Permission</h3>
-                            <button
-                                onClick={() => setShowPermissionDialog(false)}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <p className="text-gray-600">
-                                We need camera permission to take photos for your profile. 
-                                Please click "Allow" when prompted by your browser.
-                            </p>
-                            
-                            <div className="flex gap-2 justify-end">
-                                <button
-                                    onClick={() => setShowPermissionDialog(false)}
-                                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                                >
-                                    Cancel
-                                </button>
-                                <LoadingButton
-                                    onClick={async () => {
-                                        setShowPermissionDialog(false);
-                                        await openCamera();
-                                    }}
-                                    variant="primary"
-                                >
-                                    Request Permission
-                                </LoadingButton>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Camera Modal */}
-            {cameraActive && (
-                <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
-                    <div className="bg-white rounded-lg p-4 max-w-lg w-full mx-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold">Take Photo</h3>
-                            <button
-                                onClick={closeCamera}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        
-                        {!showImagePreview ? (
-                            <div className="space-y-4">
-                                <video
-                                    ref={videoRef}
-                                    autoPlay
-                                    playsInline
-                                    className="w-full rounded"
-                                />
-                                <div className="flex justify-center">
-                                    <button
-                                        onClick={capturePhoto}
-                                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                    >
-                                        📷 Capture
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <img
-                                    src={capturedImage}
-                                    alt="Captured"
-                                    className="w-full rounded"
-                                />
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        onClick={() => setShowImagePreview(false)}
-                                        className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                                    >
-                                        Retake
-                                    </button>
-                                    <LoadingButton
-                                        onClick={saveImage}
-                                        variant="primary"
-                                    >
-                                        Save Avatar
-                                    </LoadingButton>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* Cropper Modal */}
             {showCropper && avatarOriginal && (
