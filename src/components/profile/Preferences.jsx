@@ -262,224 +262,7 @@ export const Preferences = ({ showToast }) => {
     
     return (
         <div className="space-y-6">
-            {/* Work Hours Preferences */}
-            <Section 
-                title="Work Hours Preferences" 
-                description="Set your preferred working hours. These hours will be used to customize calendar views to show only your working time."
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Start Time">
-                        <TimePicker
-                            value={preferences.workStartTime}
-                            onChange={(value) => updatePreference('workStartTime', value)}
-                            use24Hour={use24Hour}
-                            className="w-full"
-                            label="Work Start Time"
-                        />
-                    </Field>
-                    <Field label="End Time">
-                        <TimePicker
-                            value={preferences.workEndTime}
-                            onChange={(value) => updatePreference('workEndTime', value)}
-                            use24Hour={use24Hour}
-                            className="w-full"
-                            label="Work End Time"
-                        />
-                    </Field>
-                </div>
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                        <div>
-                            <p className="text-sm font-medium text-blue-800">Calendar Integration</p>
-                            <p className="text-sm text-blue-700 mt-1">
-                                Your working hours will automatically adjust the time range shown in daily and weekly calendar views. 
-                                Instead of showing all 24 hours, the calendar will focus on your working period for a cleaner, more relevant view.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </Section>
-            
-            {/* PracticalManager Reminders */}
-            <Section 
-                title="PracticalManager Reminders" 
-                description="Manage system-wide reminder notifications"
-            >
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">PracticalManager Notifications</h4>
-                            <p className="text-sm text-gray-600 mt-1">System reminders and notifications</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Email</span>
-                                <SimpleToggle
-                                    checked={preferences.pmRemindersEmail}
-                                    onChange={(checked) => updatePreference('pmRemindersEmail', checked)}
-                                />
-                            </div>
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
-                                <SimpleToggle
-                                    checked={preferences.pmRemindersDesktop}
-                                    onChange={(checked) => updatePreference('pmRemindersDesktop', checked)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <Field label="Reminder Timing">
-                        <select
-                            value={preferences.pmReminderTiming}
-                            onChange={(e) => updatePreference('pmReminderTiming', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="5min">5 minutes before</option>
-                            <option value="15min">15 minutes before</option>
-                            <option value="30min">30 minutes before</option>
-                            <option value="1hour">1 hour before</option>
-                            <option value="2hours">2 hours before</option>
-                            <option value="1day">1 day before</option>
-                        </select>
-                    </Field>
-                </div>
-            </Section>
-            
-            {/* Goal Reminders */}
-            <Section 
-                title="Goal Reminders" 
-                description="Configure goal-related reminder notifications"
-            >
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">Goal Reminder Notifications</h4>
-                            <p className="text-sm text-gray-600 mt-1">Reminders for goals and deadlines</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Email</span>
-                                <SimpleToggle
-                                    checked={preferences.goalRemindersEmail}
-                                    onChange={(checked) => updatePreference('goalRemindersEmail', checked)}
-                                />
-                            </div>
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
-                                <SimpleToggle
-                                    checked={preferences.goalRemindersDesktop}
-                                    onChange={(checked) => updatePreference('goalRemindersDesktop', checked)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <Field label="Reminder Timing">
-                        <select
-                            value={preferences.goalReminderTiming}
-                            onChange={(e) => updatePreference('goalReminderTiming', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="5min">5 minutes before</option>
-                            <option value="15min">15 minutes before</option>
-                            <option value="30min">30 minutes before</option>
-                            <option value="1hour">1 hour before</option>
-                            <option value="2hours">2 hours before</option>
-                            <option value="1day">1 day before</option>
-                        </select>
-                    </Field>
-                </div>
-            </Section>
-
-            {/* Basic Notifications */}
-            <Section 
-                title="General Notifications" 
-                description="Manage basic notification preferences"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Email Notifications"
-                        description="Receive updates via email"
-                        checked={preferences.emailNotifications}
-                        onChange={(checked) => updatePreference('emailNotifications', checked)}
-                    />
-                    <Toggle
-                        label="Browser Notifications"
-                        description="Show desktop notifications"
-                        checked={preferences.browserNotifications}
-                        onChange={(checked) => updatePreference('browserNotifications', checked)}
-                    />
-                    <Toggle
-                        label="Mobile Notifications"
-                        description="Push notifications on mobile"
-                        checked={preferences.mobileNotifications}
-                        onChange={(checked) => updatePreference('mobileNotifications', checked)}
-                    />
-                    <Toggle
-                        label="Task Reminders"
-                        description="Alerts for upcoming tasks"
-                        checked={preferences.taskReminders}
-                        onChange={(checked) => updatePreference('taskReminders', checked)}
-                    />
-                    <Toggle
-                        label="Project Updates"
-                        description="Notifications about project changes"
-                        checked={preferences.projectUpdates}
-                        onChange={(checked) => updatePreference('projectUpdates', checked)}
-                    />
-                    <Toggle
-                        label="Deadline Alerts"
-                        description="Warnings for approaching deadlines"
-                        checked={preferences.deadlineAlerts}
-                        onChange={(checked) => updatePreference('deadlineAlerts', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Theme & Display */}
-            <Section 
-                title="Theme & Display" 
-                description="Customize the appearance of your workspace"
-            >
-                <div className="space-y-4">
-                    <Field label="Theme">
-                        <select
-                            value={preferences.theme}
-                            onChange={(e) => updatePreference('theme', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                            <option value="auto">Auto (System)</option>
-                        </select>
-                    </Field>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Toggle
-                            label="Compact Mode"
-                            description="Reduce spacing for more content"
-                            checked={preferences.compactMode}
-                            onChange={(checked) => updatePreference('compactMode', checked)}
-                        />
-                        <Toggle
-                            label="Show Completed Tasks"
-                            description="Display completed items in lists"
-                            checked={preferences.showCompletedTasks}
-                            onChange={(checked) => updatePreference('showCompletedTasks', checked)}
-                        />
-                        <Toggle
-                            label="Animations"
-                            description="Enable smooth transitions"
-                            checked={preferences.animationsEnabled}
-                            onChange={(checked) => updatePreference('animationsEnabled', checked)}
-                        />
-                    </div>
-                </div>
-            </Section>
-            
-            {/* Language & Region */}
+            {/* Language & Region - MOVED TO FIRST */}
             <Section 
                 title="Language & Region" 
                 description="Set your language, timezone, and format preferences"
@@ -539,6 +322,223 @@ export const Preferences = ({ showToast }) => {
                             <option value="24h">24 Hour</option>
                         </select>
                     </Field>
+                </div>
+            </Section>
+
+            {/* Work Hours Preferences - MOVED TO SECOND */}
+            <Section 
+                title="Work Hours Preferences" 
+                description="Set your preferred working hours. These hours will be used to customize calendar views to show only your working time."
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field label="Start Time">
+                        <TimePicker
+                            value={preferences.workStartTime}
+                            onChange={(value) => updatePreference('workStartTime', value)}
+                            use24Hour={use24Hour}
+                            className="w-full"
+                            label="Work Start Time"
+                        />
+                    </Field>
+                    <Field label="End Time">
+                        <TimePicker
+                            value={preferences.workEndTime}
+                            onChange={(value) => updatePreference('workEndTime', value)}
+                            use24Hour={use24Hour}
+                            className="w-full"
+                            label="Work End Time"
+                        />
+                    </Field>
+                </div>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <div>
+                            <p className="text-sm font-medium text-blue-800">Calendar Integration</p>
+                            <p className="text-sm text-blue-700 mt-1">
+                                Your working hours will automatically adjust the time range shown in daily and weekly calendar views. 
+                                Instead of showing all 24 hours, the calendar will focus on your working period for a cleaner, more relevant view.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </Section>
+            
+            {/* PracticalManager Reminders - THIRD */}
+            <Section 
+                title="PracticalManager Reminders" 
+                description="Manage system-wide reminder notifications"
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                            <h4 className="font-medium text-gray-800">PracticalManager Notifications</h4>
+                            <p className="text-sm text-gray-600 mt-1">System reminders and notifications</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                <SimpleToggle
+                                    checked={preferences.pmRemindersEmail}
+                                    onChange={(checked) => updatePreference('pmRemindersEmail', checked)}
+                                />
+                            </div>
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                <SimpleToggle
+                                    checked={preferences.pmRemindersDesktop}
+                                    onChange={(checked) => updatePreference('pmRemindersDesktop', checked)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <Field label="Reminder Timing">
+                        <select
+                            value={preferences.pmReminderTiming}
+                            onChange={(e) => updatePreference('pmReminderTiming', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="5min">5 minutes before</option>
+                            <option value="15min">15 minutes before</option>
+                            <option value="30min">30 minutes before</option>
+                            <option value="1hour">1 hour before</option>
+                            <option value="2hours">2 hours before</option>
+                            <option value="1day">1 day before</option>
+                        </select>
+                    </Field>
+                </div>
+            </Section>
+            
+            {/* Goal Reminders - FOURTH */}
+            <Section 
+                title="Goal Reminders" 
+                description="Configure goal-related reminder notifications"
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                            <h4 className="font-medium text-gray-800">Goal Reminder Notifications</h4>
+                            <p className="text-sm text-gray-600 mt-1">Reminders for goals and deadlines</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                <SimpleToggle
+                                    checked={preferences.goalRemindersEmail}
+                                    onChange={(checked) => updatePreference('goalRemindersEmail', checked)}
+                                />
+                            </div>
+                            <div className="text-center">
+                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                <SimpleToggle
+                                    checked={preferences.goalRemindersDesktop}
+                                    onChange={(checked) => updatePreference('goalRemindersDesktop', checked)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <Field label="Reminder Timing">
+                        <select
+                            value={preferences.goalReminderTiming}
+                            onChange={(e) => updatePreference('goalReminderTiming', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="5min">5 minutes before</option>
+                            <option value="15min">15 minutes before</option>
+                            <option value="30min">30 minutes before</option>
+                            <option value="1hour">1 hour before</option>
+                            <option value="2hours">2 hours before</option>
+                            <option value="1day">1 day before</option>
+                        </select>
+                    </Field>
+                </div>
+            </Section>
+
+            {/* General Notifications - FIFTH */}
+            <Section 
+                title="General Notifications" 
+                description="Manage basic notification preferences"
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Toggle
+                        label="Email Notifications"
+                        description="Receive updates via email"
+                        checked={preferences.emailNotifications}
+                        onChange={(checked) => updatePreference('emailNotifications', checked)}
+                    />
+                    <Toggle
+                        label="Browser Notifications"
+                        description="Show desktop notifications"
+                        checked={preferences.browserNotifications}
+                        onChange={(checked) => updatePreference('browserNotifications', checked)}
+                    />
+                    <Toggle
+                        label="Mobile Notifications"
+                        description="Push notifications on mobile"
+                        checked={preferences.mobileNotifications}
+                        onChange={(checked) => updatePreference('mobileNotifications', checked)}
+                    />
+                    <Toggle
+                        label="Task Reminders"
+                        description="Alerts for upcoming tasks"
+                        checked={preferences.taskReminders}
+                        onChange={(checked) => updatePreference('taskReminders', checked)}
+                    />
+                    <Toggle
+                        label="Project Updates"
+                        description="Notifications about project changes"
+                        checked={preferences.projectUpdates}
+                        onChange={(checked) => updatePreference('projectUpdates', checked)}
+                    />
+                    <Toggle
+                        label="Deadline Alerts"
+                        description="Warnings for approaching deadlines"
+                        checked={preferences.deadlineAlerts}
+                        onChange={(checked) => updatePreference('deadlineAlerts', checked)}
+                    />
+                </div>
+            </Section>
+            
+            {/* Theme & Display - SIXTH */}
+            <Section 
+                title="Theme & Display" 
+                description="Customize the appearance of your workspace"
+            >
+                <div className="space-y-4">
+                    <Field label="Theme">
+                        <select
+                            value={preferences.theme}
+                            onChange={(e) => updatePreference('theme', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="auto">Auto (System)</option>
+                        </select>
+                    </Field>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Toggle
+                            label="Compact Mode"
+                            description="Reduce spacing for more content"
+                            checked={preferences.compactMode}
+                            onChange={(checked) => updatePreference('compactMode', checked)}
+                        />
+                        <Toggle
+                            label="Show Completed Tasks"
+                            description="Display completed items in lists"
+                            checked={preferences.showCompletedTasks}
+                            onChange={(checked) => updatePreference('showCompletedTasks', checked)}
+                        />
+                        <Toggle
+                            label="Animations"
+                            description="Enable smooth transitions"
+                            checked={preferences.animationsEnabled}
+                            onChange={(checked) => updatePreference('animationsEnabled', checked)}
+                        />
+                    </div>
                 </div>
             </Section>
             
