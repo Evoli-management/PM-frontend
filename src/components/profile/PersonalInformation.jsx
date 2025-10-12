@@ -57,11 +57,14 @@ export const PersonalInformation = ({ showToast }) => {
 
     const loadUserProfile = async () => {
         try {
+            console.log('🚀 STARTING TO LOAD USER PROFILE...');
             setInitialLoading(true);
             const profileData = await userProfileService.getProfile();
-            console.log('Raw profile data from API:', profileData);
+            console.log('🔥 RAW PROFILE DATA FROM API:', profileData);
+            console.log('🔥 RAW PROFILE DATA STRINGIFIED:', JSON.stringify(profileData, null, 2));
             const formattedData = userProfileService.formatProfileData(profileData);
-            console.log('Formatted profile data:', formattedData);
+            console.log('✅ FORMATTED PROFILE DATA:', formattedData);
+            console.log('✅ FORMATTED PROFILE DATA STRINGIFIED:', JSON.stringify(formattedData, null, 2));
             
             // Set personal information
             setSavedPersonal({

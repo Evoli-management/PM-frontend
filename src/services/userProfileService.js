@@ -133,12 +133,18 @@ class UserProfileService {
      * @returns {Object} - Formatted profile data
      */
     formatProfileData(profileData) {
-        console.log('formatProfileData input:', profileData);
+        console.log('🎯 FORMAT PROFILE DATA - INPUT:', profileData);
+        console.log('🎯 FORMAT PROFILE DATA - INPUT STRINGIFIED:', JSON.stringify(profileData, null, 2));
         const { firstName, lastName, fullName, ...rest } = profileData;
+        
+        console.log('🎯 EXTRACTED VALUES:');
+        console.log('   - firstName:', firstName);
+        console.log('   - lastName:', lastName);
+        console.log('   - fullName:', fullName);
         
         // Use fullName from backend if available, otherwise construct from firstName/lastName
         const displayName = fullName || `${firstName || ''} ${lastName || ''}`.trim() || '';
-        console.log('Display name calculated:', displayName, { firstName, lastName, fullName });
+        console.log('🎯 CALCULATED DISPLAY NAME:', displayName);
         
         const result = {
             ...rest,
@@ -148,7 +154,8 @@ class UserProfileService {
             lastName
         };
         
-        console.log('formatProfileData result:', result);
+        console.log('🎯 FORMAT PROFILE DATA - RESULT:', result);
+        console.log('🎯 FORMAT PROFILE DATA - RESULT STRINGIFIED:', JSON.stringify(result, null, 2));
         return result;
     }
 
