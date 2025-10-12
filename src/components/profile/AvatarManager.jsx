@@ -287,6 +287,48 @@ export const AvatarManager = ({
                 className="hidden"
             />
 
+            {/* Permission Dialog */}
+            {showPermissionDialog && (
+                <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold">Camera Permission</h3>
+                            <button
+                                onClick={() => setShowPermissionDialog(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <p className="text-gray-600">
+                                We need camera permission to take photos for your profile. 
+                                Please click "Allow" when prompted by your browser.
+                            </p>
+                            
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setShowPermissionDialog(false)}
+                                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <LoadingButton
+                                    onClick={async () => {
+                                        setShowPermissionDialog(false);
+                                        await openCamera();
+                                    }}
+                                    variant="primary"
+                                >
+                                    Request Permission
+                                </LoadingButton>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Camera Modal */}
             {cameraActive && (
                 <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
@@ -385,6 +427,131 @@ export const AvatarManager = ({
                             >
                                 Apply Crop
                             </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Generate Avatar Modal */}
+            {showAvatarModal && (
+                <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold">Generate Avatar</h3>
+                            <button
+                                onClick={() => setShowAvatarModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {/* Avatar Preview */}
+                            <div className="flex justify-center">
+                                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200">
+                                    <svg
+                                        width="96"
+                                        height="96"
+                                        viewBox="0 0 96 96"
+                                        style={{ background: avatarPalettes[avatarPalette][0] }}
+                                    >
+                                        <circle
+                                            cx="48"
+                                            cy="38"
+                                            r="12"
+                                            fill={avatarPalettes[avatarPalette][1]}
+                                        />
+                                        <rect
+                                            x="30"
+                                            y="60"
+                                            width="36"
+                                            height="24"
+                                            rx="18"
+                                            fill={avatarPalettes[avatarPalette][2]}
+                                        />
+                                        <circle
+                                            cx="38"
+                                            cy="32"
+                                            r="2"
+                                            fill={avatarPalettes[avatarPalette][3]}
+                                        />
+                                        <circle
+                                            cx="58"
+                                            cy="32"
+                                            r="2"
+                                            fill={avatarPalettes[avatarPalette][3]}
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* Seed Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Avatar Seed
+                                </label>
+                                <input
+                                    type="text"
+                                    value={avatarSeed}
+                                    onChange={(e) => setAvatarSeed(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                                    placeholder="Enter name or text"
+                                />
+                            </div>
+
+                            {/* Color Palette */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Color Palette
+                                </label>
+                                <div className="flex gap-2">
+                                    {avatarPalettes.map((palette, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => setAvatarPalette(index)}
+                                            className={`w-8 h-8 rounded border-2 ${
+                                                avatarPalette === index ? 'border-blue-500' : 'border-gray-300'
+                                            }`}
+                                            style={{ background: `linear-gradient(45deg, ${palette[0]}, ${palette[1]})` }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Generate Button */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setAvatarSeed(Math.random().toString(36).substring(7))}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                                >
+                                    🎲 Random
+                                </button>
+                                <LoadingButton
+                                    onClick={() => {
+                                        // Generate avatar as SVG and convert to data URL
+                                        const svg = `
+                                            <svg width="256" height="256" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+                                                <rect width="96" height="96" fill="${avatarPalettes[avatarPalette][0]}"/>
+                                                <circle cx="48" cy="38" r="12" fill="${avatarPalettes[avatarPalette][1]}"/>
+                                                <rect x="30" y="60" width="36" height="24" rx="18" fill="${avatarPalettes[avatarPalette][2]}"/>
+                                                <circle cx="38" cy="32" r="2" fill="${avatarPalettes[avatarPalette][3]}"/>
+                                                <circle cx="58" cy="32" r="2" fill="${avatarPalettes[avatarPalette][3]}"/>
+                                            </svg>
+                                        `;
+                                        const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
+                                        setAvatarPreview(dataUrl);
+                                        localStorage.setItem('pm:avatar', dataUrl);
+                                        showToast('Avatar generated successfully!');
+                                        if (onAvatarChange) onAvatarChange(dataUrl);
+                                        setShowAvatarModal(false);
+                                    }}
+                                    variant="primary"
+                                    className="flex-1"
+                                >
+                                    Generate Avatar
+                                </LoadingButton>
+                            </div>
                         </div>
                     </div>
                 </div>
