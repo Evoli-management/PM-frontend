@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import Sidebar from "../components/shared/Sidebar";
+import { FaBars } from "react-icons/fa";
 
 export default function Teams() {
     // ---------------- Teams & Members UI state (local only) ----------------
@@ -49,6 +50,7 @@ export default function Teams() {
     const [joinMenuOpen, setJoinMenuOpen] = useState(false);
     const [joinMenuFilter, setJoinMenuFilter] = useState("");
     const [draggingMember, setDraggingMember] = useState(null); // { memberId, fromTeamId }
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     // Derived team permissions
     const canCreateTeams = true;
@@ -210,8 +212,27 @@ export default function Teams() {
     return (
         <div className="min-h-screen bg-[#EDEDED] px-2 py-4 sm:px-4 sm:py-6">
             <div className="flex gap-[5mm]">
-                <Sidebar />
+                <Sidebar 
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
+                />
+
+                {/* Mobile backdrop */}
+                {mobileSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+
                 <main className="flex-1">
+                    {/* Mobile menu button */}
+                    <button
+                        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+                        onClick={() => setMobileSidebarOpen(true)}
+                    >
+                        <FaBars className="h-5 w-5 text-gray-600" />
+                    </button>
                     <div className="mx-auto max-w-5xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
                         <div className="space-y-4">
                             <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>

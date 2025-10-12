@@ -1896,6 +1896,7 @@ export default function KeyAreas() {
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState(null);
     const [selectedKA, setSelectedKA] = useState(null);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const [taskTab, setTaskTab] = useState(1);
     const [allTasks, setAllTasks] = useState([]);
@@ -1928,7 +1929,6 @@ export default function KeyAreas() {
     const [editingActivityId, setEditingActivityId] = useState(null);
     const [showTaskHelp, setShowTaskHelp] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
-import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash } from "react-icons/fa";
+import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
 import DontForgetComposer from "../components/tasks/DontForgetComposer.jsx";
 import taskService from "../services/taskService";
 import keyAreaService from "../services/keyAreaService";
@@ -13,6 +13,7 @@ export default function Tasks() {
 
     // Open Don't Forget view if ?dontforget=1
     const [viewMode, setViewMode] = useState("list");
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     // Don’t Forget tasks: now server-backed (tasks without keyAreaId)
     const [tasks, setTasks] = useState([]);
@@ -551,9 +552,28 @@ export default function Tasks() {
 
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50">
-            <Sidebar user={{ name: "Hussein" }} />
+            <Sidebar 
+                user={{ name: "Hussein" }} 
+                mobileOpen={mobileSidebarOpen}
+                onMobileClose={() => setMobileSidebarOpen(false)}
+            />
 
-            <main className="flex-1 p-6">
+            {/* Mobile backdrop */}
+            {mobileSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                />
+            )}
+
+            <main className="flex-1 p-4 sm:p-6">
+                {/* Mobile menu button */}
+                <button
+                    className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+                    onClick={() => setMobileSidebarOpen(true)}
+                >
+                    <FaBars className="h-5 w-5 text-gray-600" />
+                </button>
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     {viewMode === "dont-forget" ? (
                         <div className="p-6">
@@ -904,11 +924,11 @@ export default function Tasks() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full text-sm">
+                                <div className="overflow-x-auto -mx-2 sm:mx-0">
+                                    <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                             <tr>
-                                                <th className="px-3 py-2 text-left w-8">
+                                                <th className="px-2 sm:px-3 py-2 text-left w-8">
                                                     <input
                                                         aria-label="Select all visible"
                                                         type="checkbox"
@@ -919,24 +939,24 @@ export default function Tasks() {
                                                         }
                                                     />
                                                 </th>
-                                                <th className="px-3 py-2 text-left font-semibold w-[220px]">Task</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Assignee</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Quadrant</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Goal</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Tags</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Start Date</th>
-                                                <th className="px-3 py-2 text-left font-semibold">End date</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Deadline</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Duration</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Assignee</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
                                             {dontForgetTasks.map((task) => (
                                                 <React.Fragment key={task.id}>
                                                     <tr className="border-t border-slate-200 hover:bg-slate-50">
-                                                        <td className="px-3 py-2 align-top">
+                                                        <td className="px-2 sm:px-3 py-2 align-top">
                                                             <input
                                                                 type="checkbox"
                                                                 checked={isSelected(task.id)}
@@ -944,16 +964,16 @@ export default function Tasks() {
                                                                 aria-label={`Select ${task.name}`}
                                                             />
                                                         </td>
-                                                        <td className="px-3 py-2 align-top w-[220px]">
+                                                        <td className="px-2 sm:px-3 py-2 align-top w-[160px] sm:w-[220px]">
                                                             <button
                                                                 type="button"
-                                                                className="flex items-start gap-2 text-left hover:underline cursor-pointer"
+                                                                className="flex items-start gap-1 sm:gap-2 text-left hover:underline cursor-pointer w-full"
                                                                 onClick={() => openDfTaskEditor(task)}
                                                                 title="Edit task"
                                                             >
                                                                 <img
                                                                     alt="Don't forget"
-                                                                    className="w-6 h-6 object-contain"
+                                                                    className="w-4 h-4 sm:w-6 sm:h-6 object-contain flex-shrink-0"
                                                                     src={`${import.meta.env.BASE_URL}dont-forget.png`}
                                                                     onError={(e) => {
                                                                         if (e?.currentTarget)
@@ -961,7 +981,7 @@ export default function Tasks() {
                                                                     }}
                                                                 />
                                                                 <span
-                                                                    className={`truncate ${task.completed ? "line-through text-gray-400" : "text-gray-900"}`}
+                                                                    className={`truncate text-xs sm:text-sm ${task.completed ? "line-through text-gray-400" : "text-gray-900"}`}
                                                                     title={task.name}
                                                                 >
                                                                     {task.name}
@@ -973,64 +993,64 @@ export default function Tasks() {
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 hidden sm:table-cell">
                                                             {task.assignee || ""}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top">
+                                                        <td className="px-2 sm:px-3 py-2 align-top">
                                                             <div className="flex items-center gap-2">
                                                                 <span
                                                                     className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"
                                                                     aria-hidden="true"
                                                                 ></span>
-                                                                <span className="capitalize text-slate-800">
+                                                                <span className="capitalize text-slate-800 text-xs sm:text-sm">
                                                                     {task.status || "open"}
                                                                 </span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-2 align-top">
+                                                        <td className="px-2 sm:px-3 py-2 align-top hidden md:table-cell">
                                                             {task.priority === "high" ? (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs border text-red-700 bg-red-50 border-red-200">
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs border text-red-700 bg-red-50 border-red-200">
                                                                     High
                                                                 </span>
                                                             ) : task.priority === "low" ? (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs border text-slate-600 bg-slate-50 border-slate-200">
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs border text-slate-600 bg-slate-50 border-slate-200">
                                                                     Low
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs border text-amber-700 bg-amber-50 border-amber-200">
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs border text-amber-700 bg-amber-50 border-amber-200">
                                                                     Normal
                                                                 </span>
                                                             )}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top">
+                                                        <td className="px-2 sm:px-3 py-2 align-top hidden lg:table-cell">
                                                             <span
                                                                 className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-white ${task.quadrant === "Q1" ? "bg-rose-600" : task.quadrant === "Q2" ? "bg-amber-600" : task.quadrant === "Q3" ? "bg-blue-600" : "bg-emerald-600"}`}
                                                             >
                                                                 {task.quadrant || "—"}
                                                             </span>
                                                         </td>
-                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 hidden lg:table-cell">
                                                             {task.goal ? (
                                                                 task.goal
                                                             ) : (
                                                                 <span className="text-slate-500">—</span>
                                                             )}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top max-w-[240px]">
-                                                            <span className="block truncate text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top max-w-[180px] sm:max-w-[240px] hidden xl:table-cell">
+                                                            <span className="block truncate text-slate-800 text-xs sm:text-sm">
                                                                 {task.tags ? task.tags : "—"}
                                                             </span>
                                                         </td>
-                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
                                                             {task.start_date || ""}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
                                                             {task.end_date || ""}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden lg:table-cell">
                                                             {task.dueDate || ""}
                                                         </td>
-                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
                                                             {task.duration ||
                                                                 formatDurationDays(
                                                                     task.start_date || task.dueDate,
