@@ -43,10 +43,10 @@ export default function VerifyPasswordChange() {
                             The verification link may have expired or already been used.
                         </p>
                         <button
-                            onClick={() => navigate("/settings/security")}
+                            onClick={() => navigate("/profile")}
                             className="bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2"
                         >
-                            Go to Security Settings
+                            Go to Profile Settings
                         </button>
                     </div>
                 )}

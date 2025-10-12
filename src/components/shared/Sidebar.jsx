@@ -5,7 +5,6 @@ import {
     FaCalendarAlt,
     FaLock,
     FaChevronDown,
-    FaCog,
     FaPlus,
     FaSearch,
     FaClock,
@@ -60,7 +59,6 @@ const navItems = [
         section: "Main",
     },
     { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
-    { label: "Settings", icon: <FaCog />, to: "/settings", section: "Main" },
 ];
 
 const quickActions = [

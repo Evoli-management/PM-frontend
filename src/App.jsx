@@ -12,8 +12,6 @@ import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
-// AdminSettings removed
-import AdminSettings from "./pages/AdminSettings.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
 import Modules from "./pages/Modules.jsx";
@@ -75,7 +73,6 @@ export default function App() {
                             <Route path="/verify-email-change" element={<VerifyEmailChange />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
-                            {/* Admin settings routes removed */}
                             <Route path="/dashboard" element={<Dashboard />} />
                             {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
                             <Route path="/tasks" element={<Tasks />} />
@@ -92,8 +89,6 @@ export default function App() {
                             {/* Private routes below */}
                             <Route path="/profile-settings" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
                             <Route path="/profile" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
-                            <Route path="/admin-settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
-                            <Route path="/settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
                             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                             {calendarEnabled && <Route path="/calendar" element={<PrivateRoute><Calendar /></PrivateRoute>} />}
                             <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
