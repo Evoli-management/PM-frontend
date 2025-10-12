@@ -59,7 +59,9 @@ export const PersonalInformation = ({ showToast }) => {
         try {
             setInitialLoading(true);
             const profileData = await userProfileService.getProfile();
+            console.log('Raw profile data from API:', profileData);
             const formattedData = userProfileService.formatProfileData(profileData);
+            console.log('Formatted profile data:', formattedData);
             
             // Set personal information
             setSavedPersonal({

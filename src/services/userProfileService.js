@@ -8,6 +8,7 @@ class UserProfileService {
      */
     async getProfile() {
         const res = await apiClient.get("/user/profile");
+        console.log('Raw API response from /user/profile:', res.data);
         return res.data;
     }
 
@@ -132,18 +133,23 @@ class UserProfileService {
      * @returns {Object} - Formatted profile data
      */
     formatProfileData(profileData) {
+        console.log('formatProfileData input:', profileData);
         const { firstName, lastName, fullName, ...rest } = profileData;
         
         // Use fullName from backend if available, otherwise construct from firstName/lastName
         const displayName = fullName || `${firstName || ''} ${lastName || ''}`.trim() || '';
+        console.log('Display name calculated:', displayName, { firstName, lastName, fullName });
         
-        return {
+        const result = {
             ...rest,
             name: displayName,
             fullName: displayName || 'Anonymous User',
             firstName,
             lastName
         };
+        
+        console.log('formatProfileData result:', result);
+        return result;
     }
 
     /**
