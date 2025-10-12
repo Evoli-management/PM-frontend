@@ -12,6 +12,7 @@ import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
+// AdminSettings removed
 import AdminSettings from "./pages/AdminSettings.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
@@ -31,15 +32,18 @@ import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
 import Tasks from "./pages/Tasks.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
-import VerifyEmail from "./pages/VerifyEmail.jsx";
 import Teams from "./pages/Teams.jsx";
+import VerifyEmail from "./pages/VerifyEmail.jsx";
+import VerifyPasswordChange from "./pages/VerifyPasswordChange.jsx";
+import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
 import Pricing from "./pages/Pricing.jsx";
 
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
     // Only show footer on public/auth pages
     const publicFooterRoutes = [
-        "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", "/verify-email"
+        "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
+        "/verify-email", "/verify-password-change", "/verify-email-change"
     ];
     const currentPath = window.location.hash.replace(/^#\/?/, "/");
     return (
@@ -67,10 +71,11 @@ export default function App() {
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
+                            <Route path="/verify-password-change" element={<VerifyPasswordChange />} />
+                            <Route path="/verify-email-change" element={<VerifyEmailChange />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
-                            <Route path="/admin-settings" element={<AdminSettings />} />
-                            <Route path="/settings" element={<AdminSettings />} />
+                            {/* Admin settings routes removed */}
                             <Route path="/dashboard" element={<Dashboard />} />
                             {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
                             <Route path="/tasks" element={<Tasks />} />

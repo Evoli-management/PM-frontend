@@ -23,6 +23,7 @@ import {
     FaStop,
     FaBars,
     FaEdit,
+    FaLock,
 } from "react-icons/fa";
 
 // InlineAddActivity removed per UI simplification
@@ -2087,13 +2088,23 @@ export default function KeyAreas() {
     // Sidebar sort: Alphabetical A→Z, with "Ideas" (or system default) always last
     const sortForSidebar = React.useCallback((arr) => {
         const items = Array.isArray(arr) ? arr.slice() : [];
-        return items.sort((a, b) => {
-            const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
-            const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
-            if (aIsIdeas && !bIsIdeas) return 1;
-            if (!aIsIdeas && bIsIdeas) return -1;
-            return String(a.title || "").localeCompare(String(b.title || ""));
+        
+        // Separate Ideas/default areas from regular areas
+        const regularAreas = items.filter(item => {
+            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
+            return !isIdeas;
         });
+        
+        const ideasAreas = items.filter(item => {
+            const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
+            return isIdeas;
+        });
+        
+        // Sort regular areas by position
+        const sortedRegular = regularAreas.sort((a, b) => (a.position || 0) - (b.position || 0));
+        
+        // Return regular areas first, then Ideas areas at the end (unordered)
+        return [...sortedRegular, ...ideasAreas];
     }, []);
     const toggleActivitiesRow = (id) => {
         setExpandedActivityRows((prev) => {
@@ -2279,7 +2290,15 @@ export default function KeyAreas() {
         (async () => {
             try {
                 const [kas, gs] = await Promise.all([api.listKeyAreas(), api.listGoals()]);
-                const sorted = (kas || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+                // Ensure Ideas always has position 10
+                const processedKas = (kas || []).map(ka => {
+                    const isIdeas = (ka.title || "").trim().toLowerCase() === "ideas" || !!ka.is_default;
+                    if (isIdeas) {
+                        return { ...ka, position: 10 };
+                    }
+                    return ka;
+                });
+                const sorted = processedKas.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
                 setKeyAreas(sorted);
                 // Do not persist key areas in localStorage; always rely on backend
                 // emit key areas so sidebar can populate its dropdown
@@ -2499,8 +2518,8 @@ export default function KeyAreas() {
             return keyAreas.filter((k) => (k.title || "").toLowerCase() === "ideas" || k.is_default);
         }
 
-        // Default Key Areas listing: exclude Ideas slot (position 10 or title 'Ideas') unless user filtered for it
-        const base = keyAreas.filter((k) => (k.title || "").toLowerCase() !== "ideas" && !k.is_default);
+        // Modified: Include ALL key areas (including Ideas) and let the sorting handle the order
+        const base = keyAreas; // Changed from filtering out Ideas
         if (!q) return base;
         return base.filter((k) => k.title.toLowerCase().includes(q) || (k.description || "").toLowerCase().includes(q));
     }, [keyAreas, filter]);
@@ -2515,14 +2534,16 @@ export default function KeyAreas() {
         const payload = {
             title: form.get("title").toString().trim(),
             description: form.get("description").toString().trim(),
+            color: form.get("color").toString().trim() || "#3B82F6",
         };
         if (!payload.title) return;
 
         if (editing) {
-            // Only update fields changed in the form (no color)
+            // Update all fields including color
             const updated = await api.updateKeyArea(editing.id, {
                 title: payload.title,
                 description: payload.description,
+                color: payload.color,
             });
             setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
             // emit updated list for sidebar (alphabetical with Ideas last)
@@ -2541,6 +2562,7 @@ export default function KeyAreas() {
                 const created = await api.createKeyArea({
                     title: payload.title,
                     description: payload.description,
+                    color: payload.color,
                     position: pos,
                     is_default: false,
                 });
@@ -3218,7 +3240,10 @@ export default function KeyAreas() {
                                                     if (e?.currentTarget) e.currentTarget.src = "/key-area.png";
                                                 }}
                                             />
-                                            <span className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1">
+                                            <span 
+                                                className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1"
+                                                style={{ color: selectedKA.color || '#1F2937' }}
+                                            >
                                                 {selectedKA.title}
                                             </span>
                                         </div>
@@ -4556,7 +4581,15 @@ export default function KeyAreas() {
                                         <ol className="divide-y divide-slate-200">
                                             {filteredKAs
                                                 .slice()
-                                                .sort((a, b) => (a.position || 0) - (b.position || 0))
+                                                .sort((a, b) => {
+                                                    // Ideas/default areas always go to the end
+                                                    const aIsIdeas = (a.title || "").toLowerCase() === "ideas" || a.is_default;
+                                                    const bIsIdeas = (b.title || "").toLowerCase() === "ideas" || b.is_default;
+                                                    if (aIsIdeas && !bIsIdeas) return 1;
+                                                    if (!aIsIdeas && bIsIdeas) return -1;
+                                                    // For non-Ideas areas, sort by position
+                                                    return (a.position || 0) - (b.position || 0);
+                                                })
                                                 .map((ka, idx) => (
                                                     <li
                                                         key={ka.id}
@@ -4586,7 +4619,10 @@ export default function KeyAreas() {
                                                             </span>
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-2 min-w-0">
-                                                                    <span className="font-semibold text-slate-900 truncate">
+                                                                    <span 
+                                                                        className="font-semibold truncate"
+                                                                        style={{ color: ka.color || '#1F2937' }}
+                                                                    >
                                                                         {ka.title}
                                                                     </span>
                                                                     {ka.is_default && (
@@ -5585,7 +5621,45 @@ export default function KeyAreas() {
                                                 placeholder="What belongs to this area?"
                                             />
                                         </div>
-                                        {/* Color inputs removed per request */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-900">Color</label>
+                                            <div className="mt-2 flex items-center gap-3">
+                                                <input
+                                                    type="color"
+                                                    name="color"
+                                                    defaultValue={editing?.color || "#3B82F6"}
+                                                    className="w-12 h-10 rounded-lg border border-slate-300 cursor-pointer"
+                                                    title="Choose color for this Key Area"
+                                                />
+                                                <div className="flex flex-wrap gap-2">
+                                                    {/* Preset color options */}
+                                                    {[
+                                                        "#3B82F6", // Blue
+                                                        "#EF4444", // Red  
+                                                        "#10B981", // Green
+                                                        "#F59E0B", // Amber
+                                                        "#8B5CF6", // Purple
+                                                        "#EC4899", // Pink
+                                                        "#06B6D4", // Cyan
+                                                        "#84CC16", // Lime
+                                                        "#F97316", // Orange
+                                                        "#6B7280", // Gray
+                                                    ].map(color => (
+                                                        <button
+                                                            key={color}
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                const colorInput = e.target.closest('form').querySelector('input[name="color"]');
+                                                                if (colorInput) colorInput.value = color;
+                                                            }}
+                                                            className="w-6 h-6 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+                                                            style={{ backgroundColor: color }}
+                                                            title={`Set color to ${color}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
                                                 <FaSave /> Save

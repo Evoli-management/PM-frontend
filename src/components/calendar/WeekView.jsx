@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import { generateTimeSlots } from "../../utils/timeUtils";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 function getWeekNumber(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -9,18 +12,8 @@ function getWeekNumber(date) {
 }
 
 const defaultSlotSize = 30;
-const timeSlots = (slotSize) => {
-    const slots = [];
-    // Full day: 00:00 – 23:30
-    for (let h = 0; h <= 23; h++) {
-        for (let m = 0; m < 60; m += slotSize) {
-            slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-        }
-    }
-    return slots;
-};
 
-import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
 const WeekView = ({
     currentDate,
@@ -40,8 +33,18 @@ const WeekView = ({
     filterType,
     onChangeFilter,
     loading = false,
+    activities = [],
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
+    const { 
+        timeSlots, 
+        formattedTimeSlots, 
+        workingHours, 
+        formatTime,
+        formatDate,
+        loading: prefsLoading,
+        updateSlotSize 
+    } = useCalendarPreferences(slotSize);
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
     // Fixed time column width; day columns will flex to fill available space
@@ -58,14 +61,22 @@ const WeekView = ({
         { length: 7 },
         (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
     );
-    const slots = timeSlots(slotSize);
+    
+    // Use dynamic time slots from working hours, fallback to default if still loading
+    const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("08:00", "17:00", slotSize);
+    
     const ITEM_SIZE = 38; // px per time slot row
     const LIST_HEIGHT_PX = 400; // fixed viewport height for grid scroll
     const weekNum = getWeekNumber(weekStart);
 
     // No explicit width calculations; columns will flex to fit container
 
-    // Map vertical wheel to horizontal scroll on tasks scroller for better UX
+    // Update time slots when slot size changes
+    useEffect(() => {
+        if (updateSlotSize) {
+            updateSlotSize(slotSize);
+        }
+    }, [slotSize, updateSlotSize]);
     useEffect(() => {
         const el = tasksScrollRef.current;
         if (!el) return;
@@ -126,7 +137,7 @@ const WeekView = ({
     // Range label for the week
     const endOfWeek = new Date(weekStart);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
-    const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${endOfWeek.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+    const weekLabel = `${formatDate(weekStart)} — ${formatDate(endOfWeek)}`;
 
     // Helper: does event start match this slot (rounded to nearest slot size)?
     const eventMatchesSlot = (startIso, day, slot, sizeMin) => {
@@ -158,6 +169,7 @@ const WeekView = ({
     };
 
     return (
+        <>
         <div className="p-0" style={{ overflow: "hidden" }}>
             {/* Header with navigation inside the view */}
             <div className="flex items-center justify-between mb-2">
@@ -212,9 +224,14 @@ const WeekView = ({
                 </div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
                     {weekLabel}
-                    {loading && (
+                    {(loading || prefsLoading) && (
                         <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                             Loading
+                        </span>
+                    )}
+                    {workingHours.startTime && workingHours.endTime && (
+                        <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                            {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
                         </span>
                     )}
                 </h2>
@@ -279,7 +296,7 @@ const WeekView = ({
                                             key={dIdx}
                                             className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${dIdx === days.length - 1 ? "rounded-tr-lg" : ""}`}
                                         >
-                                            {date.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+                                            {formatDate(date, { includeWeekday: true, shortWeekday: true })}
                                         </th>
                                     ))}
                                 </tr>
@@ -317,24 +334,24 @@ const WeekView = ({
                                     return (
                                         <div
                                             key={index}
-                                            style={style}
+                                            style={{ ...style, overflow: "visible" }}
                                             className={`flex w-full ${index % 2 === 0 ? "bg-blue-50" : "bg-white"}`}
                                         >
                                             <div
                                                 className="border-r border-blue-100 px-2 py-1 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center"
                                                 style={{ width: TIME_COL_PX + "px" }}
                                             >
-                                                {slot}
+                                                {formatTime(slot)}
                                             </div>
                                             {days.map((date, dIdx) => {
                                                 const slotEvents = events.filter((ev) =>
-                                                    eventMatchesSlot(ev.start, date, slot, slotSize),
+                                                    eventMatchesSlot(ev.start, date, slot, slotSize) && !ev.taskId
                                                 );
                                                 return (
                                                     <div
                                                         key={dIdx}
-                                                        className="border-r border-blue-100 px-2 py-1 h-8 align-top group flex items-center"
-                                                        style={{ flex: "1 1 0", minWidth: 0 }}
+                                                        className="border-r border-blue-100 px-2 py-1 align-top group flex items-center relative overflow-visible"
+                                                        style={{ flex: "1 1 0", minWidth: 0, height: ITEM_SIZE }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => handleDrop(e, date, slot)}
                                                         onDoubleClick={() => {
@@ -352,16 +369,28 @@ const WeekView = ({
                                                         {slotEvents.length === 0
                                                             ? null
                                                             : slotEvents.map((ev, i) => {
-                                                                  const isTaskBox = !!ev.taskId;
+                                                                  const evStart = ev.start ? new Date(ev.start) : null;
+                                                                  const evEnd = ev.end ? new Date(ev.end) : null;
+                                                                  const startMs = evStart ? evStart.getTime() : 0;
+                                                                  const endMs = evEnd ? evEnd.getTime() : 0;
+                                                                  const durMs = endMs > startMs ? endMs - startMs : slotSize * 60000;
+                                                                  const heightPx = Math.max(ITEM_SIZE * (durMs / (slotSize * 60000)) - 4, ITEM_SIZE - 4);
+                                                                  const [sh, sm] = slot.split(":");
+                                                                  const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number(sh), Number(sm));
+                                                                  const withinSlotMin = evStart ? Math.max(0, Math.min(slotSize, (evStart.getTime() - slotStart.getTime()) / 60000)) : 0;
+                                                                  const withinSlotTop = (withinSlotMin / slotSize) * ITEM_SIZE;
                                                                   return (
                                                                       <div
                                                                           key={i}
-                                                                          className={`px-2 py-1 mb-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden ${isTaskBox ? "" : categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                                          style={
-                                                                              isTaskBox
-                                                                                  ? { backgroundColor: "#7ED4E3" }
-                                                                                  : undefined
-                                                                          }
+                                                                          className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${categories[ev.kind]?.color || "bg-gray-200"}`}
+                                                                          style={{
+                                                                              position: "absolute",
+                                                                              left: 2,
+                                                                              right: 2,
+                                                                              top: 2 + withinSlotTop,
+                                                                              height: heightPx,
+                                                                              zIndex: 5,
+                                                                          }}
                                                                           draggable
                                                                           onDragStart={(e) => {
                                                                               try {
@@ -380,16 +409,43 @@ const WeekView = ({
                                                                                   e.dataTransfer.effectAllowed = "move";
                                                                               } catch {}
                                                                           }}
-                                                                          onClick={() => onEventClick(ev)}
                                                                       >
-                                                                          {!isTaskBox && (
-                                                                              <span className="shrink-0">
-                                                                                  {categories[ev.kind]?.icon || ""}
-                                                                              </span>
-                                                                          )}
-                                                                          <span className="truncate whitespace-nowrap text-xs min-w-0">
+                                                                          <span className="shrink-0">
+                                                                              {categories[ev.kind]?.icon || ""}
+                                                                          </span>
+                                                                          <span
+                                                                              className="truncate whitespace-nowrap text-xs min-w-0 flex-1"
+                                                                              tabIndex={0}
+                                                                              aria-label={ev.title}
+                                                                          >
                                                                               {ev.title}
                                                                           </span>
+                                                                          
+                                                                          {/* Action Icons - shown on hover */}
+                                                                          <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                                                                              <button
+                                                                                  className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                                  onClick={(e) => {
+                                                                                      e.stopPropagation();
+                                                                                      onEventClick && onEventClick(ev, 'edit');
+                                                                                  }}
+                                                                                  aria-label={`Edit ${ev.title}`}
+                                                                                  title="Edit appointment"
+                                                                              >
+                                                                                  <FaEdit className="w-3 h-3 text-blue-600" />
+                                                                              </button>
+                                                                              <button
+                                                                                  className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                                  onClick={(e) => {
+                                                                                      e.stopPropagation();
+                                                                                      onEventClick && onEventClick(ev, 'delete');
+                                                                                  }}
+                                                                                  aria-label={`Delete ${ev.title}`}
+                                                                                  title="Delete appointment"
+                                                                              >
+                                                                                  <FaTrash className="w-3 h-3 text-red-600" />
+                                                                              </button>
+                                                                          </div>
                                                                       </div>
                                                                   );
                                                               })}
@@ -402,88 +458,117 @@ const WeekView = ({
                             </FixedSizeList>
                         </div>
                     </div>
-                    {/* Dated tasks panel for drag-and-drop */}
-                    <div className="flex w-full bg-white border border-blue-100 rounded-b-lg mt-2">
-                        <div className="p-2" style={{ width: TIME_COL_PX + "px" }}>
-                            <div className="text-xs text-blue-500">Added Tasks</div>
-                        </div>
-                        <div className="p-2 min-w-0 relative" style={{ flex: "1 1 auto" }}>
-                            <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
-                                {(Array.isArray(todos) ? todos : []).map((t) => (
-                                    <div
-                                        key={t.id}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            try {
-                                                e.dataTransfer.setData("taskId", String(t.id));
-                                                e.dataTransfer.effectAllowed = "copy";
-                                            } catch {}
-                                        }}
-                                        className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
-                                        style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
-                                        title={t.title}
-                                        onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                    >
-                                        <div className="truncate font-medium">{t.title}</div>
-                                    </div>
-                                ))}
-                            </div>
-                            {/* Scroll cues and buttons */}
-                            {showTasksLeftCue && (
-                                <>
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
-                                    <button
-                                        type="button"
-                                        className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
-                                        aria-label="Scroll left"
-                                        onClick={() =>
-                                            tasksScrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })
-                                        }
-                                    >
-                                        <FaChevronLeft />
-                                    </button>
-                                </>
-                            )}
-                            {showTasksRightCue && (
-                                <>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
-                                    <button
-                                        type="button"
-                                        className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
-                                        aria-label="Scroll right"
-                                        onClick={() =>
-                                            tasksScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
-                                        }
-                                    >
-                                        <FaChevronRight />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                    {/* Add task/activity button at the very bottom of the container (outside the scroller) */}
-                    <div className="flex w-full bg-blue-50 rounded-b-lg border-t border-blue-100">
-                        <div style={{ width: TIME_COL_PX + "px" }}></div>
-                        {days.map((date, dIdx) => (
-                            <div
-                                key={dIdx}
-                                className={`px-2 py-1 text-center align-top ${dIdx === days.length - 1 ? "rounded-br-lg" : ""}`}
-                                style={{ flex: "1 1 0", minWidth: 0 }}
-                            >
+                    {/* Two rows: first for Add Task + task list, second for Add Activity + activity list */}
+                    <div className="flex flex-col w-full bg-white border border-blue-100 rounded-b-lg mt-2">
+                        {/* Row 1: Add Task + Task List */}
+                        <div className="flex w-full border-b border-blue-50">
+                            <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>
                                 <button
-                                    className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs w-full leading-tight whitespace-nowrap"
-                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(date)}
-                                    aria-label="Add task or activity"
+                                    type="button"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })}
                                 >
-                                    Add task/activity
+                                    <span style={{ fontWeight: "bold" }}>+</span>
+                                    <span>Add task</span>
                                 </button>
                             </div>
-                        ))}
+                            <div style={{ width: '16px' }} /> {/* Gap between button and list */}
+                            <div className="p-2 min-w-0 relative flex-1 flex items-center">
+                                <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
+                                    {(Array.isArray(todos) ? todos : []).map((t) => (
+                                        <div
+                                            key={t.id}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                try {
+                                                    e.dataTransfer.setData("taskId", String(t.id));
+                                                    e.dataTransfer.effectAllowed = "copy";
+                                                } catch {}
+                                            }}
+                                            className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
+                                            style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
+                                            title={t.title}
+                                            onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                        >
+                                            <div className="truncate font-medium">{t.title}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Scroll cues and buttons */}
+                                {showTasksLeftCue && (
+                                    <>
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
+                                        <button
+                                            type="button"
+                                            className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
+                                            aria-label="Scroll left"
+                                            onClick={() =>
+                                                tasksScrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })
+                                            }
+                                        >
+                                            <FaChevronLeft />
+                                        </button>
+                                    </>
+                                )}
+                                {showTasksRightCue && (
+                                    <>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
+                                        <button
+                                            type="button"
+                                            className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
+                                            aria-label="Scroll right"
+                                            onClick={() =>
+                                                tasksScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
+                                            }
+                                        >
+                                            <FaChevronRight />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        {/* Row 2: Add Activity + Activity List */}
+                        <div className="flex w-full">
+                            <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })}
+                                >
+                                    <span style={{ fontWeight: "bold" }}>+</span>
+                                    <span>Add activity</span>
+                                </button>
+                            </div>
+                            <div className="p-2 min-w-0 flex-1 flex items-center ml-8">
+                                <div className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
+                                    {(Array.isArray(activities) ? activities : []).map((a) => (
+                                        <div
+                                            key={a.id}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                try {
+                                                    e.dataTransfer.setData("activityId", String(a.id || ""));
+                                                    e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
+                                                    e.dataTransfer.effectAllowed = "copyMove";
+                                                } catch {}
+                                            }}
+                                            className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
+                                            style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
+                                            title={a.text || a.title}
+                                        >
+                                            <FaBars aria-hidden="true" />
+                                            <div className="truncate font-medium">{a.text || a.title}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             {/* Removed To-Do List Panel per request */}
         </div>
+        </>
     );
 };
 

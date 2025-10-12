@@ -3,6 +3,7 @@ import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import keyAreaService from "../../services/keyAreaService";
 import { getGoals } from "../../services/goalService";
+import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 
 const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEventDeleted }) => {
     if (!event) return null;
@@ -87,6 +88,10 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                 return;
             }
             setSaving(true);
+            if (!withinBusinessHours(s) || !withinBusinessHours(e)) {
+                addToast({ title: "Outside business hours", description: "Allowed 08:00–17:00", variant: "error" });
+                return;
+            }
             const payload = {
                 title: title.trim(),
                 description: notes || null,
@@ -115,6 +120,10 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
             const end = event.end ? new Date(event.end) : null;
             const newStart = new Date(start.getTime() + minutes * 60 * 1000);
             const newEnd = end ? new Date(end.getTime() + minutes * 60 * 1000) : null;
+            if (!withinBusinessHours(newStart) || (newEnd && !withinBusinessHours(newEnd))) {
+                addToast({ title: "Outside business hours", description: "Use 08:00–17:00", variant: "warning" });
+                return;
+            }
             const updated = await calendarService.updateEvent(event.id, {
                 start: newStart.toISOString(),
                 end: newEnd ? newEnd.toISOString() : null,
@@ -131,7 +140,13 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
         try {
             const end = event.end ? new Date(event.end) : null;
             if (!end) return;
-            const newEnd = new Date(end.getTime() + deltaMinutes * 60 * 1000);
+            // Snap to 30-minute increments
+            const snappedDelta = Math.round(deltaMinutes / 30) * 30;
+            const newEnd = new Date(end.getTime() + snappedDelta * 60 * 1000);
+            if (!withinBusinessHours(newEnd)) {
+                addToast({ title: "Outside business hours", description: "Use 08:00–17:00", variant: "warning" });
+                return;
+            }
             const updated = await calendarService.updateEvent(event.id, {
                 end: newEnd.toISOString(),
             });
@@ -144,6 +159,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
     };
     const remove = async () => {
         try {
+            if (!window.confirm("Delete this event?")) return;
             await calendarService.deleteEvent(event.id);
             onEventDeleted && onEventDeleted(event.id);
             onClose && onClose();

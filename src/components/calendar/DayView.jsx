@@ -1,14 +1,8 @@
 import React from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
-
-// 00:00–23:30, half-hour increments
-const hours = Array.from({ length: 48 }, (_, i) => {
-    const h = Math.floor(i / 2);
-    const m = i % 2 === 0 ? "00" : "30";
-    return `${h.toString().padStart(2, "0")}:${m}`;
-});
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
 export default function DayView({
     currentDate,
@@ -22,6 +16,7 @@ export default function DayView({
     categories,
     onTaskDrop,
     onEventMove,
+    onActivityDrop,
     onEventClick,
     onTaskClick,
     onPlanTomorrow,
@@ -31,9 +26,57 @@ export default function DayView({
     onAddTaskOrActivity,
     loading = false,
 }) {
+    const { 
+        timeSlots, 
+        formattedTimeSlots, 
+        workingHours, 
+        formatTime,
+        formatDate,
+        loading: prefsLoading 
+    } = useCalendarPreferences(30);
     const [showViewMenu, setShowViewMenu] = React.useState(false);
+    
+    // Use dynamic hours from working preferences, fallback to default if still loading
+    const hours = timeSlots.length > 0 ? timeSlots : [
+        "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00"
+    ];
+
+    // Create a formatted hours array for display
+    const formattedHours = hours.map(hour => ({
+        value: hour,
+        display: formatTime(hour)
+    }));
+    
     const today = currentDate || new Date();
     const slotSizeMin = 30;
+    const SLOT_ROW_PX = 38; // visual height per 30-min slot, aligns with WeekView
+    const overlapsSlot = (ev, refDate, slot) => {
+        try {
+            if (!ev?.start || !ev?.end) return matchesSlot(ev?.start, refDate, slot); // fallback to start-only
+            const [sh, sm] = slot.split(":");
+            const slotStart = new Date(
+                refDate.getFullYear(),
+                refDate.getMonth(),
+                refDate.getDate(),
+                Number(sh),
+                Number(sm),
+            );
+            const slotEnd = new Date(slotStart.getTime() + slotSizeMin * 60000);
+            const start = new Date(ev.start);
+            const end = new Date(ev.end);
+            if (
+                start.getFullYear() !== refDate.getFullYear() ||
+                start.getMonth() !== refDate.getMonth() ||
+                start.getDate() !== refDate.getDate()
+            )
+                return false;
+            return start < slotEnd && end > slotStart; // overlap
+        } catch {
+            return false;
+        }
+    };
     // Build date-only value for comparisons and filter todos to those spanning today
     const toDateOnly = (iso) => {
         if (!iso) return null;
@@ -104,6 +147,15 @@ export default function DayView({
             if (taskId) {
                 const task = todos.find((t) => String(t.id) === String(taskId));
                 if (task) onTaskDrop && onTaskDrop(task, date);
+                return;
+            }
+            const activityText = e.dataTransfer.getData("activityText");
+            const activityId = e.dataTransfer.getData("activityId");
+            if (activityText || activityId) {
+                const a = activityId
+                    ? dayActivities.find((x) => String(x.id) === String(activityId)) || { id: activityId, text: activityText }
+                    : { text: activityText };
+                onActivityDrop && onActivityDrop(a, date);
             }
         } catch {}
     };
@@ -162,15 +214,15 @@ export default function DayView({
                         </div>
                     </div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        {today.toLocaleDateString(undefined, {
-                            weekday: "long",
-                            month: "long",
-                            day: "numeric",
-                            year: "numeric",
-                        })}
-                        {loading && (
+                        {formatDate(today, { includeWeekday: true, longMonth: true })}
+                        {(loading || prefsLoading) && (
                             <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                                 Loading
+                            </span>
+                        )}
+                        {workingHours.startTime && workingHours.endTime && (
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
                             </span>
                         )}
                     </h2>
@@ -224,70 +276,158 @@ export default function DayView({
                         </thead>
                         <tbody>
                             {hours.map((h, idx) => {
-                                const slotEvents = events.filter((ev) => matchesSlot(ev.start, today, h));
+                                // Calculate slot start/end
+                                const [hh, mm] = h.split(":");
+                                const slotStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm));
+                                const nextSlot = hours[idx + 1];
+                                const slotEnd = nextSlot
+                                    ? new Date(today.getFullYear(), today.getMonth(), today.getDate(), ...nextSlot.split(":").map(Number))
+                                    : new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm) + 30);
+                                // Only render bars in the slot where the event starts
+                                const renderEvents = events.filter((ev) => {
+                                    const evStart = new Date(ev.start);
+                                    return evStart.getHours() === slotStart.getHours() && evStart.getMinutes() === slotStart.getMinutes();
+                                });
+                                const isBoundary = h === workingHours.endTime; // non-interactive row
+                                const formattedHour = formattedHours.find(fh => fh.value === h);
                                 return (
                                     <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
                                         <td className="border-t border-r border-blue-100 px-2 py-1 text-xs w-24 align-top">
-                                            <span>{h}</span>
+                                            <span>{formattedHour ? formattedHour.display : h}</span>
                                         </td>
                                         <td
-                                            className="border-t border-blue-100 px-2 py-1 align-top"
-                                            style={{ width: "100%" }}
-                                            onDoubleClick={() => {
-                                                const [hh, mm] = h.split(":");
-                                                const date = new Date(
-                                                    today.getFullYear(),
-                                                    today.getMonth(),
-                                                    today.getDate(),
-                                                    Number(hh),
-                                                    Number(mm),
-                                                );
-                                                onQuickCreate && onQuickCreate(date);
-                                            }}
+                                            className={`border-t border-blue-100 px-2 py-1 align-top relative ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
+                                            style={{ width: "100%", minHeight: 32 }}
+                                            {...(!isBoundary && {
+                                                onDoubleClick: () => {
+                                                    const [hh, mm] = h.split(":");
+                                                    const date = new Date(
+                                                        today.getFullYear(),
+                                                        today.getMonth(),
+                                                        today.getDate(),
+                                                        Number(hh),
+                                                        Number(mm),
+                                                    );
+                                                    onQuickCreate && onQuickCreate(date);
+                                                },
+                                                onDragOver: (e) => {
+                                                    try {
+                                                        e.preventDefault();
+                                                        e.dataTransfer.dropEffect = "copy";
+                                                    } catch {}
+                                                },
+                                                onDrop: (e) => handleDrop(e, h),
+                                            })}
                                         >
-                                            {slotEvents.length === 0
-                                                ? null
-                                                : slotEvents.map((ev, i) => {
-                                                      const isTaskBox = !!ev.taskId;
-                                                      return (
-                                                          <div
-                                                              key={i}
-                                                              className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden ${
-                                                                  isTaskBox
-                                                                      ? ""
-                                                                      : categories[ev.kind]?.color || "bg-gray-200"
-                                                              }`}
-                                                              style={
-                                                                  isTaskBox ? { backgroundColor: "#7ED4E3" } : undefined
-                                                              }
-                                                              draggable
-                                                              onDragStart={(e) => {
-                                                                  try {
-                                                                      e.dataTransfer.setData("eventId", String(ev.id));
-                                                                      const dur = ev.end
-                                                                          ? new Date(ev.end).getTime() -
-                                                                            new Date(ev.start).getTime()
-                                                                          : 60 * 60 * 1000;
-                                                                      e.dataTransfer.setData(
-                                                                          "durationMs",
-                                                                          String(Math.max(dur, 0)),
-                                                                      );
-                                                                      e.dataTransfer.effectAllowed = "move";
-                                                                  } catch {}
-                                                              }}
-                                                              onClick={() => onEventClick(ev)}
-                                                          >
-                                                              {!isTaskBox && (
-                                                                  <span className="shrink-0">
-                                                                      {categories[ev.kind]?.icon || ""}
-                                                                  </span>
-                                                              )}
-                                                              <span className="truncate whitespace-nowrap text-xs min-w-0">
-                                                                  {ev.title}
-                                                              </span>
-                                                          </div>
-                                                      );
-                                                  })}
+                                            <div style={{ position: "relative", minHeight: 32 }}>
+                                                {renderEvents.map((ev, i) => {
+                                                    const isTaskBox = !!ev.taskId;
+                                                    // Calculate bar height to span all overlapping slots
+                                                    const evStart = new Date(ev.start);
+                                                    const evEnd = ev.end ? new Date(ev.end) : new Date(evStart.getTime() + 30 * 60000);
+                                                    const slotIdx = idx;
+                                                    // Find which slot index the event ends in
+                                                    let endIdx = slotIdx;
+                                                    for (let j = slotIdx + 1; j < hours.length; j++) {
+                                                        const [ehh, emm] = hours[j].split(":");
+                                                        const slotEndTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(ehh), Number(emm));
+                                                        if (slotEndTime > evEnd) break;
+                                                        endIdx = j;
+                                                    }
+                                                    const barHeight = (endIdx - slotIdx + 1) * 32 - 4; // 32px per slot, minus small gap
+                                                    // Check if next event starts at the end of this event
+                                                    let showBoundary = false;
+                                                    if (i < renderEvents.length - 1) {
+                                                        const nextEv = renderEvents[i + 1];
+                                                        const evEndTime = ev.end ? new Date(ev.end) : new Date(evStart.getTime() + 30 * 60000);
+                                                        const nextEvStartTime = new Date(nextEv.start);
+                                                        if (evEndTime.getTime() === nextEvStartTime.getTime()) {
+                                                            showBoundary = true;
+                                                        }
+                                                    }
+                                                    return (
+                                                        <>
+                                                            <div
+                                                                key={i}
+                                                                className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden group ${
+                                                                    isTaskBox
+                                                                        ? ""
+                                                                        : categories[ev.kind]?.color || "bg-gray-200"
+                                                                }`}
+                                                                style={{
+                                                                    position: "absolute",
+                                                                    left: 0,
+                                                                    right: 0,
+                                                                    top: 0,
+                                                                    height: barHeight,
+                                                                    backgroundColor: isTaskBox ? "#7ED4E3" : undefined,
+                                                                    zIndex: 2,
+                                                                    boxShadow: "0 2px 8px -2px rgba(0,0,0,0.08)",
+                                                                    border: "1.5px solid #2563eb",
+                                                                }}
+                                                                draggable
+                                                                onDragStart={(e) => {
+                                                                    try {
+                                                                        e.dataTransfer.setData("eventId", String(ev.id));
+                                                                        const dur = ev.end
+                                                                            ? new Date(ev.end).getTime() - new Date(ev.start).getTime()
+                                                                            : 60 * 60 * 1000;
+                                                                        e.dataTransfer.setData("durationMs", String(Math.max(dur, 0)));
+                                                                        e.dataTransfer.effectAllowed = "move";
+                                                                    } catch {}
+                                                                }}
+                                                                onClick={() => onEventClick(ev)}
+                                                            >
+                                                                {!isTaskBox && (
+                                                                    <span className="shrink-0">
+                                                                        {categories[ev.kind]?.icon || ""}
+                                                                    </span>
+                                                                )}
+                                                                <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1">
+                                                                    {ev.title}
+                                                                </span>
+                                                                {!isTaskBox && (
+                                                                    <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                                                                        <button
+                                                                            className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onEventClick && onEventClick(ev, 'edit');
+                                                                            }}
+                                                                            aria-label={`Edit ${ev.title}`}
+                                                                            title="Edit appointment"
+                                                                        >
+                                                                            <FaEdit className="w-3 h-3 text-blue-600" />
+                                                                        </button>
+                                                                        <button
+                                                                            className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onEventClick && onEventClick(ev, 'delete');
+                                                                            }}
+                                                                            aria-label={`Delete ${ev.title}`}
+                                                                            title="Delete appointment"
+                                                                        >
+                                                                            <FaTrash className="w-3 h-3 text-red-600" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {showBoundary && (
+                                                                <div style={{
+                                                                    position: "absolute",
+                                                                    left: 0,
+                                                                    right: 0,
+                                                                    top: barHeight - 2,
+                                                                    height: 4,
+                                                                    background: "#fff",
+                                                                    zIndex: 3,
+                                                                }} />
+                                                            )}
+                                                        </>
+                                                    );
+                                                })}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -346,6 +486,15 @@ export default function DayView({
                                                 className="w-full px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center gap-2 text-left"
                                                 title={t.title}
                                                 onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    try {
+                                                        e.dataTransfer.setData("taskId", String(t.id));
+                                                        e.dataTransfer.setData("title", t.title || "");
+                                                        e.dataTransfer.setData("description", t.description || "");
+                                                        e.dataTransfer.effectAllowed = "copyMove";
+                                                    } catch {}
+                                                }}
                                             >
                                                 <svg
                                                     stroke="currentColor"
@@ -374,6 +523,14 @@ export default function DayView({
                                                 key={a.id}
                                                 className="w-full px-2 py-1 rounded bg-white border border-slate-200 text-xs text-slate-700 flex items-center gap-2"
                                                 title={a.text || a.title}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    try {
+                                                        e.dataTransfer.setData("activityId", String(a.id || ""));
+                                                        e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
+                                                        e.dataTransfer.effectAllowed = "copyMove";
+                                                    } catch {}
+                                                }}
                                             >
                                                 <svg
                                                     stroke="currentColor"
