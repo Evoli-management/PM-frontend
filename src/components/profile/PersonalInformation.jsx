@@ -120,16 +120,19 @@ export const PersonalInformation = ({ showToast }) => {
     };
 
     const validatePersonalForm = () => {
+        const firstName = personalDraft.name.split(' ')[0] || '';
+        const lastName = personalDraft.name.split(' ').slice(1).join(' ') || '';
+        
         const validation = userProfileService.validateProfileData({
-            firstName: personalDraft.name.split(' ')[0] || '',
-            lastName: personalDraft.name.split(' ').slice(1).join(' ') || '',
+            firstName: firstName,
+            lastName: lastName,
             phone: personalDraft.phone
         });
 
         const newErrors = {};
         
-        if (!personalDraft.name.trim()) {
-            newErrors.name = "Name is required";
+        if (!firstName.trim()) {
+            newErrors.firstName = "First name is required";
         }
         
         if (validation.errors.phone) {
@@ -290,55 +293,79 @@ export const PersonalInformation = ({ showToast }) => {
 
     return (
         <div className="space-y-6">
-            {/* Avatar Section */}
-            <Section title="Profile Picture" icon="👤">
-                <AvatarManager 
-                    avatarPreview={avatarPreview}
-                    setAvatarPreview={setAvatarPreview}
-                    onAvatarChange={handleAvatarUpdate}
-                    showToast={showToast}
-                />
-            </Section>
-
-            {/* Personal Information Section */}
-            <Section title="Personal Information" icon="👤">
-                <div className="space-y-4">
-                    <Field 
-                        label="Full Name" 
-                        value={isEditingPersonal ? personalDraft.name : savedPersonal.name}
-                        isEditing={isEditingPersonal}
-                        onChange={handlePersonalChange('name')}
-                        error={errors.name}
-                        placeholder="Enter your full name"
-                        required
-                    />
-                    
-                    {/* Email Address - Read Only (editable in Security settings) */}
-                    <div>
-                        <label className="block text-sm font-medium mb-2">
-                            Email Address <span className="text-destructive">*</span>
-                            <span className="ml-2 text-xs text-muted-foreground">(Change in Security settings)</span>
-                        </label>
-                        <input
-                            type="email"
-                            value={savedPersonal.email}
-                            className="w-full p-3 border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
-                            disabled
-                            readOnly
+            {/* Profile Picture and Basic Info - Horizontal Layout */}
+            <Section title="Personal Details" icon="👤">
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                    {/* Profile Picture on the left */}
+                    <div className="flex-shrink-0">
+                        <AvatarManager 
+                            avatarPreview={avatarPreview}
+                            setAvatarPreview={setAvatarPreview}
+                            onAvatarChange={handleAvatarUpdate}
+                            showToast={showToast}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Email cannot be changed here as it's used for login. Use Security settings to change email.
-                        </p>
                     </div>
                     
-                    <Field 
-                        label="Phone Number" 
-                        value={isEditingPersonal ? personalDraft.phone : savedPersonal.phone}
-                        isEditing={isEditingPersonal}
-                        onChange={handlePersonalChange('phone')}
-                        error={errors.phone}
-                        placeholder="Enter your phone number"
-                    />
+                    {/* Name fields on the right */}
+                    <div className="flex-1 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Field 
+                                label="First Name" 
+                                value={isEditingPersonal ? personalDraft.name.split(' ')[0] || '' : savedPersonal.name.split(' ')[0] || ''}
+                                isEditing={isEditingPersonal}
+                                onChange={(e) => {
+                                    const firstName = e.target.value;
+                                    const lastName = personalDraft.name.split(' ').slice(1).join(' ') || '';
+                                    const fullName = firstName + (lastName ? ' ' + lastName : '');
+                                    handlePersonalChange('name')({ target: { value: fullName } });
+                                }}
+                                error={errors.firstName}
+                                placeholder="Enter your first name"
+                                required
+                            />
+                            
+                            <Field 
+                                label="Last Name" 
+                                value={isEditingPersonal ? personalDraft.name.split(' ').slice(1).join(' ') || '' : savedPersonal.name.split(' ').slice(1).join(' ') || ''}
+                                isEditing={isEditingPersonal}
+                                onChange={(e) => {
+                                    const lastName = e.target.value;
+                                    const firstName = personalDraft.name.split(' ')[0] || '';
+                                    const fullName = firstName + (lastName ? ' ' + lastName : '');
+                                    handlePersonalChange('name')({ target: { value: fullName } });
+                                }}
+                                error={errors.lastName}
+                                placeholder="Enter your last name"
+                            />
+                        </div>
+                        
+                        {/* Email Address - Read Only */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                Email Address <span className="text-destructive">*</span>
+                                <span className="ml-2 text-xs text-muted-foreground">(Change in Security settings)</span>
+                            </label>
+                            <input
+                                type="email"
+                                value={savedPersonal.email}
+                                className="w-full p-3 border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
+                                disabled
+                                readOnly
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Email cannot be changed here as it's used for login. Use Security settings to change email.
+                            </p>
+                        </div>
+                        
+                        <Field 
+                            label="Phone Number" 
+                            value={isEditingPersonal ? personalDraft.phone : savedPersonal.phone}
+                            isEditing={isEditingPersonal}
+                            onChange={handlePersonalChange('phone')}
+                            error={errors.phone}
+                            placeholder="Enter your phone number"
+                        />
+                    </div>
                 </div>
 
                 <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">
