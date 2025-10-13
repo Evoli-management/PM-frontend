@@ -972,6 +972,9 @@ function TaskFullView({
     listNames = {},
     kaId = null,
     listNumbers = [],
+    selectedKA = null,
+    users = [],
+    allTasks = [],
 }) {
     const [tab, setTab] = useState(initialTab || "activities");
     const [isEditing, setIsEditing] = useState(false);
@@ -1495,154 +1498,154 @@ function TaskFullView({
                                         </div>
                                         {isOpen && (
                                             <div className="mt-2 border-t border-slate-200 pt-2">
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                                                    {/* Row 1 */}
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Activity Name
-                                                        </label>
-                                                        <input
-                                                            value={a.text != null ? a.text : a.activity_name || ""}
-                                                            onChange={(e) =>
-                                                                updateField(
-                                                                    a.id,
-                                                                    a.text != null ? "text" : "activity_name",
-                                                                    e.target.value,
-                                                                )
-                                                            }
-                                                            placeholder="Enter activity name"
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                                    {/* Left column */}
+                                                    <div className="grid gap-2 content-start">
+                                                        {/* Description */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Description
+                                                            </label>
+                                                            <input
+                                                                value={a.notes || a.description || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Start Date */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Start date
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.date_start) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* End Date */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                End date
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.date_end) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Deadline */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Deadline
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.deadline) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Date (finish) */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Date (finish)
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.finish_date) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Duration */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Duration
+                                                            </label>
+                                                            <input
+                                                                value={a.duration || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Start Date
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={toDateOnly(a.date_start) || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "date_start", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
+                                                    {/* Right column */}
+                                                    <div className="grid gap-2 content-start">
+                                                        {/* List */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                List
+                                                            </label>
+                                                            <input
+                                                                value={a.list || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Key Area */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Key Area
+                                                            </label>
+                                                            <input
+                                                                value={selectedKA?.title || selectedKA?.name || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Task */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">Task</label>
+                                                            <input
+                                                                value={(() => {
+                                                                    const taskId = a.task_id || a.taskId;
+                                                                    if (!taskId) return "—";
+                                                                    const t = (allTasks || []).find((x) => String(x.id) === String(taskId));
+                                                                    return t ? (t.title || t.name || `#${taskId}`) : `#${taskId}`;
+                                                                })()}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Respons. (Responsible) */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Respons.
+                                                            </label>
+                                                            <input
+                                                                value={a.responsible || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Priority */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Priority
+                                                            </label>
+                                                            <input
+                                                                value={(() => {
+                                                                    const p = a.priority;
+                                                                    if (p === "high" || p === 3) return "High";
+                                                                    if (p === "low" || p === 1) return "Low";
+                                                                    if (p === "normal" || p === 2) return "Normal";
+                                                                    return "—";
+                                                                })()}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Goal */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Goal
+                                                            </label>
+                                                            <input
+                                                                value={a.goal || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            End Date
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={toDateOnly(a.date_end) || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "date_end", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    {/* Row 2 */}
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Deadline
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={toDateOnly(a.deadline) || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "deadline", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Duration
-                                                        </label>
-                                                        <input
-                                                            type="time"
-                                                            value={a.duration || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "duration", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">Task</label>
-                                                        <input
-                                                            value={a.task_id || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "task_id", e.target.value)
-                                                            }
-                                                            placeholder="Task"
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    {/* Row 3 */}
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Priority
-                                                        </label>
-                                                        <select
-                                                            value={a.priority || 2}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "priority", Number(e.target.value))
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        >
-                                                            <option value={3}>High</option>
-                                                            <option value={2}>Normal</option>
-                                                            <option value={1}>Low</option>
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Responsible
-                                                        </label>
-                                                        <input
-                                                            value={a.responsible || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "responsible", e.target.value)
-                                                            }
-                                                            placeholder="Responsible"
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Notes
-                                                        </label>
-                                                        <textarea
-                                                            rows={2}
-                                                            value={a.notes || ""}
-                                                            onChange={(e) => updateField(a.id, "notes", e.target.value)}
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-end gap-2 mt-2">
-                                                    <button
-                                                        type="button"
-                                                        className="px-2 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
-                                                        onClick={async () => {
-                                                            const newTitle = (
-                                                                (a.text != null ? a.text : a.activity_name) || ""
-                                                            ).trim();
-                                                            if (!newTitle) return;
-                                                            try {
-                                                                await activityService.update(a.id, { text: newTitle });
-                                                                window.dispatchEvent(
-                                                                    new CustomEvent("ka-activities-updated", {
-                                                                        detail: { refresh: true },
-                                                                    }),
-                                                                );
-                                                            } catch (err) {
-                                                                console.error("Failed to save activity", err);
-                                                            }
-                                                        }}
-                                                    >
-                                                        Save
-                                                    </button>
                                                 </div>
                                             </div>
                                         )}
@@ -1946,12 +1949,29 @@ export default function KeyAreas() {
     useEffect(() => {
         const handler = (e) => {
             const tid = e?.detail?.taskId ?? null;
+                // Reset form and editing state for new activity
+                setEditingActivityId(null);
+                setActivityForm({
+                    title: "",
+                    description: "",
+                    list: "",
+                    key_area_id: selectedKA?.id || "",
+                    assignee: "",
+                    priority: "normal",
+                    goal: "",
+                    start_date: "",
+                    end_date: "",
+                    deadline: "",
+                    finish_date: "",
+                    duration: "",
+                    _endAuto: true,
+                });
             setActivityAttachTaskId(tid ? String(tid) : null);
             setShowActivityComposer(true);
         };
         window.addEventListener("ka-open-activity-composer", handler);
         return () => window.removeEventListener("ka-open-activity-composer", handler);
-    }, []);
+        }, [selectedKA]);
 
     // Open task editor (reuse Add Task modal) populated for editing
     useEffect(() => {
@@ -3337,6 +3357,9 @@ export default function KeyAreas() {
                                     listNames={listNames}
                                     kaId={selectedKA?.id}
                                     listNumbers={availableListNumbers}
+                                    selectedKA={selectedKA}
+                                    users={users}
+                                    allTasks={allTasks}
                                     readOnly={
                                         Boolean(selectedKA?.is_default) &&
                                         (selectedKA?.title || "").toLowerCase() !== "ideas"
@@ -3787,10 +3810,10 @@ export default function KeyAreas() {
                                                                         Start Date
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
-                                                                        Deadline
+                                                                        End date
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
-                                                                        End date
+                                                                        Deadline
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
                                                                         Duration
@@ -3958,10 +3981,10 @@ export default function KeyAreas() {
                                                                                     {toDateOnly(t.start_date) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.deadline) || "—"}
+                                                                                    {toDateOnly(t.end_date) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.end_date) || "—"}
+                                                                                    {toDateOnly(t.deadline) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
                                                                                     {formatDuration(
@@ -5138,11 +5161,6 @@ export default function KeyAreas() {
                                             {/* Header strip */}
                                             <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
                                                 {editingActivityId ? "Edit Activity" : "Add Activity"}
-                                                {activityAttachTaskId && (
-                                                    <span className="ml-2 text-xs font-normal text-slate-500">
-                                                        (attaching to task #{activityAttachTaskId})
-                                                    </span>
-                                                )}
                                             </div>
                                             <form onSubmit={onCreateActivity} className="p-4 md:p-6">
                                                 {/* Activity name field under header */}
@@ -5428,28 +5446,51 @@ export default function KeyAreas() {
                                                             <select
                                                                 name="key_area_id"
                                                                 value={activityForm.key_area_id || selectedKA?.id || ""}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        key_area_id: e.target.value,
-                                                                    }))
-                                                                }
+                                                                onChange={(e) => {
+                                                                    const nextKa = e.target.value;
+                                                                    setActivityForm((s) => ({ ...s, key_area_id: nextKa }));
+                                                                    // If current attached task is not in the new KA, clear it
+                                                                    const inKa = (allTasks || []).some(
+                                                                        (t) => String(t.key_area_id) === String(nextKa) && String(t.id) === String(activityAttachTaskId),
+                                                                    );
+                                                                    if (!inKa) setActivityAttachTaskId("");
+                                                                }}
                                                                 className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                             >
-                                                                {selectedKA && !activityForm.key_area_id && (
+                                                                {/* Ensure current KA is shown first */}
+                                                                {selectedKA && (
                                                                     <option value={selectedKA.id}>
-                                                                        {selectedKA.name}
+                                                                        {selectedKA.title || selectedKA.name}
                                                                     </option>
                                                                 )}
                                                                 {keyAreas
-                                                                    .filter(
-                                                                        (ka) =>
-                                                                            !selectedKA ||
-                                                                            String(ka.id) !== String(selectedKA.id),
-                                                                    )
+                                                                    .filter((ka) => !selectedKA || String(ka.id) !== String(selectedKA.id))
                                                                     .map((ka) => (
                                                                         <option key={ka.id} value={ka.id}>
                                                                             {ka.title || ka.name}
+                                                                        </option>
+                                                                    ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* Task (dropdown, auto-select current task) */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Task
+                                                            </label>
+                                                            <select
+                                                                name="task_id"
+                                                                value={activityAttachTaskId || ""}
+                                                                onChange={(e) => setActivityAttachTaskId(e.target.value)}
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {!activityAttachTaskId && (
+                                                                    <option value="">— Select task —</option>
+                                                                )}
+                                                                {(allTasks || [])
+                                                                    .filter((x) => String(x.key_area_id) === String(activityForm.key_area_id || selectedKA?.id))
+                                                                    .map((t) => (
+                                                                        <option key={t.id} value={t.id}>
+                                                                            {t.title || t.name || `#${t.id}`}
                                                                         </option>
                                                                     ))}
                                                             </select>
