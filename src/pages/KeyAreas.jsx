@@ -23,7 +23,13 @@ const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
                 role="button"
                 tabIndex={0}
             >
-                <svg width="20" height="20" fill="none"><text x="10" y="15" textAnchor="middle" fontSize="18" fill="#64748b">⠿</text></svg>
+                <svg width="20" height="20" fill="none">
+                    {/* Only show debug marker in development mode */}
+                    {process.env.NODE_ENV === 'development' ? (
+                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">{idx + 1}</text>
+                    ) : null}
+                    <text x="10" y="15" textAnchor="middle" fontSize="18" fill="#64748b">⠿</text>
+                </svg>
             </span>
             {/* Key Area name and metadata (draggable area) */}
             <div
@@ -74,6 +80,10 @@ const FixedKeyAreaRow = ({ ka }) => {
             <span className="mr-3 text-slate-400" title="Fixed position">
                 <svg width="20" height="20" fill="none">
                     <circle cx="10" cy="10" r="8" stroke="#94a3b8" strokeWidth="2" />
+                    {/* Only show debug marker in development mode */}
+                    {process.env.NODE_ENV === 'development' ? (
+                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">★</text>
+                    ) : null}
                     <text x="10" y="15" textAnchor="middle" fontSize="10" fill="#94a3b8">★</text>
                 </svg>
             </span>
@@ -134,9 +144,13 @@ import {
 
 // Small UI helpers for table chips/indicators
 const EmptyState = ({ title = "List is empty.", hint = "" }) => (
-    <div className="p-4 border border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-600">
+    <div className="p-4 rounded-lg bg-slate-50 text-slate-600 border border-slate-200">
         <div className="text-sm font-medium">{title}</div>
         {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
+        {/* Only show debug border in development mode */}
+        {process.env.NODE_ENV === 'development' ? (
+            <div className="absolute inset-0 border-2 border-dashed border-blue-300 pointer-events-none" />
+        ) : null}
     </div>
 );
 
