@@ -1,5 +1,109 @@
+const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        isDragging,
+    } = useSortable({ id: ka.id });
+    return (
+        <div
+            ref={setNodeRef}
+            {...attributes}
+            className={`flex items-center px-4 py-3 transition-transform ease-in-out duration-200 bg-white hover:bg-slate-50 ${isDragging ? 'z-10 shadow-lg' : ''}`}
+            style={{ touchAction: 'manipulation' }}
+            tabIndex={0}
+            aria-label={`Key Area: ${ka.title}`}
+        >
+            {/* Drag handle */}
+            <span
+                {...listeners}
+                className={`mr-3 select-none cursor-grab hover:cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
+                title="Drag to reorder"
+                aria-label="Drag handle"
+                role="button"
+                tabIndex={0}
+            >
+                <svg width="20" height="20" fill="none"><text x="10" y="15" textAnchor="middle" fontSize="18" fill="#64748b">⠿</text></svg>
+            </span>
+            {/* Key Area name and metadata (draggable area) */}
+            <div
+                {...listeners}
+                role="button"
+                aria-label={`Drag ${ka.title}`}
+                className={`flex-1 min-w-0 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab hover:cursor-grab'}`}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            >
+                <span className="font-medium text-slate-700 truncate cursor-inherit">{ka.title}</span>
+                {ka.taskCount !== undefined && (
+                    <span className="ml-2 text-xs text-slate-500 cursor-inherit">{ka.taskCount} tasks</span>
+                )}
+            </div>
+            {/* Up/Down buttons for accessibility */}
+            <div className="flex items-center gap-1 ml-2">
+                <button
+                    type="button"
+                    className="p-1 rounded focus:outline-none"
+                    aria-label="Move up"
+                    disabled={idx === 0}
+                    onClick={() => moveKeyArea(idx, idx - 1)}
+                >
+                    <svg width="16" height="16" fill="none"><path d="M8 4l-4 6h8l-4-6z" fill="#64748b" /></svg>
+                </button>
+                <button
+                    type="button"
+                    className="p-1 rounded focus:outline-none"
+                    aria-label="Move down"
+                    disabled={false}
+                    onClick={() => moveKeyArea(idx, idx + 1)}
+                >
+                    <svg width="16" height="16" fill="none"><path d="M8 12l4-6H4l4 6z" fill="#64748b" /></svg>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const FixedKeyAreaRow = ({ ka }) => {
+    return (
+        <div
+            className="flex items-center px-4 py-3 bg-slate-50 opacity-80 cursor-default"
+            tabIndex={0}
+            aria-label={`Key Area: ${ka.title} (Fixed)`}
+        >
+            {/* Fixed icon */}
+            <span className="mr-3 text-slate-400" title="Fixed position">
+                <svg width="20" height="20" fill="none">
+                    <circle cx="10" cy="10" r="8" stroke="#94a3b8" strokeWidth="2" />
+                    <text x="10" y="15" textAnchor="middle" fontSize="10" fill="#94a3b8">★</text>
+                </svg>
+            </span>
+            {/* Key Area name and metadata */}
+            <div className="flex-1 min-w-0">
+                <span className="font-medium text-slate-700 truncate">{ka.title}</span>
+                {ka.taskCount !== undefined && (
+                    <span className="ml-2 text-xs text-slate-500">{ka.taskCount} tasks</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // src/pages/KeyAreas.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+} from "@dnd-kit/sortable";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import TaskActivityModal from "../components/calendar/TaskActivityModal";
@@ -366,54 +470,35 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
 
     return (
         <div className="p-2 overflow-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-full">
-                {groups.map((col) => (
-                    <div key={col.key} className="bg-slate-50 border border-slate-200 rounded-lg">
-                        <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-700 flex items-center justify-between">
-                            <span>{col.label}</span>
-                            <span className="text-slate-500">{col.items.length}</span>
-                        </div>
-                        <div className="p-2 space-y-2 max-h-[48vh] overflow-auto">
-                            {col.items.length === 0 ? (
-                                <div className="text-xs text-slate-500">Empty</div>
-                            ) : (
-                                col.items.map((t) => (
-                                    <div
-                                        key={t.id}
-                                        className="w-full bg-white border border-slate-200 rounded-md shadow-sm hover:shadow px-2 py-2"
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <input
-                                                type="checkbox"
-                                                aria-label={`Select ${t.title}`}
-                                                className="mt-0.5"
-                                                checked={selectedIds.has(t.id)}
-                                                onChange={() => toggleSelect(t.id)}
-                                            />
-                                            {priorityBadge(t.priority)}
-                                            <button
-                                                type="button"
-                                                onClick={() => onSelect && onSelect(t)}
-                                                className="flex-1 text-left"
-                                                title={t.title}
-                                            >
-                                                <div className="min-w-0">
-                                                    <div className="font-medium truncate text-slate-900">{t.title}</div>
-                                                    {t.assignee ? (
-                                                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                                                            {t.assignee}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <DndContext
+                sensors={useSensors(
+                    useSensor(PointerSensor),
+                    useSensor(KeyboardSensor, {
+                        coordinateGetter: sortableKeyboardCoordinates,
+                    })
+                )}
+                collisionDetection={closestCenter}
+                onDragEnd={({ active, over }) => {
+                    if (!over || active.id === over.id) return;
+                    const oldIdx = keyAreas.findIndex((ka) => ka.id === active.id);
+                    const newIdx = keyAreas.findIndex((ka) => ka.id === over.id);
+                    // Prevent moving 'Ideas' or moving anything to 'Ideas' position
+                    if (keyAreas[oldIdx]?.is_fixed || keyAreas[newIdx]?.is_fixed) return;
+                    const newOrder = arrayMove(keyAreas, oldIdx, newIdx);
+                    setKeyAreas(newOrder);
+                    // TODO: Persist new order to backend
+                }}
+            >
+                <SortableContext items={keyAreas.filter(ka => !ka.is_fixed).map(ka => ka.id)}>
+                    {keyAreas.map((ka, idx) => (
+                        ka.is_fixed ? (
+                            <FixedKeyAreaRow key={ka.id} ka={ka} />
+                        ) : (
+                            <SortableKeyAreaRow key={ka.id} ka={ka} idx={idx} moveKeyArea={moveKeyArea} />
+                        )
+                    ))}
+                </SortableContext>
+            </DndContext>
         </div>
     );
 };
@@ -2679,10 +2764,12 @@ export default function KeyAreas() {
         nextOrdered.splice(toIdx, 0, moved);
         // Reassign positions 1..N
         const withPos = nextOrdered.map((k, i) => ({ ...k, position: i + 1 }));
-        // Persist changes (only those that changed position)
+        // Persist changes via bulk endpoint (falls back to per-item)
         const changed = withPos.filter((k, i) => ordered[i]?.id !== k.id || ordered[i]?.position !== k.position);
         try {
-            await Promise.all(changed.map((k) => api.updateKeyArea(k.id, { ...k, position: k.position })));
+            if (changed.length) {
+                await keyAreaService.reorder(changed);
+            }
             // Update local state
             setKeyAreas((prev) => {
                 const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
@@ -2715,10 +2802,10 @@ export default function KeyAreas() {
         const a = ordered[idx];
         const b = ordered[targetIdx];
         try {
-            // swap positions and persist both
-            await Promise.all([
-                api.updateKeyArea(a.id, { ...a, position: b.position }),
-                api.updateKeyArea(b.id, { ...b, position: a.position }),
+            // swap positions and persist via bulk reorder
+            await keyAreaService.reorder([
+                { id: a.id, position: b.position },
+                { id: b.id, position: a.position },
             ]);
             // update local state and emit
             setKeyAreas((prev) => {
@@ -4603,7 +4690,9 @@ export default function KeyAreas() {
                                                 .map((ka, idx) => (
                                                     <li
                                                         key={ka.id}
-                                                        className="flex items-center justify-between px-3 py-2"
+                                                        className={`flex items-center justify-between px-3 py-2 rounded-md ${
+                                                            ka.is_default ? '' : 'hover:bg-slate-50 cursor-grab active:cursor-grabbing'
+                                                        }`}
                                                         draggable={!ka.is_default}
                                                         onDragStart={(e) => {
                                                             if (ka.is_default) return;
@@ -4627,10 +4716,10 @@ export default function KeyAreas() {
                                                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold shrink-0">
                                                                 {ka.position && ka.position > 0 ? ka.position : idx + 1}
                                                             </span>
-                                                            <div className="min-w-0">
+                                                            <div className="min-w-0 select-none">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <span 
-                                                                        className="font-semibold truncate"
+                                                                        className="font-semibold truncate cursor-inherit"
                                                                         style={{ color: ka.color || '#1F2937' }}
                                                                     >
                                                                         {ka.title}
@@ -5651,7 +5740,7 @@ export default function KeyAreas() {
                                         </div>
                                         <div>
                                             <label className="text-sm font-semibold text-slate-900">Color</label>
-                                            <div className="mt-2 flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
                                                 <input
                                                     type="color"
                                                     name="color"
@@ -5660,10 +5749,8 @@ export default function KeyAreas() {
                                                     title="Choose color for this Key Area"
                                                 />
                                                 <div className="flex flex-wrap gap-2">
-                                                    {/* Preset color options */}
                                                     {[
                                                         "#3B82F6", // Blue
-                                                        "#EF4444", // Red  
                                                         "#10B981", // Green
                                                         "#F59E0B", // Amber
                                                         "#8B5CF6", // Purple
@@ -5671,18 +5758,22 @@ export default function KeyAreas() {
                                                         "#06B6D4", // Cyan
                                                         "#84CC16", // Lime
                                                         "#F97316", // Orange
-                                                        "#6B7280", // Gray
-                                                    ].map(color => (
+                                                    ].map((color) => (
                                                         <button
                                                             key={color}
                                                             type="button"
                                                             onClick={(e) => {
-                                                                const colorInput = e.target.closest('form').querySelector('input[name="color"]');
-                                                                if (colorInput) colorInput.value = color;
+                                                                const form = e.currentTarget.closest('form');
+                                                                const colorInput = form?.querySelector('input[name="color"]');
+                                                                if (colorInput) {
+                                                                    colorInput.value = color;
+                                                                    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                                                    colorInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                                                }
                                                             }}
-                                                            className="w-6 h-6 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+                                                            className="w-6 h-6 rounded-full border-2 border-white shadow hover:scale-110 transition-transform"
                                                             style={{ backgroundColor: color }}
-                                                            title={`Set color to ${color}`}
+                                                            aria-label={`Choose ${color}`}
                                                         />
                                                     ))}
                                                 </div>
@@ -5718,5 +5809,5 @@ export default function KeyAreas() {
                 </main>
             </div>
         </div>
-    ); and
+    );
 }
