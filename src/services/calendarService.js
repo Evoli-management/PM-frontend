@@ -67,6 +67,28 @@ const calendarService = {
         await apiClient.delete(`${base}/appointments/${id}`);
         return true;
     },
+
+    // External Calendar Sync Methods
+    async syncGoogleCalendar() {
+        const res = await apiClient.post(`${base}/sync/google`);
+        return res.data;
+    },
+
+    async syncMicrosoftCalendar() {
+        const res = await apiClient.post(`${base}/sync/microsoft`);
+        return res.data;
+    },
+
+    async getSyncStatus() {
+        const res = await apiClient.get(`${base}/sync/status`);
+        return res.data;
+    },
+
+    async disconnectCalendar(provider) {
+        if (!provider) throw new Error("Missing provider");
+        const res = await apiClient.post(`${base}/sync/disconnect`, { provider });
+        return res.data;
+    },
 };
 
 export default calendarService;

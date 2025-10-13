@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import calendarService from '../../services/calendarService';
 
 export const Integrations = ({ showToast }) => {
     const [integrations, setIntegrations] = useState({
@@ -21,13 +22,33 @@ export const Integrations = ({ showToast }) => {
     const loadIntegrations = async () => {
         setLoading(true);
         try {
-            // Load from localStorage for now - replace with API call
+            // Get sync status from API
+            const syncStatus = await calendarService.getSyncStatus();
+            
+            const updates = { ...integrations };
+            if (syncStatus.google) {
+                updates.googleCalendar = {
+                    connected: syncStatus.google.connected,
+                    email: syncStatus.google.email || '',
+                    syncEnabled: true
+                };
+            }
+            if (syncStatus.microsoft) {
+                updates.outlookCalendar = {
+                    connected: syncStatus.microsoft.connected,
+                    email: syncStatus.microsoft.email || '',
+                    syncEnabled: true
+                };
+            }
+            
+            setIntegrations(updates);
+        } catch (error) {
+            console.log('Failed to load sync status:', error);
+            // Fallback to localStorage
             const saved = localStorage.getItem('userIntegrations');
             if (saved) {
                 setIntegrations(prev => ({ ...prev, ...JSON.parse(saved) }));
             }
-        } catch (error) {
-            showToast('Failed to load integrations', 'error');
         } finally {
             setLoading(false);
         }
@@ -46,50 +67,76 @@ export const Integrations = ({ showToast }) => {
     const connectIntegration = async (type) => {
         setConnecting(type);
         try {
-            // Simulate OAuth flow - replace with actual OAuth implementation
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            const updates = { ...integrations };
+            let result;
             switch (type) {
                 case 'googleCalendar':
-                    updates.googleCalendar = { 
-                        connected: true, 
-                        email: 'user@gmail.com', 
-                        syncEnabled: true 
-                    };
+                    result = await calendarService.syncGoogleCalendar();
+                    if (result.authUrl) {
+                        // Redirect to OAuth URL
+                        window.location.href = result.authUrl;
+                        return;
+                    }
                     break;
                 case 'outlookCalendar':
-                    updates.outlookCalendar = { 
-                        connected: true, 
-                        email: 'user@outlook.com', 
-                        syncEnabled: true 
-                    };
+                    result = await calendarService.syncMicrosoftCalendar();
+                    if (result.authUrl) {
+                        // Redirect to OAuth URL
+                        window.location.href = result.authUrl;
+                        return;
+                    }
                     break;
                 case 'teams':
+                    // For now, just simulate connection
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const updates = { ...integrations };
                     updates.teams = { 
                         connected: true, 
                         tenant: 'My Organization', 
                         notificationsEnabled: true 
                     };
+                    setIntegrations(updates);
                     break;
-                default:
-                    updates[type] = { ...updates[type], connected: true };
             }
             
-            setIntegrations(updates);
-            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} connected successfully`);
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} connection initiated`);
+            
+            // Reload integrations to get updated status
+            await loadIntegrations();
+            
         } catch (error) {
+            console.error('Connection error:', error);
             showToast(`Failed to connect ${type}`, 'error');
         } finally {
             setConnecting('');
         }
     };
     
-    const disconnectIntegration = (type) => {
-        const updates = { ...integrations };
-        updates[type] = { ...updates[type], connected: false };
-        setIntegrations(updates);
-        showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`);
+    const disconnectIntegration = async (type) => {
+        try {
+            switch (type) {
+                case 'googleCalendar':
+                    await calendarService.disconnectCalendar('google');
+                    break;
+                case 'outlookCalendar':
+                    await calendarService.disconnectCalendar('microsoft');
+                    break;
+                case 'teams':
+                    // For now, just update local state
+                    break;
+            }
+            
+            const updates = { ...integrations };
+            updates[type] = { ...updates[type], connected: false };
+            setIntegrations(updates);
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`);
+            
+            // Reload to get updated status
+            await loadIntegrations();
+            
+        } catch (error) {
+            console.error('Disconnect error:', error);
+            showToast(`Failed to disconnect ${type}`, 'error');
+        }
     };
     
     const updateIntegrationSetting = (type, setting, value) => {
