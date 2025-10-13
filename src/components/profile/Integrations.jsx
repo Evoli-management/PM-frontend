@@ -71,19 +71,11 @@ export const Integrations = ({ showToast }) => {
             switch (type) {
                 case 'googleCalendar':
                     result = await calendarService.syncGoogleCalendar();
-                    if (result.authUrl) {
-                        // Redirect to OAuth URL
-                        window.location.href = result.authUrl;
-                        return;
-                    }
+                    showToast('Google Calendar connected and sync initiated!');
                     break;
                 case 'outlookCalendar':
                     result = await calendarService.syncMicrosoftCalendar();
-                    if (result.authUrl) {
-                        // Redirect to OAuth URL
-                        window.location.href = result.authUrl;
-                        return;
-                    }
+                    showToast('Outlook Calendar connected and sync initiated!');
                     break;
                 case 'teams':
                     // For now, just simulate connection
@@ -95,17 +87,20 @@ export const Integrations = ({ showToast }) => {
                         notificationsEnabled: true 
                     };
                     setIntegrations(updates);
+                    showToast('Microsoft Teams connected!');
                     break;
             }
-            
-            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} connection initiated`);
             
             // Reload integrations to get updated status
             await loadIntegrations();
             
         } catch (error) {
             console.error('Connection error:', error);
-            showToast(`Failed to connect ${type}`, 'error');
+            if (error.message === 'OAuth cancelled by user') {
+                showToast('Connection cancelled', 'info');
+            } else {
+                showToast(`Failed to connect ${type}`, 'error');
+            }
         } finally {
             setConnecting('');
         }
