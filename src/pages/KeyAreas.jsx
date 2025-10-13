@@ -3386,18 +3386,47 @@ export default function KeyAreas() {
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="max-w-7xl mx-auto p-6">
                                     <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
-                                        {/* Top Row: Task Lists + Mass Edit */}
-                                        <div className="grid grid-cols-3 gap-4">
-                                            {/* Left: Task Lists (2/3 width) */}
-                                            <div className="col-span-3 md:col-span-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <div className="text-sm font-semibold whitespace-nowrap mr-1">
-                                                        Task Lists
-                                                    </div>
-                                                    <div
-                                                        ref={tabsRef}
-                                                        className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
-                                                    >
+                                        {/* Header Row: Task Lists Label + Mass Edit Control */}
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-700">Task Lists:</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm">
+                                                <span className="text-slate-500" aria-live="polite">
+                                                    {selectedIds.size} selected
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (showMassEdit) {
+                                                            setShowMassEdit(false);
+                                                        } else {
+                                                            setShowMassEdit(true);
+                                                            // Scroll to Tasks Display area where the form appears
+                                                            setTimeout(() => {
+                                                                if (tasksDisplayRef.current) {
+                                                                    tasksDisplayRef.current.scrollIntoView({
+                                                                        behavior: "smooth",
+                                                                        block: "start",
+                                                                    });
+                                                                }
+                                                            }, 0);
+                                                        }
+                                                    }}
+                                                    className="bg-green-400 text-white rounded-md px-3 py-1 text-sm hover:bg-green-500"
+                                                    aria-label="mass edit"
+                                                >
+                                                    {showMassEdit ? "Exit Mass Edit" : "Mass Edit"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Tabs Section */}
+                                        <div className="pt-3">
+                                            <div
+                                                ref={tabsRef}
+                                                className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
+                                            >
                                                         {Array.from({ length: leftListCount }).map((_, i) => {
                                                             const n = i + 1;
                                                             return (
@@ -3459,43 +3488,13 @@ export default function KeyAreas() {
                                                                                 <button
                                                                                     role="menuitem"
                                                                                     onClick={() => {
-                                                                                        setTaskForm((s) => ({
-                                                                                            ...s,
-                                                                                            list_index: n,
-                                                                                        }));
-                                                                                        setShowTaskComposer(true);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                >
-                                                                                    Add Task
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
-                                                                                        setActivityForm((s) => ({
-                                                                                            ...s,
-                                                                                            key_area_id:
-                                                                                                selectedKA?.id ||
-                                                                                                s.key_area_id,
-                                                                                        }));
-                                                                                        setActivityAttachTaskId(null);
-                                                                                        setShowActivityComposer(true);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                >
-                                                                                    Add Activity
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
                                                                                         renameList(n);
                                                                                         setOpenListMenu(null);
                                                                                     }}
                                                                                     className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                    aria-label="Rename list"
                                                                                 >
-                                                                                    Rename
+                                                                                    Rename List
                                                                                 </button>
                                                                                 <button
                                                                                     role="menuitem"
@@ -3504,8 +3503,9 @@ export default function KeyAreas() {
                                                                                         setOpenListMenu(null);
                                                                                     }}
                                                                                     className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                                    aria-label="Delete list"
                                                                                 >
-                                                                                    Delete
+                                                                                    Delete List
                                                                                 </button>
                                                                             </div>
                                                                         </>
@@ -3556,70 +3556,31 @@ export default function KeyAreas() {
                                                                         }
                                                                     }}
                                                                     title="Add list"
-                                                                    className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
                                                                 >
-                                                                    <svg
-                                                                        stroke="currentColor"
-                                                                        fill="currentColor"
-                                                                        strokeWidth="0"
-                                                                        viewBox="0 0 448 512"
-                                                                        height="1em"
-                                                                        width="1em"
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                    >
-                                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                                     </svg>
+                                                                    Add List
                                                                 </button>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Right: Mass Edit (1/3 width) as a button */}
-                                            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
-                                                <span className="text-sm text-gray-600" aria-live="polite">
-                                                    {selectedIds.size} selected
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    disabled={selectedIds.size === 0}
-                                                    onClick={() => {
-                                                        setShowMassEdit(true);
-                                                        // Scroll to Tasks Display area where the form appears
-                                                        setTimeout(() => {
-                                                            if (tasksDisplayRef.current) {
-                                                                tasksDisplayRef.current.scrollIntoView({
-                                                                    behavior: "smooth",
-                                                                    block: "start",
-                                                                });
-                                                            }
-                                                        }, 0);
-                                                    }}
-                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                                                    aria-label="Open mass edit"
-                                                    title={
-                                                        selectedIds.size === 0
-                                                            ? "Select tasks to enable mass edit"
-                                                            : `Mass edit (${selectedIds.size})`
-                                                    }
-                                                >
-                                                    Mass Edit
-                                                </button>
-                                            </div>
                                         </div>
 
                                         {/* Bottom Row: Tasks Display (full width) */}
                                         <div ref={tasksDisplayRef}>
-                                            {showMassEdit && selectedIds.size > 0 && (
+                                            {showMassEdit && (
                                                 <form
                                                     onSubmit={applyBulkEdit}
                                                     aria-label="Mass edit selected tasks"
                                                     className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg"
                                                 >
                                                     <div className="text-sm text-blue-900 font-medium mb-3">
-                                                        Mass edit {selectedIds.size} task
-                                                        {selectedIds.size > 1 ? "s" : ""}
+                                                        {selectedIds.size === 0 
+                                                            ? "Mass Edit Mode: Select tasks to edit multiple tasks at once"
+                                                            : `Mass edit ${selectedIds.size} task${selectedIds.size > 1 ? "s" : ""}`
+                                                        }
                                                     </div>
                                                     <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                                                         <div>
@@ -3747,7 +3708,12 @@ export default function KeyAreas() {
                                                         </button>
                                                         <button
                                                             type="submit"
-                                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                                            disabled={selectedTasks.length === 0}
+                                                            className={`px-3 py-1.5 rounded-md ${
+                                                                selectedTasks.length === 0
+                                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                            }`}
                                                         >
                                                             Apply
                                                         </button>
@@ -3765,7 +3731,7 @@ export default function KeyAreas() {
                                                 visibleTasks.length === 0 ? (
                                                     <EmptyState
                                                         title="List is empty."
-                                                        hint="Use the three-dots menu to add a task."
+                                                        hint="Use the 'Add Task' button below to create your first task."
                                                     />
                                                 ) : (
                                                     <div className="overflow-x-auto">
@@ -4484,6 +4450,27 @@ export default function KeyAreas() {
                                                     }}
                                                 />
                                             )}
+                                        </div>
+                                        
+                                        {/* Add Task Footer */}
+                                        <div className="flex justify-end pr-10 pt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTaskForm((s) => ({
+                                                        ...s,
+                                                        list_index: taskTab,
+                                                    }));
+                                                    setShowTaskComposer(true);
+                                                }}
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                aria-label="Add task"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                Add Task
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
