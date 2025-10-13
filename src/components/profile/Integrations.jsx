@@ -1,34 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import calendarService from '../../services/calendarService';
 
 export const Integrations = ({ showToast }) => {
     const [integrations, setIntegrations] = useState({
         // Calendar Integrations
         googleCalendar: { connected: false, email: '', syncEnabled: true },
         outlookCalendar: { connected: false, email: '', syncEnabled: true },
-        appleCalendar: { connected: false, syncEnabled: true },
         
         // Communication
-        slack: { connected: false, workspace: '', notificationsEnabled: true },
-        teams: { connected: false, tenant: '', notificationsEnabled: true },
-        discord: { connected: false, server: '', notificationsEnabled: false },
-        
-        // Project Management
-        trello: { connected: false, boards: [], syncTasks: true },
-        asana: { connected: false, projects: [], syncTasks: true },
-        jira: { connected: false, projects: [], syncIssues: true },
-        
-        // File Storage
-        googleDrive: { connected: false, email: '', autoSync: false },
-        dropbox: { connected: false, email: '', autoSync: false },
-        oneDrive: { connected: false, email: '', autoSync: false },
-        
-        // Development
-        github: { connected: false, username: '', syncRepos: false },
-        gitlab: { connected: false, username: '', syncRepos: false },
-        
-        // Analytics
-        googleAnalytics: { connected: false, propertyId: '', enabled: false }
+        teams: { connected: false, tenant: '', notificationsEnabled: true }
     });
     
     const [loading, setLoading] = useState(false);
@@ -41,13 +22,33 @@ export const Integrations = ({ showToast }) => {
     const loadIntegrations = async () => {
         setLoading(true);
         try {
-            // Load from localStorage for now - replace with API call
+            // Get sync status from API
+            const syncStatus = await calendarService.getSyncStatus();
+            
+            const updates = { ...integrations };
+            if (syncStatus.google) {
+                updates.googleCalendar = {
+                    connected: syncStatus.google.connected,
+                    email: syncStatus.google.email || '',
+                    syncEnabled: true
+                };
+            }
+            if (syncStatus.microsoft) {
+                updates.outlookCalendar = {
+                    connected: syncStatus.microsoft.connected,
+                    email: syncStatus.microsoft.email || '',
+                    syncEnabled: true
+                };
+            }
+            
+            setIntegrations(updates);
+        } catch (error) {
+            console.log('Failed to load sync status:', error);
+            // Fallback to localStorage
             const saved = localStorage.getItem('userIntegrations');
             if (saved) {
                 setIntegrations(prev => ({ ...prev, ...JSON.parse(saved) }));
             }
-        } catch (error) {
-            showToast('Failed to load integrations', 'error');
         } finally {
             setLoading(false);
         }
@@ -66,50 +67,71 @@ export const Integrations = ({ showToast }) => {
     const connectIntegration = async (type) => {
         setConnecting(type);
         try {
-            // Simulate OAuth flow - replace with actual OAuth implementation
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            const updates = { ...integrations };
+            let result;
             switch (type) {
                 case 'googleCalendar':
-                    updates.googleCalendar = { 
-                        connected: true, 
-                        email: 'user@gmail.com', 
-                        syncEnabled: true 
-                    };
+                    result = await calendarService.syncGoogleCalendar();
+                    showToast('Google Calendar connected and sync initiated!');
                     break;
-                case 'slack':
-                    updates.slack = { 
+                case 'outlookCalendar':
+                    result = await calendarService.syncMicrosoftCalendar();
+                    showToast('Outlook Calendar connected and sync initiated!');
+                    break;
+                case 'teams':
+                    // For now, just simulate connection
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const updates = { ...integrations };
+                    updates.teams = { 
                         connected: true, 
-                        workspace: 'My Workspace', 
+                        tenant: 'My Organization', 
                         notificationsEnabled: true 
                     };
+                    setIntegrations(updates);
+                    showToast('Microsoft Teams connected!');
                     break;
-                case 'github':
-                    updates.github = { 
-                        connected: true, 
-                        username: 'myusername', 
-                        syncRepos: true 
-                    };
-                    break;
-                default:
-                    updates[type] = { ...updates[type], connected: true };
             }
             
-            setIntegrations(updates);
-            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} connected successfully`);
+            // Reload integrations to get updated status
+            await loadIntegrations();
+            
         } catch (error) {
-            showToast(`Failed to connect ${type}`, 'error');
+            console.error('Connection error:', error);
+            if (error.message === 'OAuth cancelled by user') {
+                showToast('Connection cancelled', 'info');
+            } else {
+                showToast(`Failed to connect ${type}`, 'error');
+            }
         } finally {
             setConnecting('');
         }
     };
     
-    const disconnectIntegration = (type) => {
-        const updates = { ...integrations };
-        updates[type] = { ...updates[type], connected: false };
-        setIntegrations(updates);
-        showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`);
+    const disconnectIntegration = async (type) => {
+        try {
+            switch (type) {
+                case 'googleCalendar':
+                    await calendarService.disconnectCalendar('google');
+                    break;
+                case 'outlookCalendar':
+                    await calendarService.disconnectCalendar('microsoft');
+                    break;
+                case 'teams':
+                    // For now, just update local state
+                    break;
+            }
+            
+            const updates = { ...integrations };
+            updates[type] = { ...updates[type], connected: false };
+            setIntegrations(updates);
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} disconnected`);
+            
+            // Reload to get updated status
+            await loadIntegrations();
+            
+        } catch (error) {
+            console.error('Disconnect error:', error);
+            showToast(`Failed to disconnect ${type}`, 'error');
+        }
     };
     
     const updateIntegrationSetting = (type, setting, value) => {
@@ -225,22 +247,12 @@ export const Integrations = ({ showToast }) => {
                 </div>
             </Section>
             
-            {/* Communication */}
+            {/* Communication Tools */}
             <Section 
                 title="Communication Tools" 
                 description="Connect with your team communication platforms"
             >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Slack"
-                        type="slack"
-                        icon="💬"
-                        description="Get notifications and updates in Slack"
-                        config={integrations.slack}
-                        settings={[
-                            { key: 'notificationsEnabled', label: 'Notifications', description: 'Receive task updates in Slack' }
-                        ]}
-                    />
                     <IntegrationCard
                         name="Microsoft Teams"
                         type="teams"
@@ -249,93 +261,6 @@ export const Integrations = ({ showToast }) => {
                         config={integrations.teams}
                         settings={[
                             { key: 'notificationsEnabled', label: 'Notifications', description: 'Receive updates in Teams' }
-                        ]}
-                    />
-                </div>
-            </Section>
-            
-            {/* Project Management */}
-            <Section 
-                title="Project Management" 
-                description="Sync with other project management tools"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Trello"
-                        type="trello"
-                        icon="📋"
-                        description="Sync tasks with Trello boards"
-                        config={integrations.trello}
-                        settings={[
-                            { key: 'syncTasks', label: 'Sync Tasks', description: 'Two-way sync with Trello cards' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="Asana"
-                        type="asana"
-                        icon="✅"
-                        description="Connect with Asana projects"
-                        config={integrations.asana}
-                        settings={[
-                            { key: 'syncTasks', label: 'Sync Tasks', description: 'Sync tasks with Asana' }
-                        ]}
-                    />
-                </div>
-            </Section>
-            
-            {/* File Storage */}
-            <Section 
-                title="File Storage" 
-                description="Connect cloud storage for file attachments"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Google Drive"
-                        type="googleDrive"
-                        icon="🗂️"
-                        description="Attach files from Google Drive"
-                        config={integrations.googleDrive}
-                        settings={[
-                            { key: 'autoSync', label: 'Auto Sync', description: 'Automatically sync project files' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="Dropbox"
-                        type="dropbox"
-                        icon="📦"
-                        description="Access Dropbox files in projects"
-                        config={integrations.dropbox}
-                        settings={[
-                            { key: 'autoSync', label: 'Auto Sync', description: 'Automatically sync project files' }
-                        ]}
-                    />
-                </div>
-            </Section>
-            
-            {/* Development Tools */}
-            <Section 
-                title="Development Tools" 
-                description="Connect with development platforms"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="GitHub"
-                        type="github"
-                        icon="🐙"
-                        description="Sync with GitHub repositories"
-                        config={integrations.github}
-                        settings={[
-                            { key: 'syncRepos', label: 'Sync Repositories', description: 'Track repository activity' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="GitLab"
-                        type="gitlab"
-                        icon="🦊"
-                        description="Connect with GitLab projects"
-                        config={integrations.gitlab}
-                        settings={[
-                            { key: 'syncRepos', label: 'Sync Repositories', description: 'Track repository activity' }
                         ]}
                     />
                 </div>
