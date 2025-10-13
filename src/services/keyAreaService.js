@@ -72,6 +72,37 @@ const keyAreaService = {
         return toFE(res.data);
     },
 
+    // Bulk reorder; server should accept an array of { id, sortOrder }
+    // Falls back to individual updates if endpoint is unavailable
+    async reorder(items) {
+        try {
+            const payload = Array.isArray(items)
+                ? items.map((x) => ({ id: x.id, sortOrder: x.position }))
+                : [];
+            await apiClient.patch(
+                "/key-areas/reorder",
+                { items: payload },
+                { headers: { "Content-Type": "application/json" } },
+            );
+            return true;
+        } catch (e) {
+            // If server doesn't support bulk endpoint, fallback to per-item update
+            if (Array.isArray(items)) {
+                await Promise.all(
+                    items.map((x) =>
+                        apiClient.put(
+                            `/key-areas/${x.id}`,
+                            { sortOrder: x.position },
+                            { headers: { "Content-Type": "application/json" } },
+                        ),
+                    ),
+                );
+                return true;
+            }
+            throw e;
+        }
+    },
+
     async remove(id) {
         await apiClient.delete(`/key-areas/${id}`);
         return true;
