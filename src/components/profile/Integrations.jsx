@@ -6,26 +6,9 @@ export const Integrations = ({ showToast }) => {
         // Calendar Integrations
         googleCalendar: { connected: false, email: '', syncEnabled: true },
         outlookCalendar: { connected: false, email: '', syncEnabled: true },
-        appleCalendar: { connected: false, syncEnabled: true },
         
         // Communication
-        slack: { connected: false, workspace: '', notificationsEnabled: true },
-        teams: { connected: false, tenant: '', notificationsEnabled: true },
-        discord: { connected: false, server: '', notificationsEnabled: false },
-        
-        // Project Management
-        trello: { connected: false, boards: [], syncTasks: true },
-        asana: { connected: false, projects: [], syncTasks: true },
-        jira: { connected: false, projects: [], syncIssues: true },
-        
-        // File Storage
-        googleDrive: { connected: false, email: '', autoSync: false },
-        dropbox: { connected: false, email: '', autoSync: false },
-        oneDrive: { connected: false, email: '', autoSync: false },
-        
-        // Development
-        github: { connected: false, username: '', syncRepos: false },
-        gitlab: { connected: false, username: '', syncRepos: false }
+        teams: { connected: false, tenant: '', notificationsEnabled: true }
     });
     
     const [loading, setLoading] = useState(false);
@@ -75,18 +58,18 @@ export const Integrations = ({ showToast }) => {
                         syncEnabled: true 
                     };
                     break;
-                case 'slack':
-                    updates.slack = { 
+                case 'outlookCalendar':
+                    updates.outlookCalendar = { 
                         connected: true, 
-                        workspace: 'My Workspace', 
-                        notificationsEnabled: true 
+                        email: 'user@outlook.com', 
+                        syncEnabled: true 
                     };
                     break;
-                case 'github':
-                    updates.github = { 
+                case 'teams':
+                    updates.teams = { 
                         connected: true, 
-                        username: 'myusername', 
-                        syncRepos: true 
+                        tenant: 'My Organization', 
+                        notificationsEnabled: true 
                     };
                     break;
                 default:
@@ -222,22 +205,12 @@ export const Integrations = ({ showToast }) => {
                 </div>
             </Section>
             
-            {/* Communication */}
+            {/* Communication Tools */}
             <Section 
                 title="Communication Tools" 
                 description="Connect with your team communication platforms"
             >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Slack"
-                        type="slack"
-                        icon="💬"
-                        description="Get notifications and updates in Slack"
-                        config={integrations.slack}
-                        settings={[
-                            { key: 'notificationsEnabled', label: 'Notifications', description: 'Receive task updates in Slack' }
-                        ]}
-                    />
                     <IntegrationCard
                         name="Microsoft Teams"
                         type="teams"
@@ -246,93 +219,6 @@ export const Integrations = ({ showToast }) => {
                         config={integrations.teams}
                         settings={[
                             { key: 'notificationsEnabled', label: 'Notifications', description: 'Receive updates in Teams' }
-                        ]}
-                    />
-                </div>
-            </Section>
-            
-            {/* Project Management */}
-            <Section 
-                title="Project Management" 
-                description="Sync with other project management tools"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Trello"
-                        type="trello"
-                        icon="📋"
-                        description="Sync tasks with Trello boards"
-                        config={integrations.trello}
-                        settings={[
-                            { key: 'syncTasks', label: 'Sync Tasks', description: 'Two-way sync with Trello cards' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="Asana"
-                        type="asana"
-                        icon="✅"
-                        description="Connect with Asana projects"
-                        config={integrations.asana}
-                        settings={[
-                            { key: 'syncTasks', label: 'Sync Tasks', description: 'Sync tasks with Asana' }
-                        ]}
-                    />
-                </div>
-            </Section>
-            
-            {/* File Storage */}
-            <Section 
-                title="File Storage" 
-                description="Connect cloud storage for file attachments"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="Google Drive"
-                        type="googleDrive"
-                        icon="🗂️"
-                        description="Attach files from Google Drive"
-                        config={integrations.googleDrive}
-                        settings={[
-                            { key: 'autoSync', label: 'Auto Sync', description: 'Automatically sync project files' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="Dropbox"
-                        type="dropbox"
-                        icon="📦"
-                        description="Access Dropbox files in projects"
-                        config={integrations.dropbox}
-                        settings={[
-                            { key: 'autoSync', label: 'Auto Sync', description: 'Automatically sync project files' }
-                        ]}
-                    />
-                </div>
-            </Section>
-            
-            {/* Development Tools */}
-            <Section 
-                title="Development Tools" 
-                description="Connect with development platforms"
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <IntegrationCard
-                        name="GitHub"
-                        type="github"
-                        icon="🐙"
-                        description="Sync with GitHub repositories"
-                        config={integrations.github}
-                        settings={[
-                            { key: 'syncRepos', label: 'Sync Repositories', description: 'Track repository activity' }
-                        ]}
-                    />
-                    <IntegrationCard
-                        name="GitLab"
-                        type="gitlab"
-                        icon="🦊"
-                        description="Connect with GitLab projects"
-                        config={integrations.gitlab}
-                        settings={[
-                            { key: 'syncRepos', label: 'Sync Repositories', description: 'Track repository activity' }
                         ]}
                     />
                 </div>
