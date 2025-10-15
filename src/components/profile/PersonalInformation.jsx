@@ -12,7 +12,8 @@ export const PersonalInformation = ({ showToast }) => {
     const [avatarPreview, setAvatarPreview] = useState(null);
     
     const [personalDraft, setPersonalDraft] = useState({
-        name: "",
+        firstName: "",
+        lastName: "",
         email: "",
         phone: ""
     });
@@ -26,7 +27,8 @@ export const PersonalInformation = ({ showToast }) => {
     });
     
     const [savedPersonal, setSavedPersonal] = useState({
-        name: "",
+        firstName: "",
+        lastName: "",
         email: "",
         phone: ""
     });
@@ -61,19 +63,28 @@ export const PersonalInformation = ({ showToast }) => {
             setInitialLoading(true);
             const profileData = await userProfileService.getProfile();
             console.log('🔥 Raw profile data from API:', profileData);
+            console.log('🔥 Raw profile data KEYS:', Object.keys(profileData));
+            console.log('🔥 firstName from API:', profileData.firstName);
+            console.log('🔥 lastName from API:', profileData.lastName);
+            console.log('🔥 fullName from API:', profileData.fullName);
+            console.log('🔥 name from API:', profileData.name);
             
             const formattedData = userProfileService.formatProfileData(profileData);
             console.log('✅ Formatted profile data:', formattedData);
             
             // Set personal information
-            // Use fullName from API response first, then fall back to formatted name
-            const displayName = profileData.fullName || formattedData.fullName || formattedData.name || '';
-            console.log('🎯 Setting display name:', displayName);
+            // Use direct firstName/lastName from API response
+            const firstName = profileData.firstName || formattedData.firstName || '';
+            const lastName = profileData.lastName || formattedData.lastName || '';
+            
+            console.log('🎯 Setting firstName:', firstName);
+            console.log('🎯 Setting lastName:', lastName);
             
             setSavedPersonal({
-                name: displayName,
-                email: formattedData.email || '',
-                phone: formattedData.phone || ''
+                firstName: firstName,
+                lastName: lastName,
+                email: formattedData.email || profileData.email || '',
+                phone: formattedData.phone || profileData.phone || ''
             });
 
             // Set professional information
@@ -121,15 +132,15 @@ export const PersonalInformation = ({ showToast }) => {
 
     const validatePersonalForm = () => {
         const validation = userProfileService.validateProfileData({
-            firstName: personalDraft.name.split(' ')[0] || '',
-            lastName: personalDraft.name.split(' ').slice(1).join(' ') || '',
+            firstName: personalDraft.firstName,
+            lastName: personalDraft.lastName,
             phone: personalDraft.phone
         });
 
         const newErrors = {};
         
-        if (!personalDraft.name.trim()) {
-            newErrors.name = "Name is required";
+        if (!personalDraft.firstName.trim()) {
+            newErrors.firstName = "First name is required";
         }
         
         if (validation.errors.phone) {
@@ -158,17 +169,25 @@ export const PersonalInformation = ({ showToast }) => {
         
         setIsLoading(true);
         try {
-            // Only update name and phone, not email (email is managed in Security settings)
+            // Send first name and last name separately, plus phone
             const personalData = {
-                name: personalDraft.name,
+                firstName: personalDraft.firstName,
+                lastName: personalDraft.lastName,
                 phone: personalDraft.phone
             };
             
             const updatedProfile = await userProfileService.updatePersonalInfo(personalData);
             const formattedData = userProfileService.formatProfileData(updatedProfile);
             
+            // Extract names from response
+            const displayName = updatedProfile.fullName || formattedData.fullName || formattedData.name || '';
+            const nameParts = displayName.split(' ');
+            const firstName = nameParts[0] || personalDraft.firstName;
+            const lastName = nameParts.slice(1).join(' ') || personalDraft.lastName;
+            
             setSavedPersonal({
-                name: formattedData.name || '',
+                firstName: firstName,
+                lastName: lastName,
                 email: formattedData.email || '', // Keep existing email
                 phone: formattedData.phone || ''
             });
@@ -290,55 +309,75 @@ export const PersonalInformation = ({ showToast }) => {
 
     return (
         <div className="space-y-6">
-            {/* Avatar Section */}
-            <Section title="Profile Picture" icon="👤">
-                <AvatarManager 
-                    avatarPreview={avatarPreview}
-                    setAvatarPreview={setAvatarPreview}
-                    onAvatarChange={handleAvatarUpdate}
-                    showToast={showToast}
-                />
-            </Section>
-
-            {/* Personal Information Section */}
-            <Section title="Personal Information" icon="👤">
+            {/* Profile Picture and Basic Info - Horizontal Layout */}
+            <Section title="Personal Details" icon="👤">
                 <div className="space-y-4">
-                    <Field 
-                        label="Full Name" 
-                        value={isEditingPersonal ? personalDraft.name : savedPersonal.name}
-                        isEditing={isEditingPersonal}
-                        onChange={handlePersonalChange('name')}
-                        error={errors.name}
-                        placeholder="Enter your full name"
-                        required
-                    />
-                    
-                    {/* Email Address - Read Only (editable in Security settings) */}
-                    <div>
-                        <label className="block text-sm font-medium mb-2">
-                            Email Address <span className="text-destructive">*</span>
-                            <span className="ml-2 text-xs text-muted-foreground">(Change in Security settings)</span>
-                        </label>
-                        <input
-                            type="email"
-                            value={savedPersonal.email}
-                            className="w-full p-3 border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
-                            disabled
-                            readOnly
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Email cannot be changed here as it's used for login. Use Security settings to change email.
-                        </p>
+                    {/* Profile Picture and Name Fields Row */}
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
+                        {/* Profile Picture on the left */}
+                        <div className="flex-shrink-0">
+                            <AvatarManager 
+                                avatarPreview={avatarPreview}
+                                setAvatarPreview={setAvatarPreview}
+                                onAvatarChange={handleAvatarUpdate}
+                                showToast={showToast}
+                            />
+                        </div>
+                        
+                        {/* Name fields stacked vertically on the right */}
+                        <div className="flex-1 space-y-4">
+                            <Field 
+                                label="Name" 
+                                value={isEditingPersonal ? personalDraft.firstName : savedPersonal.firstName}
+                                isEditing={isEditingPersonal}
+                                onChange={handlePersonalChange('firstName')}
+                                error={errors.firstName}
+                                placeholder="Enter your first name"
+                                required
+                                inline={true}
+                            />
+                            
+                            <Field 
+                                label="Last name" 
+                                value={isEditingPersonal ? personalDraft.lastName : savedPersonal.lastName}
+                                isEditing={isEditingPersonal}
+                                onChange={handlePersonalChange('lastName')}
+                                error={errors.lastName}
+                                placeholder="Enter your last name"
+                                inline={true}
+                            />
+                        </div>
                     </div>
                     
-                    <Field 
-                        label="Phone Number" 
-                        value={isEditingPersonal ? personalDraft.phone : savedPersonal.phone}
-                        isEditing={isEditingPersonal}
-                        onChange={handlePersonalChange('phone')}
-                        error={errors.phone}
-                        placeholder="Enter your phone number"
-                    />
+                    {/* Email and Phone fields below - separate section */}
+                    <div className="space-y-4">
+                        {/* Email Address - Read Only */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                Email Address <span className="text-destructive">*</span>
+                                <span className="ml-2 text-xs text-muted-foreground">(Change in Security settings)</span>
+                            </label>
+                            <input
+                                type="email"
+                                value={savedPersonal.email}
+                                className="w-full p-3 border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
+                                disabled
+                                readOnly
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Email cannot be changed here as it's used for login. Use Security settings to change email.
+                            </p>
+                        </div>
+                        
+                        <Field 
+                            label="Phone Number" 
+                            value={isEditingPersonal ? personalDraft.phone : savedPersonal.phone}
+                            isEditing={isEditingPersonal}
+                            onChange={handlePersonalChange('phone')}
+                            error={errors.phone}
+                            placeholder="Enter your phone number"
+                        />
+                    </div>
                 </div>
 
                 <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">

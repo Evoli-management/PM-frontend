@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
-import { FaGripVertical } from "react-icons/fa";
+import { FaGripVertical, FaBars } from "react-icons/fa";
 // Reusable dashboard widgets
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
@@ -175,6 +175,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [draggedWidget, setDraggedWidget] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     
     useEffect(() => {
         const timer = setTimeout(() => setLoading(false), 400);
@@ -195,10 +196,9 @@ export default function Dashboard() {
             activity: true,
             suggestions: false,
             teamOverview: false,
-            analytics: false,
         },
         // explicit order for all widgets — will be kept in localStorage
-        widgetOrder: ["quickAdd", "myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview", "analytics"],
+        widgetOrder: ["quickAdd", "myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview"],
         theme: "light", // or 'dark'
     };
 
@@ -629,8 +629,6 @@ export default function Dashboard() {
     
     const productivity = { productive: 24, trap: 6 }; // TODO: Replace with real productivity tracking
     const [prodTrend, setProdTrend] = useState([6, 7, 6, 8, 7, 9, 8]);
-    const [analyticsPeriod, setAnalyticsPeriod] = useState("Week"); // Week | Month
-    const [analyticsCompare, setAnalyticsCompare] = useState("None"); // None | Previous
 
     // Activity filter + drill modal
     const [activityFilter, setActivityFilter] = useState("all"); // all|tasks|goals|recognitions
@@ -880,7 +878,7 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap" href="#/analytics">
+                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
                         <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
                         <div className="text-xs font-medium opacity-80">productive</div>
                         <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
@@ -1019,39 +1017,6 @@ export default function Dashboard() {
             );
         }
 
-        if (key === "analytics") {
-            return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Analytics</h3>
-                        <div className="mb-3 flex items-center gap-2 text-sm">
-                            <span className="opacity-70">Period:</span>
-                            <select className="border rounded bg-[Canvas]" value={analyticsPeriod} onChange={(e) => setAnalyticsPeriod(e.target.value)}>
-                                <option value="Week">Week</option>
-                                <option value="Month">Month</option>
-                            </select>
-                            <span className="opacity-70 ml-3">Compare to:</span>
-                            <select className="border rounded bg-[Canvas]" value={analyticsCompare} onChange={(e) => setAnalyticsCompare(e.target.value)}>
-                                <option value="None">None</option>
-                                <option value="Previous">Previous</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="p-3 border rounded">
-                                <div className="font-semibold text-sm mb-2">Time usage</div>
-                                <TimeUsagePie productive={productivity.productive} trap={productivity.trap} />
-                            </div>
-                            <div className="p-3 border rounded">
-                                <div className="font-semibold text-sm mb-2">Weekly trend</div>
-                                <WeeklyTrendBars values={analyticsPeriod === "Week" ? [8, 6, 7, 5, 9, 4, 3] : [35, 42, 38, 44]} compareValues={analyticsCompare === "Previous" ? (analyticsPeriod === "Week" ? [6, 5, 6, 4, 7, 3, 2] : [32, 39, 36, 40]) : []} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
         return null;
     };
 
@@ -1111,18 +1076,36 @@ export default function Dashboard() {
 
     return (
         <div className="flex min-h-screen bg-[Canvas]">
-            <Sidebar user={{ name: "Hussein" }} />
-        <main className="flex-1 p-2 pt-1 md:p-4 md:pt-2 text-[CanvasText]">
-            <div className="w-full" style={{ marginTop: '-0.75rem' }}>
-                <div className="mb-4 flex items-start justify-between gap-4">
-                    <div></div>
+            <Sidebar 
+                user={{ name: "Hussein" }} 
+                mobileOpen={mobileSidebarOpen}
+                onMobileClose={() => setMobileSidebarOpen(false)}
+            />
+            {mobileSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                />
+            )}
+        <main className="flex-1 p-2 md:p-4 text-[CanvasText] min-w-0">
+            <div className="w-full max-w-full" style={{ marginTop: '-0.75rem' }}>
+                <div className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                            onClick={() => setMobileSidebarOpen(true)}
+                            aria-label="Open sidebar"
+                        >
+                            <FaBars />
+                        </button>
+                    </div>
                     {/* Widget toggles dropdown on the right */}
-                    <div className="relative ml-auto">
+                    <div className="relative ml-auto w-full sm:w-auto">
                         <details ref={widgetsDetailsRef} className="relative">
-                            <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText]">
+                            <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText] w-full sm:w-auto text-center sm:text-left">
                                 Widgets
                             </summary>
-                            <div className="absolute right-0 mt-2 w-80 bg-[Canvas] border rounded shadow p-0 z-40 max-h-96 overflow-hidden text-[CanvasText]">
+                            <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-[Canvas] border rounded shadow p-0 z-40 max-h-96 overflow-hidden text-[CanvasText]">
                                 <div className="px-3 py-2 border-b flex items-center justify-between">
                                     <div className="font-medium text-sm">Widgets</div>
                                     <div className="text-xs opacity-70">Show / hide</div>
@@ -1154,7 +1137,7 @@ export default function Dashboard() {
 
                 {/* Unified Widget Grid - All widgets in draggable layout */}
                 {visibleWidgetKeys.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-max">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-max">
                         {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
                     </div>
                 )}
@@ -1163,7 +1146,7 @@ export default function Dashboard() {
 
                 {/* Quick Add inline form area */}
                 {quickAddOpen && (
-                    <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 w-96 bg-[Canvas] border rounded shadow p-4 text-[CanvasText]">
+                    <div className="fixed left-1/2 -translate-x-1/2 bottom-4 sm:bottom-8 z-50 w-[95vw] max-w-96 bg-[Canvas] border rounded shadow p-4 text-[CanvasText]">
                         <div className="flex items-center justify-between mb-2">
                             <div className="font-semibold">Quick Add — {quickAddOpen}</div>
                             <button

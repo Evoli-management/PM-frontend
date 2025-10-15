@@ -7,6 +7,7 @@ import { Preferences } from '../components/profile/Preferences';
 import { Integrations } from '../components/profile/Integrations';
 import { Privacy } from '../components/profile/Privacy';
 import { Toast } from '../components/profile/UIComponents';
+import { FaBars } from 'react-icons/fa';
 
 // Teams Component (simplified for now)
 const TeamsTab = ({ showToast }) => {
@@ -45,6 +46,7 @@ const TeamsTab = ({ showToast }) => {
 
 export default function ProfileSetting() {
     const [activeTab, setActiveTab] = useState("My Profile");
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     
     // Global toast state
     const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
@@ -91,8 +93,27 @@ export default function ProfileSetting() {
     return (
         <div className="min-h-screen bg-[#EDEDED] px-2 py-4 sm:px-4 sm:py-6">
             <div className="flex gap-[5mm]">
-                <Sidebar />
+                <Sidebar 
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
+                />
+
+                {/* Mobile backdrop */}
+                {mobileSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+
                 <main className="flex-1">
+                    {/* Mobile menu button */}
+                    <button
+                        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+                        onClick={() => setMobileSidebarOpen(true)}
+                    >
+                        <FaBars className="h-5 w-5 text-gray-600" />
+                    </button>
                     <ProfileLayout activeTab={activeTab} setActiveTab={setActiveTab}>
                         {renderTabContent()}
                     </ProfileLayout>

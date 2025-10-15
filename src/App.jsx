@@ -12,8 +12,6 @@ import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
-// AdminSettings removed
-import AdminSettings from "./pages/AdminSettings.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
 import Modules from "./pages/Modules.jsx";
@@ -24,7 +22,6 @@ import Dashboard from "./pages/dashboard/Dashboard.jsx";
 import ENPS from "./pages/dashboard/ENPS.jsx";
 import Recognition from "./pages/dashboard/Recognition.jsx";
 import Notifications from "./pages/dashboard/Notifications.jsx";
-import Analytics from "./pages/dashboard/Analytics.jsx";
 import TeamDashboard from "./pages/dashboard/TeamDashboard.jsx";
 
 // Main feature pages
@@ -75,7 +72,6 @@ export default function App() {
                             <Route path="/verify-email-change" element={<VerifyEmailChange />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
-                            {/* Admin settings routes removed */}
                             <Route path="/dashboard" element={<Dashboard />} />
                             {calendarEnabled && <Route path="/calendar" element={<Calendar />} />}
                             <Route path="/tasks" element={<Tasks />} />
@@ -84,7 +80,6 @@ export default function App() {
                             <Route path="/enps" element={<ENPS />} />
                             <Route path="/recognition" element={<Recognition />} />
                             <Route path="/notifications" element={<Notifications />} />
-                            <Route path="/analytics" element={<Analytics />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/teams" element={<Teams />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
@@ -92,8 +87,6 @@ export default function App() {
                             {/* Private routes below */}
                             <Route path="/profile-settings" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
                             <Route path="/profile" element={<PrivateRoute><ProfileSetting /></PrivateRoute>} />
-                            <Route path="/admin-settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
-                            <Route path="/settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
                             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                             {calendarEnabled && <Route path="/calendar" element={<PrivateRoute><Calendar /></PrivateRoute>} />}
                             <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
@@ -102,7 +95,6 @@ export default function App() {
                             <Route path="/enps" element={<PrivateRoute><ENPS /></PrivateRoute>} />
                             <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-                            <Route path="/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
                             <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
                         </Routes>

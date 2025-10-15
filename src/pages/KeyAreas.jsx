@@ -1,5 +1,119 @@
+const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        isDragging,
+    } = useSortable({ id: ka.id });
+    return (
+        <div
+            ref={setNodeRef}
+            {...attributes}
+            className={`flex items-center px-4 py-3 transition-transform ease-in-out duration-200 bg-white hover:bg-slate-50 ${isDragging ? 'z-10 shadow-lg' : ''}`}
+            style={{ touchAction: 'manipulation' }}
+            tabIndex={0}
+            aria-label={`Key Area: ${ka.title}`}
+        >
+            {/* Drag handle */}
+            <span
+                {...listeners}
+                className={`mr-3 select-none cursor-grab hover:cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
+                title="Drag to reorder"
+                aria-label="Drag handle"
+                role="button"
+                tabIndex={0}
+            >
+                <svg width="20" height="20" fill="none">
+                    {/* Only show debug marker in development mode */}
+                    {process.env.NODE_ENV === 'development' ? (
+                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">{idx + 1}</text>
+                    ) : null}
+                    <text x="10" y="15" textAnchor="middle" fontSize="18" fill="#64748b">⠿</text>
+                </svg>
+            </span>
+            {/* Key Area name and metadata (draggable area) */}
+            <div
+                {...listeners}
+                role="button"
+                aria-label={`Drag ${ka.title}`}
+                className={`flex-1 min-w-0 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab hover:cursor-grab'}`}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            >
+                <span className="font-medium text-slate-700 truncate cursor-inherit">{ka.title}</span>
+                {ka.taskCount !== undefined && (
+                    <span className="ml-2 text-xs text-slate-500 cursor-inherit">{ka.taskCount} tasks</span>
+                )}
+            </div>
+            {/* Up/Down buttons for accessibility */}
+            <div className="flex items-center gap-1 ml-2">
+                <button
+                    type="button"
+                    className="p-1 rounded focus:outline-none"
+                    aria-label="Move up"
+                    disabled={idx === 0}
+                    onClick={() => moveKeyArea(idx, idx - 1)}
+                >
+                    <svg width="16" height="16" fill="none"><path d="M8 4l-4 6h8l-4-6z" fill="#64748b" /></svg>
+                </button>
+                <button
+                    type="button"
+                    className="p-1 rounded focus:outline-none"
+                    aria-label="Move down"
+                    disabled={false}
+                    onClick={() => moveKeyArea(idx, idx + 1)}
+                >
+                    <svg width="16" height="16" fill="none"><path d="M8 12l4-6H4l4 6z" fill="#64748b" /></svg>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const FixedKeyAreaRow = ({ ka }) => {
+    return (
+        <div
+            className="flex items-center px-4 py-3 bg-slate-50 opacity-80 cursor-default"
+            tabIndex={0}
+            aria-label={`Key Area: ${ka.title} (Fixed)`}
+        >
+            {/* Fixed icon */}
+            <span className="mr-3 text-slate-400" title="Fixed position">
+                <svg width="20" height="20" fill="none">
+                    <circle cx="10" cy="10" r="8" stroke="#94a3b8" strokeWidth="2" />
+                    {/* Only show debug marker in development mode */}
+                    {process.env.NODE_ENV === 'development' ? (
+                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">★</text>
+                    ) : null}
+                    <text x="10" y="15" textAnchor="middle" fontSize="10" fill="#94a3b8">★</text>
+                </svg>
+            </span>
+            {/* Key Area name and metadata */}
+            <div className="flex-1 min-w-0">
+                <span className="font-medium text-slate-700 truncate">{ka.title}</span>
+                {ka.taskCount !== undefined && (
+                    <span className="ml-2 text-xs text-slate-500">{ka.taskCount} tasks</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // src/pages/KeyAreas.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+} from "@dnd-kit/sortable";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import TaskActivityModal from "../components/calendar/TaskActivityModal";
@@ -30,9 +144,13 @@ import {
 
 // Small UI helpers for table chips/indicators
 const EmptyState = ({ title = "List is empty.", hint = "" }) => (
-    <div className="p-4 border border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-600">
+    <div className="p-4 rounded-lg bg-slate-50 text-slate-600 border border-slate-200">
         <div className="text-sm font-medium">{title}</div>
         {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
+        {/* Only show debug border in development mode */}
+        {process.env.NODE_ENV === 'development' ? (
+            <div className="absolute inset-0 border-2 border-dashed border-blue-300 pointer-events-none" />
+        ) : null}
     </div>
 );
 
@@ -366,54 +484,35 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
 
     return (
         <div className="p-2 overflow-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-full">
-                {groups.map((col) => (
-                    <div key={col.key} className="bg-slate-50 border border-slate-200 rounded-lg">
-                        <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-700 flex items-center justify-between">
-                            <span>{col.label}</span>
-                            <span className="text-slate-500">{col.items.length}</span>
-                        </div>
-                        <div className="p-2 space-y-2 max-h-[48vh] overflow-auto">
-                            {col.items.length === 0 ? (
-                                <div className="text-xs text-slate-500">Empty</div>
-                            ) : (
-                                col.items.map((t) => (
-                                    <div
-                                        key={t.id}
-                                        className="w-full bg-white border border-slate-200 rounded-md shadow-sm hover:shadow px-2 py-2"
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <input
-                                                type="checkbox"
-                                                aria-label={`Select ${t.title}`}
-                                                className="mt-0.5"
-                                                checked={selectedIds.has(t.id)}
-                                                onChange={() => toggleSelect(t.id)}
-                                            />
-                                            {priorityBadge(t.priority)}
-                                            <button
-                                                type="button"
-                                                onClick={() => onSelect && onSelect(t)}
-                                                className="flex-1 text-left"
-                                                title={t.title}
-                                            >
-                                                <div className="min-w-0">
-                                                    <div className="font-medium truncate text-slate-900">{t.title}</div>
-                                                    {t.assignee ? (
-                                                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                                                            {t.assignee}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <DndContext
+                sensors={useSensors(
+                    useSensor(PointerSensor),
+                    useSensor(KeyboardSensor, {
+                        coordinateGetter: sortableKeyboardCoordinates,
+                    })
+                )}
+                collisionDetection={closestCenter}
+                onDragEnd={({ active, over }) => {
+                    if (!over || active.id === over.id) return;
+                    const oldIdx = keyAreas.findIndex((ka) => ka.id === active.id);
+                    const newIdx = keyAreas.findIndex((ka) => ka.id === over.id);
+                    // Prevent moving 'Ideas' or moving anything to 'Ideas' position
+                    if (keyAreas[oldIdx]?.is_fixed || keyAreas[newIdx]?.is_fixed) return;
+                    const newOrder = arrayMove(keyAreas, oldIdx, newIdx);
+                    setKeyAreas(newOrder);
+                    // TODO: Persist new order to backend
+                }}
+            >
+                <SortableContext items={keyAreas.filter(ka => !ka.is_fixed).map(ka => ka.id)}>
+                    {keyAreas.map((ka, idx) => (
+                        ka.is_fixed ? (
+                            <FixedKeyAreaRow key={ka.id} ka={ka} />
+                        ) : (
+                            <SortableKeyAreaRow key={ka.id} ka={ka} idx={idx} moveKeyArea={moveKeyArea} />
+                        )
+                    ))}
+                </SortableContext>
+            </DndContext>
         </div>
     );
 };
@@ -972,6 +1071,9 @@ function TaskFullView({
     listNames = {},
     kaId = null,
     listNumbers = [],
+    selectedKA = null,
+    users = [],
+    allTasks = [],
 }) {
     const [tab, setTab] = useState(initialTab || "activities");
     const [isEditing, setIsEditing] = useState(false);
@@ -1495,154 +1597,154 @@ function TaskFullView({
                                         </div>
                                         {isOpen && (
                                             <div className="mt-2 border-t border-slate-200 pt-2">
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                                                    {/* Row 1 */}
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Activity Name
-                                                        </label>
-                                                        <input
-                                                            value={a.text != null ? a.text : a.activity_name || ""}
-                                                            onChange={(e) =>
-                                                                updateField(
-                                                                    a.id,
-                                                                    a.text != null ? "text" : "activity_name",
-                                                                    e.target.value,
-                                                                )
-                                                            }
-                                                            placeholder="Enter activity name"
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                                    {/* Left column */}
+                                                    <div className="grid gap-2 content-start">
+                                                        {/* Description */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Description
+                                                            </label>
+                                                            <input
+                                                                value={a.notes || a.description || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Start Date */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Start date
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.date_start) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* End Date */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                End date
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.date_end) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Deadline */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Deadline
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.deadline) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Date (finish) */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Date (finish)
+                                                            </label>
+                                                            <input
+                                                                value={toDateOnly(a.finish_date) || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Duration */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Duration
+                                                            </label>
+                                                            <input
+                                                                value={a.duration || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Start Date
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={toDateOnly(a.date_start) || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "date_start", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
+                                                    {/* Right column */}
+                                                    <div className="grid gap-2 content-start">
+                                                        {/* List */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                List
+                                                            </label>
+                                                            <input
+                                                                value={a.list || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Key Area */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Key Area
+                                                            </label>
+                                                            <input
+                                                                value={selectedKA?.title || selectedKA?.name || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Task */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">Task</label>
+                                                            <input
+                                                                value={(() => {
+                                                                    const taskId = a.task_id || a.taskId;
+                                                                    if (!taskId) return "—";
+                                                                    const t = (allTasks || []).find((x) => String(x.id) === String(taskId));
+                                                                    return t ? (t.title || t.name || `#${taskId}`) : `#${taskId}`;
+                                                                })()}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Respons. (Responsible) */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Respons.
+                                                            </label>
+                                                            <input
+                                                                value={a.responsible || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Priority */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Priority
+                                                            </label>
+                                                            <input
+                                                                value={(() => {
+                                                                    const p = a.priority;
+                                                                    if (p === "high" || p === 3) return "High";
+                                                                    if (p === "low" || p === 1) return "Low";
+                                                                    if (p === "normal" || p === 2) return "Normal";
+                                                                    return "—";
+                                                                })()}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
+                                                        {/* Goal */}
+                                                        <div>
+                                                            <label className="block text-[11px] text-slate-600">
+                                                                Goal
+                                                            </label>
+                                                            <input
+                                                                value={a.goal || "—"}
+                                                                readOnly
+                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            End Date
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={toDateOnly(a.date_end) || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "date_end", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    {/* Row 2 */}
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Deadline
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={toDateOnly(a.deadline) || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "deadline", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Duration
-                                                        </label>
-                                                        <input
-                                                            type="time"
-                                                            value={a.duration || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "duration", e.target.value)
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">Task</label>
-                                                        <input
-                                                            value={a.task_id || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "task_id", e.target.value)
-                                                            }
-                                                            placeholder="Task"
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    {/* Row 3 */}
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Priority
-                                                        </label>
-                                                        <select
-                                                            value={a.priority || 2}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "priority", Number(e.target.value))
-                                                            }
-                                                            className="w-full border rounded px-2 py-1"
-                                                        >
-                                                            <option value={3}>High</option>
-                                                            <option value={2}>Normal</option>
-                                                            <option value={1}>Low</option>
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Responsible
-                                                        </label>
-                                                        <input
-                                                            value={a.responsible || ""}
-                                                            onChange={(e) =>
-                                                                updateField(a.id, "responsible", e.target.value)
-                                                            }
-                                                            placeholder="Responsible"
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[11px] text-slate-600">
-                                                            Notes
-                                                        </label>
-                                                        <textarea
-                                                            rows={2}
-                                                            value={a.notes || ""}
-                                                            onChange={(e) => updateField(a.id, "notes", e.target.value)}
-                                                            className="w-full border rounded px-2 py-1"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-end gap-2 mt-2">
-                                                    <button
-                                                        type="button"
-                                                        className="px-2 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
-                                                        onClick={async () => {
-                                                            const newTitle = (
-                                                                (a.text != null ? a.text : a.activity_name) || ""
-                                                            ).trim();
-                                                            if (!newTitle) return;
-                                                            try {
-                                                                await activityService.update(a.id, { text: newTitle });
-                                                                window.dispatchEvent(
-                                                                    new CustomEvent("ka-activities-updated", {
-                                                                        detail: { refresh: true },
-                                                                    }),
-                                                                );
-                                                            } catch (err) {
-                                                                console.error("Failed to save activity", err);
-                                                            }
-                                                        }}
-                                                    >
-                                                        Save
-                                                    </button>
                                                 </div>
                                             </div>
                                         )}
@@ -1896,6 +1998,7 @@ export default function KeyAreas() {
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState(null);
     const [selectedKA, setSelectedKA] = useState(null);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const [taskTab, setTaskTab] = useState(1);
     const [allTasks, setAllTasks] = useState([]);
@@ -1928,7 +2031,6 @@ export default function KeyAreas() {
     const [editingActivityId, setEditingActivityId] = useState(null);
     const [showTaskHelp, setShowTaskHelp] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
@@ -1946,12 +2048,29 @@ export default function KeyAreas() {
     useEffect(() => {
         const handler = (e) => {
             const tid = e?.detail?.taskId ?? null;
+                // Reset form and editing state for new activity
+                setEditingActivityId(null);
+                setActivityForm({
+                    title: "",
+                    description: "",
+                    list: "",
+                    key_area_id: selectedKA?.id || "",
+                    assignee: "",
+                    priority: "normal",
+                    goal: "",
+                    start_date: "",
+                    end_date: "",
+                    deadline: "",
+                    finish_date: "",
+                    duration: "",
+                    _endAuto: true,
+                });
             setActivityAttachTaskId(tid ? String(tid) : null);
             setShowActivityComposer(true);
         };
         window.addEventListener("ka-open-activity-composer", handler);
         return () => window.removeEventListener("ka-open-activity-composer", handler);
-    }, []);
+        }, [selectedKA]);
 
     // Open task editor (reuse Add Task modal) populated for editing
     useEffect(() => {
@@ -2659,10 +2778,12 @@ export default function KeyAreas() {
         nextOrdered.splice(toIdx, 0, moved);
         // Reassign positions 1..N
         const withPos = nextOrdered.map((k, i) => ({ ...k, position: i + 1 }));
-        // Persist changes (only those that changed position)
+        // Persist changes via bulk endpoint (falls back to per-item)
         const changed = withPos.filter((k, i) => ordered[i]?.id !== k.id || ordered[i]?.position !== k.position);
         try {
-            await Promise.all(changed.map((k) => api.updateKeyArea(k.id, { ...k, position: k.position })));
+            if (changed.length) {
+                await keyAreaService.reorder(changed);
+            }
             // Update local state
             setKeyAreas((prev) => {
                 const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
@@ -2695,10 +2816,10 @@ export default function KeyAreas() {
         const a = ordered[idx];
         const b = ordered[targetIdx];
         try {
-            // swap positions and persist both
-            await Promise.all([
-                api.updateKeyArea(a.id, { ...a, position: b.position }),
-                api.updateKeyArea(b.id, { ...b, position: a.position }),
+            // swap positions and persist via bulk reorder
+            await keyAreaService.reorder([
+                { id: a.id, position: b.position },
+                { id: b.id, position: a.position },
             ]);
             // update local state and emit
             setKeyAreas((prev) => {
@@ -3337,6 +3458,9 @@ export default function KeyAreas() {
                                     listNames={listNames}
                                     kaId={selectedKA?.id}
                                     listNumbers={availableListNumbers}
+                                    selectedKA={selectedKA}
+                                    users={users}
+                                    allTasks={allTasks}
                                     readOnly={
                                         Boolean(selectedKA?.is_default) &&
                                         (selectedKA?.title || "").toLowerCase() !== "ideas"
@@ -3363,18 +3487,47 @@ export default function KeyAreas() {
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="max-w-7xl mx-auto p-6">
                                     <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
-                                        {/* Top Row: Task Lists + Mass Edit */}
-                                        <div className="grid grid-cols-3 gap-4">
-                                            {/* Left: Task Lists (2/3 width) */}
-                                            <div className="col-span-3 md:col-span-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <div className="text-sm font-semibold whitespace-nowrap mr-1">
-                                                        Task Lists
-                                                    </div>
-                                                    <div
-                                                        ref={tabsRef}
-                                                        className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
-                                                    >
+                                        {/* Header Row: Task Lists Label + Mass Edit Control */}
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-700">Task Lists:</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm">
+                                                <span className="text-slate-500" aria-live="polite">
+                                                    {selectedIds.size} selected
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (showMassEdit) {
+                                                            setShowMassEdit(false);
+                                                        } else {
+                                                            setShowMassEdit(true);
+                                                            // Scroll to Tasks Display area where the form appears
+                                                            setTimeout(() => {
+                                                                if (tasksDisplayRef.current) {
+                                                                    tasksDisplayRef.current.scrollIntoView({
+                                                                        behavior: "smooth",
+                                                                        block: "start",
+                                                                    });
+                                                                }
+                                                            }, 0);
+                                                        }
+                                                    }}
+                                                    className="bg-green-400 text-white rounded-md px-3 py-1 text-sm hover:bg-green-500"
+                                                    aria-label="mass edit"
+                                                >
+                                                    {showMassEdit ? "Exit Mass Edit" : "Mass Edit"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Tabs Section */}
+                                        <div className="pt-3">
+                                            <div
+                                                ref={tabsRef}
+                                                className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
+                                            >
                                                         {Array.from({ length: leftListCount }).map((_, i) => {
                                                             const n = i + 1;
                                                             return (
@@ -3436,43 +3589,13 @@ export default function KeyAreas() {
                                                                                 <button
                                                                                     role="menuitem"
                                                                                     onClick={() => {
-                                                                                        setTaskForm((s) => ({
-                                                                                            ...s,
-                                                                                            list_index: n,
-                                                                                        }));
-                                                                                        setShowTaskComposer(true);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                >
-                                                                                    Add Task
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
-                                                                                        setActivityForm((s) => ({
-                                                                                            ...s,
-                                                                                            key_area_id:
-                                                                                                selectedKA?.id ||
-                                                                                                s.key_area_id,
-                                                                                        }));
-                                                                                        setActivityAttachTaskId(null);
-                                                                                        setShowActivityComposer(true);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                >
-                                                                                    Add Activity
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
                                                                                         renameList(n);
                                                                                         setOpenListMenu(null);
                                                                                     }}
                                                                                     className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                    aria-label="Rename list"
                                                                                 >
-                                                                                    Rename
+                                                                                    Rename List
                                                                                 </button>
                                                                                 <button
                                                                                     role="menuitem"
@@ -3481,8 +3604,9 @@ export default function KeyAreas() {
                                                                                         setOpenListMenu(null);
                                                                                     }}
                                                                                     className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                                    aria-label="Delete list"
                                                                                 >
-                                                                                    Delete
+                                                                                    Delete List
                                                                                 </button>
                                                                             </div>
                                                                         </>
@@ -3533,70 +3657,31 @@ export default function KeyAreas() {
                                                                         }
                                                                     }}
                                                                     title="Add list"
-                                                                    className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
                                                                 >
-                                                                    <svg
-                                                                        stroke="currentColor"
-                                                                        fill="currentColor"
-                                                                        strokeWidth="0"
-                                                                        viewBox="0 0 448 512"
-                                                                        height="1em"
-                                                                        width="1em"
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                    >
-                                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                                     </svg>
+                                                                    Add List
                                                                 </button>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Right: Mass Edit (1/3 width) as a button */}
-                                            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
-                                                <span className="text-sm text-gray-600" aria-live="polite">
-                                                    {selectedIds.size} selected
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    disabled={selectedIds.size === 0}
-                                                    onClick={() => {
-                                                        setShowMassEdit(true);
-                                                        // Scroll to Tasks Display area where the form appears
-                                                        setTimeout(() => {
-                                                            if (tasksDisplayRef.current) {
-                                                                tasksDisplayRef.current.scrollIntoView({
-                                                                    behavior: "smooth",
-                                                                    block: "start",
-                                                                });
-                                                            }
-                                                        }, 0);
-                                                    }}
-                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                                                    aria-label="Open mass edit"
-                                                    title={
-                                                        selectedIds.size === 0
-                                                            ? "Select tasks to enable mass edit"
-                                                            : `Mass edit (${selectedIds.size})`
-                                                    }
-                                                >
-                                                    Mass Edit
-                                                </button>
-                                            </div>
                                         </div>
 
                                         {/* Bottom Row: Tasks Display (full width) */}
                                         <div ref={tasksDisplayRef}>
-                                            {showMassEdit && selectedIds.size > 0 && (
+                                            {showMassEdit && (
                                                 <form
                                                     onSubmit={applyBulkEdit}
                                                     aria-label="Mass edit selected tasks"
                                                     className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg"
                                                 >
                                                     <div className="text-sm text-blue-900 font-medium mb-3">
-                                                        Mass edit {selectedIds.size} task
-                                                        {selectedIds.size > 1 ? "s" : ""}
+                                                        {selectedIds.size === 0 
+                                                            ? "Mass Edit Mode: Select tasks to edit multiple tasks at once"
+                                                            : `Mass edit ${selectedIds.size} task${selectedIds.size > 1 ? "s" : ""}`
+                                                        }
                                                     </div>
                                                     <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                                                         <div>
@@ -3724,7 +3809,12 @@ export default function KeyAreas() {
                                                         </button>
                                                         <button
                                                             type="submit"
-                                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                                            disabled={selectedTasks.length === 0}
+                                                            className={`px-3 py-1.5 rounded-md ${
+                                                                selectedTasks.length === 0
+                                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                            }`}
                                                         >
                                                             Apply
                                                         </button>
@@ -3742,7 +3832,7 @@ export default function KeyAreas() {
                                                 visibleTasks.length === 0 ? (
                                                     <EmptyState
                                                         title="List is empty."
-                                                        hint="Use the three-dots menu to add a task."
+                                                        hint="Use the 'Add Task' button below to create your first task."
                                                     />
                                                 ) : (
                                                     <div className="overflow-x-auto">
@@ -3787,10 +3877,10 @@ export default function KeyAreas() {
                                                                         Start Date
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
-                                                                        Deadline
+                                                                        End date
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
-                                                                        End date
+                                                                        Deadline
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
                                                                         Duration
@@ -3958,10 +4048,10 @@ export default function KeyAreas() {
                                                                                     {toDateOnly(t.start_date) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.deadline) || "—"}
+                                                                                    {toDateOnly(t.end_date) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.end_date) || "—"}
+                                                                                    {toDateOnly(t.deadline) || "—"}
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top text-slate-800">
                                                                                     {formatDuration(
@@ -4462,6 +4552,27 @@ export default function KeyAreas() {
                                                 />
                                             )}
                                         </div>
+                                        
+                                        {/* Add Task Footer */}
+                                        <div className="flex justify-end pr-10 pt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTaskForm((s) => ({
+                                                        ...s,
+                                                        list_index: taskTab,
+                                                    }));
+                                                    setShowTaskComposer(true);
+                                                }}
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                aria-label="Add task"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                Add Task
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4593,7 +4704,9 @@ export default function KeyAreas() {
                                                 .map((ka, idx) => (
                                                     <li
                                                         key={ka.id}
-                                                        className="flex items-center justify-between px-3 py-2"
+                                                        className={`flex items-center justify-between px-3 py-2 rounded-md ${
+                                                            ka.is_default ? '' : 'hover:bg-slate-50 cursor-grab active:cursor-grabbing'
+                                                        }`}
                                                         draggable={!ka.is_default}
                                                         onDragStart={(e) => {
                                                             if (ka.is_default) return;
@@ -4617,10 +4730,10 @@ export default function KeyAreas() {
                                                             <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold shrink-0">
                                                                 {ka.position && ka.position > 0 ? ka.position : idx + 1}
                                                             </span>
-                                                            <div className="min-w-0">
+                                                            <div className="min-w-0 select-none">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <span 
-                                                                        className="font-semibold truncate"
+                                                                        className="font-semibold truncate cursor-inherit"
                                                                         style={{ color: ka.color || '#1F2937' }}
                                                                     >
                                                                         {ka.title}
@@ -5138,11 +5251,6 @@ export default function KeyAreas() {
                                             {/* Header strip */}
                                             <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
                                                 {editingActivityId ? "Edit Activity" : "Add Activity"}
-                                                {activityAttachTaskId && (
-                                                    <span className="ml-2 text-xs font-normal text-slate-500">
-                                                        (attaching to task #{activityAttachTaskId})
-                                                    </span>
-                                                )}
                                             </div>
                                             <form onSubmit={onCreateActivity} className="p-4 md:p-6">
                                                 {/* Activity name field under header */}
@@ -5428,28 +5536,51 @@ export default function KeyAreas() {
                                                             <select
                                                                 name="key_area_id"
                                                                 value={activityForm.key_area_id || selectedKA?.id || ""}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        key_area_id: e.target.value,
-                                                                    }))
-                                                                }
+                                                                onChange={(e) => {
+                                                                    const nextKa = e.target.value;
+                                                                    setActivityForm((s) => ({ ...s, key_area_id: nextKa }));
+                                                                    // If current attached task is not in the new KA, clear it
+                                                                    const inKa = (allTasks || []).some(
+                                                                        (t) => String(t.key_area_id) === String(nextKa) && String(t.id) === String(activityAttachTaskId),
+                                                                    );
+                                                                    if (!inKa) setActivityAttachTaskId("");
+                                                                }}
                                                                 className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                             >
-                                                                {selectedKA && !activityForm.key_area_id && (
+                                                                {/* Ensure current KA is shown first */}
+                                                                {selectedKA && (
                                                                     <option value={selectedKA.id}>
-                                                                        {selectedKA.name}
+                                                                        {selectedKA.title || selectedKA.name}
                                                                     </option>
                                                                 )}
                                                                 {keyAreas
-                                                                    .filter(
-                                                                        (ka) =>
-                                                                            !selectedKA ||
-                                                                            String(ka.id) !== String(selectedKA.id),
-                                                                    )
+                                                                    .filter((ka) => !selectedKA || String(ka.id) !== String(selectedKA.id))
                                                                     .map((ka) => (
                                                                         <option key={ka.id} value={ka.id}>
                                                                             {ka.title || ka.name}
+                                                                        </option>
+                                                                    ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* Task (dropdown, auto-select current task) */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                Task
+                                                            </label>
+                                                            <select
+                                                                name="task_id"
+                                                                value={activityAttachTaskId || ""}
+                                                                onChange={(e) => setActivityAttachTaskId(e.target.value)}
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {!activityAttachTaskId && (
+                                                                    <option value="">— Select task —</option>
+                                                                )}
+                                                                {(allTasks || [])
+                                                                    .filter((x) => String(x.key_area_id) === String(activityForm.key_area_id || selectedKA?.id))
+                                                                    .map((t) => (
+                                                                        <option key={t.id} value={t.id}>
+                                                                            {t.title || t.name || `#${t.id}`}
                                                                         </option>
                                                                     ))}
                                                             </select>
@@ -5623,7 +5754,7 @@ export default function KeyAreas() {
                                         </div>
                                         <div>
                                             <label className="text-sm font-semibold text-slate-900">Color</label>
-                                            <div className="mt-2 flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
                                                 <input
                                                     type="color"
                                                     name="color"
@@ -5632,10 +5763,8 @@ export default function KeyAreas() {
                                                     title="Choose color for this Key Area"
                                                 />
                                                 <div className="flex flex-wrap gap-2">
-                                                    {/* Preset color options */}
                                                     {[
                                                         "#3B82F6", // Blue
-                                                        "#EF4444", // Red  
                                                         "#10B981", // Green
                                                         "#F59E0B", // Amber
                                                         "#8B5CF6", // Purple
@@ -5643,18 +5772,22 @@ export default function KeyAreas() {
                                                         "#06B6D4", // Cyan
                                                         "#84CC16", // Lime
                                                         "#F97316", // Orange
-                                                        "#6B7280", // Gray
-                                                    ].map(color => (
+                                                    ].map((color) => (
                                                         <button
                                                             key={color}
                                                             type="button"
                                                             onClick={(e) => {
-                                                                const colorInput = e.target.closest('form').querySelector('input[name="color"]');
-                                                                if (colorInput) colorInput.value = color;
+                                                                const form = e.currentTarget.closest('form');
+                                                                const colorInput = form?.querySelector('input[name="color"]');
+                                                                if (colorInput) {
+                                                                    colorInput.value = color;
+                                                                    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                                                    colorInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                                                }
                                                             }}
-                                                            className="w-6 h-6 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+                                                            className="w-6 h-6 rounded-full border-2 border-white shadow hover:scale-110 transition-transform"
                                                             style={{ backgroundColor: color }}
-                                                            title={`Set color to ${color}`}
+                                                            aria-label={`Choose ${color}`}
                                                         />
                                                     ))}
                                                 </div>

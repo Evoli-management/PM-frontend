@@ -19,6 +19,7 @@ import {
     FaBullseye,
     FaCheckCircle,
     FaClock,
+    FaBars,
 } from "react-icons/fa";
 import { getKeyAreas } from "../services/keyAreaService";
 
@@ -35,6 +36,7 @@ const Goals = () => {
     const [keyAreas, setKeyAreas] = useState([]);
     const [toast, setToast] = useState(null);
     const [currentView, setCurrentView] = useState("grid");
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const showToast = (type, message) => {
         setToast({ type, message });
@@ -259,8 +261,27 @@ const Goals = () => {
 
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
+            <Sidebar 
+                mobileOpen={mobileSidebarOpen}
+                onMobileClose={() => setMobileSidebarOpen(false)}
+            />
+
+            {/* Mobile backdrop */}
+            {mobileSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                />
+            )}
+
             <div className="flex-1 p-4 md:p-8">
+                {/* Mobile menu button */}
+                <button
+                    className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+                    onClick={() => setMobileSidebarOpen(true)}
+                >
+                    <FaBars className="h-5 w-5 text-gray-600" />
+                </button>
                 {/* Header with Stats */}
                 <div className="mb-8">
                     <GoalsHeader

@@ -119,7 +119,6 @@ export default function Navbar() {
                             >
                                 👤 Profile & Settings
                             </Link>
-                            {/* Admin Settings link removed */}
                             <div className="border-t border-gray-200 my-1"></div>
                             <button
                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
