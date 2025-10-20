@@ -19,6 +19,7 @@ export default function DayView({
     onActivityDrop,
     onEventClick,
     onTaskClick,
+    onActivityClick,
     onPlanTomorrow,
     onShiftDate,
     onSetDate,
@@ -519,10 +520,12 @@ export default function DayView({
                                 ) : (
                                     <div className="flex flex-col gap-1">
                                         {dayActivities.map((a) => (
-                                            <div
+                                            <button
                                                 key={a.id}
-                                                className="w-full px-2 py-1 rounded bg-white border border-slate-200 text-xs text-slate-700 flex items-center gap-2"
+                                                type="button"
+                                                className="w-full px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center gap-2 text-left cursor-pointer transition-colors"
                                                 title={a.text || a.title}
+                                                onClick={() => onActivityClick && onActivityClick(a)}
                                                 draggable
                                                 onDragStart={(e) => {
                                                     try {
@@ -544,7 +547,7 @@ export default function DayView({
                                                     <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
                                                 </svg>
                                                 <span className="truncate">{a.text || a.title}</span>
-                                            </div>
+                                            </button>
                                         ))}
                                     </div>
                                 )}
