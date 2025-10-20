@@ -5,6 +5,7 @@ import apiClient from "./apiClient";
 const toFE = (area) => ({
     id: area.id,
     title: area.name,
+    color: area.color || '#3B82F6',
     description: area.description || "",
     position: area.sortOrder ?? 0,
     is_default: !!area.isSystem,
@@ -26,6 +27,7 @@ const toBEUpdate = (data) => {
     if (data.description !== undefined) out.description = data.description;
     if (data.position !== undefined) out.sortOrder = data.position;
     if (data.listNames !== undefined) out.listNames = data.listNames;
+    if (data.color !== undefined) out.color = data.color;
     return out;
 };
 
