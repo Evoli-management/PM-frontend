@@ -116,7 +116,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
-import TaskActivityModal from "../components/calendar/TaskActivityModal";
+import CreateActivityModal from "../components/modals/CreateActivityModal";
 import {
     FaPlus,
     FaChevronLeft,
@@ -1161,26 +1161,16 @@ function TaskFullView({
         } catch {}
     };
     const toggleRow = (id) => {
-        setOpenActivityRows((prev) => {
-            // If clicking the already open row, close it
-            if (prev.has(id)) return new Set();
-            // If switching to a different row, "save" current list and open only this one
-            if (prev.size > 0 && !prev.has(id)) {
-                onUpdateActivities && onUpdateActivities(String(task.id), list);
-            }
-            return new Set([id]);
-        });
+        // Open activity in read-only modal instead of inline expansion
+        const activity = list.find(a => a.id === id);
+        if (activity) {
+            setActivityModal({ open: true, item: activity });
+        }
     };
 
-    // When hovering another activity, close any open one (and save), but don't open the hovered.
+    // When hovering another activity, do nothing (inline details removed)
     const closeOnHoverDifferent = (id) => {
-        setOpenActivityRows((prev) => {
-            if (prev.size > 0 && !prev.has(id)) {
-                onUpdateActivities && onUpdateActivities(String(task.id), list);
-                return new Set();
-            }
-            return prev;
-        });
+        // No-op: inline details removed
     };
     const updateField = (id, field, value) => {
         setList(list.map((a) => (a.id === id ? { ...a, [field]: value } : a)));
@@ -1595,159 +1585,6 @@ function TaskFullView({
                                                 <FaAngleDoubleLeft className="w-4 h-4" />
                                             </button>
                                         </div>
-                                        {isOpen && (
-                                            <div className="mt-2 border-t border-slate-200 pt-2">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                                    {/* Left column */}
-                                                    <div className="grid gap-2 content-start">
-                                                        {/* Description */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Description
-                                                            </label>
-                                                            <input
-                                                                value={a.notes || a.description || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Start Date */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Start date
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.date_start) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* End Date */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                End date
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.date_end) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Deadline */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Deadline
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.deadline) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Date (finish) */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Date (finish)
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.finish_date) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Duration */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Duration
-                                                            </label>
-                                                            <input
-                                                                value={a.duration || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    {/* Right column */}
-                                                    <div className="grid gap-2 content-start">
-                                                        {/* List */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                List
-                                                            </label>
-                                                            <input
-                                                                value={a.list || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Key Area */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Key Area
-                                                            </label>
-                                                            <input
-                                                                value={selectedKA?.title || selectedKA?.name || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Task */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">Task</label>
-                                                            <input
-                                                                value={(() => {
-                                                                    const taskId = a.task_id || a.taskId;
-                                                                    if (!taskId) return "—";
-                                                                    const t = (allTasks || []).find((x) => String(x.id) === String(taskId));
-                                                                    return t ? (t.title || t.name || `#${taskId}`) : `#${taskId}`;
-                                                                })()}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Respons. (Responsible) */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Respons.
-                                                            </label>
-                                                            <input
-                                                                value={a.responsible || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Priority */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Priority
-                                                            </label>
-                                                            <input
-                                                                value={(() => {
-                                                                    const p = a.priority;
-                                                                    if (p === "high" || p === 3) return "High";
-                                                                    if (p === "low" || p === 1) return "Low";
-                                                                    if (p === "normal" || p === 2) return "Normal";
-                                                                    return "—";
-                                                                })()}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Goal */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Goal
-                                                            </label>
-                                                            <input
-                                                                value={a.goal || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
                                     </li>
                                 );
                             })}
@@ -1983,7 +1820,22 @@ function TaskFullView({
                     }}
                 />
             )}
-            {/* no popup modal for activities in TaskFullView; inline expansion used */}
+            {/* Read-only activity modal */}
+            {activityModal.open && activityModal.item && (
+                <CreateActivityModal
+                    isOpen={activityModal.open}
+                    onClose={() => setActivityModal({ open: false, item: null })}
+                    onSave={() => {}} // no-op: read-only
+                    activityId={activityModal.item.id}
+                    initialData={{
+                        taskId: activityModal.item.task_id || activityModal.item.taskId || "",
+                        text: activityModal.item.text || activityModal.item.activity_name || "",
+                        title: activityModal.item.text || activityModal.item.activity_name || "",
+                    }}
+                    attachedTaskId={activityModal.item.task_id || activityModal.item.taskId || null}
+                    readOnly={true}
+                />
+            )}
         </div>
     );
 }
@@ -2664,10 +2516,22 @@ export default function KeyAreas() {
                 description: payload.description,
                 color: payload.color,
             });
-            setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
+                setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { 
+                    ...k, 
+                    title: payload.title,
+                    description: payload.description,
+                    color: payload.color,
+                    ...updated 
+                } : k)));
             // emit updated list for sidebar (alphabetical with Ideas last)
             try {
-                const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
+                    const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { 
+                        ...k, 
+                        title: payload.title,
+                        description: payload.description,
+                        color: payload.color,
+                        ...updated 
+                    } : k));
                 const sidebarList = sortForSidebar(updatedList);
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
             } catch (e) {}
@@ -2948,10 +2812,6 @@ export default function KeyAreas() {
 
     const renameList = async (n) => {
         if (!selectedKA) return;
-        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") {
-            alert("Cannot rename lists for the Ideas key area.");
-            return;
-        }
         const current = getListName(selectedKA.id, n);
         const val = prompt("Rename list", current);
         if (val === null) return; // cancelled
@@ -2967,10 +2827,6 @@ export default function KeyAreas() {
 
     const deleteList = async (n) => {
         if (!selectedKA) return;
-        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") {
-            alert("Cannot edit lists for the Ideas key area.");
-            return;
-        }
         const kaId = selectedKA.id;
         // Only allow deletion if the list has no tasks
         const hasTasks = (allTasks || []).some(
@@ -3345,6 +3201,8 @@ export default function KeyAreas() {
                                         onClick={() => {
                                             setSelectedKA(null);
                                             setAllTasks([]);
+                                            // Clear any URL params (like ?select=ideas) to show full list
+                                            navigate("/key-areas", { replace: true });
                                         }}
                                     >
                                         <FaChevronLeft />
@@ -4727,14 +4585,19 @@ export default function KeyAreas() {
                                                         onDragEnd={() => setDragKAId(null)}
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0">
-                                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold shrink-0">
+                                                            <span 
+                                                                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold shrink-0"
+                                                                style={{ 
+                                                                    backgroundColor: ka.color ? `${ka.color}66` : '#e2e8f0',
+                                                                    color: ka.color || '#334155'
+                                                                }}
+                                                            >
                                                                 {ka.position && ka.position > 0 ? ka.position : idx + 1}
                                                             </span>
                                                             <div className="min-w-0 select-none">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <span 
-                                                                        className="font-semibold truncate cursor-inherit"
-                                                                        style={{ color: ka.color || '#1F2937' }}
+                                                                        className="font-semibold truncate cursor-inherit text-slate-700"
                                                                     >
                                                                         {ka.title}
                                                                     </span>
@@ -4779,32 +4642,35 @@ export default function KeyAreas() {
                                                                 </>
                                                             )}
                                                             <button
-                                                                className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
+                                                                className="rounded-md bg-white text-slate-700 hover:bg-slate-50 flex items-center justify-center p-2 text-xs border border-slate-200"
+                                                                title="Edit"
+                                                                aria-label="Edit key area"
                                                                 onClick={() => {
                                                                     setEditing(ka);
                                                                     setShowForm(true);
                                                                 }}
                                                             >
-                                                                <FaEdit /> Edit
+                                                                <FaEdit />
                                                             </button>
                                                             <button
-                                                                disabled={ka.is_default}
+                                                                disabled={ka.is_default || (ka.title || "").toLowerCase() === "ideas"}
                                                                 title={
-                                                                    ka.is_default
-                                                                        ? undefined
+                                                                    ka.is_default || (ka.title || "").toLowerCase() === "ideas"
+                                                                        ? "Cannot delete the Ideas key area"
                                                                         : typeof ka.taskCount === "number" &&
                                                                             ka.taskCount > 0
                                                                           ? `${ka.taskCount} task(s) present`
                                                                           : undefined
                                                                 }
-                                                                className={`rounded-md font-semibold flex items-center gap-1.5 px-2 py-1 text-xs border ${
-                                                                    ka.is_default
+                                                                aria-label="Delete key area"
+                                                                className={`rounded-md flex items-center justify-center p-2 text-xs border ${
+                                                                    ka.is_default || (ka.title || "").toLowerCase() === "ideas"
                                                                         ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
                                                                         : "bg-white text-red-600 hover:bg-red-50 border-red-200"
                                                                 }`}
                                                                 onClick={() => onDeleteKA(ka)}
                                                             >
-                                                                <FaTrash /> Delete
+                                                                <FaTrash />
                                                             </button>
                                                         </div>
                                                     </li>
@@ -5007,49 +4873,6 @@ export default function KeyAreas() {
                                                                 No later than
                                                             </p>
                                                         </div>
-                                                        {/* Date (finish) */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Date (finish)
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="finish_date"
-                                                                    value={toDateOnly(taskForm.finish_date)}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            finish_date: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                    ref={(el) => (taskForm._finishRef = el)}
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={() => {
-                                                                        try {
-                                                                            taskForm._finishRef?.focus();
-                                                                            taskForm._finishRef?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                taskForm._finishRef?.focus();
-                                                                                taskForm._finishRef?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
                                                         {/* Duration */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5076,21 +4899,6 @@ export default function KeyAreas() {
                                                     </div>
                                                     {/* Right column */}
                                                     <div className="grid gap-3 content-start">
-                                                        {/* List */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                List
-                                                            </label>
-                                                            <input
-                                                                name="list"
-                                                                value={taskForm.list || ""}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({ ...s, list: e.target.value }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="List name"
-                                                            />
-                                                        </div>
                                                         {/* Key Area */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5125,6 +4933,43 @@ export default function KeyAreas() {
                                                                             {ka.title || ka.name}
                                                                         </option>
                                                                     ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* List */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                List
+                                                            </label>
+                                                            <select
+                                                                name="list_index"
+                                                                value={taskForm.list_index || 1}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        list_index: Number(e.target.value),
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {(() => {
+                                                                    const kaId = taskForm.key_area_id || selectedKA?.id;
+                                                                    const names = kaId ? (listNames[String(kaId)] || {}) : {};
+                                                                    // Get lists with custom names
+                                                                    const namedLists = Object.keys(names).map(Number).filter(Boolean);
+                                                                    // Get lists that have tasks
+                                                                    const listsWithTasks = kaId 
+                                                                        ? Array.from(new Set((allTasks || [])
+                                                                            .filter(t => String(t.key_area_id) === String(kaId))
+                                                                            .map(t => t.list_index || 1)))
+                                                                        : [];
+                                                                    // Combine and ensure at least List 1 exists
+                                                                    const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
+                                                                    return allNumbers.map((n) => (
+                                                                        <option key={n} value={n}>
+                                                                            {names[String(n)] || `List ${n}`}
+                                                                        </option>
+                                                                    ));
+                                                                })()}
                                                             </select>
                                                         </div>
                                                         {/* Respons. */}
@@ -5177,15 +5022,21 @@ export default function KeyAreas() {
                                                             <label className="text-xs font-semibold text-slate-700">
                                                                 Goal
                                                             </label>
-                                                            <input
+                                                            <select
                                                                 name="goal"
                                                                 value={taskForm.goal || ""}
                                                                 onChange={(e) =>
                                                                     setTaskForm((s) => ({ ...s, goal: e.target.value }))
                                                                 }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="Goal"
-                                                            />
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="">— Select Goal —</option>
+                                                                {goals.map((goal) => (
+                                                                    <option key={goal.id} value={goal.id}>
+                                                                        {goal.title}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -5437,53 +5288,6 @@ export default function KeyAreas() {
                                                                 No later than
                                                             </p>
                                                         </div>
-                                                        {/* Date (finish) */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Date (finish)
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="finish_date"
-                                                                    value={toDateOnly(activityForm.finish_date)}
-                                                                    onChange={(e) =>
-                                                                        setActivityForm((s) => ({
-                                                                            ...s,
-                                                                            finish_date: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={(e) => {
-                                                                        try {
-                                                                            const el =
-                                                                                e.currentTarget.previousElementSibling;
-                                                                            el?.focus();
-                                                                            el?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                const el =
-                                                                                    e.currentTarget
-                                                                                        .previousElementSibling;
-                                                                                el?.focus();
-                                                                                el?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
                                                         {/* Duration */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5510,24 +5314,6 @@ export default function KeyAreas() {
                                                     </div>
                                                     {/* Right column */}
                                                     <div className="grid gap-3 content-start">
-                                                        {/* List */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                List
-                                                            </label>
-                                                            <input
-                                                                name="list"
-                                                                value={activityForm.list || ""}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        list: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="List name"
-                                                            />
-                                                        </div>
                                                         {/* Key Area */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5560,6 +5346,43 @@ export default function KeyAreas() {
                                                                             {ka.title || ka.name}
                                                                         </option>
                                                                     ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* List */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                List
+                                                            </label>
+                                                            <select
+                                                                name="list_index"
+                                                                value={activityForm.list_index || 1}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        list_index: Number(e.target.value),
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {(() => {
+                                                                    const kaId = activityForm.key_area_id || selectedKA?.id;
+                                                                    const names = kaId ? (listNames[String(kaId)] || {}) : {};
+                                                                    // Get lists with custom names
+                                                                    const namedLists = Object.keys(names).map(Number).filter(Boolean);
+                                                                    // Get lists that have tasks
+                                                                    const listsWithTasks = kaId 
+                                                                        ? Array.from(new Set((allTasks || [])
+                                                                            .filter(t => String(t.key_area_id) === String(kaId))
+                                                                            .map(t => t.list_index || 1)))
+                                                                        : [];
+                                                                    // Combine and ensure at least List 1 exists
+                                                                    const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
+                                                                    return allNumbers.map((n) => (
+                                                                        <option key={n} value={n}>
+                                                                            {names[String(n)] || `List ${n}`}
+                                                                        </option>
+                                                                    ));
+                                                                })()}
                                                             </select>
                                                         </div>
                                                         {/* Task (dropdown, auto-select current task) */}
@@ -5635,7 +5458,7 @@ export default function KeyAreas() {
                                                             <label className="text-xs font-semibold text-slate-700">
                                                                 Goal
                                                             </label>
-                                                            <input
+                                                            <select
                                                                 name="goal"
                                                                 value={activityForm.goal || ""}
                                                                 onChange={(e) =>
@@ -5644,9 +5467,15 @@ export default function KeyAreas() {
                                                                         goal: e.target.value,
                                                                     }))
                                                                 }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="Goal"
-                                                            />
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="">— Select Goal —</option>
+                                                                {goals.map((goal) => (
+                                                                    <option key={goal.id} value={goal.id}>
+                                                                        {goal.title}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
