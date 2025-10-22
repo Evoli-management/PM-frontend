@@ -38,8 +38,11 @@ export default function QuarterView({
     currentDate,
     onShiftDate,
     events,
+    todos = [],
     categories,
     onDayClick,
+    onEventClick,
+    onTaskClick,
     view,
     onChangeView,
     filterType,
@@ -50,13 +53,26 @@ export default function QuarterView({
     const monthNames = months.map((m) => m.toLocaleString("default", { month: "long", year: "numeric" }));
     const weeks = getWeeksInQuarter(months);
 
-    // Map events to days
-    const eventsByDay = {};
-    events.forEach((ev) => {
-        const key = new Date(ev.start).toLocaleDateString();
-        if (!eventsByDay[key]) eventsByDay[key] = [];
-        eventsByDay[key].push(ev);
-    });
+    // Helpers for day span checks
+    const getDayBounds = (date) => {
+        const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+        const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+        return { start, end };
+    };
+    const overlapsDay = (rangeStart, rangeEnd, dayStart, dayEnd) => {
+        const s = rangeStart ? new Date(rangeStart) : null;
+        const e = rangeEnd ? new Date(rangeEnd) : null;
+        if (!s && !e) return false;
+        const rs = s || e;
+        const re = e || s;
+        return rs <= dayEnd && re >= dayStart;
+    };
+    const taskSpan = (t) => {
+        // Prefer explicit start/end, otherwise use dueDate as both
+        const s = t.startDate || t.dueDate || t.endDate || null;
+        const e = t.endDate || t.dueDate || t.startDate || s || null;
+        return { s, e };
+    };
 
     // Helper to get week number for a given date
     function getWeekNumberLocal(date) {
@@ -209,7 +225,7 @@ export default function QuarterView({
                                                 key={mIdx}
                                                 className={`px-3 py-3 text-center align-top cursor-pointer border border-blue-100 hover:bg-blue-100`}
                                                 style={{ minWidth: 80 }}
-                                                onClick={() => onDayClick(date)}
+                                                onClick={() => onDayClick && onDayClick(date)}
                                             >
                                                 <span
                                                     className={`text-sm font-semibold flex items-center justify-center gap-1 ${isWeekend ? "text-red-500" : "text-gray-700"}`}
@@ -220,11 +236,86 @@ export default function QuarterView({
                                                         day: "numeric",
                                                     })}
                                                 </span>
-                                                {/* Placeholder for empty cell */}
-                                                {(!eventsByDay[date.toLocaleDateString()] ||
-                                                    eventsByDay[date.toLocaleDateString()].length === 0) && (
-                                                    <span className="block text-xs text-gray-400 mt-1">No events</span>
-                                                )}
+                                                {/* Daily items: up to 3 chips from events/todos */}
+                                                {(() => {
+                                                    const { start: dStart, end: dEnd } = getDayBounds(date);
+                                                    const dayEvents = (events || []).filter((ev) =>
+                                                        overlapsDay(ev.start, ev.end, dStart, dEnd),
+                                                    );
+                                                    const dayTodos = (todos || []).filter((t) => {
+                                                        const { s, e } = taskSpan(t);
+                                                        return overlapsDay(s, e, dStart, dEnd);
+                                                    });
+                                                    const chips = [];
+                                                    // Events first
+                                                    for (const ev of dayEvents) {
+                                                        const color = categories?.[ev.kind]?.color || "bg-slate-300";
+                                                        chips.push({
+                                                            type: "event",
+                                                            id: ev.id,
+                                                            title: ev.title || "(event)",
+                                                            color,
+                                                            taskId: ev.taskId,
+                                                            data: ev,
+                                                        });
+                                                    }
+                                                    // Then todos (tasks) that don't already have an event this day
+                                                    const eventTaskIds = new Set(
+                                                        dayEvents.map((e) => String(e.taskId || "")),
+                                                    );
+                                                    for (const t of dayTodos) {
+                                                        if (eventTaskIds.has(String(t.id))) continue;
+                                                        chips.push({
+                                                            type: "task",
+                                                            id: t.id,
+                                                            title: t.title || "(task)",
+                                                            color: "#7ED4E3",
+                                                            data: t,
+                                                        });
+                                                    }
+                                                    const maxShow = 3;
+                                                    const show = chips.slice(0, maxShow);
+                                                    const extra = chips.length - show.length;
+                                                    if (chips.length === 0) return null;
+                                                    return (
+                                                        <div className="mt-2 flex flex-col gap-1 items-center">
+                                                            {show.map((c) => (
+                                                                <button
+                                                                    key={`${c.type}-${c.id}`}
+                                                                    title={c.title}
+                                                                    className={`text-[11px] px-2 py-[2px] rounded hover:opacity-90 truncate w-full`}
+                                                                    style={
+                                                                        c.type === "task"
+                                                                            ? {
+                                                                                  backgroundColor: "#7ED4E3",
+                                                                                  color: "#0B4A53",
+                                                                              }
+                                                                            : undefined
+                                                                    }
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (c.type === "event") {
+                                                                            if (c.taskId && onTaskClick)
+                                                                                return onTaskClick(String(c.taskId));
+                                                                            return onEventClick && onEventClick(c.data);
+                                                                        }
+                                                                        if (c.type === "task")
+                                                                            return (
+                                                                                onTaskClick && onTaskClick(String(c.id))
+                                                                            );
+                                                                    }}
+                                                                >
+                                                                    <span className="truncate">{c.title}</span>
+                                                                </button>
+                                                            ))}
+                                                            {extra > 0 && (
+                                                                <div className="text-[11px] text-blue-700">
+                                                                    +{extra} more
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                         );
                                     })}

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import Sidebar from "../components/shared/Sidebar";
+import { FaBars } from "react-icons/fa";
 
 export default function Teams() {
     // ---------------- Teams & Members UI state (local only) ----------------
@@ -49,6 +50,7 @@ export default function Teams() {
     const [joinMenuOpen, setJoinMenuOpen] = useState(false);
     const [joinMenuFilter, setJoinMenuFilter] = useState("");
     const [draggingMember, setDraggingMember] = useState(null); // { memberId, fromTeamId }
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     // Derived team permissions
     const canCreateTeams = true;
@@ -200,9 +202,9 @@ export default function Teams() {
     };
 
     // Enhanced Section Component
-    const Section = ({ title, children }) => (
-        <section className="mt-5 border-t border-gray-200 pt-5">
-            <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2>
+    const Section = ({ title, children, divider = true }) => (
+        <section className={divider ? "mt-5 border-t border-gray-200 pt-5" : "mt-5 pt-5"}>
+            {title ? <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2> : null}
             {children}
         </section>
     );
@@ -210,12 +212,30 @@ export default function Teams() {
     return (
         <div className="min-h-screen bg-[#EDEDED] px-2 py-4 sm:px-4 sm:py-6">
             <div className="flex gap-[5mm]">
-                <Sidebar />
-                <main className="flex-1">
-                    <div className="mx-auto max-w-5xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
-                        <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
+                <Sidebar 
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
+                />
 
+                {/* Mobile backdrop */}
+                {mobileSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+
+                <main className="flex-1">
+                    {/* Mobile menu button */}
+                    <button
+                        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+                        onClick={() => setMobileSidebarOpen(true)}
+                    >
+                        <FaBars className="h-5 w-5 text-gray-600" />
+                    </button>
+                    <div className="mx-auto max-w-5xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
                         <div className="space-y-4">
+                            <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
                             <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
                                 TEAM MANAGEMENT
                             </div>
