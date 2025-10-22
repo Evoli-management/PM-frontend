@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useToast } from "../shared/ToastProvider.jsx";
 import keyAreaService from "../../services/keyAreaService";
 import taskService from "../../services/taskService";
-import activityService from "../../services/activityService";
+import { getGoals } from "../../services/goalService";
 
 export default function CreateTaskModal({ 
     isOpen, 
@@ -10,11 +10,16 @@ export default function CreateTaskModal({
     onSave,
     initialData = {},
     preselectedKeyArea = null,
-    renderInline = false
+    renderInline = false,
+    taskId = null  // For edit mode
 }) {
     const { addToast } = useToast();
     const [keyAreas, setKeyAreas] = useState([]);
+    const [goals, setGoals] = useState([]);
+    const [allTasks, setAllTasks] = useState([]);
+    const [listNames, setListNames] = useState({});
     const [loading, setLoading] = useState(false);
+    const isEditMode = !!taskId;
     
     const [form, setForm] = useState({
         keyAreaId: preselectedKeyArea || initialData.keyAreaId || "",
@@ -24,19 +29,17 @@ export default function CreateTaskModal({
         time: initialData.time || "09:00",
         dueDate: initialData.dueDate || "",
         endDate: initialData.endDate || "",
+        list_index: initialData.list_index || 1,
         priority: initialData.priority || "medium",
         assignee: initialData.assignee || "",
         status: initialData.status || "todo",
-        // UI-only extras to match form fields
         duration: initialData.duration || "",
-        list: initialData.list || "",
         goal: initialData.goal || "",
     });
 
     // Refs for date pickers
     const startDateRef = useRef(null);
     const endDateRef = useRef(null);
-    const finishDateRef = useRef(null);
     const dueDateRef = useRef(null);
 
     const openPicker = (ref) => {
@@ -52,20 +55,64 @@ export default function CreateTaskModal({
         try { el.click(); } catch (_) {}
     };
 
-    // Load key areas on mount
+    // Load key areas and tasks on mount
     useEffect(() => {
         if (!isOpen) return;
         
         (async () => {
             try {
-                const areas = await keyAreaService.list({ includeTaskCount: false });
+                console.log('Fetching goals and other data...');
+                const [areas, goalsData, allTasksData] = await Promise.all([
+                    keyAreaService.list({ includeTaskCount: false }),
+                    getGoals(),
+                    taskService.list({})
+                ]);
+                console.log('Goals fetched:', goalsData);
                 setKeyAreas(Array.isArray(areas) ? areas : []);
+                setGoals(Array.isArray(goalsData) ? goalsData : []);
+                setAllTasks(Array.isArray(allTasksData) ? allTasksData : []);
             } catch (error) {
-                console.error("Failed to load key areas:", error);
+                console.error("Failed to load data:", error);
                 setKeyAreas([]);
+                setGoals([]);
+                setAllTasks([]);
             }
         })();
     }, [isOpen]);
+
+    // Load listNames for the selected key area
+    useEffect(() => {
+        if (!form.keyAreaId) {
+            setListNames({});
+            return;
+        }
+        const selectedArea = keyAreas.find(a => a.id === form.keyAreaId);
+        if (selectedArea?.listNames) {
+            setListNames(selectedArea.listNames);
+        } else {
+            setListNames({});
+        }
+    }, [form.keyAreaId, keyAreas]);
+
+    // Compute available lists for the smart dropdown
+    const availableLists = (() => {
+        if (!form.keyAreaId) return [1];
+        
+        // Get lists with custom names
+        const namedLists = Object.keys(listNames || {})
+            .map(Number)
+            .filter((idx) => listNames[idx] && listNames[idx].trim() !== "");
+        
+        // Get lists that have tasks
+        const listsWithTasks = allTasks
+            .filter((t) => t.keyAreaId === form.keyAreaId && t.list_index)
+            .map((t) => t.list_index)
+            .filter((idx, i, arr) => arr.indexOf(idx) === i);
+        
+        // Combine and deduplicate
+        const combined = [1, ...namedLists, ...listsWithTasks];
+        return [...new Set(combined)].sort((a, b) => a - b);
+    })();
 
     // Reset form when modal closes
     useEffect(() => {
@@ -78,11 +125,11 @@ export default function CreateTaskModal({
                 time: "09:00",
                 dueDate: "",
                 endDate: "",
+                list_index: 1,
                 priority: "medium",
                 assignee: "",
                 status: "todo",
                 duration: "",
-                list: "",
                 goal: "",
             });
         }
@@ -93,7 +140,7 @@ export default function CreateTaskModal({
         setForm(prev => {
             const next = {
                 ...prev,
-                [name]: value
+                [name]: name === 'list_index' ? parseInt(value, 10) : value
             };
             if (name === 'date') {
                 // Ensure endDate is not before start date; set if empty or earlier
@@ -131,24 +178,33 @@ export default function CreateTaskModal({
                     (form.date ? new Date(form.date).toISOString() : null),
                 dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
                 endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
+                list_index: form.list_index || 1,
                 status: form.status,
                 priority: form.priority,
             };
 
-            const createdTask = await taskService.create(taskData);
+            let result;
+            if (isEditMode) {
+                result = await taskService.update(taskId, taskData);
+                addToast({ 
+                    title: "Task updated successfully", 
+                    variant: "success" 
+                });
+            } else {
+                result = await taskService.create(taskData);
+                addToast({ 
+                    title: "Task created successfully", 
+                    variant: "success" 
+                });
+            }
             
-            addToast({ 
-                title: "Task created successfully", 
-                variant: "success" 
-            });
-            
-            onSave?.(createdTask);
+            onSave?.(result);
             onClose();
             
         } catch (error) {
-            console.error("Failed to create task:", error);
+            console.error(`Failed to ${isEditMode ? 'update' : 'create'} task:`, error);
             addToast({ 
-                title: error.response?.data?.message || "Failed to create task", 
+                title: error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} task`, 
                 variant: "error" 
             });
         } finally {
@@ -162,7 +218,9 @@ export default function CreateTaskModal({
     return (
         <div className="fixed inset-0 bg-black/40 z-50 grid place-items-center">
             <div className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden">
-                <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">Add Task</div>
+                <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
+                    {isEditMode ? "Edit Task" : "Add Task"}
+                </div>
                 <form className="p-4 md:p-6" onSubmit={handleSubmit}>
                     <div className="mb-4">
                         <label className="sr-only" htmlFor="ka-task-title">Task name</label>
@@ -197,13 +255,6 @@ export default function CreateTaskModal({
                                 <p className="mt-1 text-[11px] text-slate-500">No later than</p>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Date (finish)</label>
-                                <div className="relative mt-1">
-                                    <input ref={finishDateRef} className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon" type="date" value={form.endDate || ""} name="endDate" onChange={handleInputChange} />
-                                    <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(finishDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(finishDateRef); }}>📅</span>
-                                </div>
-                            </div>
-                            <div className="flex flex-col">
                                 <label className="text-xs font-semibold text-slate-700">Duration</label>
                                 <div className="relative mt-1">
                                     <input className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 1h, 1d" value={form.duration || ""} name="duration" onChange={handleInputChange} />
@@ -213,15 +264,27 @@ export default function CreateTaskModal({
                         </div>
                         <div className="grid gap-3 content-start">
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">List</label>
-                                <input className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="List name" value={form.list || ""} name="list" onChange={handleInputChange} />
-                            </div>
-                            <div className="flex flex-col">
                                 <label className="text-xs font-semibold text-slate-700">Key Area</label>
                                 <select name="keyAreaId" className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.keyAreaId} onChange={handleInputChange}>
                                     <option value="">— Select key area —</option>
                                     {keyAreas.map(area => (
                                         <option key={area.id} value={area.id}>{area.title}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-xs font-semibold text-slate-700">List</label>
+                                <select
+                                    name="list_index"
+                                    className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={form.list_index}
+                                    onChange={handleInputChange}
+                                    disabled={!form.keyAreaId}
+                                >
+                                    {availableLists.map((idx) => (
+                                        <option key={idx} value={idx}>
+                                            {listNames[idx] || `List ${idx}`}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -242,7 +305,19 @@ export default function CreateTaskModal({
                             </div>
                             <div className="flex flex-col">
                                 <label className="text-xs font-semibold text-slate-700">Goal</label>
-                                <input className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Goal" value={form.goal || ""} name="goal" onChange={handleInputChange} />
+                                <select 
+                                    className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    value={form.goal || ""} 
+                                    name="goal" 
+                                    onChange={handleInputChange}
+                                >
+                                    <option value="">— Select Goal —</option>
+                                    {goals.map((goal) => (
+                                        <option key={goal.id} value={goal.id}>
+                                            {goal.title}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     </div>

@@ -9,6 +9,8 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
     const [activeTab, setActiveTab] = useState(item?.type === "activity" ? "activity" : "task");
     const [keyAreas, setKeyAreas] = useState([]);
     const [tasks, setTasks] = useState([]);
+    const [listNames, setListNames] = useState({});
+    const [allTasks, setAllTasks] = useState([]);
 
     const [taskForm, setTaskForm] = useState(() => {
         const localDate = (() => {
@@ -29,6 +31,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
             endDate: item?.endDate || "",
             priority: item?.priority || "medium",
             assignee: item?.assignee || "",
+            list_index: item?.list_index || 1,
         };
     });
 
@@ -36,6 +39,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
         text: item?.title || "",
         keyAreaId: "",
         taskId: "",
+        list_index: item?.list_index || 1,
     });
 
     // No special options needed; using native time input for hour/minute scroll
@@ -44,7 +48,25 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
         (async () => {
             try {
                 const kas = await keyAreaService.list({ includeTaskCount: false });
-                setKeyAreas(Array.isArray(kas) ? kas : []);
+                const keyAreasData = Array.isArray(kas) ? kas : [];
+                setKeyAreas(keyAreasData);
+                
+                // Build listNames map from key areas
+                const namesMap = {};
+                keyAreasData.forEach(ka => {
+                    if (ka.listNames) {
+                        namesMap[String(ka.id)] = ka.listNames;
+                    }
+                });
+                setListNames(namesMap);
+                
+                // Load all tasks for list dropdown logic
+                const tasksPromises = keyAreasData.map(ka => 
+                    taskService.list({ keyAreaId: ka.id }).catch(() => [])
+                );
+                const tasksArrays = await Promise.all(tasksPromises);
+                const allTasksFlat = tasksArrays.flat();
+                setAllTasks(allTasksFlat);
             } catch {}
         })();
     }, []);
@@ -134,22 +156,6 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                     {activeTab === "task" ? (
                         <div className="space-y-2">
                             <div>
-                                <label className="block text-xs text-slate-600 mb-1">Key Area</label>
-                                <select
-                                    name="keyAreaId"
-                                    value={taskForm.keyAreaId}
-                                    onChange={handleTaskChange}
-                                    className="w-full px-3 py-2 border rounded"
-                                >
-                                    <option value="">— Select key area —</option>
-                                    {keyAreas.map((ka) => (
-                                        <option key={ka.id} value={ka.id}>
-                                            {ka.title}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
                                 <label className="block text-xs text-slate-600 mb-1">Title</label>
                                 <input
                                     name="title"
@@ -219,6 +225,60 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
+                                    <label className="block text-xs text-slate-600 mb-1">Key Area</label>
+                                    <select
+                                        name="keyAreaId"
+                                        value={taskForm.keyAreaId}
+                                        onChange={handleTaskChange}
+                                        className="w-full px-3 py-2 border rounded"
+                                    >
+                                        <option value="">— Select key area —</option>
+                                        {keyAreas.map((ka) => (
+                                            <option key={ka.id} value={ka.id}>
+                                                {ka.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-600 mb-1">List</label>
+                                    <select
+                                        name="list_index"
+                                        value={taskForm.list_index || 1}
+                                        onChange={(e) => setTaskForm(s => ({ ...s, list_index: Number(e.target.value) }))}
+                                        className="w-full px-3 py-2 border rounded"
+                                    >
+                                        {(() => {
+                                            const kaId = taskForm.keyAreaId;
+                                            const names = kaId ? (listNames[String(kaId)] || {}) : {};
+                                            const namedLists = Object.keys(names).map(Number).filter(Boolean);
+                                            const listsWithTasks = kaId 
+                                                ? Array.from(new Set((allTasks || [])
+                                                    .filter(t => String(t.keyAreaId || t.key_area_id) === String(kaId))
+                                                    .map(t => t.list_index || 1)))
+                                                : [];
+                                            const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
+                                            return allNumbers.map((n) => (
+                                                <option key={n} value={n}>
+                                                    {names[String(n)] || `List ${n}`}
+                                                </option>
+                                            ));
+                                        })()}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs text-slate-600 mb-1">Assignee</label>
+                                    <input
+                                        name="assignee"
+                                        value={taskForm.assignee}
+                                        onChange={handleTaskChange}
+                                        placeholder="Optional"
+                                        className="w-full px-3 py-2 border rounded"
+                                    />
+                                </div>
+                                <div>
                                     <label className="block text-xs text-slate-600 mb-1">Priority</label>
                                     <select
                                         name="priority"
@@ -230,16 +290,6 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                         <option value="medium">Medium</option>
                                         <option value="high">High</option>
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-slate-600 mb-1">Assignee</label>
-                                    <input
-                                        name="assignee"
-                                        value={taskForm.assignee}
-                                        onChange={handleTaskChange}
-                                        placeholder="Optional"
-                                        className="w-full px-3 py-2 border rounded"
-                                    />
                                 </div>
                             </div>
                         </div>
@@ -256,23 +306,53 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                                     required
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs text-slate-600 mb-1">
-                                    Key Area (optional, to pick a task)
-                                </label>
-                                <select
-                                    name="keyAreaId"
-                                    value={activityForm.keyAreaId}
-                                    onChange={handleActivityChange}
-                                    className="w-full px-3 py-2 border rounded"
-                                >
-                                    <option value="">— None —</option>
-                                    {keyAreas.map((ka) => (
-                                        <option key={ka.id} value={ka.id}>
-                                            {ka.title}
-                                        </option>
-                                    ))}
-                                </select>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs text-slate-600 mb-1">
+                                        Key Area (optional)
+                                    </label>
+                                    <select
+                                        name="keyAreaId"
+                                        value={activityForm.keyAreaId}
+                                        onChange={handleActivityChange}
+                                        className="w-full px-3 py-2 border rounded"
+                                    >
+                                        <option value="">— None —</option>
+                                        {keyAreas.map((ka) => (
+                                            <option key={ka.id} value={ka.id}>
+                                                {ka.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-600 mb-1">List</label>
+                                    <select
+                                        name="list_index"
+                                        value={activityForm.list_index || 1}
+                                        onChange={(e) => setActivityForm(s => ({ ...s, list_index: Number(e.target.value) }))}
+                                        className="w-full px-3 py-2 border rounded"
+                                        disabled={!activityForm.keyAreaId}
+                                    >
+                                        {(() => {
+                                            const kaId = activityForm.keyAreaId;
+                                            if (!kaId) {
+                                                return <option value="1">— Select key area first —</option>;
+                                            }
+                                            const names = listNames[String(kaId)] || {};
+                                            const namedLists = Object.keys(names).map(Number).filter(Boolean);
+                                            const listsWithTasks = Array.from(new Set((allTasks || [])
+                                                .filter(t => String(t.keyAreaId || t.key_area_id) === String(kaId))
+                                                .map(t => t.list_index || 1)));
+                                            const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
+                                            return allNumbers.map((n) => (
+                                                <option key={n} value={n}>
+                                                    {names[String(n)] || `List ${n}`}
+                                                </option>
+                                            ));
+                                        })()}
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs text-slate-600 mb-1">Attach to Task (optional)</label>
