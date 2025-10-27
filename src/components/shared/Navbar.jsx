@@ -133,42 +133,42 @@ export default function Navbar() {
 
                         {openQuick && (
                             <div className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-50">
-                                <div className="px-3 py-2 text-xs text-slate-500 border-b">Don't forget</div>
+                                <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
-                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => triggerQuickAdd('task')}
                                 >
-                                    ⚡ Create Task
+                                    Create Task
                                 </button>
                                 <button
-                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => triggerQuickAdd('activity')}
                                 >
-                                    ✍️ Create Activity
+                                    Create Activity
                                 </button>
                                 <button
-                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => triggerQuickAdd('appointment')}
                                 >
-                                    📅 Create Appointment
+                                    Create Appointment
                                 </button>
                                 <button
-                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => triggerQuickAdd('goal')}
                                 >
-                                    🎯 Create Goal
+                                    Create Goal
                                 </button>
                                 <button
-                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => triggerQuickAdd('stroke')}
                                 >
-                                    👍 Give Strokes
+                                    Give Strokes
                                 </button>
                                 <button
-                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => { setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch(e){ window.location.href = '/#/key-areas'; } }}
                                 >
-                                    🧭 Edit Key Areas
+                                    Edit Key Areas
                                 </button>
                             </div>
                         )}
