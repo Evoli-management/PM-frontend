@@ -793,7 +793,17 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />
+                    <QuickAddBar
+                        onOpen={(t) => {
+                            try {
+                                const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                            } catch (err) {
+                                console.warn('quickAdd dispatch error', err);
+                            }
+                        }}
+                        message={message}
+                    />
                 </div>
             );
         }
@@ -1182,7 +1192,18 @@ export default function Dashboard() {
                 {prefs.widgets.quickAdd && (
                     <div className="mb-3">
                         <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
-                            <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />
+                            <QuickAddBar
+                                onOpen={(t) => {
+                                    try {
+                                        // Map lightweight quick types to the modal manager's types
+                                        const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                        window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                                    } catch (err) {
+                                        console.warn('quickAdd dispatch error', err);
+                                    }
+                                }}
+                                message={message}
+                            />
                         </div>
                     </div>
                 )}
