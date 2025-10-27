@@ -276,88 +276,82 @@ const Goals = () => {
                         onViewChange={setCurrentView}
                     />
 
-                    {/* Combined Stats and Filters Row */}
+                    {/* Combined Stats and Filters in Single Row */}
                     {!isLoading && goals.length > 0 && (
                         <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
-                            {/* Stats */}
-                            <div className="grid grid-cols-4 gap-3 mb-3 pb-3 border-b border-slate-100">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-gray-100 rounded-lg">
-                                        <FaBullseye className="w-4 h-4 text-gray-600" />
+                            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                                {/* Compact Stats */}
+                                <div className="flex gap-3">
+                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                                        <FaBullseye className="w-3.5 h-3.5 text-gray-600" />
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-sm font-bold text-gray-900">{stats.total}</span>
+                                            <span className="text-xs text-gray-500">Total</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="text-xl font-bold text-gray-900">{stats.total}</div>
-                                        <div className="text-xs text-gray-500">Total</div>
+                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                                        <FaRocket className="w-3.5 h-3.5 text-blue-600" />
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-sm font-bold text-blue-600">{stats.active}</span>
+                                            <span className="text-xs text-gray-500">Active</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-blue-100 rounded-lg">
-                                        <FaRocket className="w-4 h-4 text-blue-600" />
+                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                                        <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-sm font-bold text-green-600">{stats.completed}</span>
+                                            <span className="text-xs text-gray-500">Done</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="text-xl font-bold text-blue-600">{stats.active}</div>
-                                        <div className="text-xs text-gray-500">Active</div>
+                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
+                                        <FaClock className="w-3.5 h-3.5 text-red-600" />
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
+                                            <span className="text-xs text-gray-500">Overdue</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-green-100 rounded-lg">
-                                        <FaCheckCircle className="w-4 h-4 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xl font-bold text-green-600">{stats.completed}</div>
-                                        <div className="text-xs text-gray-500">Done</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-red-100 rounded-lg">
-                                        <FaClock className="w-4 h-4 text-red-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xl font-bold text-red-600">{stats.overdue}</div>
-                                        <div className="text-xs text-gray-500">Overdue</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Filters */}
-                            <div className="flex flex-col md:flex-row gap-2">
-                                <div className="flex-1 relative">
-                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search goals..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
-                                    />
                                 </div>
 
-                                <div className="relative">
-                                    <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                    <select
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
-                                    >
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="completed">Completed</option>
-                                        <option value="archived">Archived</option>
-                                    </select>
-                                </div>
+                                {/* Filters */}
+                                <div className="flex flex-1 gap-2">
+                                    <div className="flex-1 relative">
+                                        <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search goals..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
+                                        />
+                                    </div>
 
-                                <div className="relative">
-                                    <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                    <select
-                                        value={sortBy}
-                                        onChange={(e) => setSortBy(e.target.value)}
-                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
-                                    >
-                                        <option value="dueDate">Due Date</option>
-                                        <option value="progress">Progress</option>
-                                        <option value="title">Title</option>
-                                        <option value="created">Recently Created</option>
-                                    </select>
+                                    <div className="relative">
+                                        <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
+                                        >
+                                            <option value="all">All Status</option>
+                                            <option value="active">Active</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="archived">Archived</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="relative">
+                                        <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                        <select
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value)}
+                                            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
+                                        >
+                                            <option value="dueDate">Due Date</option>
+                                            <option value="progress">Progress</option>
+                                            <option value="title">Title</option>
+                                            <option value="created">Recently Created</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
