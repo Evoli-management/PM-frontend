@@ -108,16 +108,16 @@ export default function Navbar() {
                 background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             }}
         >
-            <div className="w-full px-2 md:px-4 py-3 flex items-center justify-between">
-                <Link to="/" className="font-bold tracking-wide flex items-center gap-2">
-                    <img
-                        src={`${import.meta.env.BASE_URL}logo.png`}
-                        alt="Practical Manager"
-                        className="h-12 object-contain"
-                        style={{ maxHeight: '56px' }}
-                    />
-                    <span className="sr-only">Practical Manager</span>
-                </Link>
+            <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
+                    <Link to="/" className="font-bold tracking-wide flex items-center gap-2">
+                        <img
+                            src={`${import.meta.env.BASE_URL}logo.png`}
+                            alt="Practical Manager"
+                            className="h-10 object-contain"
+                            style={{ maxHeight: '44px' }}
+                        />
+                        <span className="sr-only">Practical Manager</span>
+                    </Link>
                 <div className="relative flex items-center gap-3">
                     {/* Quick Actions icon */}
                     <div className="relative" ref={quickRef}>
@@ -177,11 +177,11 @@ export default function Navbar() {
                     <div className="relative" ref={menuRef}>
                         <button
                             onClick={() => setOpen((o) => !o)}
-                            className="flex items-center gap-3 rounded-full border border-white/30 bg-blue-500/40 px-3 py-1.5 hover:bg-blue-500/60"
+                            className="flex items-center gap-2 rounded-full border border-white/30 bg-blue-500/40 px-2 py-1 hover:bg-blue-500/60"
                             aria-haspopup="menu"
                             aria-expanded={open ? "true" : "false"}
                         >
-                            <span className="w-9 h-9 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
+                            <span className="w-8 h-8 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
                                 {userProfile?.avatarUrl ? (
                                     <img 
                                         src={userProfile.avatarUrl} 
@@ -195,11 +195,11 @@ export default function Navbar() {
                                     />
                                 ) : null}
                                 <FaUser 
-                                    className={`w-6 h-6 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
+                                    className={`w-5 h-5 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
                                 />
                             </span>
                             <svg
-                                className="w-5 h-5"
+                                className="w-4 h-4"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
