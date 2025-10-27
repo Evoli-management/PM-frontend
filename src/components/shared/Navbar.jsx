@@ -84,7 +84,12 @@ export default function Navbar() {
         >
             <div className="w-full px-2 md:px-4 py-3 flex items-center justify-between">
                 <Link to="/" className="font-bold tracking-wide flex items-center gap-2">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Practical Manager" className="w-8 h-8" />
+                    <img
+                        src={`${import.meta.env.BASE_URL}logo.png`}
+                        alt="Practical Manager"
+                        className="h-12 object-contain"
+                        style={{ maxHeight: '56px' }}
+                    />
                     <span className="sr-only">Practical Manager</span>
                 </Link>
                 <div className="relative flex items-center gap-3">
