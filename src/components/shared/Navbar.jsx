@@ -64,6 +64,32 @@ export default function Navbar() {
             console.error('Failed to fetch user profile:', error);
         }
     };
+
+    // Helper: open dashboard (if not already) and dispatch the quick-add event
+    const triggerQuickAdd = (type) => {
+        try {
+            setOpenQuick(false);
+            // If we're already on the dashboard, dispatch immediately
+            if (location.pathname === "/dashboard") {
+                window.dispatchEvent(new CustomEvent('open-quickadd', { detail: { type } }));
+                return;
+            }
+
+            // Navigate to dashboard (HashRouter uses #/dashboard)
+            try {
+                window.location.hash = '#/dashboard';
+            } catch (e) {
+                window.location.href = '/#/dashboard';
+            }
+
+            // Dispatch after a short delay to give the dashboard time to mount and register its listener
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('open-quickadd', { detail: { type } }));
+            }, 200);
+        } catch (err) {
+            console.warn('openQuick handler error', err);
+        }
+    };
     
     // Don't render navbar on public pages
     if (isPublicRoute) {
@@ -106,28 +132,44 @@ export default function Navbar() {
                         </button>
 
                         {openQuick && (
-                            <div className="absolute right-20 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
-                                <Link
-                                    to="/tasks"
-                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => setOpenQuick(false)}
+                            <div className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                                <div className="px-3 py-2 text-xs text-slate-500 border-b">Don't forget</div>
+                                <button
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => triggerQuickAdd('task')}
                                 >
-                                    ⚡ New Task
-                                </Link>
-                                <Link
-                                    to="/goals"
-                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => setOpenQuick(false)}
+                                    ⚡ Create Task
+                                </button>
+                                <button
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => triggerQuickAdd('activity')}
                                 >
-                                    🎯 Set Goal
-                                </Link>
-                                <Link
-                                    to="/teams"
-                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => setOpenQuick(false)}
+                                    ✍️ Create Activity
+                                </button>
+                                <button
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => triggerQuickAdd('appointment')}
                                 >
-                                    👥 Invite Team
-                                </Link>
+                                    📅 Create Appointment
+                                </button>
+                                <button
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => triggerQuickAdd('goal')}
+                                >
+                                    🎯 Create Goal
+                                </button>
+                                <button
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => triggerQuickAdd('stroke')}
+                                >
+                                    👍 Give Strokes
+                                </button>
+                                <button
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => { setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch(e){ window.location.href = '/#/key-areas'; } }}
+                                >
+                                    🧭 Edit Key Areas
+                                </button>
                             </div>
                         )}
                     </div>
