@@ -161,9 +161,9 @@ export const Field = ({
 
 // Enhanced Section Component
 export const Section = ({ title, children, description = "" }) => (
-    <section className="mt-5 border-t border-gray-200 pt-5 dark:border-slate-700">
-        <div className="mb-3">
-            <h2 className="text-[15px] font-semibold text-gray-800 dark:text-slate-100">{title}</h2>
+    <section className="mt-4 pt-3">
+        <div className="mb-2">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
             {description && (
                 <p className="text-xs text-gray-600 dark:text-slate-400 mt-1">{description}</p>
             )}

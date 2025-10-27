@@ -71,6 +71,46 @@ export const Preferences = ({ showToast }) => {
         loadPreferences();
     }, []);
     
+    // Apply theme changes to the document
+    useEffect(() => {
+        const applyTheme = (theme) => {
+            const root = document.documentElement;
+            
+            if (theme === 'dark') {
+                root.classList.add('dark');
+            } else if (theme === 'light') {
+                root.classList.remove('dark');
+            } else if (theme === 'auto') {
+                // Auto mode - follow system preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (prefersDark) {
+                    root.classList.add('dark');
+                } else {
+                    root.classList.remove('dark');
+                }
+            }
+        };
+        
+        applyTheme(preferences.theme);
+        
+        // Listen for system theme changes when in auto mode
+        if (preferences.theme === 'auto') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const handler = (e) => {
+                if (preferences.theme === 'auto') {
+                    if (e.matches) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                }
+            };
+            
+            mediaQuery.addEventListener('change', handler);
+            return () => mediaQuery.removeEventListener('change', handler);
+        }
+    }, [preferences.theme]);
+    
     const loadPreferences = async () => {
         setLoading(true);
         try {
@@ -108,8 +148,6 @@ export const Preferences = ({ showToast }) => {
     const savePreferences = async () => {
         setSaving(true);
         try {
-            console.log('Current preferences state:', preferences);
-            
             // Validate preferences
             const validation = userPreferencesService.validatePreferences(preferences);
             if (!validation.isValid) {
@@ -153,15 +191,13 @@ export const Preferences = ({ showToast }) => {
             // Add other supported fields
             if (preferences.timeFormat) apiData.timeFormat = preferences.timeFormat;
             if (preferences.dateFormat) apiData.dateFormat = preferences.dateFormat;
+            if (preferences.theme) apiData.theme = preferences.theme;
             if (preferences.goalRemindersEmail !== undefined) apiData.goalRemindersEmail = preferences.goalRemindersEmail;
             if (preferences.goalRemindersDesktop !== undefined) apiData.goalRemindersDesktop = preferences.goalRemindersDesktop;
             if (preferences.goalReminderTiming) apiData.goalReminderTiming = preferences.goalReminderTiming;
             if (preferences.pmRemindersEmail !== undefined) apiData.pmRemindersEmail = preferences.pmRemindersEmail;
             if (preferences.pmRemindersDesktop !== undefined) apiData.pmRemindersDesktop = preferences.pmRemindersDesktop;
             if (preferences.pmReminderTiming) apiData.pmReminderTiming = preferences.pmReminderTiming;
-
-            // Debug: Log the data being sent to help diagnose format issues
-            console.log('Saving preferences - API data:', JSON.stringify(apiData, null, 2));
 
             // Save to API
             await userPreferencesService.updatePreferences(apiData);
@@ -200,6 +236,14 @@ export const Preferences = ({ showToast }) => {
                 }));
             }
             
+            if (apiData.theme) {
+                window.dispatchEvent(new CustomEvent('themeChanged', {
+                    detail: {
+                        theme: apiData.theme
+                    }
+                }));
+            }
+            
             showToast('Preferences saved successfully');
         } catch (error) {
             console.error('Error saving preferences:', error);
@@ -212,7 +256,6 @@ export const Preferences = ({ showToast }) => {
     };
     
     const updatePreference = (key, value) => {
-        console.log(`Updating preference ${key} to:`, value, typeof value);
         setPreferences(prev => ({ ...prev, [key]: value }));
     };
     
@@ -272,14 +315,10 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.language}
                             onChange={(e) => updatePreference('language', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="en">English</option>
-                            <option value="es">Español</option>
-                            <option value="fr">Français</option>
-                            <option value="de">Deutsch</option>
-                            <option value="it">Italiano</option>
-                            <option value="pt">Português</option>
+                            <option value="sl">Slovenian</option>
                         </select>
                     </Field>
                     
@@ -287,7 +326,7 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.timezone}
                             onChange={(e) => updatePreference('timezone', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="America/New_York">Eastern Time</option>
                             <option value="America/Chicago">Central Time</option>
@@ -303,7 +342,7 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.dateFormat}
                             onChange={(e) => updatePreference('dateFormat', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="MM/dd/yyyy">MM/DD/YYYY</option>
                             <option value="dd/MM/yyyy">DD/MM/YYYY</option>
@@ -316,7 +355,7 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.timeFormat}
                             onChange={(e) => updatePreference('timeFormat', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="12h">12 Hour</option>
                             <option value="24h">24 Hour</option>
@@ -398,7 +437,7 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.pmReminderTiming}
                             onChange={(e) => updatePreference('pmReminderTiming', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="5min">5 minutes before</option>
                             <option value="15min">15 minutes before</option>
@@ -443,7 +482,7 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.goalReminderTiming}
                             onChange={(e) => updatePreference('goalReminderTiming', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="5min">5 minutes before</option>
                             <option value="15min">15 minutes before</option>
@@ -466,7 +505,7 @@ export const Preferences = ({ showToast }) => {
                         <select
                             value={preferences.theme}
                             onChange={(e) => updatePreference('theme', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
                             <option value="light">Light</option>
                             <option value="dark">Dark</option>
@@ -477,7 +516,7 @@ export const Preferences = ({ showToast }) => {
             </Section>
             
             {/* Actions */}
-            <div className="flex justify-between pt-6 border-t border-gray-200">
+            <div className="flex justify-between pt-6">
                 <button
                     onClick={resetToDefaults}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors duration-200"
