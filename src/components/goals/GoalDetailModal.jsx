@@ -165,7 +165,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                         : "border-transparent text-gray-500 hover:text-gray-700"
                                 }`}
                             >
-                                {tab === "overview" ? "Overview" : tab === " offender" ? "Milestones" : "Activity"}
+                                {tab === "overview" ? "Overview" : tab === "milestones" ? "Milestones" : "Activity"}
                             </button>
                         ))}
                     </nav>
