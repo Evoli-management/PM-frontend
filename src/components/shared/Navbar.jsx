@@ -65,29 +65,13 @@ export default function Navbar() {
         }
     };
 
-    // Helper: open dashboard (if not already) and dispatch the quick-add event
-    const triggerQuickAdd = (type) => {
+    // Helper: open a modal globally via event so we reuse existing modal UI
+    const openCreateModal = (type) => {
         try {
             setOpenQuick(false);
-            // If we're already on the dashboard, dispatch immediately
-            if (location.pathname === "/dashboard") {
-                window.dispatchEvent(new CustomEvent('open-quickadd', { detail: { type } }));
-                return;
-            }
-
-            // Navigate to dashboard (HashRouter uses #/dashboard)
-            try {
-                window.location.hash = '#/dashboard';
-            } catch (e) {
-                window.location.href = '/#/dashboard';
-            }
-
-            // Dispatch after a short delay to give the dashboard time to mount and register its listener
-            setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('open-quickadd', { detail: { type } }));
-            }, 200);
+            window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type } }));
         } catch (err) {
-            console.warn('openQuick handler error', err);
+            console.warn('openCreateModal handler error', err);
         }
     };
     
@@ -136,31 +120,31 @@ export default function Navbar() {
                                 <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => triggerQuickAdd('task')}
+                                    onClick={() => openCreateModal('task')}
                                 >
                                     Create Task
                                 </button>
                                 <button
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => triggerQuickAdd('activity')}
+                                    onClick={() => openCreateModal('activity')}
                                 >
                                     Create Activity
                                 </button>
                                 <button
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => triggerQuickAdd('appointment')}
+                                    onClick={() => openCreateModal('appointment')}
                                 >
                                     Create Appointment
                                 </button>
                                 <button
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => triggerQuickAdd('goal')}
+                                    onClick={() => openCreateModal('goal')}
                                 >
                                     Create Goal
                                 </button>
                                 <button
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onClick={() => triggerQuickAdd('stroke')}
+                                    onClick={() => openCreateModal('stroke')}
                                 >
                                     Give Strokes
                                 </button>
