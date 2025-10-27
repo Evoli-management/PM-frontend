@@ -712,7 +712,8 @@ export default function Dashboard() {
     }
 
     // Determine which widgets are visible and keep their selection order
-    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
+    // quickAdd is handled separately (top fixed widget and non-draggable)
+    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k] && k !== 'quickAdd');
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
@@ -1135,7 +1136,16 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Unified Widget Grid - All widgets in draggable layout */}
+                {/* Quick Add fixed widget at top (non-draggable) */}
+                {prefs.widgets.quickAdd && (
+                    <div className="mb-3">
+                        <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />
+                        </div>
+                    </div>
+                )}
+
+                {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
                 {visibleWidgetKeys.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-max">
                         {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
