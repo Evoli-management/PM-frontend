@@ -12,9 +12,10 @@ import {
     FaClock,
     FaSave,
     FaBuilding,
-    FaPlus,
     FaTrophy,
     FaBullseye,
+    FaChartPie,
+    FaClock as FaHistory,
 } from "react-icons/fa";
 
 const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
@@ -30,56 +31,33 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
     const progressPercent = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
     const isOverdue = goal.status === "active" && new Date(goal.dueDate) < new Date();
     const isCompleted = goal.status === "completed";
-
     const completionDate = isCompleted && goal.completedAt
         ? new Date(goal.completedAt).toLocaleDateString()
         : null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            onClick={onClose}
+        >
             <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to { 
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                .animate-fadeIn {
-                    animation: fadeIn 0.2s ease-out;
-                }
-                .animate-slideUp {
-                    animation: slideUp 0.3s ease-out;
-                }
-                .milestone-scroll::-webkit-scrollbar {
-                    width: 6px;
-                }
-                .milestone-scroll::-webkit-scrollbar-track {
-                    background: #f1f5f9;
-                    border-radius: 3px;
-                }
-                .milestone-scroll::-webkit-scrollbar-thumb {
-                    background: #cbd5e1;
-                    border-radius: 3px;
-                }
-                .milestone-scroll::-webkit-scrollbar-thumb:hover {
-                    background: #94a3b8;
-                }
+                @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+                @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+                .animate-fadeIn { animation:fadeIn .2s ease-out; }
+                .animate-slideUp { animation:slideUp .3s ease-out; }
+                .milestone-scroll::-webkit-scrollbar { width:6px; }
+                .milestone-scroll::-webkit-scrollbar-track { background:#f1f5f9; border-radius:3px; }
+                .milestone-scroll::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+                .milestone-scroll::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
             `}</style>
 
             <div
                 className="bg-white rounded-xl w-full max-w-6xl shadow-2xl flex flex-col animate-slideUp"
-                style={{ maxHeight: '90vh', border: '1px solid #e5e7eb' }}
+                style={{ maxHeight: "90vh", border: "1px solid #e5e7eb" }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
+                {/* ==== HEADER ==== */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
@@ -106,79 +84,58 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* Quick Actions */}
-                        <button
-                            onClick={() => {/* Edit handled by parent */}}
-                            className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-200"
-                            title="Edit Goal"
-                        >
+                        <button className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all" title="Edit">
                             <FaEdit className="w-4.5 h-4.5" />
                         </button>
 
                         {goal.status === "active" && (
-                            <button
-                                onClick={() => {/* Mark complete */}}
-                                className="p-2.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all duration-200"
-                                title="Mark Complete"
-                            >
+                            <button className="p-2.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all" title="Complete">
                                 <FaCheckCircle className="w-4.5 h-4.5" />
                             </button>
                         )}
 
                         <button
-                            onClick={() => {/* Toggle visibility */}}
-                            className="p-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                            className="p-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all"
                             title={goal.visibility === "public" ? "Make Private" : "Make Public"}
                         >
-                            {goal.visibility === "public" ? (
-                                <FaEyeSlash className="w-4.5 h-4.5" />
-                            ) : (
-                                <FaEye className="w-4.5 h-4.5" />
-                            )}
+                            {goal.visibility === "public" ? <FaEyeSlash className="w-4.5 h-4.5" /> : <FaEye className="w-4.5 h-4.5" />}
                         </button>
 
                         {goal.status !== "archived" && (
-                            <button
-                                onClick={() => {/* Archive */}}
-                                className="p-2.5 text-gray-600 hover:text-amber-600 hover:bg-amber-100 rounded-lg transition-all duration-200"
-                                title="Archive Goal"
-                            >
+                            <button className="p-2.5 text-gray-600 hover:text-amber-600 hover:bg-amber-100 rounded-lg transition-all" title="Archive">
                                 <FaArchive className="w-4.5 h-4.5" />
                             </button>
                         )}
 
                         <button
                             onClick={() => {
-                                if (window.confirm("Are you sure you want to delete this goal?")) {
+                                if (window.confirm("Delete this goal?")) {
                                     onDelete(goal.id);
                                     onClose();
                                 }
                             }}
-                            className="p-2.5 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200"
-                            title="Delete Goal"
+                            className="p-2.5 text-red-600 hover:bg-red-100 rounded-lg transition-all"
+                            title="Delete"
                         >
                             <FaTrash className="w-4.5 h-4.5" />
                         </button>
 
                         <div className="w-px h-7 bg-gray-300 mx-1" />
 
-                        <button
-                            onClick={onClose}
-                            className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
-                        >
+                        <button onClick={onClose} className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                             <FaTimes className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* Tabs */}
+                {/* ==== TABS ==== */}
                 <div className="border-b border-gray-200 flex-shrink-0">
                     <nav className="flex px-6">
                         {["overview", "milestones", "activity"].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-5 py-3.5 text-sm font-semibold capitalize transition-all duration-200 border-b-2 ${
+                                className={`px-5 py-3.5 text-sm font-semibold capitalize transition-all border-b-2 ${
                                     activeTab === tab
                                         ? "border-blue-600 text-blue-600"
                                         : "border-transparent text-gray-500 hover:text-gray-700"
@@ -190,13 +147,14 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                     </nav>
                 </div>
 
-                {/* Scrollable Content */}
+                {/* ==== CONTENT (always two columns) ==== */}
                 <div className="flex-1 overflow-hidden">
                     <div className="h-full flex">
-                        {/* Left: Main Info */}
+                        {/* LEFT COLUMN – TAB CONTENT */}
                         <div className="flex-1 px-6 py-6 overflow-y-auto">
+                            {/* ---------- OVERVIEW ---------- */}
                             {activeTab === "overview" && (
-                                <div className="space-y-6 max-w-2xl">
+                                <div className="space-y-6">
                                     {/* Progress Card */}
                                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
                                         <div className="flex items-center justify-between mb-3">
@@ -206,7 +164,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                             </span>
                                             <span className="text-lg font-bold text-blue-600">{progressPercent}%</span>
                                         </div>
-                                        <div className="w-full bg-white/80 rounded-full h-3 mb-3 shadow-sm">
+                                        <div className="w-full bg-white/80 rounded-full h-3 shadow-sm">
                                             <div
                                                 className={`h-full rounded-full transition-all duration-700 shadow-sm ${
                                                     progressPercent >= 90
@@ -220,7 +178,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                 style={{ width: `${progressPercent}%` }}
                                             />
                                         </div>
-                                        <div className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center justify-between text-sm mt-3">
                                             <div className="flex items-center gap-1.5 text-gray-600">
                                                 <FaFlag className="w-3.5 h-3.5" />
                                                 {completedMilestones}/{totalMilestones} milestones
@@ -232,183 +190,118 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                         </div>
                                     </div>
 
-                                    {/* Goal Info Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Left Column */}
-                                        <div>
-                                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                <FaBullseye className="w-5 h-5 text-blue-600" />
-                                                Goal Details
-                                            </h3>
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</label>
-                                                    <p className="mt-1.5 text-gray-800 leading-relaxed">
-                                                        {goal.description || (
-                                                            <span className="italic text-gray-400">No description provided</span>
-                                                        )}
-                                                    </p>
-                                                </div>
+                                    {/* Goal Details */}
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                            <FaBullseye className="w-5 h-5 text-blue-600" />
+                                            Goal Details
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</label>
+                                                <p className="mt-1.5 text-gray-800 leading-relaxed">
+                                                    {goal.description || <span className="italic text-gray-400">No description provided</span>}
+                                                </p>
+                                            </div>
 
-                                                <div>
-                                                    <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Key Area</label>
-                                                    {editingKeyArea ? (
-                                                        <div className="flex items-center gap-2 mt-1.5">
-                                                            <select
-                                                                value={tempKeyAreaId}
-                                                                onChange={(e) => setTempKeyAreaId(e.target.value)}
-                                                                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                                                            >
-                                                                <option value="">None</option>
-                                                                {keyAreas.map((area) => (
-                                                                    <option key={area.id} value={area.id}>
-                                                                        {area.name}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                            <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg">
-                                                                <FaSave className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setEditingKeyArea(false)}
-                                                                className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"
-                                                            >
-                                                                <FaTimes className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center justify-between mt-1.5">
-                                                            <p className="text-gray-800 font-medium">{keyAreaName}</p>
-                                                            <button
-                                                                onClick={() => setEditingKeyArea(true)}
-                                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                                                            >
-                                                                <FaEdit className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Due Date</label>
-                                                    <p className={`mt-1.5 font-medium ${isOverdue ? "text-red-600" : "text-gray-800"}`}>
-                                                        {new Date(goal.dueDate).toLocaleDateString()}
-                                                        {isOverdue && " (Overdue)"}
-                                                    </p>
-                                                </div>
-
-                                                {goal.startDate && (
-                                                    <div>
-                                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Start Date</label>
-                                                        <p className="mt-1.5 text-gray-800">
-                                                            {new Date(goal.startDate).toLocaleDateString()}
-                                                        </p>
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Key Area</label>
+                                                {editingKeyArea ? (
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <select
+                                                            value={tempKeyAreaId}
+                                                            onChange={(e) => setTempKeyAreaId(e.target.value)}
+                                                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                        >
+                                                            <option value="">None</option>
+                                                            {keyAreas.map((a) => (
+                                                                <option key={a.id} value={a.id}>{a.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><FaSave className="w-4 h-4" /></button>
+                                                        <button onClick={() => setEditingKeyArea(false)} className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"><FaTimes className="w-4 h-4" /></button>
                                                     </div>
-                                                )}
-
-                                                {completionDate && (
-                                                    <div>
-                                                        <label className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Completed On</label>
-                                                        <p className="mt-1.5 text-emerald-700 font-medium flex items-center gap-1.5">
-                                                            <FaTrophy className="w-4 h-4" />
-                                                            {completionDate}
-                                                        </p>
+                                                ) : (
+                                                    <div className="flex items-center justify-between mt-1.5">
+                                                        <p className="text-gray-800 font-medium">{keyAreaName}</p>
+                                                        <button
+                                                            onClick={() => setEditingKeyArea(true)}
+                                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                                                        >
+                                                            <FaEdit className="w-3.5 h-3.5" />
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
-                                        </div>
 
-                                        {/* Right Column */}
-                                        <div>
-                                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                <FaBuilding className="w-5 h-5 text-indigo-600" />
-                                                Status & Settings
-                                            </h3>
-                                            <div className="space-y-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
-                                                <div className="flex justify-between">
-                                                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</span>
-                                                    <span className="text-sm font-medium text-gray-800 capitalize">{goal.status}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Visibility</span>
-                                                    <span className="text-sm font-medium text-gray-800 capitalize">{goal.visibility}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</span>
-                                                    <span className="text-sm text-gray-800">
-                                                        {goal.createdAt ? new Date(goal.createdAt).toLocaleDateString() : "Unknown"}
-                                                    </span>
-                                                </div>
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Due Date</label>
+                                                <p className={`mt-1.5 font-medium ${isOverdue ? "text-red-600" : "text-gray-800"}`}>
+                                                    {new Date(goal.dueDate).toLocaleDateString()}
+                                                    {isOverdue && " (Overdue)"}
+                                                </p>
                                             </div>
+
+                                            {goal.startDate && (
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Start Date</label>
+                                                    <p className="mt-1.5 text-gray-800">{new Date(goal.startDate).toLocaleDateString()}</p>
+                                                </div>
+                                            )}
+
+                                            {completionDate && (
+                                                <div>
+                                                    <label className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Completed On</label>
+                                                    <p className="mt-1.5 text-emerald-700 font-medium flex items-center gap-1.5">
+                                                        <FaTrophy className="w-4 h-4" />
+                                                        {completionDate}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {activeTab === "activity" && (
-                                <div className="text-center py-16">
-                                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                                        <FaClock className="w-8 h-8 text-gray-400" />
-                                    </div>
-                                    <p className="text-gray-600 font-medium">Activity log coming soon</p>
-                                    <p className="text-sm text-gray-500 mt-1">Track edits, completions, and updates</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Right: Milestones */}
-                        {activeTab === "milestones" && (
-                            <div className="border-l border-gray-200 flex flex-col" style={{ minWidth: '420px' }}>
-                                <div className="px-6 py-5 flex-shrink-0 border-b border-gray-200">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="text-lg font-bold text-gray-900">Milestones</h3>
-                                            <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-                                                {completedMilestones}/{totalMilestones}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto px-6 py-4 milestone-scroll">
+                            {/* ---------- MILESTONES ---------- */}
+                            {activeTab === "milestones" && (
+                                <div className="space-y-4">
                                     {goal.milestones && goal.milestones.length > 0 ? (
-                                        <div className="space-y-3">
-                                            {goal.milestones.map((milestone, idx) => (
-                                                <div
-                                                    key={milestone.id || idx}
-                                                    className="group bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200"
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm mt-0.5 ${
-                                                            milestone.done
+                                        goal.milestones.map((m, i) => (
+                                            <div
+                                                key={m.id || i}
+                                                className="group bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div
+                                                        className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm mt-0.5 ${
+                                                            m.done
                                                                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600"
                                                                 : "bg-gradient-to-br from-gray-400 to-gray-500"
-                                                        }`}>
-                                                            {milestone.done ? <FaCheckCircle className="w-4 h-4" /> : idx + 1}
-                                                        </div>
-
-                                                        <div className="flex-1">
-                                                            <p className={`font-semibold text-sm ${milestone.done ? "line-through text-gray-500" : "text-gray-900"}`}>
-                                                                {milestone.title || "Untitled milestone"}
+                                                        }`}
+                                                    >
+                                                        {m.done ? <FaCheckCircle className="w-4 h-4" /> : i + 1}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className={`font-semibold text-sm ${m.done ? "line-through text-gray-500" : "text-gray-900"}`}>
+                                                            {m.title || "Untitled milestone"}
+                                                        </p>
+                                                        {m.dueDate && (
+                                                            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                                                <FaCalendarAlt className="w-3 h-3" />
+                                                                {new Date(m.dueDate).toLocaleDateString()}
                                                             </p>
-                                                            {milestone.dueDate && (
-                                                                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                                                    <FaCalendarAlt className="w-3 h-3" />
-                                                                    {new Date(milestone.dueDate).toLocaleDateString()}
-                                                                </p>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="flex items-center gap-2 text-xs">
-                                                            <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                                                                <FaTrophy className="w-3 h-3" />
-                                                                {milestone.weight || 1}x Score
-                                                            </span>
-                                                        </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-xs">
+                                                        <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                                                            <FaTrophy className="w-3 h-3" />
+                                                            {m.weight || 1}x Score
+                                                        </span>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        ))
                                     ) : (
                                         <div className="text-center py-12">
                                             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -419,8 +312,71 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                         </div>
                                     )}
                                 </div>
+                            )}
+
+                            {/* ---------- ACTIVITY ---------- */}
+                            {activeTab === "activity" && (
+                                <div className="text-center py-16">
+                                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                                        <FaHistory className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-gray-600 font-medium">Activity log coming soon</p>
+                                    <p className="text-sm text-gray-500 mt-1">Track edits, completions, and updates</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* RIGHT COLUMN – PERSISTENT SIDE PANEL (always visible) */}
+                        <div className="w-80 border-l border-gray-200 flex flex-col bg-gray-50">
+                            {/* Summary Card */}
+                            <div className="p-5 flex-shrink-0">
+                                <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                                    <FaChartPie className="w-4 h-4 text-indigo-600" />
+                                    Goal Summary
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Status</span>
+                                        <span className="font-medium capitalize">{goal.status}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Visibility</span>
+                                        <span className="font-medium capitalize">{goal.visibility}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Created</span>
+                                        <span className="font-medium">
+                                            {goal.createdAt ? new Date(goal.createdAt).toLocaleDateString() : "—"}
+                                        </span>
+                                    </div>
+                                    {completionDate && (
+                                        <div className="flex justify-between text-emerald-600">
+                                            <span>Completed</span>
+                                            <span className="font-medium">{completionDate}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
+
+                            {/* Quick Stats */}
+                            <div className="px-5 py-4 border-t border-gray-200 flex-1 overflow-y-auto">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h4>
+                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                                        <div className="text-2xl font-bold text-blue-600">{totalMilestones}</div>
+                                        <div className="text-gray-500">Total</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                                        <div className="text-2xl font-bold text-emerald-600">{completedMilestones}</div>
+                                        <div className="text-gray-500">Done</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-3 text-center shadow-sm col-span-2">
+                                        <div className="text-2xl font-bold text-indigo-600">{progressPercent}%</div>
+                                        <div className="text-gray-500">Progress</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
