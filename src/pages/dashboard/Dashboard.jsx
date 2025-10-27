@@ -519,6 +519,30 @@ export default function Dashboard() {
     const [quickAddOpen, setQuickAddOpen] = useState(null); // 'task'|'goal'|'stroke'|'note'|'appointment'
     const [message, setMessage] = useState("");
     const [quickAddLoading, setQuickAddLoading] = useState(false);
+
+    // Listen for global quick-add events from Navbar (or other components)
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const t = (e?.detail && e.detail.type) || e?.type || null;
+                if (t) {
+                    setQuickAddOpen(t);
+                    // Ensure any existing message is cleared
+                    setMessage("");
+                    // Allow focus to happen when input mounts
+                    setTimeout(() => {
+                        const el = document.getElementById('quickAddInput');
+                        if (el) el.focus();
+                    }, 80);
+                }
+            } catch (err) {
+                console.warn('open-quickadd handler error', err);
+            }
+        };
+
+        window.addEventListener('open-quickadd', handler);
+        return () => window.removeEventListener('open-quickadd', handler);
+    }, []);
     
     // Refresh dashboard data
     const refreshDashboardData = async () => {
@@ -561,6 +585,24 @@ export default function Dashboard() {
                         taskId: null,
                     });
                     setMessage(`✅ Task "${inputValue}" added to activity feed!`);
+                    break;
+
+                case 'activity':
+                    // Create a free-form activity (same as note)
+                    await activityService.create({
+                        text: `${inputValue.trim()}`,
+                        taskId: null,
+                    });
+                    setMessage(`✅ Activity "${inputValue}" added to activity feed!`);
+                    break;
+
+                case 'stroke':
+                    // Use activity endpoint to record a recognition/stroke
+                    await activityService.create({
+                        text: `Stroke: ${inputValue.trim()}`,
+                        taskId: null,
+                    });
+                    setMessage(`✅ Stroke for "${inputValue}" sent!`);
                     break;
                     
                 case 'appointment':
