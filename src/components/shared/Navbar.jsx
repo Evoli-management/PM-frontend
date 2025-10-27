@@ -76,7 +76,12 @@ export default function Navbar() {
     }
 
     return (
-        <header className="bg-blue-600 text-white">
+        <header
+            className="text-white"
+            style={{
+                background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
+            }}
+        >
             <div className="w-full px-2 md:px-4 py-3 flex items-center justify-between">
                 <Link to="/" className="font-bold tracking-wide flex items-center gap-2">
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Practical Manager" className="w-8 h-8" />
