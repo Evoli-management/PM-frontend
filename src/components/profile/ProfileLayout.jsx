@@ -6,7 +6,6 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         "Security",
         "Preferences",
         "Integrations",
-        "Privacy",
         "Teams & Members"
     ];
 
@@ -24,7 +23,6 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                     "security": "Security",
                     "preferences": "Preferences",
                     "integrations": "Integrations",
-                    "privacy": "Privacy",
                     "teams": "Teams & Members",
                     "teams-members": "Teams & Members",
                 };

@@ -13,7 +13,6 @@ export default function ProfileSetting() {
     const [teamDraft, setTeamDraft] = useState({ mainTeamName: "", otherTeams: [] });
     const [isLoading, setIsLoading] = useState(false);
     const [prefSaved, setPrefSaved] = useState(false);
-    const [privacySaved, setPrivacySaved] = useState(false);
     const [accountSaved, setAccountSaved] = useState(false);
     const [emailSaved, setEmailSaved] = useState(false);
     const [passwordSaved, setPasswordSaved] = useState(false);
