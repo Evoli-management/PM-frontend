@@ -1,26 +1,33 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { FaUser } from "react-icons/fa";
+import { FaUser, FaBolt } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
+    const [openQuick, setOpenQuick] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
     const menuRef = useRef(null);
+    const quickRef = useRef(null);
 
     // Close the profile/settings popover when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (!open) return;
             const node = menuRef.current;
-            if (node && !node.contains(e.target)) {
+            const qnode = quickRef.current;
+            // Close profile menu if click outside
+            if (open && node && !node.contains(e.target)) {
                 setOpen(false);
+            }
+            // Close quick actions if click outside
+            if (openQuick && qnode && !qnode.contains(e.target)) {
+                setOpenQuick(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [open]);
+    }, [open, openQuick]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const location = useLocation();
     
@@ -74,69 +81,110 @@ export default function Navbar() {
                 <Link to="/" className="font-bold tracking-wide">
                     Practical Manager
                 </Link>
-                <div className="relative" ref={menuRef}>
-                    <button
-                        onClick={() => setOpen((o) => !o)}
-                        className="flex items-center gap-3 rounded-full border border-white/30 bg-blue-500/40 px-3 py-1.5 hover:bg-blue-500/60"
-                        aria-haspopup="menu"
-                        aria-expanded={open ? "true" : "false"}
-                    >
-                        <span className="w-9 h-9 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
-                            {userProfile?.avatarUrl ? (
-                                <img 
-                                    src={userProfile.avatarUrl} 
-                                    alt="Profile Avatar"
-                                    className="w-full h-full object-cover rounded-full"
-                                    onError={(e) => {
-                                        // Fallback to icon if image fails to load
-                                        e.target.style.display = 'none';
-                                        e.target.nextSibling.style.display = 'flex';
-                                    }}
-                                />
-                            ) : null}
-                            <FaUser 
-                                className={`w-6 h-6 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
-                            />
-                        </span>
-                        <svg
-                            className="w-5 h-5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                <div className="relative flex items-center gap-3">
+                    {/* Quick Actions icon */}
+                    <div className="relative" ref={quickRef}>
+                        <button
+                            onClick={() => setOpenQuick((o) => !o)}
+                            className="text-white/90 hover:text-white px-3 py-1.5 rounded-full"
+                            aria-haspopup="menu"
+                            aria-expanded={openQuick ? "true" : "false"}
+                            title="Quick Actions"
                         >
-                            <path d="M6 9l6 6 6-6" />
-                        </svg>
-                    </button>
-                    {open && (
-                        <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
-                            <Link
-                                to="/profile"
-                                className="block px-3 py-2 text-sm hover:bg-slate-50"
-                                onClick={() => setOpen(false)}
+                            <FaBolt className="w-5 h-5" />
+                        </button>
+
+                        {openQuick && (
+                            <div className="absolute right-20 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                                <Link
+                                    to="/tasks"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => setOpenQuick(false)}
+                                >
+                                    ⚡ New Task
+                                </Link>
+                                <Link
+                                    to="/goals"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => setOpenQuick(false)}
+                                >
+                                    🎯 Set Goal
+                                </Link>
+                                <Link
+                                    to="/teams"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => setOpenQuick(false)}
+                                >
+                                    👥 Invite Team
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            onClick={() => setOpen((o) => !o)}
+                            className="flex items-center gap-3 rounded-full border border-white/30 bg-blue-500/40 px-3 py-1.5 hover:bg-blue-500/60"
+                            aria-haspopup="menu"
+                            aria-expanded={open ? "true" : "false"}
+                        >
+                            <span className="w-9 h-9 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
+                                {userProfile?.avatarUrl ? (
+                                    <img 
+                                        src={userProfile.avatarUrl} 
+                                        alt="Profile Avatar"
+                                        className="w-full h-full object-cover rounded-full"
+                                        onError={(e) => {
+                                            // Fallback to icon if image fails to load
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                    />
+                                ) : null}
+                                <FaUser 
+                                    className={`w-6 h-6 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
+                                />
+                            </span>
+                            <svg
+                                className="w-5 h-5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             >
-                                👤 Profile & Settings
-                            </Link>
-                            <div className="border-t border-gray-200 my-1"></div>
-                            <button
-                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                onClick={() => {
-                                    setOpen(false);
-                                    // Clear auth token and redirect to login
-                                    localStorage.removeItem("access_token");
-                                    try {
-                                        window.location.hash = "#/login";
-                                    } catch (e) {
-                                        window.location.href = "/login";
-                                    }
-                                }}
-                            >
-                                Logout
-                            </button>
-                        </div>
-                    )}
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </button>
+                        {open && (
+                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                                <Link
+                                    to="/profile"
+                                    className="block px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => setOpen(false)}
+                                >
+                                    👤 Profile & Settings
+                                </Link>
+                                <div className="border-t border-gray-200 my-1"></div>
+                                <button
+                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onClick={() => {
+                                        setOpen(false);
+                                        // Clear auth token and redirect to login
+                                        localStorage.removeItem("access_token");
+                                        try {
+                                            window.location.hash = "#/login";
+                                        } catch (e) {
+                                            window.location.href = "/login";
+                                        }
+                                    }}
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </header>
