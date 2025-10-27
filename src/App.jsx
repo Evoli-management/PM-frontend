@@ -1,6 +1,7 @@
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
+import ModalManager from "./components/shared/ModalManager.jsx";
 import PrivateRoute from "./components/shared/PrivateRoute.jsx";
 import Footer from "./components/shared/Footer.jsx";
 import { isFeatureEnabled } from "./utils/flags.js";
@@ -47,6 +48,7 @@ export default function App() {
         <Router>
             <div className="">
                 <Navbar />
+                <ModalManager />
                 <main className="flex-grow">
                     <Suspense
                         fallback={
