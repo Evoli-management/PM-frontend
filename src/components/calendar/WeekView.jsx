@@ -466,14 +466,15 @@ const WeekView = ({
                                 <button
                                     type="button"
                                     className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    style={{ minWidth: 110, minHeight: 36 }}
                                     onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })}
                                 >
                                     <span style={{ fontWeight: "bold" }}>+</span>
                                     <span>Add task</span>
                                 </button>
                             </div>
-                            <div style={{ width: '16px' }} /> {/* Gap between button and list */}
-                            <div className="p-2 min-w-0 relative flex-1 flex items-center">
+                            {/* Align task list start with activity list (use same ml-8 offset) */}
+                            <div className="p-2 min-w-0 relative flex-1 flex items-center ml-8">
                                 <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
                                     {(Array.isArray(todos) ? todos : []).map((t) => (
                                         <div
@@ -533,6 +534,7 @@ const WeekView = ({
                                 <button
                                     type="button"
                                     className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    style={{ minWidth: 110, minHeight: 36 }}
                                     onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })}
                                 >
                                     <span style={{ fontWeight: "bold" }}>+</span>

@@ -5,6 +5,7 @@ import apiClient from "./apiClient";
 const toFE = (area) => ({
     id: area.id,
     title: area.name,
+    color: area.color || '#3B82F6',
     description: area.description || "",
     position: area.sortOrder ?? 0,
     is_default: !!area.isSystem,
@@ -26,6 +27,7 @@ const toBEUpdate = (data) => {
     if (data.description !== undefined) out.description = data.description;
     if (data.position !== undefined) out.sortOrder = data.position;
     if (data.listNames !== undefined) out.listNames = data.listNames;
+    if (data.color !== undefined) out.color = data.color;
     return out;
 };
 
@@ -70,6 +72,37 @@ const keyAreaService = {
             headers: { "Content-Type": "application/json" },
         });
         return toFE(res.data);
+    },
+
+    // Bulk reorder; server should accept an array of { id, sortOrder }
+    // Falls back to individual updates if endpoint is unavailable
+    async reorder(items) {
+        try {
+            const payload = Array.isArray(items)
+                ? items.map((x) => ({ id: x.id, sortOrder: x.position }))
+                : [];
+            await apiClient.patch(
+                "/key-areas/reorder",
+                { items: payload },
+                { headers: { "Content-Type": "application/json" } },
+            );
+            return true;
+        } catch (e) {
+            // If server doesn't support bulk endpoint, fallback to per-item update
+            if (Array.isArray(items)) {
+                await Promise.all(
+                    items.map((x) =>
+                        apiClient.put(
+                            `/key-areas/${x.id}`,
+                            { sortOrder: x.position },
+                            { headers: { "Content-Type": "application/json" } },
+                        ),
+                    ),
+                );
+                return true;
+            }
+            throw e;
+        }
     },
 
     async remove(id) {

@@ -519,6 +519,30 @@ export default function Dashboard() {
     const [quickAddOpen, setQuickAddOpen] = useState(null); // 'task'|'goal'|'stroke'|'note'|'appointment'
     const [message, setMessage] = useState("");
     const [quickAddLoading, setQuickAddLoading] = useState(false);
+
+    // Listen for global quick-add events from Navbar (or other components)
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const t = (e?.detail && e.detail.type) || e?.type || null;
+                if (t) {
+                    setQuickAddOpen(t);
+                    // Ensure any existing message is cleared
+                    setMessage("");
+                    // Allow focus to happen when input mounts
+                    setTimeout(() => {
+                        const el = document.getElementById('quickAddInput');
+                        if (el) el.focus();
+                    }, 80);
+                }
+            } catch (err) {
+                console.warn('open-quickadd handler error', err);
+            }
+        };
+
+        window.addEventListener('open-quickadd', handler);
+        return () => window.removeEventListener('open-quickadd', handler);
+    }, []);
     
     // Refresh dashboard data
     const refreshDashboardData = async () => {
@@ -561,6 +585,24 @@ export default function Dashboard() {
                         taskId: null,
                     });
                     setMessage(`✅ Task "${inputValue}" added to activity feed!`);
+                    break;
+
+                case 'activity':
+                    // Create a free-form activity (same as note)
+                    await activityService.create({
+                        text: `${inputValue.trim()}`,
+                        taskId: null,
+                    });
+                    setMessage(`✅ Activity "${inputValue}" added to activity feed!`);
+                    break;
+
+                case 'stroke':
+                    // Use activity endpoint to record a recognition/stroke
+                    await activityService.create({
+                        text: `Stroke: ${inputValue.trim()}`,
+                        taskId: null,
+                    });
+                    setMessage(`✅ Stroke for "${inputValue}" sent!`);
                     break;
                     
                 case 'appointment':
@@ -712,7 +754,8 @@ export default function Dashboard() {
     }
 
     // Determine which widgets are visible and keep their selection order
-    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
+    // quickAdd is handled separately (top fixed widget and non-draggable)
+    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k] && k !== 'quickAdd');
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
@@ -1135,7 +1178,16 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Unified Widget Grid - All widgets in draggable layout */}
+                {/* Quick Add fixed widget at top (non-draggable) */}
+                {prefs.widgets.quickAdd && (
+                    <div className="mb-3">
+                        <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />
+                        </div>
+                    </div>
+                )}
+
+                {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
                 {visibleWidgetKeys.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-max">
                         {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}

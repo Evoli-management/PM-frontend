@@ -1,8 +1,122 @@
+const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        isDragging,
+    } = useSortable({ id: ka.id });
+    return (
+        <div
+            ref={setNodeRef}
+            {...attributes}
+            className={`flex items-center px-4 py-3 transition-transform ease-in-out duration-200 bg-white hover:bg-slate-50 ${isDragging ? 'z-10 shadow-lg' : ''}`}
+            style={{ touchAction: 'manipulation' }}
+            tabIndex={0}
+            aria-label={`Key Area: ${ka.title}`}
+        >
+            {/* Drag handle */}
+            <span
+                {...listeners}
+                className={`mr-3 select-none cursor-grab hover:cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
+                title="Drag to reorder"
+                aria-label="Drag handle"
+                role="button"
+                tabIndex={0}
+            >
+                <svg width="20" height="20" fill="none">
+                    {/* Only show debug marker in development mode */}
+                    {process.env.NODE_ENV === 'development' ? (
+                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">{idx + 1}</text>
+                    ) : null}
+                    <text x="10" y="15" textAnchor="middle" fontSize="18" fill="#64748b">⠿</text>
+                </svg>
+            </span>
+            {/* Key Area name and metadata (draggable area) */}
+            <div
+                {...listeners}
+                role="button"
+                aria-label={`Drag ${ka.title}`}
+                className={`flex-1 min-w-0 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab hover:cursor-grab'}`}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            >
+                <span className="font-medium text-slate-700 truncate cursor-inherit">{ka.title}</span>
+                {ka.taskCount !== undefined && (
+                    <span className="ml-2 text-xs text-slate-500 cursor-inherit">{ka.taskCount} tasks</span>
+                )}
+            </div>
+            {/* Up/Down buttons for accessibility */}
+            <div className="flex items-center gap-1 ml-2">
+                <button
+                    type="button"
+                    className="p-1 rounded focus:outline-none"
+                    aria-label="Move up"
+                    disabled={idx === 0}
+                    onClick={() => moveKeyArea(idx, idx - 1)}
+                >
+                    <svg width="16" height="16" fill="none"><path d="M8 4l-4 6h8l-4-6z" fill="#64748b" /></svg>
+                </button>
+                <button
+                    type="button"
+                    className="p-1 rounded focus:outline-none"
+                    aria-label="Move down"
+                    disabled={false}
+                    onClick={() => moveKeyArea(idx, idx + 1)}
+                >
+                    <svg width="16" height="16" fill="none"><path d="M8 12l4-6H4l4 6z" fill="#64748b" /></svg>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const FixedKeyAreaRow = ({ ka }) => {
+    return (
+        <div
+            className="flex items-center px-4 py-3 bg-slate-50 opacity-80 cursor-default"
+            tabIndex={0}
+            aria-label={`Key Area: ${ka.title} (Fixed)`}
+        >
+            {/* Fixed icon */}
+            <span className="mr-3 text-slate-400" title="Fixed position">
+                <svg width="20" height="20" fill="none">
+                    <circle cx="10" cy="10" r="8" stroke="#94a3b8" strokeWidth="2" />
+                    {/* Only show debug marker in development mode */}
+                    {process.env.NODE_ENV === 'development' ? (
+                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">★</text>
+                    ) : null}
+                    <text x="10" y="15" textAnchor="middle" fontSize="10" fill="#94a3b8">★</text>
+                </svg>
+            </span>
+            {/* Key Area name and metadata */}
+            <div className="flex-1 min-w-0">
+                <span className="font-medium text-slate-700 truncate">{ka.title}</span>
+                {ka.taskCount !== undefined && (
+                    <span className="ml-2 text-xs text-slate-500">{ka.taskCount} tasks</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // src/pages/KeyAreas.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+} from "@dnd-kit/sortable";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
-import TaskActivityModal from "../components/calendar/TaskActivityModal";
+import CreateActivityModal from "../components/modals/CreateActivityModal";
 import {
     FaPlus,
     FaChevronLeft,
@@ -30,9 +144,13 @@ import {
 
 // Small UI helpers for table chips/indicators
 const EmptyState = ({ title = "List is empty.", hint = "" }) => (
-    <div className="p-4 border border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-600">
+    <div className="p-4 rounded-lg bg-slate-50 text-slate-600 border border-slate-200">
         <div className="text-sm font-medium">{title}</div>
         {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
+        {/* Only show debug border in development mode */}
+        {process.env.NODE_ENV === 'development' ? (
+            <div className="absolute inset-0 border-2 border-dashed border-blue-300 pointer-events-none" />
+        ) : null}
     </div>
 );
 
@@ -366,54 +484,35 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
 
     return (
         <div className="p-2 overflow-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-full">
-                {groups.map((col) => (
-                    <div key={col.key} className="bg-slate-50 border border-slate-200 rounded-lg">
-                        <div className="px-3 py-2 border-b border-slate-200 text-xs font-semibold text-slate-700 flex items-center justify-between">
-                            <span>{col.label}</span>
-                            <span className="text-slate-500">{col.items.length}</span>
-                        </div>
-                        <div className="p-2 space-y-2 max-h-[48vh] overflow-auto">
-                            {col.items.length === 0 ? (
-                                <div className="text-xs text-slate-500">Empty</div>
-                            ) : (
-                                col.items.map((t) => (
-                                    <div
-                                        key={t.id}
-                                        className="w-full bg-white border border-slate-200 rounded-md shadow-sm hover:shadow px-2 py-2"
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <input
-                                                type="checkbox"
-                                                aria-label={`Select ${t.title}`}
-                                                className="mt-0.5"
-                                                checked={selectedIds.has(t.id)}
-                                                onChange={() => toggleSelect(t.id)}
-                                            />
-                                            {priorityBadge(t.priority)}
-                                            <button
-                                                type="button"
-                                                onClick={() => onSelect && onSelect(t)}
-                                                className="flex-1 text-left"
-                                                title={t.title}
-                                            >
-                                                <div className="min-w-0">
-                                                    <div className="font-medium truncate text-slate-900">{t.title}</div>
-                                                    {t.assignee ? (
-                                                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                                                            {t.assignee}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <DndContext
+                sensors={useSensors(
+                    useSensor(PointerSensor),
+                    useSensor(KeyboardSensor, {
+                        coordinateGetter: sortableKeyboardCoordinates,
+                    })
+                )}
+                collisionDetection={closestCenter}
+                onDragEnd={({ active, over }) => {
+                    if (!over || active.id === over.id) return;
+                    const oldIdx = keyAreas.findIndex((ka) => ka.id === active.id);
+                    const newIdx = keyAreas.findIndex((ka) => ka.id === over.id);
+                    // Prevent moving 'Ideas' or moving anything to 'Ideas' position
+                    if (keyAreas[oldIdx]?.is_fixed || keyAreas[newIdx]?.is_fixed) return;
+                    const newOrder = arrayMove(keyAreas, oldIdx, newIdx);
+                    setKeyAreas(newOrder);
+                    // TODO: Persist new order to backend
+                }}
+            >
+                <SortableContext items={keyAreas.filter(ka => !ka.is_fixed).map(ka => ka.id)}>
+                    {keyAreas.map((ka, idx) => (
+                        ka.is_fixed ? (
+                            <FixedKeyAreaRow key={ka.id} ka={ka} />
+                        ) : (
+                            <SortableKeyAreaRow key={ka.id} ka={ka} idx={idx} moveKeyArea={moveKeyArea} />
+                        )
+                    ))}
+                </SortableContext>
+            </DndContext>
         </div>
     );
 };
@@ -1062,26 +1161,16 @@ function TaskFullView({
         } catch {}
     };
     const toggleRow = (id) => {
-        setOpenActivityRows((prev) => {
-            // If clicking the already open row, close it
-            if (prev.has(id)) return new Set();
-            // If switching to a different row, "save" current list and open only this one
-            if (prev.size > 0 && !prev.has(id)) {
-                onUpdateActivities && onUpdateActivities(String(task.id), list);
-            }
-            return new Set([id]);
-        });
+        // Open activity in read-only modal instead of inline expansion
+        const activity = list.find(a => a.id === id);
+        if (activity) {
+            setActivityModal({ open: true, item: activity });
+        }
     };
 
-    // When hovering another activity, close any open one (and save), but don't open the hovered.
+    // When hovering another activity, do nothing (inline details removed)
     const closeOnHoverDifferent = (id) => {
-        setOpenActivityRows((prev) => {
-            if (prev.size > 0 && !prev.has(id)) {
-                onUpdateActivities && onUpdateActivities(String(task.id), list);
-                return new Set();
-            }
-            return prev;
-        });
+        // No-op: inline details removed
     };
     const updateField = (id, field, value) => {
         setList(list.map((a) => (a.id === id ? { ...a, [field]: value } : a)));
@@ -1496,159 +1585,6 @@ function TaskFullView({
                                                 <FaAngleDoubleLeft className="w-4 h-4" />
                                             </button>
                                         </div>
-                                        {isOpen && (
-                                            <div className="mt-2 border-t border-slate-200 pt-2">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                                    {/* Left column */}
-                                                    <div className="grid gap-2 content-start">
-                                                        {/* Description */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Description
-                                                            </label>
-                                                            <input
-                                                                value={a.notes || a.description || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Start Date */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Start date
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.date_start) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* End Date */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                End date
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.date_end) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Deadline */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Deadline
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.deadline) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Date (finish) */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Date (finish)
-                                                            </label>
-                                                            <input
-                                                                value={toDateOnly(a.finish_date) || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Duration */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Duration
-                                                            </label>
-                                                            <input
-                                                                value={a.duration || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    {/* Right column */}
-                                                    <div className="grid gap-2 content-start">
-                                                        {/* List */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                List
-                                                            </label>
-                                                            <input
-                                                                value={a.list || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Key Area */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Key Area
-                                                            </label>
-                                                            <input
-                                                                value={selectedKA?.title || selectedKA?.name || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Task */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">Task</label>
-                                                            <input
-                                                                value={(() => {
-                                                                    const taskId = a.task_id || a.taskId;
-                                                                    if (!taskId) return "—";
-                                                                    const t = (allTasks || []).find((x) => String(x.id) === String(taskId));
-                                                                    return t ? (t.title || t.name || `#${taskId}`) : `#${taskId}`;
-                                                                })()}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Respons. (Responsible) */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Respons.
-                                                            </label>
-                                                            <input
-                                                                value={a.responsible || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Priority */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Priority
-                                                            </label>
-                                                            <input
-                                                                value={(() => {
-                                                                    const p = a.priority;
-                                                                    if (p === "high" || p === 3) return "High";
-                                                                    if (p === "low" || p === 1) return "Low";
-                                                                    if (p === "normal" || p === 2) return "Normal";
-                                                                    return "—";
-                                                                })()}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                        {/* Goal */}
-                                                        <div>
-                                                            <label className="block text-[11px] text-slate-600">
-                                                                Goal
-                                                            </label>
-                                                            <input
-                                                                value={a.goal || "—"}
-                                                                readOnly
-                                                                className="w-full border rounded px-2 py-1 bg-slate-50 text-slate-700"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
                                     </li>
                                 );
                             })}
@@ -1884,7 +1820,22 @@ function TaskFullView({
                     }}
                 />
             )}
-            {/* no popup modal for activities in TaskFullView; inline expansion used */}
+            {/* Read-only activity modal */}
+            {activityModal.open && activityModal.item && (
+                <CreateActivityModal
+                    isOpen={activityModal.open}
+                    onClose={() => setActivityModal({ open: false, item: null })}
+                    onSave={() => {}} // no-op: read-only
+                    activityId={activityModal.item.id}
+                    initialData={{
+                        taskId: activityModal.item.task_id || activityModal.item.taskId || "",
+                        text: activityModal.item.text || activityModal.item.activity_name || "",
+                        title: activityModal.item.text || activityModal.item.activity_name || "",
+                    }}
+                    attachedTaskId={activityModal.item.task_id || activityModal.item.taskId || null}
+                    readOnly={true}
+                />
+            )}
         </div>
     );
 }
@@ -2565,10 +2516,22 @@ export default function KeyAreas() {
                 description: payload.description,
                 color: payload.color,
             });
-            setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { ...k, ...updated } : k)));
+                setKeyAreas((prev) => prev.map((k) => (k.id === editing.id ? { 
+                    ...k, 
+                    title: payload.title,
+                    description: payload.description,
+                    color: payload.color,
+                    ...updated 
+                } : k)));
             // emit updated list for sidebar (alphabetical with Ideas last)
             try {
-                const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { ...k, ...updated } : k));
+                    const updatedList = (keyAreas || []).map((k) => (k.id === editing.id ? { 
+                        ...k, 
+                        title: payload.title,
+                        description: payload.description,
+                        color: payload.color,
+                        ...updated 
+                    } : k));
                 const sidebarList = sortForSidebar(updatedList);
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-data", { detail: { keyAreas: sidebarList } }));
             } catch (e) {}
@@ -2679,10 +2642,12 @@ export default function KeyAreas() {
         nextOrdered.splice(toIdx, 0, moved);
         // Reassign positions 1..N
         const withPos = nextOrdered.map((k, i) => ({ ...k, position: i + 1 }));
-        // Persist changes (only those that changed position)
+        // Persist changes via bulk endpoint (falls back to per-item)
         const changed = withPos.filter((k, i) => ordered[i]?.id !== k.id || ordered[i]?.position !== k.position);
         try {
-            await Promise.all(changed.map((k) => api.updateKeyArea(k.id, { ...k, position: k.position })));
+            if (changed.length) {
+                await keyAreaService.reorder(changed);
+            }
             // Update local state
             setKeyAreas((prev) => {
                 const map = new Map(prev.map((x) => [String(x.id), { ...x }]));
@@ -2715,10 +2680,10 @@ export default function KeyAreas() {
         const a = ordered[idx];
         const b = ordered[targetIdx];
         try {
-            // swap positions and persist both
-            await Promise.all([
-                api.updateKeyArea(a.id, { ...a, position: b.position }),
-                api.updateKeyArea(b.id, { ...b, position: a.position }),
+            // swap positions and persist via bulk reorder
+            await keyAreaService.reorder([
+                { id: a.id, position: b.position },
+                { id: b.id, position: a.position },
             ]);
             // update local state and emit
             setKeyAreas((prev) => {
@@ -2847,10 +2812,6 @@ export default function KeyAreas() {
 
     const renameList = async (n) => {
         if (!selectedKA) return;
-        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") {
-            alert("Cannot rename lists for the Ideas key area.");
-            return;
-        }
         const current = getListName(selectedKA.id, n);
         const val = prompt("Rename list", current);
         if (val === null) return; // cancelled
@@ -2866,10 +2827,6 @@ export default function KeyAreas() {
 
     const deleteList = async (n) => {
         if (!selectedKA) return;
-        if (selectedKA.is_default || (selectedKA.title || "").toLowerCase() === "ideas") {
-            alert("Cannot edit lists for the Ideas key area.");
-            return;
-        }
         const kaId = selectedKA.id;
         // Only allow deletion if the list has no tasks
         const hasTasks = (allTasks || []).some(
@@ -3244,6 +3201,8 @@ export default function KeyAreas() {
                                         onClick={() => {
                                             setSelectedKA(null);
                                             setAllTasks([]);
+                                            // Clear any URL params (like ?select=ideas) to show full list
+                                            navigate("/key-areas", { replace: true });
                                         }}
                                     >
                                         <FaChevronLeft />
@@ -3386,18 +3345,47 @@ export default function KeyAreas() {
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="max-w-7xl mx-auto p-6">
                                     <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
-                                        {/* Top Row: Task Lists + Mass Edit */}
-                                        <div className="grid grid-cols-3 gap-4">
-                                            {/* Left: Task Lists (2/3 width) */}
-                                            <div className="col-span-3 md:col-span-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <div className="text-sm font-semibold whitespace-nowrap mr-1">
-                                                        Task Lists
-                                                    </div>
-                                                    <div
-                                                        ref={tabsRef}
-                                                        className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
-                                                    >
+                                        {/* Header Row: Task Lists Label + Mass Edit Control */}
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-700">Task Lists:</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm">
+                                                <span className="text-slate-500" aria-live="polite">
+                                                    {selectedIds.size} selected
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (showMassEdit) {
+                                                            setShowMassEdit(false);
+                                                        } else {
+                                                            setShowMassEdit(true);
+                                                            // Scroll to Tasks Display area where the form appears
+                                                            setTimeout(() => {
+                                                                if (tasksDisplayRef.current) {
+                                                                    tasksDisplayRef.current.scrollIntoView({
+                                                                        behavior: "smooth",
+                                                                        block: "start",
+                                                                    });
+                                                                }
+                                                            }, 0);
+                                                        }
+                                                    }}
+                                                    className="bg-green-400 text-white rounded-md px-3 py-1 text-sm hover:bg-green-500"
+                                                    aria-label="mass edit"
+                                                >
+                                                    {showMassEdit ? "Exit Mass Edit" : "Mass Edit"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Tabs Section */}
+                                        <div className="pt-3">
+                                            <div
+                                                ref={tabsRef}
+                                                className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-0.5"
+                                            >
                                                         {Array.from({ length: leftListCount }).map((_, i) => {
                                                             const n = i + 1;
                                                             return (
@@ -3459,43 +3447,13 @@ export default function KeyAreas() {
                                                                                 <button
                                                                                     role="menuitem"
                                                                                     onClick={() => {
-                                                                                        setTaskForm((s) => ({
-                                                                                            ...s,
-                                                                                            list_index: n,
-                                                                                        }));
-                                                                                        setShowTaskComposer(true);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                >
-                                                                                    Add Task
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
-                                                                                        setActivityForm((s) => ({
-                                                                                            ...s,
-                                                                                            key_area_id:
-                                                                                                selectedKA?.id ||
-                                                                                                s.key_area_id,
-                                                                                        }));
-                                                                                        setActivityAttachTaskId(null);
-                                                                                        setShowActivityComposer(true);
-                                                                                        setOpenListMenu(null);
-                                                                                    }}
-                                                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                                                                >
-                                                                                    Add Activity
-                                                                                </button>
-                                                                                <button
-                                                                                    role="menuitem"
-                                                                                    onClick={() => {
                                                                                         renameList(n);
                                                                                         setOpenListMenu(null);
                                                                                     }}
                                                                                     className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                                                    aria-label="Rename list"
                                                                                 >
-                                                                                    Rename
+                                                                                    Rename List
                                                                                 </button>
                                                                                 <button
                                                                                     role="menuitem"
@@ -3504,8 +3462,9 @@ export default function KeyAreas() {
                                                                                         setOpenListMenu(null);
                                                                                     }}
                                                                                     className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                                    aria-label="Delete list"
                                                                                 >
-                                                                                    Delete
+                                                                                    Delete List
                                                                                 </button>
                                                                             </div>
                                                                         </>
@@ -3556,70 +3515,31 @@ export default function KeyAreas() {
                                                                         }
                                                                     }}
                                                                     title="Add list"
-                                                                    className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
                                                                 >
-                                                                    <svg
-                                                                        stroke="currentColor"
-                                                                        fill="currentColor"
-                                                                        strokeWidth="0"
-                                                                        viewBox="0 0 448 512"
-                                                                        height="1em"
-                                                                        width="1em"
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                    >
-                                                                        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                                                     </svg>
+                                                                    Add List
                                                                 </button>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Right: Mass Edit (1/3 width) as a button */}
-                                            <div className="col-span-3 md:col-span-1 flex items-center justify-end gap-3">
-                                                <span className="text-sm text-gray-600" aria-live="polite">
-                                                    {selectedIds.size} selected
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    disabled={selectedIds.size === 0}
-                                                    onClick={() => {
-                                                        setShowMassEdit(true);
-                                                        // Scroll to Tasks Display area where the form appears
-                                                        setTimeout(() => {
-                                                            if (tasksDisplayRef.current) {
-                                                                tasksDisplayRef.current.scrollIntoView({
-                                                                    behavior: "smooth",
-                                                                    block: "start",
-                                                                });
-                                                            }
-                                                        }, 0);
-                                                    }}
-                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                                                    aria-label="Open mass edit"
-                                                    title={
-                                                        selectedIds.size === 0
-                                                            ? "Select tasks to enable mass edit"
-                                                            : `Mass edit (${selectedIds.size})`
-                                                    }
-                                                >
-                                                    Mass Edit
-                                                </button>
-                                            </div>
                                         </div>
 
                                         {/* Bottom Row: Tasks Display (full width) */}
                                         <div ref={tasksDisplayRef}>
-                                            {showMassEdit && selectedIds.size > 0 && (
+                                            {showMassEdit && (
                                                 <form
                                                     onSubmit={applyBulkEdit}
                                                     aria-label="Mass edit selected tasks"
                                                     className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg"
                                                 >
                                                     <div className="text-sm text-blue-900 font-medium mb-3">
-                                                        Mass edit {selectedIds.size} task
-                                                        {selectedIds.size > 1 ? "s" : ""}
+                                                        {selectedIds.size === 0 
+                                                            ? "Mass Edit Mode: Select tasks to edit multiple tasks at once"
+                                                            : `Mass edit ${selectedIds.size} task${selectedIds.size > 1 ? "s" : ""}`
+                                                        }
                                                     </div>
                                                     <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                                                         <div>
@@ -3747,7 +3667,12 @@ export default function KeyAreas() {
                                                         </button>
                                                         <button
                                                             type="submit"
-                                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                                            disabled={selectedTasks.length === 0}
+                                                            className={`px-3 py-1.5 rounded-md ${
+                                                                selectedTasks.length === 0
+                                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                            }`}
                                                         >
                                                             Apply
                                                         </button>
@@ -3765,7 +3690,7 @@ export default function KeyAreas() {
                                                 visibleTasks.length === 0 ? (
                                                     <EmptyState
                                                         title="List is empty."
-                                                        hint="Use the three-dots menu to add a task."
+                                                        hint="Use the 'Add Task' button below to create your first task."
                                                     />
                                                 ) : (
                                                     <div className="overflow-x-auto">
@@ -4485,6 +4410,27 @@ export default function KeyAreas() {
                                                 />
                                             )}
                                         </div>
+                                        
+                                        {/* Add Task Footer */}
+                                        <div className="flex justify-end pr-10 pt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTaskForm((s) => ({
+                                                        ...s,
+                                                        list_index: taskTab,
+                                                    }));
+                                                    setShowTaskComposer(true);
+                                                }}
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                aria-label="Add task"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                Add Task
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4616,7 +4562,9 @@ export default function KeyAreas() {
                                                 .map((ka, idx) => (
                                                     <li
                                                         key={ka.id}
-                                                        className="flex items-center justify-between px-3 py-2"
+                                                        className={`flex items-center justify-between px-3 py-2 rounded-md ${
+                                                            ka.is_default ? '' : 'hover:bg-slate-50 cursor-grab active:cursor-grabbing'
+                                                        }`}
                                                         draggable={!ka.is_default}
                                                         onDragStart={(e) => {
                                                             if (ka.is_default) return;
@@ -4637,14 +4585,19 @@ export default function KeyAreas() {
                                                         onDragEnd={() => setDragKAId(null)}
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0">
-                                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold shrink-0">
+                                                            <span 
+                                                                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold shrink-0"
+                                                                style={{ 
+                                                                    backgroundColor: ka.color ? `${ka.color}66` : '#e2e8f0',
+                                                                    color: ka.color || '#334155'
+                                                                }}
+                                                            >
                                                                 {ka.position && ka.position > 0 ? ka.position : idx + 1}
                                                             </span>
-                                                            <div className="min-w-0">
+                                                            <div className="min-w-0 select-none">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <span 
-                                                                        className="font-semibold truncate"
-                                                                        style={{ color: ka.color || '#1F2937' }}
+                                                                        className="font-semibold truncate cursor-inherit text-slate-700"
                                                                     >
                                                                         {ka.title}
                                                                     </span>
@@ -4689,32 +4642,35 @@ export default function KeyAreas() {
                                                                 </>
                                                             )}
                                                             <button
-                                                                className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
+                                                                className="rounded-md bg-white text-slate-700 hover:bg-slate-50 flex items-center justify-center p-2 text-xs border border-slate-200"
+                                                                title="Edit"
+                                                                aria-label="Edit key area"
                                                                 onClick={() => {
                                                                     setEditing(ka);
                                                                     setShowForm(true);
                                                                 }}
                                                             >
-                                                                <FaEdit /> Edit
+                                                                <FaEdit />
                                                             </button>
                                                             <button
-                                                                disabled={ka.is_default}
+                                                                disabled={ka.is_default || (ka.title || "").toLowerCase() === "ideas"}
                                                                 title={
-                                                                    ka.is_default
-                                                                        ? undefined
+                                                                    ka.is_default || (ka.title || "").toLowerCase() === "ideas"
+                                                                        ? "Cannot delete the Ideas key area"
                                                                         : typeof ka.taskCount === "number" &&
                                                                             ka.taskCount > 0
                                                                           ? `${ka.taskCount} task(s) present`
                                                                           : undefined
                                                                 }
-                                                                className={`rounded-md font-semibold flex items-center gap-1.5 px-2 py-1 text-xs border ${
-                                                                    ka.is_default
+                                                                aria-label="Delete key area"
+                                                                className={`rounded-md flex items-center justify-center p-2 text-xs border ${
+                                                                    ka.is_default || (ka.title || "").toLowerCase() === "ideas"
                                                                         ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
                                                                         : "bg-white text-red-600 hover:bg-red-50 border-red-200"
                                                                 }`}
                                                                 onClick={() => onDeleteKA(ka)}
                                                             >
-                                                                <FaTrash /> Delete
+                                                                <FaTrash />
                                                             </button>
                                                         </div>
                                                     </li>
@@ -4917,49 +4873,6 @@ export default function KeyAreas() {
                                                                 No later than
                                                             </p>
                                                         </div>
-                                                        {/* Date (finish) */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Date (finish)
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="finish_date"
-                                                                    value={toDateOnly(taskForm.finish_date)}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            finish_date: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                    ref={(el) => (taskForm._finishRef = el)}
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={() => {
-                                                                        try {
-                                                                            taskForm._finishRef?.focus();
-                                                                            taskForm._finishRef?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                taskForm._finishRef?.focus();
-                                                                                taskForm._finishRef?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
                                                         {/* Duration */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -4986,21 +4899,6 @@ export default function KeyAreas() {
                                                     </div>
                                                     {/* Right column */}
                                                     <div className="grid gap-3 content-start">
-                                                        {/* List */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                List
-                                                            </label>
-                                                            <input
-                                                                name="list"
-                                                                value={taskForm.list || ""}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({ ...s, list: e.target.value }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="List name"
-                                                            />
-                                                        </div>
                                                         {/* Key Area */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5035,6 +4933,43 @@ export default function KeyAreas() {
                                                                             {ka.title || ka.name}
                                                                         </option>
                                                                     ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* List */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                List
+                                                            </label>
+                                                            <select
+                                                                name="list_index"
+                                                                value={taskForm.list_index || 1}
+                                                                onChange={(e) =>
+                                                                    setTaskForm((s) => ({
+                                                                        ...s,
+                                                                        list_index: Number(e.target.value),
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {(() => {
+                                                                    const kaId = taskForm.key_area_id || selectedKA?.id;
+                                                                    const names = kaId ? (listNames[String(kaId)] || {}) : {};
+                                                                    // Get lists with custom names
+                                                                    const namedLists = Object.keys(names).map(Number).filter(Boolean);
+                                                                    // Get lists that have tasks
+                                                                    const listsWithTasks = kaId 
+                                                                        ? Array.from(new Set((allTasks || [])
+                                                                            .filter(t => String(t.key_area_id) === String(kaId))
+                                                                            .map(t => t.list_index || 1)))
+                                                                        : [];
+                                                                    // Combine and ensure at least List 1 exists
+                                                                    const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
+                                                                    return allNumbers.map((n) => (
+                                                                        <option key={n} value={n}>
+                                                                            {names[String(n)] || `List ${n}`}
+                                                                        </option>
+                                                                    ));
+                                                                })()}
                                                             </select>
                                                         </div>
                                                         {/* Respons. */}
@@ -5087,15 +5022,21 @@ export default function KeyAreas() {
                                                             <label className="text-xs font-semibold text-slate-700">
                                                                 Goal
                                                             </label>
-                                                            <input
+                                                            <select
                                                                 name="goal"
                                                                 value={taskForm.goal || ""}
                                                                 onChange={(e) =>
                                                                     setTaskForm((s) => ({ ...s, goal: e.target.value }))
                                                                 }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="Goal"
-                                                            />
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="">— Select Goal —</option>
+                                                                {goals.map((goal) => (
+                                                                    <option key={goal.id} value={goal.id}>
+                                                                        {goal.title}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -5347,53 +5288,6 @@ export default function KeyAreas() {
                                                                 No later than
                                                             </p>
                                                         </div>
-                                                        {/* Date (finish) */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Date (finish)
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="finish_date"
-                                                                    value={toDateOnly(activityForm.finish_date)}
-                                                                    onChange={(e) =>
-                                                                        setActivityForm((s) => ({
-                                                                            ...s,
-                                                                            finish_date: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={(e) => {
-                                                                        try {
-                                                                            const el =
-                                                                                e.currentTarget.previousElementSibling;
-                                                                            el?.focus();
-                                                                            el?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                const el =
-                                                                                    e.currentTarget
-                                                                                        .previousElementSibling;
-                                                                                el?.focus();
-                                                                                el?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
                                                         {/* Duration */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5420,24 +5314,6 @@ export default function KeyAreas() {
                                                     </div>
                                                     {/* Right column */}
                                                     <div className="grid gap-3 content-start">
-                                                        {/* List */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                List
-                                                            </label>
-                                                            <input
-                                                                name="list"
-                                                                value={activityForm.list || ""}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        list: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="List name"
-                                                            />
-                                                        </div>
                                                         {/* Key Area */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
@@ -5470,6 +5346,43 @@ export default function KeyAreas() {
                                                                             {ka.title || ka.name}
                                                                         </option>
                                                                     ))}
+                                                            </select>
+                                                        </div>
+                                                        {/* List */}
+                                                        <div className="flex flex-col">
+                                                            <label className="text-xs font-semibold text-slate-700">
+                                                                List
+                                                            </label>
+                                                            <select
+                                                                name="list_index"
+                                                                value={activityForm.list_index || 1}
+                                                                onChange={(e) =>
+                                                                    setActivityForm((s) => ({
+                                                                        ...s,
+                                                                        list_index: Number(e.target.value),
+                                                                    }))
+                                                                }
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                {(() => {
+                                                                    const kaId = activityForm.key_area_id || selectedKA?.id;
+                                                                    const names = kaId ? (listNames[String(kaId)] || {}) : {};
+                                                                    // Get lists with custom names
+                                                                    const namedLists = Object.keys(names).map(Number).filter(Boolean);
+                                                                    // Get lists that have tasks
+                                                                    const listsWithTasks = kaId 
+                                                                        ? Array.from(new Set((allTasks || [])
+                                                                            .filter(t => String(t.key_area_id) === String(kaId))
+                                                                            .map(t => t.list_index || 1)))
+                                                                        : [];
+                                                                    // Combine and ensure at least List 1 exists
+                                                                    const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
+                                                                    return allNumbers.map((n) => (
+                                                                        <option key={n} value={n}>
+                                                                            {names[String(n)] || `List ${n}`}
+                                                                        </option>
+                                                                    ));
+                                                                })()}
                                                             </select>
                                                         </div>
                                                         {/* Task (dropdown, auto-select current task) */}
@@ -5545,7 +5458,7 @@ export default function KeyAreas() {
                                                             <label className="text-xs font-semibold text-slate-700">
                                                                 Goal
                                                             </label>
-                                                            <input
+                                                            <select
                                                                 name="goal"
                                                                 value={activityForm.goal || ""}
                                                                 onChange={(e) =>
@@ -5554,9 +5467,15 @@ export default function KeyAreas() {
                                                                         goal: e.target.value,
                                                                     }))
                                                                 }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="Goal"
-                                                            />
+                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            >
+                                                                <option value="">— Select Goal —</option>
+                                                                {goals.map((goal) => (
+                                                                    <option key={goal.id} value={goal.id}>
+                                                                        {goal.title}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -5664,7 +5583,7 @@ export default function KeyAreas() {
                                         </div>
                                         <div>
                                             <label className="text-sm font-semibold text-slate-900">Color</label>
-                                            <div className="mt-2 flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
                                                 <input
                                                     type="color"
                                                     name="color"
@@ -5673,10 +5592,8 @@ export default function KeyAreas() {
                                                     title="Choose color for this Key Area"
                                                 />
                                                 <div className="flex flex-wrap gap-2">
-                                                    {/* Preset color options */}
                                                     {[
                                                         "#3B82F6", // Blue
-                                                        "#EF4444", // Red  
                                                         "#10B981", // Green
                                                         "#F59E0B", // Amber
                                                         "#8B5CF6", // Purple
@@ -5684,18 +5601,22 @@ export default function KeyAreas() {
                                                         "#06B6D4", // Cyan
                                                         "#84CC16", // Lime
                                                         "#F97316", // Orange
-                                                        "#6B7280", // Gray
-                                                    ].map(color => (
+                                                    ].map((color) => (
                                                         <button
                                                             key={color}
                                                             type="button"
                                                             onClick={(e) => {
-                                                                const colorInput = e.target.closest('form').querySelector('input[name="color"]');
-                                                                if (colorInput) colorInput.value = color;
+                                                                const form = e.currentTarget.closest('form');
+                                                                const colorInput = form?.querySelector('input[name="color"]');
+                                                                if (colorInput) {
+                                                                    colorInput.value = color;
+                                                                    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                                                    colorInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                                                }
                                                             }}
-                                                            className="w-6 h-6 rounded-full border-2 border-white shadow-md hover:scale-110 transition-transform"
+                                                            className="w-6 h-6 rounded-full border-2 border-white shadow hover:scale-110 transition-transform"
                                                             style={{ backgroundColor: color }}
-                                                            title={`Set color to ${color}`}
+                                                            aria-label={`Choose ${color}`}
                                                         />
                                                     ))}
                                                 </div>
@@ -5731,5 +5652,5 @@ export default function KeyAreas() {
                 </main>
             </div>
         </div>
-    ); and
+    );
 }

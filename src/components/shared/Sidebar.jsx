@@ -5,7 +5,6 @@ import {
     FaCalendarAlt,
     FaLock,
     FaChevronDown,
-    FaPlus,
     FaSearch,
     FaGripVertical,
 } from "react-icons/fa";
@@ -54,20 +53,6 @@ const navItems = [
         icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
         to: "/teams",
         section: "Main",
-    },
-];
-
-const quickActions = [
-    { label: "New Task", icon: <FaPlus />, to: "/tasks" },
-    {
-        label: "Set Goal",
-        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
-        to: "/goals",
-    },
-    {
-        label: "Invite Team",
-        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
-        to: "/teams",
     },
 ];
 
@@ -451,7 +436,7 @@ export default function Sidebar({
                                                                         >
                                                                             {isDraggable && (
                                                                                 <FaGripVertical 
-                                                                                    className="text-gray-300 hover:text-gray-600 text-xs mr-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                                                                                    className="text-gray-300 hover:text-gray-600 text-xs mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
                                                                                     title="Drag to reorder"
                                                                                 />
                                                                             )}
@@ -507,20 +492,7 @@ export default function Sidebar({
                     </div>
                 </div>
                 
-                {!collapsed && (
-                    <div className="mt-6 px-2">
-                        <div className="uppercase text-xs text-blue-700 font-bold mb-2">Quick Actions</div>
-                        {quickActions.map((action) => (
-                            <Link
-                                key={action.label}
-                                to={action.to}
-                                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 mb-2 shadow text-blue-700 font-bold hover:bg-blue-50 transition"
-                            >
-                                {action.icon} <span>{action.label}</span>
-                            </Link>
-                        ))}
-                    </div>
-                )}
+                {/* Quick Actions removed per request */}
             </div>
         </aside>
     );
