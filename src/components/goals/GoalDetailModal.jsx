@@ -9,16 +9,17 @@ import {
     FaEyeSlash,
     FaCalendarAlt,
     FaFlag,
-    FaClock,
     FaSave,
     FaBuilding,
     FaTrophy,
     FaBullseye,
     FaChartPie,
-    FaClock as FaHistory,
+    FaHistory,
 } from "react-icons/fa";
+import GoalForm from "./GoalForm";
 
 const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
+    const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
     const [editingKeyArea, setEditingKeyArea] = useState(false);
     const [tempKeyAreaId, setTempKeyAreaId] = useState(goal?.keyAreaId || "");
@@ -34,6 +35,25 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
     const completionDate = isCompleted && goal.completedAt
         ? new Date(goal.completedAt).toLocaleDateString()
         : null;
+
+    const handleEdit = () => setIsEditing(true);
+    const handleCancelEdit = () => setIsEditing(false);
+    const handleSave = async (goalData) => {
+        await onUpdate(goal.id, goalData);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <GoalForm
+                goal={goal}
+                onClose={handleCancelEdit}
+                onGoalCreated={handleSave}
+                keyAreas={keyAreas}
+                isEditing={true}
+            />
+        );
+    }
 
     return (
         <div
@@ -57,7 +77,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                 style={{ maxHeight: "90vh", border: "1px solid #e5e7eb" }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* ==== HEADER ==== */}
+                {/* HEADER */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
@@ -84,7 +104,11 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all" title="Edit">
+                        <button
+                            onClick={handleEdit}
+                            className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all"
+                            title="Edit Goal"
+                        >
                             <FaEdit className="w-4.5 h-4.5" />
                         </button>
 
@@ -128,7 +152,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                     </div>
                 </div>
 
-                {/* ==== TABS ==== */}
+                {/* TABS */}
                 <div className="border-b border-gray-200 flex-shrink-0">
                     <nav className="flex px-6">
                         {["overview", "milestones", "activity"].map((tab) => (
@@ -141,21 +165,20 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                         : "border-transparent text-gray-500 hover:text-gray-700"
                                 }`}
                             >
-                                {tab === "overview" ? "Overview" : tab === "milestones" ? "Milestones" : "Activity"}
+                                {tab === "overview" ? "Overview" : tab === " offender" ? "Milestones" : "Activity"}
                             </button>
                         ))}
                     </nav>
                 </div>
 
-                {/* ==== CONTENT (always two columns) ==== */}
+                {/* CONTENT – ALWAYS TWO COLUMNS */}
                 <div className="flex-1 overflow-hidden">
                     <div className="h-full flex">
-                        {/* LEFT COLUMN – TAB CONTENT */}
+                        {/* LEFT: TAB CONTENT */}
                         <div className="flex-1 px-6 py-6 overflow-y-auto">
-                            {/* ---------- OVERVIEW ---------- */}
+                            {/* OVERVIEW */}
                             {activeTab === "overview" && (
                                 <div className="space-y-6">
-                                    {/* Progress Card */}
                                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -190,7 +213,6 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                         </div>
                                     </div>
 
-                                    {/* Goal Details */}
                                     <div>
                                         <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                                             <FaBullseye className="w-5 h-5 text-blue-600" />
@@ -200,7 +222,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                             <div>
                                                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</label>
                                                 <p className="mt-1.5 text-gray-800 leading-relaxed">
-                                                    {goal.description || <span className="italic text-gray-400">No description provided</span>}
+                                                    {goal.description || <span className="italic text-gray-400">No description</span>}
                                                 </p>
                                             </div>
 
@@ -263,7 +285,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 </div>
                             )}
 
-                            {/* ---------- MILESTONES ---------- */}
+                            {/* MILESTONES */}
                             {activeTab === "milestones" && (
                                 <div className="space-y-4">
                                     {goal.milestones && goal.milestones.length > 0 ? (
@@ -314,7 +336,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 </div>
                             )}
 
-                            {/* ---------- ACTIVITY ---------- */}
+                            {/* ACTIVITY */}
                             {activeTab === "activity" && (
                                 <div className="text-center py-16">
                                     <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
@@ -326,9 +348,8 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                             )}
                         </div>
 
-                        {/* RIGHT COLUMN – PERSISTENT SIDE PANEL (always visible) */}
+                        {/* RIGHT: PERSISTENT SIDE PANEL */}
                         <div className="w-80 border-l border-gray-200 flex flex-col bg-gray-50">
-                            {/* Summary Card */}
                             <div className="p-5 flex-shrink-0">
                                 <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
                                     <FaChartPie className="w-4 h-4 text-indigo-600" />
@@ -358,7 +379,6 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 </div>
                             </div>
 
-                            {/* Quick Stats */}
                             <div className="px-5 py-4 border-t border-gray-200 flex-1 overflow-y-auto">
                                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h4>
                                 <div className="grid grid-cols-2 gap-3 text-xs">
