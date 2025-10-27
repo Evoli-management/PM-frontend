@@ -73,7 +73,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
             `}</style>
 
             <div
-                className="bg-white rounded-xl w-full max-w-6xl shadow-2xl flex flex-col animate-slideUp"
+                className="bg-white rounded-xl w-full max-w-4xl shadow-2xl flex flex-col animate-slideUp"
                 style={{ maxHeight: "90vh", border: "1px solid #e5e7eb" }}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -175,11 +175,11 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                 <div className="flex-1 overflow-hidden" style={{ minHeight: '500px', maxHeight: 'calc(90vh - 200px)' }}>
                     <div className="h-full flex">
                         {/* LEFT: TAB CONTENT */}
-                        <div className="flex-1 px-6 py-6 overflow-y-auto milestone-scroll">
+                        <div className="flex-1 px-6 py-6 overflow-y-auto milestone-scroll max-w-2xl">
                             {/* OVERVIEW */}
                             {activeTab === "overview" && (
                                 <div className="space-y-6 pb-6">
-                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                                 <FaTrophy className="w-4 h-4 text-blue-600" />
@@ -358,8 +358,8 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                         </div>
 
                         {/* RIGHT: PERSISTENT SIDE PANEL */}
-                        <div className="w-80 border-l border-gray-200 flex flex-col bg-gray-50">
-                            <div className="p-5 flex-shrink-0">
+                        <div className="w-72 border-l border-gray-200 flex flex-col bg-gray-50">
+                            <div className="p-4 flex-shrink-0">
                                 <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
                                     <FaChartPie className="w-4 h-4 text-indigo-600" />
                                     Goal Summary
@@ -388,19 +388,19 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 </div>
                             </div>
 
-                            <div className="px-5 py-4 border-t border-gray-200 flex-1 overflow-y-auto milestone-scroll">
+                            <div className="px-4 py-4 border-t border-gray-200 flex-1 overflow-y-auto milestone-scroll">
                                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h4>
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div className="bg-white rounded-lg p-3 text-center shadow-sm">
-                                        <div className="text-2xl font-bold text-blue-600">{totalMilestones}</div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
+                                        <div className="text-xl font-bold text-blue-600">{totalMilestones}</div>
                                         <div className="text-gray-500">Total</div>
                                     </div>
-                                    <div className="bg-white rounded-lg p-3 text-center shadow-sm">
-                                        <div className="text-2xl font-bold text-emerald-600">{completedMilestones}</div>
+                                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm">
+                                        <div className="text-xl font-bold text-emerald-600">{completedMilestones}</div>
                                         <div className="text-gray-500">Done</div>
                                     </div>
-                                    <div className="bg-white rounded-lg p-3 text-center shadow-sm col-span-2">
-                                        <div className="text-2xl font-bold text-indigo-600">{progressPercent}%</div>
+                                    <div className="bg-white rounded-lg p-2.5 text-center shadow-sm col-span-2">
+                                        <div className="text-xl font-bold text-indigo-600">{progressPercent}%</div>
                                         <div className="text-gray-500">Progress</div>
                                     </div>
                                 </div>
