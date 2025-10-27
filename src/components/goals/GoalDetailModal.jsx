@@ -172,13 +172,13 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                 </div>
 
                 {/* CONTENT – ALWAYS TWO COLUMNS */}
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden" style={{ minHeight: '500px', maxHeight: 'calc(90vh - 200px)' }}>
                     <div className="h-full flex">
                         {/* LEFT: TAB CONTENT */}
-                        <div className="flex-1 px-6 py-6 overflow-y-auto">
+                        <div className="flex-1 px-6 py-6 overflow-y-auto milestone-scroll">
                             {/* OVERVIEW */}
                             {activeTab === "overview" && (
-                                <div className="space-y-6">
+                                <div className="space-y-6 pb-6">
                                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -287,7 +287,14 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
 
                             {/* MILESTONES */}
                             {activeTab === "milestones" && (
-                                <div className="space-y-4">
+                                <div className="space-y-4 pb-6">
+                                    <div className="mb-4">
+                                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                            <FaFlag className="w-5 h-5 text-blue-600" />
+                                            Milestones ({completedMilestones}/{totalMilestones})
+                                        </h3>
+                                        <p className="text-sm text-gray-500 mt-1">Track your progress step by step</p>
+                                    </div>
                                     {goal.milestones && goal.milestones.length > 0 ? (
                                         goal.milestones.map((m, i) => (
                                             <div
@@ -338,12 +345,14 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
 
                             {/* ACTIVITY */}
                             {activeTab === "activity" && (
-                                <div className="text-center py-16">
-                                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                                        <FaHistory className="w-8 h-8 text-gray-400" />
+                                <div className="h-full flex items-center justify-center pb-6">
+                                    <div className="text-center">
+                                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                                            <FaHistory className="w-8 h-8 text-gray-400" />
+                                        </div>
+                                        <p className="text-gray-600 font-medium">Activity log coming soon</p>
+                                        <p className="text-sm text-gray-500 mt-1">Track edits, completions, and updates</p>
                                     </div>
-                                    <p className="text-gray-600 font-medium">Activity log coming soon</p>
-                                    <p className="text-sm text-gray-500 mt-1">Track edits, completions, and updates</p>
                                 </div>
                             )}
                         </div>
@@ -379,7 +388,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 </div>
                             </div>
 
-                            <div className="px-5 py-4 border-t border-gray-200 flex-1 overflow-y-auto">
+                            <div className="px-5 py-4 border-t border-gray-200 flex-1 overflow-y-auto milestone-scroll">
                                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h4>
                                 <div className="grid grid-cols-2 gap-3 text-xs">
                                     <div className="bg-white rounded-lg p-3 text-center shadow-sm">
