@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
-import CreateTaskModal from "../modals/CreateTaskModal.jsx";
-import CalendarCreateModal from "../modals/CalendarCreateModal.jsx";
-import CreateActivityModal from "../modals/CreateActivityModal.jsx";
-import GoalForm from "../goals/GoalForm.jsx";
-import DontForgetComposer from "../tasks/DontForgetComposer.jsx";
+import React, { useEffect, useState, Suspense } from "react";
+// Lazy-load modal components to reduce initial bundle size
+const CreateTaskModal = React.lazy(() => import("../modals/CreateTaskModal.jsx"));
+const CalendarCreateModal = React.lazy(() => import("../modals/CalendarCreateModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal.jsx"));
+const GoalForm = React.lazy(() => import("../goals/GoalForm.jsx"));
+const DontForgetComposer = React.lazy(() => import("../tasks/DontForgetComposer.jsx"));
 import taskService from "../../services/taskService";
 import { createGoal } from "../../services/goalService";
 import { useToast } from "./ToastProvider.jsx";
@@ -84,55 +85,72 @@ export default function ModalManager() {
 
     return (
         <>
+            {/* Lightweight accessible fallback used while lazy-loaded modals load */}
+            {/**
+             * Accessible loading fallback: role=status with polite live region so
+             * screen readers announce the loading state when a modal is requested.
+             */}
+            {/* Fallback element reused below via inline JSX */}
+            
             {/* Task modal */}
             {modal.type === 'task' && (
-                <CreateTaskModal
-                    isOpen={true}
-                    onClose={close}
-                    onSave={(res) => { addToast({ title: 'Task created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('task-created', { detail: res })); }}
-                    renderInline={false}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
+                    <CreateTaskModal
+                        isOpen={true}
+                        onClose={close}
+                        onSave={(res) => { addToast({ title: 'Task created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('task-created', { detail: res })); }}
+                        renderInline={false}
+                    />
+                </Suspense>
             )}
 
             {/* Activity modal */}
             {modal.type === 'activity' && (
-                <CreateActivityModal
-                    isOpen={true}
-                    onClose={close}
-                    onSave={(res) => { addToast({ title: 'Activity created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('activity-created', { detail: res })); }}
-                    renderInline={false}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
+                    <CreateActivityModal
+                        isOpen={true}
+                        onClose={close}
+                        onSave={(res) => { addToast({ title: 'Activity created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('activity-created', { detail: res })); }}
+                        renderInline={false}
+                    />
+                </Suspense>
             )}
 
             {/* Appointment / Calendar modal */}
             {modal.type === 'appointment' && (
-                <CalendarCreateModal
-                    isOpen={true}
-                    onClose={close}
-                    onSave={handleCalendarSave}
-                    defaultType={'task'}
-                    initialData={{}}
-                    preselectedKeyArea={null}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
+                    <CalendarCreateModal
+                        isOpen={true}
+                        onClose={close}
+                        onSave={handleCalendarSave}
+                        defaultType={'task'}
+                        initialData={{}}
+                        preselectedKeyArea={null}
+                    />
+                </Suspense>
             )}
 
             {/* Goal modal */}
             {modal.type === 'goal' && (
-                <GoalForm
-                    onClose={close}
-                    onGoalCreated={handleGoalCreate}
-                    keyAreas={[]}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
+                    <GoalForm
+                        onClose={close}
+                        onGoalCreated={handleGoalCreate}
+                        keyAreas={[]}
+                    />
+                </Suspense>
             )}
 
             {/* Don't Forget composer */}
             {modal.type === 'dontforget' && (
-                <DontForgetComposer
-                    open={true}
-                    onClose={close}
-                    onAdd={handleDontForgetAdd}
-                    defaultList={1}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
+                    <DontForgetComposer
+                        open={true}
+                        onClose={close}
+                        onAdd={handleDontForgetAdd}
+                        defaultList={1}
+                    />
+                </Suspense>
             )}
         </>
     );
