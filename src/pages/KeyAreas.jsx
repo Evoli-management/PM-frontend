@@ -1146,7 +1146,7 @@ function TaskFullView({
         });
     };
     const toggleCompleted = (id) => {
-        setList(list.map((a) => (a.id === id ? { ...a, completed: a.completed ? 0 : 1 } : a)));
+        setList(list.map((a) => (a.id === id ? { ...a, completed: a.completed ? false : true } : a)));
     };
     const setPriorityValue = (id, value) => {
         // set priority explicitly via icon click; icons stay visible regardless of value
@@ -1479,7 +1479,7 @@ function TaskFullView({
                                             {/* Complete toggle */}
                                             <button
                                                 type="button"
-                                                className="mt-0.5 text-slate-500 hover:text-blue-600"
+                                                className={`mt-0.5 ${a.completed ? 'text-blue-600' : 'text-slate-500'} hover:text-blue-600`}
                                                 title={a.completed ? "Mark incomplete" : "Mark completed"}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -3982,19 +3982,11 @@ export default function KeyAreas() {
                                                                                                     );
                                                                                                 };
 
-                                                                                                const toggleComplete = (
-                                                                                                    id,
-                                                                                                ) => {
+                                                                                                const toggleComplete = (id) => {
                                                                                                     setList(
                                                                                                         list.map((a) =>
                                                                                                             a.id === id
-                                                                                                                ? {
-                                                                                                                      ...a,
-                                                                                                                      completed:
-                                                                                                                          a.completed
-                                                                                                                              ? 0
-                                                                                                                              : 1,
-                                                                                                                  }
+                                                                                                                ? { ...a, completed: a.completed ? false : true }
                                                                                                                 : a,
                                                                                                         ),
                                                                                                     );
@@ -4168,23 +4160,11 @@ export default function KeyAreas() {
                                                                                                                             <div className="flex items-center">
                                                                                                                                 <button
                                                                                                                                     type="button"
-                                                                                                                                    className="mr-2 text-blue-700"
-                                                                                                                                    title={
-                                                                                                                                        a.completed
-                                                                                                                                            ? "Unmark"
-                                                                                                                                            : "Mark completed"
-                                                                                                                                    }
-                                                                                                                                    onClick={() =>
-                                                                                                                                        toggleComplete(
-                                                                                                                                            a.id,
-                                                                                                                                        )
-                                                                                                                                    }
+                                                                                                                                    className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500 hover:text-blue-600'}`}
+                                                                                                                                    title={a.completed ? "Unmark" : "Mark completed"}
+                                                                                                                                    onClick={() => toggleComplete(a.id)}
                                                                                                                                 >
-                                                                                                                                    {a.completed ? (
-                                                                                                                                        <FaCheckCircle />
-                                                                                                                                    ) : (
-                                                                                                                                        <FaRegCircle />
-                                                                                                                                    )}
+                                                                                                                                    {a.completed ? <FaCheckCircle /> : <FaRegCircle />}
                                                                                                                                 </button>
                                                                                                                                 <span
                                                                                                                                     className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]"

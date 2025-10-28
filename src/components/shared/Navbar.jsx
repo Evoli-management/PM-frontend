@@ -32,6 +32,15 @@ export default function Navbar() {
     const location = useLocation();
     const [openWidgets, setOpenWidgets] = useState(false);
     const widgetsRef = useRef(null);
+    const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
+        try {
+            const raw = localStorage.getItem('pm:dashboard:prefs');
+            const stored = raw ? JSON.parse(raw) : {};
+            return stored.widgets || {};
+        } catch (e) {
+            return {};
+        }
+    });
     
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
@@ -102,11 +111,27 @@ export default function Navbar() {
             // write back to localStorage
             localStorage.setItem('pm:dashboard:prefs', JSON.stringify(next));
             // notify dashboard to update its local state
+            // update our local state so the checkbox reflects immediately
+            setWidgetsPrefs(widgets);
             window.dispatchEvent(new CustomEvent('dashboard-prefs-updated', { detail: { widgets } }));
         } catch (err) {
             console.warn('toggleWidget error', err);
         }
     };
+
+    // Keep local widgetsPrefs in sync when other components update dashboard prefs
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const widgets = e?.detail?.widgets;
+                if (widgets) setWidgetsPrefs((p) => ({ ...p, ...widgets }));
+            } catch (err) {
+                console.warn('navbar prefs handler error', err);
+            }
+        };
+        window.addEventListener('dashboard-prefs-updated', handler);
+        return () => window.removeEventListener('dashboard-prefs-updated', handler);
+    }, []);
     
     // Don't render navbar on public pages
     if (isPublicRoute) {
@@ -154,9 +179,7 @@ export default function Navbar() {
                                     <div className="px-2 py-1 text-xs text-slate-500 border-b">Widgets</div>
                                     <div className="p-2 max-h-64 overflow-auto">
                                         {widgetKeys.map((w) => {
-                                            const raw = localStorage.getItem('pm:dashboard:prefs');
-                                            const stored = raw ? JSON.parse(raw) : {};
-                                            const checked = (stored.widgets && typeof stored.widgets[w.key] === 'boolean') ? stored.widgets[w.key] : true;
+                                            const checked = typeof widgetsPrefs[w.key] === 'boolean' ? widgetsPrefs[w.key] : true;
                                             return (
                                                 <label key={w.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50">
                                                     <input type="checkbox" checked={checked} onChange={() => toggleWidget(w.key)} />
