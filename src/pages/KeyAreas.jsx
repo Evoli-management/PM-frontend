@@ -274,6 +274,7 @@ import keyAreaService from "../services/keyAreaService";
 import usersService from "../services/usersService";
 import taskService from "../services/taskService";
 import activityService from "../services/activityService";
+import { useToast } from "../components/shared/ToastProvider.jsx";
 // ...existing code...
 
 // Normalize backend task status to UI status
@@ -1145,8 +1146,24 @@ function TaskFullView({
             return copy;
         });
     };
-    const toggleCompleted = (id) => {
-        setList(list.map((a) => (a.id === id ? { ...a, completed: a.completed ? false : true } : a)));
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
+
+    const toggleCompleted = async (id) => {
+        // optimistic UI update
+        const prev = Array.isArray(list) ? [...list] : [];
+        const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+        setList(next);
+        try {
+            const item = next.find((a) => a.id === id);
+            await activityService.update(id, { completed: !!item.completed });
+            // success toast (subtle)
+            addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
+        } catch (e) {
+            // rollback
+            console.error("Failed to update activity completion", e);
+            setList(prev);
+            addToast && addToast({ title: "Failed to update activity", variant: "error" });
+        }
     };
     const setPriorityValue = (id, value) => {
         // set priority explicitly via icon click; icons stay visible regardless of value
