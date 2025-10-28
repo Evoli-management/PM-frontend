@@ -1145,40 +1145,7 @@ export default function Dashboard() {
                             <FaBars />
                         </button>
                     </div>
-                    {/* Widget toggles dropdown on the right */}
-                    <div className="relative ml-auto w-full sm:w-auto">
-                        <details ref={widgetsDetailsRef} className="relative">
-                            <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText] w-full sm:w-auto text-center sm:text-left">
-                                Widgets
-                            </summary>
-                            <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-[Canvas] border rounded shadow p-0 z-40 max-h-96 overflow-hidden text-[CanvasText]">
-                                <div className="px-3 py-2 border-b flex items-center justify-between">
-                                    <div className="font-medium text-sm">Widgets</div>
-                                    <div className="text-xs opacity-70">Show / hide</div>
-                                </div>
-                                <div className="p-2 max-h-80 overflow-auto">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                                        {Object.keys(prefs.widgets).map((k) => (
-                                            <label
-                                                key={k}
-                                                className="flex items-center justify-between px-2 py-2 rounded cursor-pointer"
-                                            >
-                                                <span className="capitalize text-sm">{k.replace(/([A-Z])/g, " $1")}</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={prefs.widgets[k]}
-                                                    onChange={() => toggleWidget(k)}
-                                                    className="h-4 w-4"
-                                                />
-                                            </label>
-                                        ))}
-                                    </div>
-
-                                    
-                                </div>
-                            </div>
-                        </details>
-                    </div>
+                    {/* Widgets control moved to Navbar (keeps header slim) */}
                 </div>
 
                 {/* Quick Add fixed widget at top (non-draggable) */}
