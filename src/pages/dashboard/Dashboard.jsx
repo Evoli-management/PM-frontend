@@ -337,27 +337,20 @@ export default function Dashboard() {
     // Dark mode disabled; keep theme as light while retaining the button UI
     const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
 
-    // Close Widgets dropdown on outside click / Escape
-    const widgetsDetailsRef = useRef(null);
+    // Dashboard will listen for prefs updates dispatched by Navbar widget control
     useEffect(() => {
-        function handlePointerDown(e) {
-            const el = widgetsDetailsRef.current;
-            if (el && el.open && !el.contains(e.target)) {
-                el.open = false;
+        const handler = (e) => {
+            try {
+                const widgets = e?.detail?.widgets;
+                if (widgets) {
+                    setPrefs((p) => ({ ...p, widgets: { ...p.widgets, ...widgets } }));
+                }
+            } catch (err) {
+                console.warn('dashboard prefs handler error', err);
             }
-        }
-        function handleKey(e) {
-            if (e.key === "Escape") {
-                const el = widgetsDetailsRef.current;
-                if (el && el.open) el.open = false;
-            }
-        }
-        document.addEventListener("pointerdown", handlePointerDown);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("pointerdown", handlePointerDown);
-            document.removeEventListener("keydown", handleKey);
         };
+        window.addEventListener('dashboard-prefs-updated', handler);
+        return () => window.removeEventListener('dashboard-prefs-updated', handler);
     }, []);
 
     // (top summary layout handled below nearer the JSX so it has current prefs)

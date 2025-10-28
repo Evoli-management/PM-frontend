@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { FaUser, FaBolt } from "react-icons/fa";
+import { FaUser, FaBolt, FaTh } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
 
 export default function Navbar() {
@@ -30,6 +30,8 @@ export default function Navbar() {
     }, [open, openQuick]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const location = useLocation();
+    const [openWidgets, setOpenWidgets] = useState(false);
+    const widgetsRef = useRef(null);
     
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
@@ -74,6 +76,37 @@ export default function Navbar() {
             console.warn('openCreateModal handler error', err);
         }
     };
+
+    // Widget keys shown in Navbar control (keeps labels simple)
+    const widgetKeys = [
+        { key: 'quickAdd', label: 'Quick Add' },
+        { key: 'myDay', label: 'My Day' },
+        { key: 'goals', label: 'Goals' },
+        { key: 'enps', label: 'eNPS' },
+        { key: 'strokes', label: 'Strokes' },
+        { key: 'productivity', label: 'Productivity' },
+        { key: 'calendarPreview', label: 'Calendar Preview' },
+        { key: 'activity', label: "What's New" },
+        { key: 'suggestions', label: 'Suggestions' },
+        { key: 'teamOverview', label: 'Team Overview' },
+    ];
+
+    // Toggle a widget on/off and persist to dashboard prefs in localStorage
+    const toggleWidget = (k) => {
+        try {
+            const raw = localStorage.getItem('pm:dashboard:prefs');
+            const stored = raw ? JSON.parse(raw) : {};
+            const widgets = { ...(stored.widgets || {}) };
+            widgets[k] = !widgets[k];
+            const next = { ...(stored || {}), widgets };
+            // write back to localStorage
+            localStorage.setItem('pm:dashboard:prefs', JSON.stringify(next));
+            // notify dashboard to update its local state
+            window.dispatchEvent(new CustomEvent('dashboard-prefs-updated', { detail: { widgets } }));
+        } catch (err) {
+            console.warn('toggleWidget error', err);
+        }
+    };
     
     // Don't render navbar on public pages
     if (isPublicRoute) {
@@ -103,6 +136,39 @@ export default function Navbar() {
                         <span className="sr-only">Practical Manager</span>
                     </Link>
                 <div className="relative flex items-center gap-3">
+                    {/* Widgets control: only show on Dashboard route */}
+                    {location.pathname === '/dashboard' && (
+                        <div className="relative" ref={widgetsRef}>
+                            <button
+                                onClick={() => setOpenWidgets((o) => !o)}
+                                className="text-white/90 hover:text-white px-3 py-1.5 rounded-full"
+                                aria-haspopup="menu"
+                                aria-expanded={openWidgets ? "true" : "false"}
+                                title="Widgets"
+                            >
+                                <FaTh className="w-5 h-5" />
+                            </button>
+
+                            {openWidgets && (
+                                <div className="absolute right-20 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-50 p-2">
+                                    <div className="px-2 py-1 text-xs text-slate-500 border-b">Widgets</div>
+                                    <div className="p-2 max-h-64 overflow-auto">
+                                        {widgetKeys.map((w) => {
+                                            const raw = localStorage.getItem('pm:dashboard:prefs');
+                                            const stored = raw ? JSON.parse(raw) : {};
+                                            const checked = (stored.widgets && typeof stored.widgets[w.key] === 'boolean') ? stored.widgets[w.key] : true;
+                                            return (
+                                                <label key={w.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50">
+                                                    <input type="checkbox" checked={checked} onChange={() => toggleWidget(w.key)} />
+                                                    <span className="text-sm">{w.label}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     {/* Quick Actions icon */}
                     <div className="relative" ref={quickRef}>
                         <button
