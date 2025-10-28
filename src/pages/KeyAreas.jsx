@@ -135,6 +135,7 @@ import {
     FaChevronDown,
     FaChevronUp,
     FaStop,
+    FaSpinner,
     FaBars,
     FaEdit,
     FaLock,
@@ -1008,6 +1009,9 @@ function TaskSlideOver({
                                 >
                                     Add Activity
                                 </button>
+                                {savingActivityIds && savingActivityIds.size > 0 && (
+                                    <div className="inline-block align-middle ml-3 text-xs text-slate-500">Saving...</div>
+                                )}
                             </div>
                             <div>
                                 {taskActivities && taskActivities.length > 0 ? (
@@ -1149,20 +1153,32 @@ function TaskFullView({
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
 
     const toggleCompleted = async (id) => {
-        // optimistic UI update
+        // avoid duplicate saves
+        if (savingActivityIds.has(id)) return;
+
         const prev = Array.isArray(list) ? [...list] : [];
         const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+        // optimistic update
         setList(next);
+
+        // mark as saving
+        setSavingActivityIds((s) => new Set([...s, id]));
         try {
             const item = next.find((a) => a.id === id);
             await activityService.update(id, { completed: !!item.completed });
-            // success toast (subtle)
             addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
         } catch (e) {
-            // rollback
             console.error("Failed to update activity completion", e);
+            // rollback
             setList(prev);
             addToast && addToast({ title: "Failed to update activity", variant: "error" });
+        } finally {
+            // remove saving flag
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
         }
     };
     const setPriorityValue = (id, value) => {
@@ -1496,14 +1512,17 @@ function TaskFullView({
                                             {/* Complete toggle */}
                                             <button
                                                 type="button"
-                                                className={`mt-0.5 ${a.completed ? 'text-blue-600' : 'text-slate-500'} hover:text-blue-600`}
-                                                title={a.completed ? "Mark incomplete" : "Mark completed"}
+                                                disabled={savingActivityIds.has(a.id)}
+                                                className={`mt-0.5 ${a.completed ? 'text-blue-600' : 'text-slate-500'} ${savingActivityIds.has(a.id) ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
+                                                title={savingActivityIds.has(a.id) ? 'Saving...' : (a.completed ? "Mark incomplete" : "Mark completed")}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     toggleCompleted(a.id);
                                                 }}
                                             >
-                                                {a.completed ? (
+                                                {savingActivityIds.has(a.id) ? (
+                                                    <FaSpinner className="w-4 h-4 animate-spin" />
+                                                ) : a.completed ? (
                                                     <FaCheckCircle className="w-4 h-4" />
                                                 ) : (
                                                     <FaRegCircle className="w-4 h-4" />
@@ -1912,6 +1931,9 @@ export default function KeyAreas() {
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
+    // Toasts and saving state for activity updates
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
+    const [savingActivityIds, setSavingActivityIds] = useState(new Set());
 
     // Open global activity composer on request (from various UI spots)
     useEffect(() => {
@@ -3999,14 +4021,27 @@ export default function KeyAreas() {
                                                                                                     );
                                                                                                 };
 
-                                                                                                const toggleComplete = (id) => {
-                                                                                                    setList(
-                                                                                                        list.map((a) =>
-                                                                                                            a.id === id
-                                                                                                                ? { ...a, completed: a.completed ? false : true }
-                                                                                                                : a,
-                                                                                                        ),
-                                                                                                    );
+                                                                                                const toggleComplete = async (id) => {
+                                                                                                    if (savingActivityIds.has(id)) return;
+                                                                                                    const prev = Array.isArray(list) ? [...list] : [];
+                                                                                                    const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+                                                                                                    setList(next);
+                                                                                                    setSavingActivityIds((s) => new Set([...s, id]));
+                                                                                                    try {
+                                                                                                        const item = next.find((a) => a.id === id);
+                                                                                                        await activityService.update(id, { completed: !!item.completed });
+                                                                                                        addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
+                                                                                                    } catch (e) {
+                                                                                                        console.error("Failed to update activity completion", e);
+                                                                                                        setList(prev);
+                                                                                                        addToast && addToast({ title: "Failed to update activity", variant: "error" });
+                                                                                                    } finally {
+                                                                                                        setSavingActivityIds((s) => {
+                                                                                                            const copy = new Set(s);
+                                                                                                            copy.delete(id);
+                                                                                                            return copy;
+                                                                                                        });
+                                                                                                    }
                                                                                                 };
                                                                                                 const remove = async (
                                                                                                     id,
@@ -4175,14 +4210,21 @@ export default function KeyAreas() {
                                                                                                                         >
                                                                                                                             {/* Basic row */}
                                                                                                                             <div className="flex items-center">
-                                                                                                                                <button
-                                                                                                                                    type="button"
-                                                                                                                                    className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500 hover:text-blue-600'}`}
-                                                                                                                                    title={a.completed ? "Unmark" : "Mark completed"}
-                                                                                                                                    onClick={() => toggleComplete(a.id)}
-                                                                                                                                >
-                                                                                                                                    {a.completed ? <FaCheckCircle /> : <FaRegCircle />}
-                                                                                                                                </button>
+                                                                                                                                                                <button
+                                                                                                                                                                    type="button"
+                                                                                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                                                                                    className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500'} ${savingActivityIds.has(a.id) ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
+                                                                                                                                                                    title={savingActivityIds.has(a.id) ? 'Saving...' : (a.completed ? "Unmark" : "Mark completed")}
+                                                                                                                                                                    onClick={() => toggleComplete(a.id)}
+                                                                                                                                                                >
+                                                                                                                                                                    {savingActivityIds.has(a.id) ? (
+                                                                                                                                                                        <FaSpinner className="animate-spin" />
+                                                                                                                                                                    ) : a.completed ? (
+                                                                                                                                                                        <FaCheckCircle />
+                                                                                                                                                                    ) : (
+                                                                                                                                                                        <FaRegCircle />
+                                                                                                                                                                    )}
+                                                                                                                                                                </button>
                                                                                                                                 <span
                                                                                                                                     className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]"
                                                                                                                                     title="Drag handle"
