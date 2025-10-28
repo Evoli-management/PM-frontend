@@ -3,7 +3,7 @@ import React from "react";
 export default function QuickAddBar({ onOpen, message }) {
     const items = ["task", "goal", "stroke", "note", "appointment"];
     return (
-        <div className="bg-[Canvas] rounded-lg shadow-sm p-1 mb-2 flex items-center gap-2 border text-[CanvasText]">
+        <div className="flex items-center gap-2 w-full">
             <div className="flex gap-2">
                 {items.map((t) => (
                     <button

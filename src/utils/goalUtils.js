@@ -218,3 +218,228 @@ export const formatGoalForDisplay = (goal) => {
         progressColor: getProgressColor(standardizedGoal.progressPercent),
     };
 };
+
+/**
+ * Calculate goal progress based on milestones
+ */
+export const calculateGoalProgress = (goal) => {
+    if (!goal) return 0;
+
+    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+    const totalMilestones = goal.milestones?.length || 0;
+
+    if (totalMilestones > 0) {
+        return Math.round((completedMilestones / totalMilestones) * 100);
+    }
+
+    return goal.progressPercent || 0;
+};
+
+/**
+ * Calculate time-based information for a goal
+ */
+export const calculateTimeInfo = (goal) => {
+    const now = new Date();
+    const dueDate = new Date(goal.dueDate);
+    const startDate = goal.startDate ? new Date(goal.startDate) : null;
+
+    const dueInDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+    const isOverdue = dueDate < now;
+    const totalDuration = startDate ? Math.ceil((dueDate - startDate) / (1000 * 60 * 60 * 24)) : null;
+    const daysPassed = startDate ? Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24))) : null;
+    const timeProgressPercent =
+        totalDuration && daysPassed !== null ? Math.min(100, Math.round((daysPassed / totalDuration) * 100)) : null;
+
+    return {
+        dueInDays,
+        isOverdue,
+        totalDuration,
+        daysPassed,
+        timeProgressPercent,
+        daysOverdue: isOverdue ? Math.abs(dueInDays) : 0,
+    };
+};
+
+/**
+ * Get status display information for a goal
+ */
+export const getGoalStatusDisplay = (goal) => {
+    const timeInfo = calculateTimeInfo(goal);
+
+    if (goal.status === "completed") {
+        const completedDate = goal.completedAt ? new Date(goal.completedAt) : new Date(goal.dueDate);
+        const dueDate = new Date(goal.dueDate);
+
+        if (completedDate < dueDate) {
+            const daysEarly = Math.ceil((dueDate - completedDate) / (1000 * 60 * 60 * 24));
+            return {
+                text: `Completed ${daysEarly} day${daysEarly === 1 ? "" : "s"} early`,
+                color: "text-green-600",
+                status: "early",
+            };
+        } else if (completedDate > dueDate) {
+            const daysLate = Math.ceil((completedDate - dueDate) / (1000 * 60 * 60 * 24));
+            return {
+                text: `Completed ${daysLate} day${daysLate === 1 ? "" : "s"} late`,
+                color: "text-orange-600",
+                status: "late",
+            };
+        }
+        return {
+            text: "Completed on time",
+            color: "text-green-600",
+            status: "ontime",
+        };
+    }
+
+    if (goal.status === "archived") {
+        return {
+            text: "Archived",
+            color: "text-gray-600",
+            status: "archived",
+        };
+    }
+
+    // Active goals
+    if (timeInfo.isOverdue) {
+        return {
+            text: `${timeInfo.daysOverdue} day${timeInfo.daysOverdue === 1 ? "" : "s"} overdue`,
+            color: "text-red-600",
+            status: "overdue",
+        };
+    } else if (timeInfo.dueInDays === 0) {
+        return {
+            text: "Due today",
+            color: "text-red-600",
+            status: "today",
+        };
+    } else if (timeInfo.dueInDays === 1) {
+        return {
+            text: "Due tomorrow",
+            color: "text-amber-600",
+            status: "tomorrow",
+        };
+    } else if (timeInfo.dueInDays <= 7) {
+        return {
+            text: `${timeInfo.dueInDays} days left`,
+            color: "text-amber-600",
+            status: "urgent",
+        };
+    } else {
+        return {
+            text: `${timeInfo.dueInDays} days left`,
+            color: "text-gray-600",
+            status: "normal",
+        };
+    }
+};
+
+/**
+ * Calculate comprehensive goal statistics
+ */
+export const calculateGoalStats = (goals) => {
+    if (!goals || goals.length === 0) {
+        return {
+            total: 0,
+            active: 0,
+            completed: 0,
+            archived: 0,
+            overdue: 0,
+            completedOnTime: 0,
+            completedLate: 0,
+            completedEarly: 0,
+            avgProgress: 0,
+            avgTimeProgress: 0,
+        };
+    }
+
+    const stats = {
+        total: goals.length,
+        active: 0,
+        completed: 0,
+        archived: 0,
+        overdue: 0,
+        completedOnTime: 0,
+        completedLate: 0,
+        completedEarly: 0,
+        totalProgress: 0,
+        totalTimeProgress: 0,
+        timeProgressCount: 0,
+    };
+
+    goals.forEach((goal) => {
+        // Status counts
+        if (goal.status === "active") stats.active++;
+        else if (goal.status === "completed") stats.completed++;
+        else if (goal.status === "archived") stats.archived++;
+
+        // Progress calculation
+        const progress = calculateGoalProgress(goal);
+        stats.totalProgress += progress;
+
+        // Time progress calculation
+        const timeInfo = calculateTimeInfo(goal);
+        if (timeInfo.timeProgressPercent !== null) {
+            stats.totalTimeProgress += timeInfo.timeProgressPercent;
+            stats.timeProgressCount++;
+        }
+
+        // Overdue check for active goals
+        if (goal.status === "active" && timeInfo.isOverdue) {
+            stats.overdue++;
+        }
+
+        // Completion timing for completed goals
+        if (goal.status === "completed") {
+            const statusDisplay = getGoalStatusDisplay(goal);
+            if (statusDisplay.status === "early") stats.completedEarly++;
+            else if (statusDisplay.status === "late") stats.completedLate++;
+            else if (statusDisplay.status === "ontime") stats.completedOnTime++;
+        }
+    });
+
+    // Calculate averages
+    stats.avgProgress = Math.round(stats.totalProgress / goals.length);
+    stats.avgTimeProgress =
+        stats.timeProgressCount > 0 ? Math.round(stats.totalTimeProgress / stats.timeProgressCount) : 0;
+
+    // Clean up intermediate values
+    delete stats.totalProgress;
+    delete stats.totalTimeProgress;
+    delete stats.timeProgressCount;
+
+    return stats;
+};
+
+/**
+ * Get progress bar color based on progress and status
+ */
+export const getProgressBarColor = (goal, progressPercent) => {
+    if (goal.status === "completed") return "bg-green-500";
+    if (goal.status === "archived") return "bg-gray-400";
+
+    if (progressPercent >= 80) return "bg-emerald-500";
+    if (progressPercent >= 60) return "bg-blue-500";
+    if (progressPercent >= 40) return "bg-amber-500";
+    return "bg-gray-400";
+};
+
+/**
+ * Format date for display
+ */
+export const formatGoalDate = (dateString) => {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    if (diffDays === -1) return "Yesterday";
+    if (diffDays > 0 && diffDays <= 7) return `In ${diffDays} days`;
+    if (diffDays < 0 && diffDays >= -7) return `${Math.abs(diffDays)} days ago`;
+
+    return date.toLocaleDateString();
+};

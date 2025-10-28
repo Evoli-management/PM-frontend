@@ -5,19 +5,14 @@ import {
     FaCalendarAlt,
     FaLock,
     FaChevronDown,
-    FaCog,
-    FaSignOutAlt,
-    FaPlus,
     FaSearch,
-    FaClock,
-    FaChartBar,
+    FaGripVertical,
 } from "react-icons/fa";
+import { isFeatureEnabled } from "../../utils/flags.js";
 
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
-    // Tasks & Activities removed per request
     { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
-    // Quick access for tasks not tied to Key Areas ("Activity Trap")
     {
         label: "Don't Forget",
         icon: (
@@ -35,7 +30,6 @@ const navItems = [
         icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
         to: "/goals",
         section: "Main",
-        badge: 2,
     },
     {
         label: "Key Areas",
@@ -54,28 +48,11 @@ const navItems = [
             },
         ],
     },
-    { label: "Time Tracking", icon: <FaClock />, to: "/time-tracking", section: "Main" },
     {
         label: "Team",
         icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
         to: "/teams",
         section: "Main",
-    },
-    { label: "Analytics", icon: <FaChartBar />, to: "/analytics", section: "Main" },
-    { label: "Settings", icon: <FaCog />, to: "/settings", section: "Main" },
-];
-
-const quickActions = [
-    { label: "New Task", icon: <FaPlus />, to: "/tasks" },
-    {
-        label: "Set Goal",
-        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
-        to: "/goals",
-    },
-    {
-        label: "Invite Team",
-        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
-        to: "/teams",
     },
 ];
 
@@ -88,44 +65,93 @@ export default function Sidebar({
 }) {
     const location = useLocation();
     const [keyAreasList, setKeyAreasList] = useState([]);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [internalCollapsed, setInternalCollapsed] = useState(false);
     const [search, setSearch] = useState("");
-    const [keyAreasOpen, setKeyAreasOpen] = useState(false); // State for Key Areas dropdown
+    const [keyAreasOpen, setKeyAreasOpen] = useState(false);
+    const [draggedItem, setDraggedItem] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
-    // derive avatar or initials for profile display
-    const avatarSrc = (user && user.avatar) || null;
-    const initials = (user && user.name)
-        ? user.name
-              .split(" ")
-              .map((p) => p[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase()
-        : "U";
-
-    // no navigation for Key Areas toggle; we only open/close
-
     const navigate = useNavigate();
+    const calendarEnabled = isFeatureEnabled("calendar");
 
-    // Key Areas list comes from page events; no local cache
+    // Drag and drop handlers
+    const handleDragStart = (e, ka, index) => {
+        setDraggedItem({ ka, index });
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", e.target);
+        e.target.style.opacity = "0.5";
+    };
+
+    const handleDragEnd = (e) => {
+        e.target.style.opacity = "1";
+        setDraggedItem(null);
+        setDragOverIndex(null);
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDragOverIndex(index);
+    };
+
+    const handleDragLeave = (e) => {
+        // Only clear dragOverIndex if we're leaving the entire droppable area
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDragOverIndex(null);
+        }
+    };
+
+    const handleDrop = (e, targetIndex) => {
+        e.preventDefault();
+        setDragOverIndex(null);
+        
+        if (!draggedItem || draggedItem.index === targetIndex) {
+            return;
+        }
+
+        const newKeyAreasList = [...displayKeyAreas];
+        const draggedKa = newKeyAreasList[draggedItem.index];
+        
+        // Remove the dragged item
+        newKeyAreasList.splice(draggedItem.index, 1);
+        
+        // Insert at new position
+        newKeyAreasList.splice(targetIndex, 0, draggedKa);
+        
+        // Update the positions for all key areas
+        const updatedKeyAreas = newKeyAreasList.map((ka, index) => ({
+            ...ka,
+            position: index
+        }));
+        
+        // Update local state immediately for UI responsiveness
+        setKeyAreasList(updatedKeyAreas);
+        
+        // Emit custom event to notify the KeyAreas page about the reorder
+        try {
+            window.dispatchEvent(new CustomEvent("sidebar-keyareas-reorder", { 
+                detail: { keyAreas: updatedKeyAreas } 
+            }));
+        } catch (err) {
+            console.warn("Failed to emit keyareas reorder event:", err);
+        }
+        
+        setDraggedItem(null);
+    };
 
     const handleKeyAreasClick = (e, item) => {
         e.preventDefault();
-        // navigate to Key Areas main view and toggle submenu
         const nextOpen = !keyAreasOpen;
         let openedFirstId = null;
         try {
             if (nextOpen) {
-                // if we already have the list, go straight to the first KA
                 if (keyAreasList && keyAreasList.length > 0) {
                     const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
                     openedFirstId = first?.id;
                     navigate({ pathname: item.to, search: `?ka=${first.id}&openKA=1` });
                 } else {
-                    // otherwise, open view and wait for the list, then select first
                     openFirstKARef.current = true;
                     navigate({ pathname: item.to, search: "?openKA=1" });
                 }
@@ -133,7 +159,6 @@ export default function Sidebar({
                 navigate({ pathname: item.to, search: "?view=all" });
             }
         } catch (err) {
-            // fallback
             if (nextOpen) {
                 if (keyAreasList && keyAreasList.length > 0) {
                     const first = [...keyAreasList].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
@@ -153,7 +178,6 @@ export default function Sidebar({
                 if (openedFirstId != null) {
                     window.dispatchEvent(new CustomEvent("sidebar-open-ka", { detail: { id: openedFirstId } }));
                 }
-                // do not emit sidebar-keyareas-click here to avoid overriding selection
             } else {
                 window.dispatchEvent(new CustomEvent("sidebar-keyareas-click"));
             }
@@ -166,8 +190,13 @@ export default function Sidebar({
             const ka = e?.detail?.keyAreas || [];
             setKeyAreasList(Array.isArray(ka) ? ka : []);
             if (openFirstKARef.current && Array.isArray(ka) && ka.length > 0) {
-                // select first KA after list arrives
-                const first = [...ka].sort((a, b) => (a.position || 0) - (b.position || 0))[0];
+                const first = [...ka].sort((a, b) => {
+                    const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
+                    const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
+                    if (aIsIdeas && !bIsIdeas) return 1;
+                    if (!aIsIdeas && bIsIdeas) return -1;
+                    return String(a.title || "").localeCompare(String(b.title || ""));
+                })[0];
                 try {
                     navigate({ pathname: "/key-areas", search: `?ka=${first.id}&openKA=1` });
                 } catch {
@@ -183,6 +212,54 @@ export default function Sidebar({
         return () => window.removeEventListener("sidebar-keyareas-data", handler);
     }, []);
 
+    // Derive display list: Use position if available, otherwise alphabetical A→Z, Ideas last, dedupe any duplicate Ideas
+    const displayKeyAreas = React.useMemo(() => {
+        let arr = Array.isArray(keyAreasList) ? keyAreasList.slice() : [];
+        const seen = new Set();
+        arr = arr.filter((x) => {
+            const id = String(x.id || "");
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+        const ideas = arr.filter(
+            (i) =>
+                String(i.title || "")
+                    .trim()
+                    .toLowerCase() === "ideas" || i.is_default,
+        );
+        if (ideas.length > 1) {
+            const keep = ideas.find((i) => i.is_default) || ideas[0];
+            const keepId = keep.id;
+            arr = arr.filter((i) => {
+                const isIdeas =
+                    String(i.title || "")
+                        .trim()
+                        .toLowerCase() === "ideas" || i.is_default;
+                return !isIdeas || i.id === keepId;
+            });
+        }
+        
+        // Sort by position if available, otherwise by name (Ideas last)
+        return arr.sort((a, b) => {
+            // If both have positions, sort by position
+            if (typeof a.position === 'number' && typeof b.position === 'number') {
+                return a.position - b.position;
+            }
+            
+            // If only one has position, prioritize it
+            if (typeof a.position === 'number') return -1;
+            if (typeof b.position === 'number') return 1;
+            
+            // Fallback to original alphabetical sorting with Ideas last
+            const aIsIdeas = (a.title || "").trim().toLowerCase() === "ideas" || !!a.is_default;
+            const bIsIdeas = (b.title || "").trim().toLowerCase() === "ideas" || !!b.is_default;
+            if (aIsIdeas && !bIsIdeas) return 1;
+            if (!aIsIdeas && bIsIdeas) return -1;
+            return String(a.title || "").localeCompare(String(b.title || ""));
+        });
+    }, [keyAreasList]);
+
     // when landing on /key-areas with openKA=1, auto-open the dropdown on first render
     React.useEffect(() => {
         if (location.pathname.startsWith("/key-areas")) {
@@ -191,10 +268,9 @@ export default function Sidebar({
                 setKeyAreasOpen(true);
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname, location.search]);
 
-    // mobile overlay classes: off-canvas when closed, fixed overlay when open on small screens
+    // mobile overlay classes
     const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full";
 
     return (
@@ -207,7 +283,6 @@ export default function Sidebar({
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
                     {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
 
-                    {/* mobile close button */}
                     <div className="ml-auto flex items-center gap-2">
                         {mobileOpen && (
                             <button
@@ -252,6 +327,7 @@ export default function Sidebar({
                         </button>
                     </div>
                 </div>
+                
                 {!collapsed && (
                     <div className="mb-4 px-2">
                         <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow">
@@ -266,17 +342,16 @@ export default function Sidebar({
                         </div>
                     </div>
                 )}
-                {/* Profile Settings style: wrap nav in a subtle gray container (labels hidden when collapsed) */}
+                
                 <div className={`px-2`}>
                     <div className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
                         <nav aria-label="Sidebar navigation">
                             {navItems
                                 .filter((item) => item.label.toLowerCase().includes(search.toLowerCase()))
+                                .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
                                 .map((item) => {
-                                    const isKeyAreas =
-                                        item.label === "Key Areas" || (item.to && item.to === "/key-areas");
+                                    const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
 
-                                    // Key Areas: render as a toggle with submenu (All Key Areas, Ideas, Bright Idea)
                                     if (isKeyAreas) {
                                         return (
                                             <div key={item.label} className="mb-2">
@@ -301,55 +376,91 @@ export default function Sidebar({
 
                                                 {!collapsed && keyAreasOpen && (
                                                     <div className="ml-6 mt-2 space-y-1">
-                                                        {/* dynamically render key areas received from KeyAreas page */}
-                                                        {keyAreasList &&
-                                                            keyAreasList.length > 0 &&
-                                                            keyAreasList.map((ka) => {
+                                                        {displayKeyAreas &&
+                                                            displayKeyAreas.length > 0 &&
+                                                            displayKeyAreas.map((ka, index) => {
                                                                 const isActive =
                                                                     location.pathname.startsWith("/key-areas") &&
                                                                     new URLSearchParams(location.search).get("ka") ===
                                                                         String(ka.id);
-                                                                const itemClasses = isActive
-                                                                    ? "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-blue-700 font-semibold bg-white shadow-inner text-left w-full"
-                                                                    : "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-gray-800 hover:bg-white text-left w-full";
+                                                                const baseClasses = "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-left w-full";
+                                                                const activeClasses = "text-blue-700 font-semibold bg-white shadow-inner";
+                                                                const inactiveClasses = "text-gray-800 hover:bg-white";
+                                                                const dragOverClasses = dragOverIndex === index ? "bg-blue-100 border-2 border-blue-300 border-dashed" : "";
+                                                                
+                                                                const itemClasses = `${baseClasses} ${isActive ? activeClasses : inactiveClasses} ${dragOverClasses}`;
                                                                 const isLocked = !!ka.is_default;
                                                                 const isIdeas = /idea/i.test(ka.title || "");
+                                                                const isDraggable = !isLocked; // Only allow dragging non-default items
+                                                                
                                                                 return (
-                                                                    <Link
+                                                                    <div
                                                                         key={ka.id}
-                                                                        to={{
-                                                                            pathname: "/key-areas",
-                                                                            search: `?ka=${ka.id}`,
+                                                                        draggable={isDraggable}
+                                                                        onDragStart={isDraggable ? (e) => handleDragStart(e, ka, index) : undefined}
+                                                                        onDragEnd={isDraggable ? handleDragEnd : undefined}
+                                                                        onDragOver={(e) => handleDragOver(e, index)}
+                                                                        onDragLeave={handleDragLeave}
+                                                                        onDrop={(e) => handleDrop(e, index)}
+                                                                        className={`relative sidebar-key-area-item ${
+                                                                            isDraggable ? 'sidebar-draggable cursor-move' : ''
+                                                                        } ${
+                                                                            draggedItem?.ka.id === ka.id ? 'sidebar-dragging' : ''
+                                                                        } ${
+                                                                            dragOverIndex === index ? 'sidebar-drag-over' : ''
+                                                                        }`}
+                                                                        style={{
+                                                                            opacity: draggedItem?.ka.id === ka.id ? 0.7 : 1
                                                                         }}
-                                                                        onClick={(e) => {
-                                                                            // keep dropdown open; just dispatch event
-                                                                            try {
-                                                                                window.dispatchEvent(
-                                                                                    new CustomEvent("sidebar-open-ka", {
-                                                                                        detail: { id: ka.id },
-                                                                                    }),
-                                                                                );
-                                                                            } catch (err) {}
-                                                                        }}
-                                                                        className={itemClasses}
                                                                     >
-                                                                        <span className="text-sm flex items-center gap-2">
-                                                                            {ka.title}
-                                                                            {isLocked && (
-                                                                                <span className="ml-2 inline-flex items-center">
-                                                                                    {isIdeas ? (
-                                                                                        <img
-                                                                                            src={`${import.meta.env.BASE_URL}ideas.png`}
-                                                                                            alt="Ideas"
-                                                                                            className="w-4 h-4 object-contain"
-                                                                                        />
-                                                                                    ) : (
-                                                                                        <FaLock className="text-slate-500 text-xs" />
-                                                                                    )}
-                                                                                </span>
+                                                                        <Link
+                                                                            to={{
+                                                                                pathname: "/key-areas",
+                                                                                search: `?ka=${ka.id}`,
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                // Prevent navigation if we're dragging
+                                                                                if (draggedItem) {
+                                                                                    e.preventDefault();
+                                                                                    return;
+                                                                                }
+                                                                                try {
+                                                                                    window.dispatchEvent(
+                                                                                        new CustomEvent("sidebar-open-ka", {
+                                                                                            detail: { id: ka.id },
+                                                                                        }),
+                                                                                    );
+                                                                                } catch (err) {}
+                                                                            }}
+                                                                            className={`${itemClasses} group`}
+                                                                        >
+                                                                            {isDraggable && (
+                                                                                <FaGripVertical 
+                                                                                    className="text-gray-300 hover:text-gray-600 text-xs mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                                                                                    title="Drag to reorder"
+                                                                                />
                                                                             )}
-                                                                        </span>
-                                                                    </Link>
+                                                                            <span 
+                                                                                className="text-sm flex items-center gap-2 flex-1"
+                                                                                style={{ color: ka.color || '#374151' }}
+                                                                            >
+                                                                                {ka.title}
+                                                                                {isLocked && (
+                                                                                    <span className="ml-2 inline-flex items-center">
+                                                                                        {isIdeas ? (
+                                                                                            <img
+                                                                                                src={`${import.meta.env.BASE_URL}ideas.png`}
+                                                                                                alt="Ideas"
+                                                                                                className="w-4 h-4 object-contain"
+                                                                                            />
+                                                                                        ) : (
+                                                                                            <FaLock className="text-slate-500 text-xs" />
+                                                                                        )}
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                        </Link>
+                                                                    </div>
                                                                 );
                                                             })}
                                                     </div>
@@ -358,7 +469,6 @@ export default function Sidebar({
                                         );
                                     }
 
-                                    // All other nav items: render as simple links
                                     return (
                                         <div key={item.label} className="mb-2">
                                             <Link
@@ -378,56 +488,11 @@ export default function Sidebar({
                                         </div>
                                     );
                                 })}
-                            {/* Ideas quick link removed per request */}
                         </nav>
                     </div>
                 </div>
-                {!collapsed && (
-                    <div className="mt-6 px-2">
-                        <div className="uppercase text-xs text-blue-700 font-bold mb-2">Quick Actions</div>
-                        {quickActions.map((action) => (
-                            <Link
-                                key={action.label}
-                                to={action.to}
-                                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 mb-2 shadow text-blue-700 font-bold hover:bg-blue-50 transition"
-                            >
-                                {action.icon} <span>{action.label}</span>
-                            </Link>
-                        ))}
-                    </div>
-                )}
-            </div>
-            <div className="mt-2 border-t border-blue-200" />
-            <div className="mt-4 px-2 relative flex-shrink-0">
-                <div className="flex items-center gap-3 px-2 py-3 bg-white rounded-lg border border-blue-200">
-                    <Link to="/profile" className="flex items-center gap-3 w-full text-left">
-                        <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-lg font-bold text-white">
-                            {avatarSrc ? (
-                                <img src={avatarSrc} alt={user?.name || "User"} className="w-full h-full object-cover" />
-                            ) : (
-                                <span>{initials}</span>
-                            )}
-                        </div>
-                        {!collapsed && <div className="text-sm font-medium text-blue-900">{user?.name || "User"}</div>}
-                    </Link>
-                </div>
-
-                <div className="mt-2">
-                    <button
-                        className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-white text-blue-900 hover:bg-blue-50 border border-blue-200 transition"
-                        onClick={() => {
-                            // TODO: integrate real logout; for now navigate to login
-                            try {
-                                window.location.hash = "#/login";
-                            } catch (e) {
-                                window.location.href = "/login";
-                            }
-                        }}
-                        aria-label="Logout"
-                    >
-                        <FaSignOutAlt /> <span className="font-semibold">Logout</span>
-                    </button>
-                </div>
+                
+                {/* Quick Actions removed per request */}
             </div>
         </aside>
     );
