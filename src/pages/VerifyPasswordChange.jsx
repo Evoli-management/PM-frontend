@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import authService from "../services/authService";
 
 export default function VerifyPasswordChange() {
     const { search } = useLocation();
@@ -15,16 +14,17 @@ export default function VerifyPasswordChange() {
             return;
         }
         
-        authService
-            .confirmPasswordChange(token)
-            .then(() => {
+        (async () => {
+            try {
+                const { default: auth } = await import("../services/authService");
+                await auth.confirmPasswordChange(token);
                 setStatus("Password changed successfully! Redirecting to login…");
                 setTimeout(() => navigate("/login"), 2000);
-            })
-            .catch((e) => {
+            } catch (e) {
                 const msg = e?.response?.data?.message || "Password change verification failed";
                 setStatus(typeof msg === "string" ? msg : "Password change verification failed");
-            });
+            }
+        })();
     }, [search, navigate]);
 
     return (

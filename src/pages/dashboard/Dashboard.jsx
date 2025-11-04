@@ -13,8 +13,15 @@ import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
 import WeeklyTrendBars from "../../components/dashboard/widgets/WeeklyTrendBars.jsx";
 
 // Real API Services
-import { getGoals } from "../../services/goalService";
-import activityService from "../../services/activityService";
+// goalService will be dynamically imported where needed to allow code-splitting
+// Load activityService on demand to keep it out of the main chunk
+let _activityService = null;
+const getActivityService = async () => {
+    if (_activityService) return _activityService;
+    const mod = await import("../../services/activityService");
+    _activityService = mod?.default || mod;
+    return _activityService;
+};
 import calendarService from "../../services/calendarService";
 
 // Fallback data for when API is unavailable
@@ -376,7 +383,8 @@ export default function Dashboard() {
             // Load Goals
             try {
                 console.log("Loading goals...");
-                const goalsData = await getGoals();
+                const mod = await import("../../services/goalService");
+                const goalsData = await mod.getGoals();
                 console.log("Goals loaded:", goalsData);
                 
                 // Transform goals data for dashboard display
@@ -403,7 +411,8 @@ export default function Dashboard() {
             // Load Activity Feed
             try {
                 console.log("Loading activities...");
-                const activitiesData = await activityService.list();
+                const activitySvc = await getActivityService();
+                const activitiesData = await activitySvc.list();
                 console.log("Activities loaded:", activitiesData);
                 
                 // Transform activity data for dashboard display
@@ -573,28 +582,22 @@ export default function Dashboard() {
                     
                 case 'task':
                     // Create activity entry for now (until task service is integrated)
-                    await activityService.create({
-                        text: `New task: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
+                    const activitySvc = await getActivityService();
+                    await activitySvc.create({ text: `New task: ${inputValue.trim()}`, taskId: null });
                     setMessage(`✅ Task "${inputValue}" added to activity feed!`);
                     break;
 
                 case 'activity':
                     // Create a free-form activity (same as note)
-                    await activityService.create({
-                        text: `${inputValue.trim()}`,
-                        taskId: null,
-                    });
+                    const activitySvc2 = await getActivityService();
+                    await activitySvc2.create({ text: `${inputValue.trim()}`, taskId: null });
                     setMessage(`✅ Activity "${inputValue}" added to activity feed!`);
                     break;
 
                 case 'stroke':
                     // Use activity endpoint to record a recognition/stroke
-                    await activityService.create({
-                        text: `Stroke: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
+                    const activitySvc3 = await getActivityService();
+                    await activitySvc3.create({ text: `Stroke: ${inputValue.trim()}`, taskId: null });
                     setMessage(`✅ Stroke for "${inputValue}" sent!`);
                     break;
                     
@@ -615,10 +618,8 @@ export default function Dashboard() {
                     
                 case 'note':
                     // Create as activity for now
-                    await activityService.create({
-                        text: `Note: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
+                    const activitySvc4 = await getActivityService();
+                    await activitySvc4.create({ text: `Note: ${inputValue.trim()}`, taskId: null });
                     setMessage(`✅ Note "${inputValue}" saved!`);
                     break;
                     

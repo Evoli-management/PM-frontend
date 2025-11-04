@@ -5,8 +5,14 @@ const CalendarCreateModal = React.lazy(() => import("../modals/CalendarCreateMod
 const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal.jsx"));
 const GoalForm = React.lazy(() => import("../goals/GoalForm.jsx"));
 const DontForgetComposer = React.lazy(() => import("../tasks/DontForgetComposer.jsx"));
-import taskService from "../../services/taskService";
-import { createGoal } from "../../services/goalService";
+// Load taskService on demand to allow code-splitting
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
 import { useToast } from "./ToastProvider.jsx";
 
 export default function ModalManager() {
@@ -27,6 +33,9 @@ export default function ModalManager() {
     // onSave handlers
     const handleGoalCreate = async (goalData) => {
         try {
+            // Dynamically import goalService so it can be code-split from
+            // the main bundle when GoalForm is only used on demand.
+            const { createGoal } = await import("../../services/goalService");
             const res = await createGoal(goalData);
             addToast({ title: 'Goal created', variant: 'success' });
             close();
@@ -70,7 +79,8 @@ export default function ModalManager() {
             };
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
 
-            const created = await taskService.create(body);
+            const svc = await getTaskService();
+            const created = await svc.create(body);
             addToast({ title: 'Task added to Don\'t Forget', variant: 'success' });
             close();
             // Broadcast so tasks page can refresh if open

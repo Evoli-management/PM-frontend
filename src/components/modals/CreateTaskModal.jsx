@@ -1,9 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import Modal from "../shared/Modal";
 import { useToast } from "../shared/ToastProvider.jsx";
-import keyAreaService from "../../services/keyAreaService";
-import taskService from "../../services/taskService";
-import { getGoals } from "../../services/goalService";
+// Load services on demand to allow them to be code-split from the main bundle
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
+
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
 
 export default function CreateTaskModal({ 
     isOpen, 
@@ -63,10 +76,14 @@ export default function CreateTaskModal({
         (async () => {
             try {
                 console.log('Fetching goals and other data...');
+                const kaSvc = await getKeyAreaService();
+                const ts = await getTaskService();
                 const [areas, goalsData, allTasksData] = await Promise.all([
-                    keyAreaService.list({ includeTaskCount: false }),
-                    getGoals(),
-                    taskService.list({})
+                    kaSvc.list({ includeTaskCount: false }),
+                    // Dynamically import goalService so it can be split from the
+                    // initial bundle when the modal is not used at startup.
+                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
+                    ts.list({}),
                 ]);
                 console.log('Goals fetched:', goalsData);
                 setKeyAreas(Array.isArray(areas) ? areas : []);
@@ -186,13 +203,15 @@ export default function CreateTaskModal({
 
             let result;
             if (isEditMode) {
-                result = await taskService.update(taskId, taskData);
+                const svc = await getTaskService();
+                result = await svc.update(taskId, taskData);
                 addToast({ 
                     title: "Task updated successfully", 
                     variant: "success" 
                 });
             } else {
-                result = await taskService.create(taskData);
+                const svc = await getTaskService();
+                result = await svc.create(taskData);
                 addToast({ 
                     title: "Task created successfully", 
                     variant: "success" 

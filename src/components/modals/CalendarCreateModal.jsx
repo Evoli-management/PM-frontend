@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import CreateTaskModal from "./CreateTaskModal.jsx";
-import CreateActivityModal from "./CreateActivityModal.jsx";
+import React, { useState, Suspense } from "react";
+const CreateTaskModal = React.lazy(() => import("./CreateTaskModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("./CreateActivityModal.jsx"));
 
 export default function CalendarCreateModal({ 
     isOpen, 
@@ -67,24 +67,28 @@ export default function CalendarCreateModal({
                 {/* Content Area */}
                 <div className="relative">
                     {activeType === "task" ? (
-                        <CreateTaskModal
-                            isOpen={true}
-                            onClose={onClose}
-                            onSave={handleSave}
-                            initialData={initialData}
-                            preselectedKeyArea={preselectedKeyArea}
-                            renderInline={true}
-                        />
+                        <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}> 
+                            <CreateTaskModal
+                                isOpen={true}
+                                onClose={onClose}
+                                onSave={handleSave}
+                                initialData={initialData}
+                                preselectedKeyArea={preselectedKeyArea}
+                                renderInline={true}
+                            />
+                        </Suspense>
                     ) : (
-                        <CreateActivityModal
-                            isOpen={true}
-                            onClose={onClose}
-                            onSave={handleSave}
-                            initialData={initialData}
-                            preselectedKeyArea={preselectedKeyArea}
-                            preselectedTask={preselectedTask}
-                            renderInline={true}
-                        />
+                        <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                            <CreateActivityModal
+                                isOpen={true}
+                                onClose={onClose}
+                                onSave={handleSave}
+                                initialData={initialData}
+                                preselectedKeyArea={preselectedKeyArea}
+                                preselectedTask={preselectedTask}
+                                renderInline={true}
+                            />
+                        </Suspense>
                     )}
                 </div>
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import CreateTaskModal from "../modals/CreateTaskModal.jsx";
-import CreateActivityModal from "../modals/CreateActivityModal.jsx";
+import React, { useState, useEffect, Suspense } from "react";
+const CreateTaskModal = React.lazy(() => import("../modals/CreateTaskModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal.jsx"));
 
 const CalendarView = () => {
     const [view, setView] = useState("monthly");
@@ -128,18 +128,22 @@ const CalendarView = () => {
 
             {/* Modals for Add Task and Add Activity */}
             {showCreateModal && defaultType === "task" && (
-                <CreateTaskModal
-                    isOpen={showCreateModal}
-                    onClose={() => setShowCreateModal(false)}
-                    initialData={{}}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                    <CreateTaskModal
+                        isOpen={showCreateModal}
+                        onClose={() => setShowCreateModal(false)}
+                        initialData={{}}
+                    />
+                </Suspense>
             )}
             {showCreateModal && defaultType === "activity" && (
-                <CreateActivityModal
-                    isOpen={showCreateModal}
-                    onClose={() => setShowCreateModal(false)}
-                    initialData={{ attachedTaskId: modalItem?.attachedTaskId || "" }}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                    <CreateActivityModal
+                        isOpen={showCreateModal}
+                        onClose={() => setShowCreateModal(false)}
+                        initialData={{ attachedTaskId: modalItem?.attachedTaskId || "" }}
+                    />
+                </Suspense>
             )}
         </div>
     );

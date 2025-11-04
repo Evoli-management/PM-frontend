@@ -10,6 +10,7 @@ export default function Navbar() {
     const [userProfile, setUserProfile] = useState(null);
     const menuRef = useRef(null);
     const quickRef = useRef(null);
+    const quickButtonRef = useRef(null);
 
     // Close the profile/settings popover when clicking outside
     useEffect(() => {
@@ -85,6 +86,31 @@ export default function Navbar() {
             console.warn('openCreateModal handler error', err);
         }
     };
+
+    // When the quick actions menu opens, move focus into the first actionable item
+    useEffect(() => {
+        if (!openQuick) return;
+        const node = quickRef.current;
+        if (!node) return;
+
+        const first = node.querySelector('button, [tabindex]:not([tabindex="-1"])');
+        if (first) {
+            // small timeout to ensure menu is visible before focusing
+            setTimeout(() => first.focus(), 0);
+        }
+
+        const onKey = (e) => {
+            if (e.key === 'Escape') {
+                setOpenQuick(false);
+                try {
+                    if (quickButtonRef.current) quickButtonRef.current.focus();
+                } catch (err) {}
+            }
+        };
+
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [openQuick]);
 
     // Widget keys shown in Navbar control (keeps labels simple)
     const widgetKeys = [
@@ -195,56 +221,88 @@ export default function Navbar() {
                     {/* Quick Actions icon */}
                     <div className="relative" ref={quickRef}>
                         <button
+                            ref={quickButtonRef}
                             onClick={() => setOpenQuick((o) => !o)}
+                            onKeyDown={(e) => {
+                                // Open menu with ArrowDown for keyboard users
+                                if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setOpenQuick(true);
+                                }
+                            }}
                             className="text-white/90 hover:text-white px-3 py-1.5 rounded-full"
                             aria-haspopup="menu"
                             aria-expanded={openQuick ? "true" : "false"}
+                            aria-controls="quick-actions-menu"
                             title="Quick Actions"
+                            aria-label="Quick Actions"
                         >
                             <FaBolt className="w-5 h-5" />
+                            <span className="sr-only">Quick Actions</span>
                         </button>
 
                         {openQuick && (
-                            <div className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-50">
                                 <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenQuick(false); openCreateModal('dontforget'); } }}
                                     onClick={() => { setOpenQuick(false); openCreateModal('dontforget'); }}
                                 >
                                     Don't Forget
                                 </button>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('task'); } }}
                                     onClick={() => openCreateModal('task')}
                                 >
                                     Create Task
                                 </button>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('activity'); } }}
                                     onClick={() => openCreateModal('activity')}
                                 >
                                     Create Activity
                                 </button>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('appointment'); } }}
                                     onClick={() => openCreateModal('appointment')}
                                 >
                                     Create Appointment
                                 </button>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('goal'); } }}
                                     onClick={() => openCreateModal('goal')}
                                 >
                                     Create Goal
                                 </button>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreateModal('stroke'); } }}
                                     onClick={() => openCreateModal('stroke')}
                                 >
                                     Give Strokes
                                 </button>
                                 <button
+                                    role="menuitem"
+                                    tabIndex={0}
                                     className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch(ex){ window.location.href = '/#/key-areas'; } } }}
                                     onClick={() => { setOpenQuick(false); try { window.location.hash = '#/key-areas'; } catch(e){ window.location.href = '/#/key-areas'; } }}
                                 >
                                     Edit Key Areas
