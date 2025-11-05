@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
+import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
 const DontForgetComposer = React.lazy(() => import("../components/tasks/DontForgetComposer.jsx"));
@@ -52,6 +53,7 @@ export default function Tasks() {
 
     // Key Areas for assignment dialog
     const [dfKeyAreas, setDfKeyAreas] = useState([]);
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
     useEffect(() => {
         if (viewMode !== "dont-forget") return;
         (async () => {
@@ -351,6 +353,10 @@ export default function Tasks() {
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
             markSaving(id);
+            try {
+                if (newStatus === 'done') addToast && addToast({ title: 'Marked completed', variant: 'success' });
+                else addToast && addToast({ title: 'Marked open', variant: 'info' });
+            } catch {}
         } catch (e) {
             console.error("Failed to update status", e);
         }
@@ -375,6 +381,14 @@ export default function Tasks() {
                 ),
             );
             markSaving(id);
+            // show a success toast for completed tasks
+            try {
+                if (s === 'done') {
+                    addToast && addToast({ title: 'Marked completed', variant: 'success' });
+                } else if (s === 'open') {
+                    addToast && addToast({ title: 'Marked open', variant: 'info' });
+                }
+            } catch {}
         } catch (e) {
             console.error('Failed to update status', e);
         }
@@ -1015,6 +1029,7 @@ export default function Tasks() {
                                                                             e.currentTarget.src = "/dont-forget.png";
                                                                     }}
                                                                 />
+                                                                {/* status dot removed from name field; visual indicator now in Status column */}
                                                                 <span
                                                                     className={`truncate text-xs sm:text-sm ${task.completed ? "line-through text-gray-400" : "text-gray-900"}`}
                                                                     title={task.name}
@@ -1033,6 +1048,11 @@ export default function Tasks() {
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top">
                                                             <div className="flex items-center gap-2">
+                                                                {/* Status color dot (same mapping used in KeyAreas) */}
+                                                                <span
+                                                                    className={`inline-block w-2.5 h-2.5 rounded-full ${String(task.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(task.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`}
+                                                                    aria-hidden="true"
+                                                                />
                                                                 <select
                                                                     value={task.status || 'open'}
                                                                     onChange={(e) => { e.stopPropagation(); setStatus(task.id, e.target.value); }}
