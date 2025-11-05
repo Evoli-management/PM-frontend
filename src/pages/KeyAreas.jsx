@@ -100,6 +100,30 @@ const FixedKeyAreaRow = ({ ka }) => {
 
 // src/pages/KeyAreas.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import Sidebar from "../components/shared/Sidebar.jsx";
+import {
+    FaSearch,
+    FaPlus,
+    FaBars,
+    FaChevronLeft,
+    FaTimes,
+    FaSave,
+    FaStop,
+    FaEllipsisV,
+    FaCheckCircle,
+    FaRegCircle,
+    FaAlignJustify,
+    FaTag,
+    FaTrash,
+    FaEdit,
+    FaAngleDoubleLeft,
+    FaChevronUp,
+    FaChevronDown,
+    FaLock,
+    FaListUl,
+    FaExclamationCircle,
+} from "react-icons/fa";
 import {
     DndContext,
     closestCenter,
@@ -108,37 +132,6 @@ import {
     useSensor,
     useSensors,
 } from "@dnd-kit/core";
-import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    useSortable,
-} from "@dnd-kit/sortable";
-import { useLocation, useNavigate } from "react-router-dom";
-import Sidebar from "../components/shared/Sidebar";
-import CreateActivityModal from "../components/modals/CreateActivityModal";
-import {
-    FaPlus,
-    FaChevronLeft,
-    FaSearch,
-    FaEllipsisV,
-    FaTimes,
-    FaSave,
-    FaTrash,
-    FaListUl,
-    FaExclamationCircle,
-    FaRegCircle,
-    FaCheckCircle,
-    FaAlignJustify,
-    FaTag,
-    FaAngleDoubleLeft,
-    FaChevronDown,
-    FaChevronUp,
-    FaStop,
-    FaBars,
-    FaEdit,
-    FaLock,
-} from "react-icons/fa";
 
 // InlineAddActivity removed per UI simplification
 
@@ -274,6 +267,7 @@ import keyAreaService from "../services/keyAreaService";
 import usersService from "../services/usersService";
 import taskService from "../services/taskService";
 import activityService from "../services/activityService";
+import CreateActivityModal from "../components/modals/CreateActivityModal.jsx";
 // ...existing code...
 
 // Normalize backend task status to UI status
@@ -320,12 +314,15 @@ const api = {
             const rows = await taskService.list({ keyAreaId });
             return (Array.isArray(rows) ? rows : []).map((t) => ({
                 ...t,
-                status: mapTaskStatusToUi(t.status),
+                // `taskService.list` already maps backend enums to FE-friendly values
+                status: t.status,
                 // normalize for UI naming
                 due_date: t.dueDate || t.due_date || null,
                 deadline: t.dueDate || t.due_date || null,
                 start_date: t.startDate || t.start_date || null,
                 end_date: t.endDate || t.end_date || null,
+                // expose completion date for UI (nullable ISO string)
+                completionDate: t.completionDate || t.completion_date || null,
                 assignee: t.assignee ?? null,
                 duration: t.duration ?? null,
                 key_area_id: t.keyAreaId || t.key_area_id || keyAreaId,
@@ -412,16 +409,10 @@ const api = {
         };
         const updated = await taskService.update(id, payload);
         // Normalize BE response back to UI shape
-        const normalized = {
-            ...updated,
-            status: (() => {
-                const s = String(updated.status || "todo").toLowerCase();
-                if (s === "todo") return "open";
-                if (s === "in_progress") return "in_progress";
-                if (s === "completed") return "done";
-                if (s === "cancelled" || s === "canceled") return "blocked";
-                return "open";
-            })(),
+                const normalized = {
+                    ...updated,
+                    // `taskService.update` already returns FE-friendly status strings
+                    status: updated.status || "open",
             due_date: updated.dueDate || null,
             deadline: updated.dueDate || null,
             start_date: updated.startDate || null,
@@ -456,7 +447,7 @@ const api = {
 };
 
 // Minimal placeholders to keep non-list views functional
-const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {} }) => {
+const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {}, onStatusChange = () => {} }) => {
     const cols = [
         { key: "open", label: "Open" },
         { key: "in_progress", label: "In progress" },
@@ -517,7 +508,7 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
     );
 };
 
-const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {} }) => {
+const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {}, onStatusChange = () => {} }) => {
     // Group by deadline date (YYYY-MM-DD); undated last
     const byDate = tasks.reduce((acc, t) => {
         const key = toDateOnly(t.deadline) || "No date";
@@ -572,7 +563,35 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
                                         <div className="text-[11px] text-slate-500 mt-0.5 truncate capitalize">
                                             {String(t.status || "open").replace("_", " ")}
                                         </div>
+                                        {/* Show read-only completion date when present */}
+                                        {t.completionDate ? (
+                                            <div className="text-[11px] text-slate-500 mt-1 truncate">
+                                                Completed: {new Date(t.completionDate).toLocaleString()}
+                                            </div>
+                                        ) : null}
                                     </button>
+
+                                    {/* Inline 3-option status control (open / in_progress / done) */}
+                                    <div className="ml-2 w-36">
+                                        <select
+                                            aria-label={`Change status for ${t.title}`}
+                                            className="w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
+                                            value={String(t.status || "open").toLowerCase()}
+                                            onChange={async (e) => {
+                                                const next = e.target.value;
+                                                try {
+                                                    // optimistic UI update handled by parent callback
+                                                    onStatusChange && onStatusChange(t.id, next);
+                                                } catch (err) {
+                                                    console.error("Failed to update status", err);
+                                                }
+                                            }}
+                                        >
+                                            <option value="open">Open</option>
+                                            <option value="in_progress">In progress</option>
+                                            <option value="done">Done</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -1854,6 +1873,59 @@ export default function KeyAreas() {
 
     const [taskTab, setTaskTab] = useState(1);
     const [allTasks, setAllTasks] = useState([]);
+    // Handler: change a task's status (UI value: open | in_progress | done)
+    const handleTaskStatusChange = async (id, uiStatus) => {
+        // optimistic update: set status locally (completionDate will be reconciled from server)
+        setAllTasks((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, status: uiStatus } : t)),
+        );
+
+        try {
+            // Send request to update the status
+            await api.updateTask(id, { status: uiStatus });
+            // Fetch canonical server state for this task so UI reflects server-side completionDate and status
+            const server = await taskService.get(id);
+            if (server) {
+                const normalized = {
+                    ...server,
+                    // server returned via taskService.get is already FE-friendly
+                    status: server.status,
+                    completionDate: server.completionDate || server.completion_date || null,
+                    due_date: server.dueDate || server.due_date || null,
+                    start_date: server.startDate || server.start_date || null,
+                    end_date: server.endDate || server.end_date || null,
+                    assignee: server.assignee ?? null,
+                    duration: server.duration ?? null,
+                    key_area_id: server.keyAreaId || server.key_area_id || selectedKA?.id,
+                };
+                setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)));
+                setSelectedTaskFull((prev) => (prev && prev.id === id ? { ...prev, ...normalized } : prev));
+                return;
+            }
+        } catch (err) {
+            console.error("Failed to update task status", err);
+            // revert optimistic change by fetching the task list from backend if possible
+            try {
+                const rows = await taskService.list({ keyAreaId: selectedKA?.id });
+                const server = (Array.isArray(rows) ? rows : []).find((r) => r.id === id);
+                if (server) {
+                    const normalized = {
+                        ...server,
+                        // server returned via taskService.list/get is already FE-friendly
+                        status: server.status,
+                        completionDate: server.completionDate || server.completion_date || null,
+                    };
+                    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)));
+                } else {
+                    // If server doesn't return the task, clear optimistic completionDate and revert status
+                    setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: "open", completionDate: null } : t)));
+                }
+            } catch (e) {
+                // If we can't refresh, at least revert the optimistic status to open and clear completionDate
+                setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: "open", completionDate: null } : t)));
+            }
+        }
+    };
     const [searchTerm, setSearchTerm] = useState("");
     const [quadrant, setQuadrant] = useState("all");
     const [selectedTask, setSelectedTask] = useState(null);
@@ -3743,6 +3815,9 @@ export default function KeyAreas() {
                                                                     <th className="px-3 py-2 text-left font-semibold">
                                                                         Duration
                                                                     </th>
+                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                        Completed
+                                                                    </th>
                                                                     <th
                                                                         className="px-3 py-2 text-center font-semibold w-16"
                                                                         title="Activities"
@@ -3869,11 +3944,18 @@ export default function KeyAreas() {
                                                                                         <StatusIndicator
                                                                                             status={t.status || "open"}
                                                                                         />
-                                                                                        <span className="capitalize text-slate-800">
-                                                                                            {String(
-                                                                                                t.status || "open",
-                                                                                            ).replace("_", " ")}
-                                                                                        </span>
+                                                                                        <div>
+                                                                                            <select
+                                                                                                aria-label={`Change status for ${t.title}`}
+                                                                                                className="rounded-md border border-slate-300 bg-white p-1 text-sm"
+                                                                                                value={String(t.status || "open").toLowerCase()}
+                                                                                                onChange={(e) => handleTaskStatusChange(t.id, e.target.value)}
+                                                                                            >
+                                                                                                <option value="open">Open</option>
+                                                                                                <option value="in_progress">In progress</option>
+                                                                                                <option value="done">Done</option>
+                                                                                            </select>
+                                                                                        </div>
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="px-3 py-2 align-top">
@@ -3917,6 +3999,13 @@ export default function KeyAreas() {
                                                                                         t.end_date,
                                                                                     )}
                                                                                 </td>
+                                                                                <td className="px-3 py-2 align-top text-slate-800">
+                                                                                    {t.completionDate ? (
+                                                                                        <span>{new Date(t.completionDate).toLocaleString()}</span>
+                                                                                    ) : (
+                                                                                        <span className="text-slate-500">—</span>
+                                                                                    )}
+                                                                                </td>
                                                                                 <td className="px-3 py-2 align-top text-center w-16">
                                                                                     <button
                                                                                         type="button"
@@ -3947,7 +4036,7 @@ export default function KeyAreas() {
                                                                                 <tr className="bg-slate-50">
                                                                                     <td className="px-3 py-2" />
                                                                                     <td
-                                                                                        colSpan={12}
+                                                                                        colSpan={14}
                                                                                         className="px-0 py-2"
                                                                                     >
                                                                                         <div className="ml-6 pl-6 border-l-2 border-slate-200">
@@ -4397,6 +4486,7 @@ export default function KeyAreas() {
                                                         setSelectedTaskFull(t);
                                                         setTaskFullInitialTab("activities");
                                                     }}
+                                                    onStatusChange={handleTaskStatusChange}
                                                 />
                                             ) : (
                                                 <CalendarView
@@ -4407,6 +4497,7 @@ export default function KeyAreas() {
                                                         setSelectedTaskFull(t);
                                                         setTaskFullInitialTab("activities");
                                                     }}
+                                                    onStatusChange={handleTaskStatusChange}
                                                 />
                                             )}
                                         </div>

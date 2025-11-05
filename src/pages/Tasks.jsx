@@ -75,6 +75,8 @@ export default function Tasks() {
                         dueDate: t.dueDate ? t.dueDate.slice(0, 10) : "",
                         end_date: t.endDate ? t.endDate.slice(0, 10) : "",
                         duration: t.duration || "",
+                        // preserve raw ISO for completionDate so we can format locally
+                        completionDate: t.completionDate || null,
                         time: "",
                         notes: t.description || "",
                         keyArea: "", // DF has no key area
@@ -347,6 +349,21 @@ export default function Tasks() {
             console.error("Failed to update priority", e);
         }
     };
+    const setStatus = async (id, s) => {
+        try {
+            await taskService.update(id, { status: s });
+            setTasks((prev) =>
+                prev.map((t) =>
+                    t.id === id
+                        ? { ...t, status: s, completed: s === 'done' }
+                        : t,
+                ),
+            );
+            markSaving(id);
+        } catch (e) {
+            console.error('Failed to update status', e);
+        }
+    };
     const deleteTask = async (id) => {
         try {
             await taskService.remove(id);
@@ -417,6 +434,8 @@ export default function Tasks() {
                 time: task.time || "",
                 notes: task.notes || "",
                 listIndex: task.listIndex || 1,
+                // include completionDate (raw ISO) as read-only
+                completionDate: task.completionDate || null,
                 keyAreaId: "",
             },
         });
@@ -950,6 +969,7 @@ export default function Tasks() {
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
@@ -998,13 +1018,16 @@ export default function Tasks() {
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top">
                                                             <div className="flex items-center gap-2">
-                                                                <span
-                                                                    className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"
-                                                                    aria-hidden="true"
-                                                                ></span>
-                                                                <span className="capitalize text-slate-800 text-xs sm:text-sm">
-                                                                    {task.status || "open"}
-                                                                </span>
+                                                                <select
+                                                                    value={task.status || 'open'}
+                                                                    onChange={(e) => { e.stopPropagation(); setStatus(task.id, e.target.value); }}
+                                                                    className="text-xs sm:text-sm rounded-md border bg-white px-2 py-1"
+                                                                    aria-label={`Change status for ${task.name}`}
+                                                                >
+                                                                    <option value="open">Open</option>
+                                                                    <option value="in_progress">In progress</option>
+                                                                    <option value="done">Done</option>
+                                                                </select>
                                                             </div>
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top hidden md:table-cell">
@@ -1056,6 +1079,9 @@ export default function Tasks() {
                                                                     task.start_date || task.dueDate,
                                                                     task.end_date,
                                                                 )}
+                                                        </td>
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
+                                                            {task.completionDate ? new Date(task.completionDate).toLocaleString() : "—"}
                                                         </td>
                                                     </tr>
                                                     {/* Row expansion removed per new design */}
@@ -1132,6 +1158,14 @@ export default function Tasks() {
                                                         placeholder="Task title"
                                                     />
                                                 </div>
+                                                {editModal.form?.completionDate && (
+                                                    <div className="mt-1 text-xs text-slate-700">
+                                                        <span className="font-semibold">Completion Date: </span>
+                                                        <span title="Automatically recorded when marked completed">
+                                                            {new Date(editModal.form.completionDate).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                )}
                                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-1.5">
                                                     <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5">
                                                         <label className="text-xs font-semibold text-slate-900 block">
