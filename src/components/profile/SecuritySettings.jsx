@@ -374,141 +374,6 @@ export const SecuritySettings = ({ showToast }) => {
 
     return (
         <div className="space-y-6">
-            {/* Password Change */}
-            <Section 
-                title="Password & Authentication" 
-                description="Manage your password and authentication settings"
-            >
-                <div className="space-y-4">
-                    {changeMode === 'password' ? (
-                        <div className="space-y-4">
-                            <PasswordField
-                                value={passwordDraft.current}
-                                onChange={handlePasswordChange('current')}
-                                placeholder="Current password"
-                                open={showPw.old}
-                                toggle={() => setShowPw(prev => ({ ...prev, old: !prev.old }))}
-                                error={errors.current}
-                            />
-                            
-                            <PasswordField
-                                value={passwordDraft.next}
-                                onChange={handlePasswordChange('next')}
-                                placeholder="New password"
-                                open={showPw.new1}
-                                toggle={() => setShowPw(prev => ({ ...prev, new1: !prev.new1 }))}
-                                error={errors.next}
-                            />
-                            
-                            <PasswordField
-                                value={passwordDraft.confirm}
-                                onChange={handlePasswordChange('confirm')}
-                                placeholder="Confirm new password"
-                                open={showPw.new2}
-                                toggle={() => setShowPw(prev => ({ ...prev, new2: !prev.new2 }))}
-                                error={errors.confirm}
-                            />
-                            
-                            <div className="flex gap-2">
-                                <LoadingButton
-                                    onClick={savePasswordChange}
-                                    loading={isLoading}
-                                    variant="primary"
-                                >
-                                    Change Password
-                                </LoadingButton>
-                                <button
-                                    onClick={() => {
-                                        setChangeMode(null);
-                                        setPasswordDraft({ current: "", next: "", confirm: "" });
-                                        setErrors({});
-                                    }}
-                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                                    disabled={isLoading}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setChangeMode('password')}
-                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                        >
-                            Change Password
-                        </button>
-                    )}
-                </div>
-            </Section>
-
-            {/* Email Change */}
-            <Section 
-                title="Email Address" 
-                description="Change your email address used for login"
-            >
-                <div className="space-y-4">
-                    {changeMode === 'email' ? (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Current Password</label>
-                                <input
-                                    type="password"
-                                    value={emailDraft.current}
-                                    onChange={handleEmailChange('current')}
-                                    className="w-full p-3 border rounded-lg"
-                                    placeholder="Enter your current password"
-                                />
-                                {errors.currentPassword && (
-                                    <p className="text-sm text-red-600 mt-1">{errors.currentPassword}</p>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium mb-2">New Email Address</label>
-                                <input
-                                    type="email"
-                                    value={emailDraft.next}
-                                    onChange={handleEmailChange('next')}
-                                    className="w-full p-3 border rounded-lg"
-                                    placeholder="Enter your new email address"
-                                />
-                                {errors.newEmail && (
-                                    <p className="text-sm text-red-600 mt-1">{errors.newEmail}</p>
-                                )}
-                            </div>
-                            
-                            <div className="flex gap-2">
-                                <LoadingButton
-                                    onClick={saveEmailChange}
-                                    loading={isLoading}
-                                    variant="primary"
-                                >
-                                    Change Email
-                                </LoadingButton>
-                                <button
-                                    onClick={() => {
-                                        setChangeMode(null);
-                                        setEmailDraft({ current: "", next: "" });
-                                        setErrors({});
-                                    }}
-                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                                    disabled={isLoading}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setChangeMode('email')}
-                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                        >
-                            Change Email
-                        </button>
-                    )}
-                </div>
-            </Section>
-
             {/* Two-Factor Authentication */}
             <Section 
                 title="Two-Factor Authentication" 
@@ -719,6 +584,208 @@ export const SecuritySettings = ({ showToast }) => {
                                 </div>
                             </div>
                         </div>
+                    )}
+                </div>
+            </Section>
+
+            {/* Password Change */}
+            <Section 
+                title="Password & Authentication" 
+                description="Manage your password and authentication settings"
+            >
+                <div className="space-y-4">
+                    {changeMode === 'password' ? (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-1">
+                                    <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    Current Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPw.old ? "text" : "password"}
+                                        value={passwordDraft.current}
+                                        onChange={handlePasswordChange('current')}
+                                        className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none pr-8"
+                                        placeholder="Current password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPw(prev => ({ ...prev, old: !prev.old }))}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    >
+                                        {showPw.old ? '👁️' : '👁️‍🗨️'}
+                                    </button>
+                                </div>
+                                {errors.current && (
+                                    <p className="text-xs text-red-600 mt-1">{errors.current}</p>
+                                )}
+                            </div>
+                            
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-1">
+                                    <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                    </svg>
+                                    New Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPw.new1 ? "text" : "password"}
+                                        value={passwordDraft.next}
+                                        onChange={handlePasswordChange('next')}
+                                        className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none pr-8"
+                                        placeholder="New password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPw(prev => ({ ...prev, new1: !prev.new1 }))}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    >
+                                        {showPw.new1 ? '👁️' : '👁️‍🗨️'}
+                                    </button>
+                                </div>
+                                {errors.next && (
+                                    <p className="text-xs text-red-600 mt-1">{errors.next}</p>
+                                )}
+                            </div>
+                            
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-1">
+                                    <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Confirm New Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPw.new2 ? "text" : "password"}
+                                        value={passwordDraft.confirm}
+                                        onChange={handlePasswordChange('confirm')}
+                                        className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none pr-8"
+                                        placeholder="Confirm new password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPw(prev => ({ ...prev, new2: !prev.new2 }))}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    >
+                                        {showPw.new2 ? '👁️' : '👁️‍🗨️'}
+                                    </button>
+                                </div>
+                                {errors.confirm && (
+                                    <p className="text-xs text-red-600 mt-1">{errors.confirm}</p>
+                                )}
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                <LoadingButton
+                                    onClick={savePasswordChange}
+                                    loading={isLoading}
+                                    variant="primary"
+                                >
+                                    Change Password
+                                </LoadingButton>
+                                <button
+                                    onClick={() => {
+                                        setChangeMode(null);
+                                        setPasswordDraft({ current: "", next: "", confirm: "" });
+                                        setErrors({});
+                                    }}
+                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                                    disabled={isLoading}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setChangeMode('password')}
+                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                            Change Password
+                        </button>
+                    )}
+                </div>
+            </Section>
+
+            {/* Email Change */}
+            <Section 
+                title="Email Address" 
+                description="Change your email address used for login"
+            >
+                <div className="space-y-4">
+                    {changeMode === 'email' ? (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-1">
+                                    <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    Current Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={emailDraft.current}
+                                    onChange={handleEmailChange('current')}
+                                    className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                                    placeholder="Enter your current password"
+                                />
+                                {errors.currentPassword && (
+                                    <p className="text-sm text-red-600 mt-1">{errors.currentPassword}</p>
+                                )}
+                            </div>
+                            
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-1">
+                                    <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    New Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    value={emailDraft.next}
+                                    onChange={handleEmailChange('next')}
+                                    className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                                    placeholder="Enter your new email address"
+                                />
+                                {errors.newEmail && (
+                                    <p className="text-sm text-red-600 mt-1">{errors.newEmail}</p>
+                                )}
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                <LoadingButton
+                                    onClick={saveEmailChange}
+                                    loading={isLoading}
+                                    variant="primary"
+                                >
+                                    Change Email
+                                </LoadingButton>
+                                <button
+                                    onClick={() => {
+                                        setChangeMode(null);
+                                        setEmailDraft({ current: "", next: "" });
+                                        setErrors({});
+                                    }}
+                                    className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                                    disabled={isLoading}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setChangeMode('email')}
+                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                            Change Email
+                        </button>
                     )}
                 </div>
             </Section>

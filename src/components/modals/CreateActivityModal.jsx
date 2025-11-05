@@ -1,10 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../shared/Modal';
 import { useToast } from "../shared/ToastProvider.jsx";
-import activityService from "../../services/activityService";
-import keyAreaService from "../../services/keyAreaService";
-import taskService from "../../services/taskService";
-import { getGoals } from "../../services/goalService";
+// Load services on demand so they can be split out of the main bundle
+let _activityService = null;
+const getActivityService = async () => {
+    if (_activityService) return _activityService;
+    const mod = await import("../../services/activityService");
+    _activityService = mod?.default || mod;
+    return _activityService;
+};
+
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
+
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
 
 const CreateActivityModal = ({ isOpen, onClose, onSave, initialData = {}, attachedTaskId = null, activityId = null, dayTaskIds = [], readOnly = false }) => {
     const { addToast } = useToast();
@@ -77,10 +97,13 @@ const CreateActivityModal = ({ isOpen, onClose, onSave, initialData = {}, attach
         async function loadData() {
             try {
                 console.log('Fetching goals and other data for activity modal...');
+                const kaSvc = await getKeyAreaService();
+                const ts = await getTaskService();
                 const [areas, goalsData, allTasksData] = await Promise.all([
-                    keyAreaService.list({ includeTaskCount: false }),
-                    getGoals(),
-                    taskService.list({})
+                    kaSvc.list({ includeTaskCount: false }),
+                    // Dynamic import to allow goalService to be code-split
+                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
+                    ts.list({}),
                 ]);
                 console.log('Goals fetched for activity modal:', goalsData);
                 if (!ignore) {
@@ -150,7 +173,8 @@ const CreateActivityModal = ({ isOpen, onClose, onSave, initialData = {}, attach
             }
             try {
                 setLoadingTasks(true);
-                const rows = await taskService.list({ keyAreaId: ka });
+                const ts = await getTaskService();
+                const rows = await ts.list({ keyAreaId: ka });
                 if (!ignore) setTasks(Array.isArray(rows) ? rows : []);
             } catch (e) {
                 console.error("Failed to load tasks for key area", ka, e);
@@ -212,10 +236,12 @@ const CreateActivityModal = ({ isOpen, onClose, onSave, initialData = {}, attach
             
             let result;
             if (isEditMode) {
-                result = await activityService.update(activityId, payload);
+                const svc = await getActivityService();
+                result = await svc.update(activityId, payload);
                 addToast({ title: "Activity updated", variant: "success" });
             } else {
-                result = await activityService.create(payload);
+                const svc = await getActivityService();
+                result = await svc.create(payload);
                 addToast({ title: "Activity created", variant: "success" });
             }
             

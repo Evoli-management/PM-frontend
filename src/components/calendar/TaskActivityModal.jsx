@@ -1,7 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useToast } from "../shared/ToastProvider.jsx";
-import keyAreaService from "../../services/keyAreaService";
-import taskService from "../../services/taskService";
+// Load keyAreaService and taskService on demand so they can be code-split
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
 
 export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
     const { addToast } = useToast();
@@ -47,23 +60,22 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
     useEffect(() => {
         (async () => {
             try {
-                const kas = await keyAreaService.list({ includeTaskCount: false });
+                const kas = await (await getKeyAreaService()).list({ includeTaskCount: false });
                 const keyAreasData = Array.isArray(kas) ? kas : [];
                 setKeyAreas(keyAreasData);
-                
+
                 // Build listNames map from key areas
                 const namesMap = {};
-                keyAreasData.forEach(ka => {
+                keyAreasData.forEach((ka) => {
                     if (ka.listNames) {
                         namesMap[String(ka.id)] = ka.listNames;
                     }
                 });
                 setListNames(namesMap);
-                
+
                 // Load all tasks for list dropdown logic
-                const tasksPromises = keyAreasData.map(ka => 
-                    taskService.list({ keyAreaId: ka.id }).catch(() => [])
-                );
+                const ts = await getTaskService();
+                const tasksPromises = keyAreasData.map((ka) => ts.list({ keyAreaId: ka.id }).catch(() => []));
                 const tasksArrays = await Promise.all(tasksPromises);
                 const allTasksFlat = tasksArrays.flat();
                 setAllTasks(allTasksFlat);
@@ -77,12 +89,13 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
                 setTasks([]);
                 return;
             }
-            try {
-                const list = await taskService.list({ keyAreaId: activityForm.keyAreaId });
-                setTasks(Array.isArray(list) ? list : []);
-            } catch {
-                setTasks([]);
-            }
+                try {
+                    const ts = await getTaskService();
+                    const list = await ts.list({ keyAreaId: activityForm.keyAreaId });
+                    setTasks(Array.isArray(list) ? list : []);
+                } catch {
+                    setTasks([]);
+                }
         })();
     }, [activityForm.keyAreaId]);
 

@@ -1,11 +1,26 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
-import DontForgetComposer from "../components/tasks/DontForgetComposer.jsx";
-import taskService from "../services/taskService";
-import keyAreaService from "../services/keyAreaService";
+const DontForgetComposer = React.lazy(() => import("../components/tasks/DontForgetComposer.jsx"));
+
+// Lazy getters for services to allow code-splitting
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../services/taskService");
+    _taskService = mod.default || mod;
+    return _taskService;
+};
+
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../services/keyAreaService");
+    _keyAreaService = mod.default || mod;
+    return _keyAreaService;
+};
 
 export default function Tasks() {
     const location = useLocation();
@@ -41,7 +56,7 @@ export default function Tasks() {
         if (viewMode !== "dont-forget") return;
         (async () => {
             try {
-                const list = await keyAreaService.list({ includeTaskCount: false });
+                const list = await (await getKeyAreaService()).list({ includeTaskCount: false });
                 // Exclude Ideas/default area from choices
                 setDfKeyAreas(list.filter((k) => !k.is_default && (k.title || "").toLowerCase() !== "ideas"));
             } catch (e) {
@@ -59,7 +74,7 @@ export default function Tasks() {
         let cancelled = false;
         (async () => {
             try {
-                const data = await taskService.list({ unassigned: true });
+                const data = await (await getTaskService()).list({ unassigned: true });
                 if (!cancelled) {
                     // Map API fields to this view’s expected shape
                     const mapped = data.map((t) => ({
@@ -233,7 +248,7 @@ export default function Tasks() {
                 ...(mappedPriority ? { priority: mappedPriority } : {}),
             };
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
-            const created = await taskService.create(body);
+            const created = await (await getTaskService()).create(body);
             // Push to local list
             if (!payload?.keyAreaId) {
                 setTasks((prev) => [
@@ -308,7 +323,7 @@ export default function Tasks() {
             await Promise.all(
                 Array.from(selectedIds).map(async (id) => {
                     try {
-                        await taskService.remove(id);
+                        await (await getTaskService()).remove(id);
                     } catch (e) {
                         console.warn("Failed to delete task", id, e);
                     }
@@ -331,7 +346,7 @@ export default function Tasks() {
         const newCompleted = !t.completed;
         const newStatus = newCompleted ? "done" : "open";
         try {
-            await taskService.update(id, { status: newStatus });
+            await (await getTaskService()).update(id, { status: newStatus });
             setTasks((prev) =>
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
@@ -342,7 +357,7 @@ export default function Tasks() {
     };
     const setPriority = async (id, p) => {
         try {
-            await taskService.update(id, { priority: p });
+            await (await getTaskService()).update(id, { priority: p });
             setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, priority: p } : t)));
             markSaving(id);
         } catch (e) {
@@ -366,7 +381,7 @@ export default function Tasks() {
     };
     const deleteTask = async (id) => {
         try {
-            await taskService.remove(id);
+            await (await getTaskService()).remove(id);
             setTasks((prev) => prev.filter((t) => t.id !== id));
         } catch (e) {
             console.error("Failed to delete task", e);
@@ -389,7 +404,7 @@ export default function Tasks() {
             return;
         }
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
@@ -443,9 +458,9 @@ export default function Tasks() {
     const confirmAssignAndOpen = async () => {
         const { task, kaId } = assignModal;
         if (!task || !kaId) return;
-        try {
-            // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
-            await taskService.update(task.id, { keyAreaId: kaId });
+            try {
+                // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
+            await (await getTaskService()).update(task.id, { keyAreaId: kaId });
             // Remove from DF view
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
             setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 });
@@ -474,7 +489,7 @@ export default function Tasks() {
                     // Non-API fields will be applied locally after
                     if (Object.keys(patch).length > 0) {
                         try {
-                            await taskService.update(id, patch);
+                            await (await getTaskService()).update(id, patch);
                         } catch (e) {
                             console.warn("Failed to update", id, e);
                         }
@@ -526,7 +541,7 @@ export default function Tasks() {
         if (form.duration !== undefined) patch.duration = form.duration;
         if (form.keyAreaId) patch.keyAreaId = form.keyAreaId;
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             if (form.keyAreaId) {
                 // Task moved to a Key Area: remove from DF list and open it in Key Areas
                 setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -1114,11 +1129,13 @@ export default function Tasks() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <DontForgetComposer
-                                    open={showComposer}
-                                    onClose={() => setShowComposer(false)}
-                                    onAdd={(data) => addDontForgetTask(data)}
-                                />
+                                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                                    <DontForgetComposer
+                                        open={showComposer}
+                                        onClose={() => setShowComposer(false)}
+                                        onAdd={(data) => addDontForgetTask(data)}
+                                    />
+                                </Suspense>
 
                                 {editModal.open && (
                                     <div

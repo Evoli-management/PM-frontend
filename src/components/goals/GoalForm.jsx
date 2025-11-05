@@ -34,7 +34,9 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     };
 
     const addMilestone = () => {
-        setMilestones([...milestones, { title: "", weight: 1.0, dueDate: "" }]);
+        if (milestones.length < 10) {
+            setMilestones([...milestones, { title: "", weight: 1.0, dueDate: "" }]);
+        }
     };
 
     const removeMilestone = (index) => {
@@ -107,7 +109,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
             <style>{`
                 @keyframes fadeIn {
                     from { opacity: 0; }
@@ -129,111 +131,134 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                 .animate-slideUp {
                     animation: slideUp 0.3s ease-out;
                 }
+                
+                /* Custom scrollbar for milestones */
+                .milestone-scroll::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .milestone-scroll::-webkit-scrollbar-track {
+                    background: #f1f5f9;
+                    border-radius: 3px;
+                }
+                .milestone-scroll::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 3px;
+                }
+                .milestone-scroll::-webkit-scrollbar-thumb:hover {
+                    background: #94a3b8;
+                }
             `}</style>
             
-            <div className="bg-white rounded-xl w-full max-w-5xl shadow-2xl flex flex-col animate-slideUp" style={{ height: '85vh', border: '1px solid #e5e7eb' }}>
+            <div className="bg-white rounded-xl w-full max-w-6xl shadow-2xl flex flex-col animate-slideUp" style={{ maxHeight: '90vh', border: '1px solid #e5e7eb' }}>
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-white">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <FaRocket className="w-5 h-5 text-blue-600" />
+                        <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
+                            <FaRocket className="w-5 h-5 text-white" />
                         </div>
-                        <h2 className="text-lg font-semibold text-gray-900">
-                            {isEditing ? "Edit Goal" : "Create Goal"}
-                        </h2>
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900">
+                                {isEditing ? "Edit Goal" : "Create New Goal"}
+                            </h2>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                {isEditing ? "Update your goal details" : "Set your target and break it down into milestones"}
+                            </p>
+                        </div>
                     </div>
                     <button 
                         onClick={onClose} 
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
                     >
-                        <FaTimes className="w-4 h-4" />
+                        <FaTimes className="w-5 h-5" />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 py-5">
-                    <div className="h-full">
-                        {errors.general && (
-                            <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 rounded-r text-red-700 text-sm animate-slideUp">
-                                {errors.general}
-                            </div>
-                        )}
+                {/* Content - Fixed Height Container */}
+                <div className="flex-1 overflow-hidden">
+                    <div className="h-full flex">
+                        {/* Left Column - Main Info (Scrollable) */}
+                        <div className="flex-1 px-6 py-6 overflow-y-auto">
+                            {errors.general && (
+                                <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r text-red-700 text-sm animate-slideUp">
+                                    <strong className="font-medium">Error:</strong> {errors.general}
+                                </div>
+                            )}
 
-                        <div className="grid grid-cols-12 gap-6 h-full">
-                            {/* Left Column - Main Info */}
-                            <div className="col-span-7 space-y-4">
+                            <div className="space-y-5 max-w-2xl">
                                 {/* Title */}
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                        Goal Title <span className="text-red-500">*</span>
-                                    </label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-semibold text-gray-700">
+                                            Goal Title <span className="text-red-500">*</span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => handleInputChange("title", e.target.value)}
-                                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                                        className={`w-full px-4 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                                             errors.title ? "border-red-300 bg-red-50" : "border-gray-300 hover:border-gray-400"
                                         }`}
-                                        placeholder="Enter goal title"
+                                        placeholder="e.g., Launch my SaaS product"
                                     />
-                                    {errors.title && <p className="text-red-600 text-xs mt-1 animate-slideUp">{errors.title}</p>}
+                                    {errors.title && <p className="text-red-600 text-xs mt-1.5 animate-slideUp">{errors.title}</p>}
                                 </div>
 
                                 {/* Description */}
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
                                         Description
                                     </label>
                                     <textarea
                                         value={formData.description}
                                         onChange={(e) => handleInputChange("description", e.target.value)}
-                                        rows="3"
-                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none hover:border-gray-400 transition-all duration-200"
-                                        placeholder="Describe your goal..."
+                                        rows="4"
+                                        className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none hover:border-gray-400 transition-all duration-200"
+                                        placeholder="Describe what you want to achieve and why it matters..."
                                     />
                                 </div>
 
                                 {/* Date Fields */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Start Date
                                         </label>
                                         <input
                                             type="date"
                                             value={formData.startDate}
                                             onChange={(e) => handleInputChange("startDate", e.target.value)}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                            className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Due Date <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="date"
                                             value={formData.dueDate}
                                             onChange={(e) => handleInputChange("dueDate", e.target.value)}
-                                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                                            className={`w-full px-4 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                                                 errors.dueDate ? "border-red-300 bg-red-50" : "border-gray-300 hover:border-gray-400"
                                             }`}
                                             min={new Date().toISOString().split("T")[0]}
                                         />
-                                        {errors.dueDate && <p className="text-red-600 text-xs mt-1 animate-slideUp">{errors.dueDate}</p>}
+                                        {errors.dueDate && <p className="text-red-600 text-xs mt-1.5 animate-slideUp">{errors.dueDate}</p>}
                                     </div>
                                 </div>
 
                                 {/* Select Fields */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Key Area
                                         </label>
                                         <select
                                             value={formData.keyAreaId}
                                             onChange={(e) => handleInputChange("keyAreaId", e.target.value)}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                            className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200 bg-white"
                                         >
                                             <option value="">None</option>
                                             {keyAreas.map((area) => (
@@ -245,13 +270,13 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Status
                                         </label>
                                         <select
                                             value={formData.status}
                                             onChange={(e) => handleInputChange("status", e.target.value)}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                            className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200 bg-white"
                                             disabled={!isEditing}
                                         >
                                             <option value="active">Active</option>
@@ -261,13 +286,13 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Visibility
                                         </label>
                                         <select
                                             value={formData.visibility}
                                             onChange={(e) => handleInputChange("visibility", e.target.value)}
-                                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200"
+                                            className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200 bg-white"
                                         >
                                             <option value="public">Public</option>
                                             <option value="private">Private</option>
@@ -275,22 +300,32 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Right Column - Milestones */}
-                            <div className="col-span-5 border-l border-gray-200 pl-6 flex flex-col">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-semibold text-gray-900">Milestones</h3>
+                        {/* Right Column - Milestones */}
+                        <div className="col-span-5 border-l border-gray-200 flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+                            <div className="px-6 py-6 flex-shrink-0">
+                                <div className="flex items-center justify-between mb-5">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-semibold text-gray-700">Milestones</h3>
+                                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                            {milestones.length}/10
+                                        </span>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={addMilestone}
-                                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                                        disabled={milestones.length >= 10}
+                                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <FaPlus className="w-3 h-3" />
                                         Add
                                     </button>
                                 </div>
+                            </div>
 
-                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                            <div className="flex-1 overflow-y-auto px-6" style={{ minHeight: 0 }}>
+                                <div className="space-y-2.5">
                                     {milestones.map((milestone, index) => (
                                         <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-sm">
                                             <div className="flex items-start gap-2 mb-2">
@@ -345,12 +380,12 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     </div>
                 </div>
 
-                {/* Footer */}
+                {/* Footer - Fixed */}
                 <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow"
+                        className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow"
                     >
                         Cancel
                     </button>
@@ -358,10 +393,10 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                         type="button"
                         onClick={handleSubmit}
                         disabled={isSubmitting}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
                     >
-                        <FaSave className="w-3.5 h-3.5" />
-                        {isSubmitting ? "Saving..." : isEditing ? "Update Goal" : "Create Goal"}
+                        <FaSave className="w-4 h-4" />
+                        {isSubmitting ? "Saving..." : isEditing ? "Update Goal" : "Save Goal"}
                     </button>
                 </div>
             </div>

@@ -283,7 +283,7 @@ const mapTaskStatusToUi = (s) => {
 const api = {
     async listKeyAreas() {
         try {
-            return await keyAreaService.list({ includeTaskCount: true });
+            return await (await getKeyAreaService()).list({ includeTaskCount: true });
         } catch (e) {
             // if unauthorized, let global axios handler redirect to login
             if (e?.response?.status === 401) {
@@ -298,20 +298,20 @@ const api = {
     },
     async updateKeyArea(id, data) {
         // Only update via backend; no local fallbacks
-        return await keyAreaService.update(id, data);
+        return await (await getKeyAreaService()).update(id, data);
     },
     async createKeyArea(data) {
         // Only create via backend; no local fallbacks
-        return await keyAreaService.create(data);
+        return await (await getKeyAreaService()).create(data);
     },
     async deleteKeyArea(id) {
-        await keyAreaService.remove(id);
+        await (await getKeyAreaService()).remove(id);
         return true;
     },
     async listTasks(keyAreaId) {
         // Fetch from backend and normalize for UI
         try {
-            const rows = await taskService.list({ keyAreaId });
+            const rows = await (await getTaskService()).list({ keyAreaId });
             return (Array.isArray(rows) ? rows : []).map((t) => ({
                 ...t,
                 // `taskService.list` already maps backend enums to FE-friendly values
@@ -357,7 +357,7 @@ const api = {
                 return "medium";
             })(),
         };
-        const created = await taskService.create(payload);
+    const created = await (await getTaskService()).create(payload);
         // normalize for UI
         return {
             ...created,
@@ -407,7 +407,7 @@ const api = {
                 return undefined;
             })(),
         };
-        const updated = await taskService.update(id, payload);
+    const updated = await (await getTaskService()).update(id, payload);
         // Normalize BE response back to UI shape
                 const normalized = {
                     ...updated,
@@ -441,7 +441,8 @@ const api = {
         return { ...normalized, ...uiOnly };
     },
     async deleteTask(id) {
-        await taskService.remove(id);
+        const svc = await getTaskService();
+        await svc.remove(id);
         return true;
     },
 };
@@ -648,7 +649,7 @@ function TaskSlideOver({
         setActivitiesTarget(String(task.id));
         (async () => {
             try {
-                const list = await activityService.list({ taskId: task.id });
+                const list = await (await getActivityService()).list({ taskId: task.id });
                 setTaskActivities(Array.isArray(list) ? list : []);
             } catch (e) {
                 console.error("Failed to load activities", e);
@@ -668,11 +669,11 @@ function TaskSlideOver({
         (async () => {
             try {
                 if (activitiesTarget === "new") {
-                    const list = await activityService.list();
+                    const list = await (await getActivityService()).list();
                     // Unattached activities: filter those without taskId
                     setTaskActivities((Array.isArray(list) ? list : []).filter((a) => !a.taskId));
                 } else {
-                    const list = await activityService.list({ taskId: activitiesTarget });
+                    const list = await (await getActivityService()).list({ taskId: activitiesTarget });
                     setTaskActivities(Array.isArray(list) ? list : []);
                 }
             } catch (e) {
@@ -689,7 +690,7 @@ function TaskSlideOver({
             const tid = e?.detail?.taskId;
             if (tid && String(tid) !== String(task.id)) return; // ignore events for other tasks
             try {
-                const list = await activityService.list({ taskId: task.id });
+                const list = await (await getActivityService()).list({ taskId: task.id });
                 setTaskActivities(Array.isArray(list) ? list : []);
             } catch (err) {
                 // ignore
@@ -703,7 +704,7 @@ function TaskSlideOver({
         const text = (newActivity || "").trim();
         if (!text) return;
         try {
-            const created = await activityService.create({
+            const created = await (await getActivityService()).create({
                 text,
                 taskId: activitiesTarget === "new" ? null : activitiesTarget,
             });
@@ -718,7 +719,7 @@ function TaskSlideOver({
 
     const removeActivity = async (id) => {
         try {
-            await activityService.remove(id);
+            await (await getActivityService()).remove(id);
             setTaskActivities((prev) => prev.filter((a) => a.id !== id));
             window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
         } catch (e) {
@@ -731,7 +732,8 @@ function TaskSlideOver({
         try {
             // delete each activity shown
             const ids = (taskActivities || []).map((a) => a.id);
-            await Promise.all(ids.map((id) => activityService.remove(id)));
+            const _svc = await getActivityService();
+            await Promise.all(ids.map((id) => _svc.remove(id)));
             setTaskActivities([]);
             window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
         } catch (e) {
@@ -1026,6 +1028,9 @@ function TaskSlideOver({
                                 >
                                     Add Activity
                                 </button>
+                                {savingActivityIds && savingActivityIds.size > 0 && (
+                                    <div className="inline-block align-middle ml-3 text-xs text-slate-500">Saving...</div>
+                                )}
                             </div>
                             <div>
                                 {taskActivities && taskActivities.length > 0 ? (
@@ -1143,7 +1148,8 @@ function TaskFullView({
         const t = (text || "").trim();
         if (!t) return;
         try {
-            const created = await activityService.create({ text: t, taskId: task.id });
+            const svc = await getActivityService();
+            const created = await svc.create({ text: t, taskId: task.id });
             setList([...(list || []), created]);
             window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
         } catch (e) {
@@ -1152,7 +1158,8 @@ function TaskFullView({
     };
     const removeActivity = async (id) => {
         try {
-            await activityService.remove(id);
+            const svc = await getActivityService();
+            await svc.remove(id);
             setList(list.filter((a) => a.id !== id));
             window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
         } catch (e) {
@@ -1164,8 +1171,37 @@ function TaskFullView({
             return copy;
         });
     };
-    const toggleCompleted = (id) => {
-        setList(list.map((a) => (a.id === id ? { ...a, completed: a.completed ? 0 : 1 } : a)));
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
+
+    const toggleCompleted = async (id) => {
+        // avoid duplicate saves
+        if (savingActivityIds.has(id)) return;
+
+        const prev = Array.isArray(list) ? [...list] : [];
+        const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+        // optimistic update
+        setList(next);
+
+        // mark as saving
+        setSavingActivityIds((s) => new Set([...s, id]));
+        try {
+            const svc = await getActivityService();
+            const item = next.find((a) => a.id === id);
+            await svc.update(id, { completed: !!item.completed });
+            addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
+        } catch (e) {
+            console.error("Failed to update activity completion", e);
+            // rollback
+            setList(prev);
+            addToast && addToast({ title: "Failed to update activity", variant: "error" });
+        } finally {
+            // remove saving flag
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
+        }
     };
     const setPriorityValue = (id, value) => {
         // set priority explicitly via icon click; icons stay visible regardless of value
@@ -1498,14 +1534,17 @@ function TaskFullView({
                                             {/* Complete toggle */}
                                             <button
                                                 type="button"
-                                                className="mt-0.5 text-slate-500 hover:text-blue-600"
-                                                title={a.completed ? "Mark incomplete" : "Mark completed"}
+                                                disabled={savingActivityIds.has(a.id)}
+                                                className={`mt-0.5 ${a.completed ? 'text-blue-600' : 'text-slate-500'} ${savingActivityIds.has(a.id) ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
+                                                title={savingActivityIds.has(a.id) ? 'Saving...' : (a.completed ? "Mark incomplete" : "Mark completed")}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     toggleCompleted(a.id);
                                                 }}
                                             >
-                                                {a.completed ? (
+                                                {savingActivityIds.has(a.id) ? (
+                                                    <FaSpinner className="w-4 h-4 animate-spin" />
+                                                ) : a.completed ? (
                                                     <FaCheckCircle className="w-4 h-4" />
                                                 ) : (
                                                     <FaRegCircle className="w-4 h-4" />
@@ -1841,19 +1880,21 @@ function TaskFullView({
             )}
             {/* Read-only activity modal */}
             {activityModal.open && activityModal.item && (
-                <CreateActivityModal
-                    isOpen={activityModal.open}
-                    onClose={() => setActivityModal({ open: false, item: null })}
-                    onSave={() => {}} // no-op: read-only
-                    activityId={activityModal.item.id}
-                    initialData={{
-                        taskId: activityModal.item.task_id || activityModal.item.taskId || "",
-                        text: activityModal.item.text || activityModal.item.activity_name || "",
-                        title: activityModal.item.text || activityModal.item.activity_name || "",
-                    }}
-                    attachedTaskId={activityModal.item.task_id || activityModal.item.taskId || null}
-                    readOnly={true}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                    <CreateActivityModal
+                        isOpen={activityModal.open}
+                        onClose={() => setActivityModal({ open: false, item: null })}
+                        onSave={() => {}} // no-op: read-only
+                        activityId={activityModal.item.id}
+                        initialData={{
+                            taskId: activityModal.item.task_id || activityModal.item.taskId || "",
+                            text: activityModal.item.text || activityModal.item.activity_name || "",
+                            title: activityModal.item.text || activityModal.item.activity_name || "",
+                        }}
+                        attachedTaskId={activityModal.item.task_id || activityModal.item.taskId || null}
+                        readOnly={true}
+                    />
+                </Suspense>
             )}
         </div>
     );
@@ -1967,6 +2008,9 @@ export default function KeyAreas() {
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
+    // Toasts and saving state for activity updates
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
+    const [savingActivityIds, setSavingActivityIds] = useState(new Set());
 
     // Open global activity composer on request (from various UI spots)
     useEffect(() => {
@@ -2166,7 +2210,8 @@ export default function KeyAreas() {
     // Helper: refresh activities for a specific task id
     const refreshActivitiesForTask = async (taskId) => {
         try {
-            const list = await activityService.list({ taskId });
+            const svc = await getActivityService();
+            const list = await svc.list({ taskId });
             setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: Array.isArray(list) ? list : [] }));
         } catch (e) {
             console.error("Failed to refresh activities", e);
@@ -2177,10 +2222,11 @@ export default function KeyAreas() {
     const refreshAllActivities = async () => {
         if (!Array.isArray(allTasks) || allTasks.length === 0) return;
         try {
+            const svc = await getActivityService();
             const entries = await Promise.all(
                 allTasks.map(async (t) => {
                     try {
-                        const list = await activityService.list({ taskId: t.id });
+                        const list = await svc.list({ taskId: t.id });
                         return [String(t.id), Array.isArray(list) ? list : []];
                     } catch {
                         return [String(t.id), []];
@@ -2718,7 +2764,8 @@ export default function KeyAreas() {
         const changed = withPos.filter((k, i) => ordered[i]?.id !== k.id || ordered[i]?.position !== k.position);
         try {
             if (changed.length) {
-                await keyAreaService.reorder(changed);
+                const svc = await getKeyAreaService();
+                await svc.reorder(changed);
             }
             // Update local state
             setKeyAreas((prev) => {
@@ -2753,7 +2800,8 @@ export default function KeyAreas() {
         const b = ordered[targetIdx];
         try {
             // swap positions and persist via bulk reorder
-            await keyAreaService.reorder([
+            const svc = await getKeyAreaService();
+            await svc.reorder([
                 { id: a.id, position: b.position },
                 { id: b.id, position: a.position },
             ]);
@@ -2816,10 +2864,11 @@ export default function KeyAreas() {
         setAllTasks(t);
         // refresh activities for these tasks
         try {
+            const svc = await getActivityService();
             const entries = await Promise.all(
                 (t || []).map(async (row) => {
                     try {
-                        const list = await activityService.list({ taskId: row.id });
+                        const list = await svc.list({ taskId: row.id });
                         return [String(row.id), Array.isArray(list) ? list : []];
                     } catch {
                         return [String(row.id), []];
@@ -2890,7 +2939,8 @@ export default function KeyAreas() {
         const newMap = { ...(listNames[String(selectedKA.id)] || {}), [String(n)]: val };
         setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: newMap }));
         try {
-            await keyAreaService.update(selectedKA.id, { listNames: newMap });
+            const svc = await getKeyAreaService();
+            await svc.update(selectedKA.id, { listNames: newMap });
         } catch (e) {
             console.error("Failed to persist list names", e);
             alert("Failed to save list name. Please try again.");
@@ -2919,7 +2969,8 @@ export default function KeyAreas() {
         setListNames((prev) => ({ ...prev, [String(kaId)]: newMap }));
         if (taskTab === n) setTaskTab(1);
         try {
-            await keyAreaService.update(kaId, { listNames: newMap });
+            const svc = await getKeyAreaService();
+            await svc.update(kaId, { listNames: newMap });
         } catch (e) {
             console.error("Failed to persist list names", e);
             alert("Failed to delete list. Please try again.");
@@ -3061,12 +3112,13 @@ export default function KeyAreas() {
         if (!title) return;
 
         try {
+            const svc = await getActivityService();
             if (editingActivityId) {
-                await activityService.update(editingActivityId, { text: title });
+                await svc.update(editingActivityId, { text: title });
                 const tid = activityAttachTaskId;
                 if (tid) {
                     try {
-                        const list = await activityService.list({ taskId: tid });
+                        const list = await svc.list({ taskId: tid });
                         setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list : [] }));
                     } catch {}
                 }
@@ -3078,11 +3130,11 @@ export default function KeyAreas() {
             } else {
                 const payload = { text: title };
                 if (activityAttachTaskId) payload.taskId = activityAttachTaskId;
-                const created = await activityService.create(payload);
+                const created = await svc.create(payload);
                 // Update local state immediately for the specific task (if attached)
                 if (activityAttachTaskId) {
                     try {
-                        const list = await activityService.list({ taskId: activityAttachTaskId });
+                        const list = await svc.list({ taskId: activityAttachTaskId });
                         setActivitiesByTask((prev) => ({
                             ...prev,
                             [String(activityAttachTaskId)]: Array.isArray(list) ? list : [],
@@ -3164,9 +3216,10 @@ export default function KeyAreas() {
         // Prevent deleting a task that still has activities
         try {
             let list = activitiesByTask[String(task.id)];
-            if (!Array.isArray(list)) {
+                if (!Array.isArray(list)) {
                 // fetch latest to be sure
-                list = await activityService.list({ taskId: task.id });
+                const svc = await getActivityService();
+                list = await svc.list({ taskId: task.id });
             }
             const count = Array.isArray(list) ? list.length : 0;
             if (count > 0) {
@@ -3570,21 +3623,22 @@ export default function KeyAreas() {
                                                                             return copy;
                                                                         });
                                                                         setTaskTab(next);
-                                                                        try {
-                                                                            const names = listNames[kaId] || {};
-                                                                            const newMap = {
-                                                                                ...names,
-                                                                                [next]: nextName,
-                                                                            };
-                                                                            await keyAreaService.update(kaId, {
-                                                                                listNames: newMap,
-                                                                            });
-                                                                        } catch (e) {
-                                                                            console.error(
-                                                                                "Failed to persist new list",
-                                                                                e,
-                                                                            );
-                                                                        }
+                                                                            try {
+                                                                                const names = listNames[kaId] || {};
+                                                                                const newMap = {
+                                                                                    ...names,
+                                                                                    [next]: nextName,
+                                                                                };
+                                                                                const svc = await getKeyAreaService();
+                                                                                await svc.update(kaId, {
+                                                                                    listNames: newMap,
+                                                                                });
+                                                                            } catch (e) {
+                                                                                console.error(
+                                                                                    "Failed to persist new list",
+                                                                                    e,
+                                                                                );
+                                                                            }
                                                                     }}
                                                                     title="Add list"
                                                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
@@ -4071,37 +4125,36 @@ export default function KeyAreas() {
                                                                                                     );
                                                                                                 };
 
-                                                                                                const toggleComplete = (
-                                                                                                    id,
-                                                                                                ) => {
-                                                                                                    setList(
-                                                                                                        list.map((a) =>
-                                                                                                            a.id === id
-                                                                                                                ? {
-                                                                                                                      ...a,
-                                                                                                                      completed:
-                                                                                                                          a.completed
-                                                                                                                              ? 0
-                                                                                                                              : 1,
-                                                                                                                  }
-                                                                                                                : a,
-                                                                                                        ),
-                                                                                                    );
+                                                                                                const toggleComplete = async (id) => {
+                                                                                                    if (savingActivityIds.has(id)) return;
+                                                                                                    const prev = Array.isArray(list) ? [...list] : [];
+                                                                                                    const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+                                                                                                    setList(next);
+                                                                                                    setSavingActivityIds((s) => new Set([...s, id]));
+                                                                                                    try {
+                                                                                                        const svc = await getActivityService();
+                                                                                                        const item = next.find((a) => a.id === id);
+                                                                                                        await svc.update(id, { completed: !!item.completed });
+                                                                                                        addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
+                                                                                                    } catch (e) {
+                                                                                                        console.error("Failed to update activity completion", e);
+                                                                                                        setList(prev);
+                                                                                                        addToast && addToast({ title: "Failed to update activity", variant: "error" });
+                                                                                                    } finally {
+                                                                                                        setSavingActivityIds((s) => {
+                                                                                                            const copy = new Set(s);
+                                                                                                            copy.delete(id);
+                                                                                                            return copy;
+                                                                                                        });
+                                                                                                    }
                                                                                                 };
                                                                                                 const remove = async (
                                                                                                     id,
                                                                                                 ) => {
                                                                                                     try {
-                                                                                                        await activityService.remove(
-                                                                                                            id,
-                                                                                                        );
-                                                                                                        setList(
-                                                                                                            list.filter(
-                                                                                                                (a) =>
-                                                                                                                    a.id !==
-                                                                                                                    id,
-                                                                                                            ),
-                                                                                                        );
+                                                                                                        const svc = await getActivityService();
+                                                                                                        await svc.remove(id);
+                                                                                                        setList(list.filter((a) => a.id !== id));
                                                                                                         window.dispatchEvent(
                                                                                                             new CustomEvent(
                                                                                                                 "ka-activities-updated",
@@ -4201,18 +4254,9 @@ export default function KeyAreas() {
                                                                                                     ).trim();
                                                                                                     if (!text) return;
                                                                                                     try {
-                                                                                                        const created =
-                                                                                                            await activityService.create(
-                                                                                                                {
-                                                                                                                    text,
-                                                                                                                    taskId: t.id,
-                                                                                                                },
-                                                                                                            );
-                                                                                                        setList([
-                                                                                                            ...(list ||
-                                                                                                                []),
-                                                                                                            created,
-                                                                                                        ]);
+                                                                                                        const svc = await getActivityService();
+                                                                                                        const created = await svc.create({ text, taskId: t.id });
+                                                                                                        setList([...(list || []), created]);
                                                                                                         window.dispatchEvent(
                                                                                                             new CustomEvent(
                                                                                                                 "ka-activities-updated",
@@ -4255,26 +4299,21 @@ export default function KeyAreas() {
                                                                                                                         >
                                                                                                                             {/* Basic row */}
                                                                                                                             <div className="flex items-center">
-                                                                                                                                <button
-                                                                                                                                    type="button"
-                                                                                                                                    className="mr-2 text-blue-700"
-                                                                                                                                    title={
-                                                                                                                                        a.completed
-                                                                                                                                            ? "Unmark"
-                                                                                                                                            : "Mark completed"
-                                                                                                                                    }
-                                                                                                                                    onClick={() =>
-                                                                                                                                        toggleComplete(
-                                                                                                                                            a.id,
-                                                                                                                                        )
-                                                                                                                                    }
-                                                                                                                                >
-                                                                                                                                    {a.completed ? (
-                                                                                                                                        <FaCheckCircle />
-                                                                                                                                    ) : (
-                                                                                                                                        <FaRegCircle />
-                                                                                                                                    )}
-                                                                                                                                </button>
+                                                                                                                                                                <button
+                                                                                                                                                                    type="button"
+                                                                                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                                                                                    className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500'} ${savingActivityIds.has(a.id) ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
+                                                                                                                                                                    title={savingActivityIds.has(a.id) ? 'Saving...' : (a.completed ? "Unmark" : "Mark completed")}
+                                                                                                                                                                    onClick={() => toggleComplete(a.id)}
+                                                                                                                                                                >
+                                                                                                                                                                    {savingActivityIds.has(a.id) ? (
+                                                                                                                                                                        <FaSpinner className="animate-spin" />
+                                                                                                                                                                    ) : a.completed ? (
+                                                                                                                                                                        <FaCheckCircle />
+                                                                                                                                                                    ) : (
+                                                                                                                                                                        <FaRegCircle />
+                                                                                                                                                                    )}
+                                                                                                                                                                </button>
                                                                                                                                 <span
                                                                                                                                     className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]"
                                                                                                                                     title="Drag handle"

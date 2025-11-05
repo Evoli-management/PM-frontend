@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { FaChevronDown } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import QuarterView from "./QuarterView";
@@ -7,12 +7,26 @@ import WeekView from "./WeekView";
 import DayView from "./DayView";
 import ListView from "./ListView";
 import EventModal from "./EventModal";
-import CreateTaskModal from "../modals/CreateTaskModal";
-import CreateActivityModal from "../modals/CreateActivityModal";
+const CreateTaskModal = React.lazy(() => import("../modals/CreateTaskModal"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal"));
 import ElephantTaskModal from "./ElephantTaskModal";
 import ElephantTaskInput from "./ElephantTaskInput";
-import taskService from "../../services/taskService";
-import activityService from "../../services/activityService";
+// taskService and activityService are loaded on demand to keep them out of the main chunk
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
+
+let _activityService = null;
+const getActivityService = async () => {
+    if (_activityService) return _activityService;
+    const mod = await import("../../services/activityService");
+    _activityService = mod?.default || mod;
+    return _activityService;
+};
 import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
@@ -466,7 +480,8 @@ const CalendarContainer = () => {
         let task = taskOrId;
         try {
             if (typeof taskOrId === "string") {
-                task = await taskService.get(taskOrId);
+                const svc = await getTaskService();
+                task = await svc.get(taskOrId);
             }
         } catch (e) {
             addToast({ title: "Task not found", variant: "error" });
@@ -510,7 +525,8 @@ const CalendarContainer = () => {
         let activity = activityOrId;
         try {
             if (typeof activityOrId === "string") {
-                activity = await activityService.get(activityOrId);
+                const svc = await getActivityService();
+                activity = await svc.get(activityOrId);
             }
         } catch (e) {
             addToast({ title: "Activity not found", variant: "error" });
@@ -553,7 +569,10 @@ const CalendarContainer = () => {
         })();
         try {
             if (form.type === "activity") {
-                await activityService.create({ text: form.text || form.title, taskId: form.taskId || null });
+                {
+                    const svc = await getActivityService();
+                    await svc.create({ text: form.text || form.title, taskId: form.taskId || null });
+                }
                 addToast({ title: "Activity added", variant: "success" });
             } else {
                 const toEndOfDayIso = (dateStr) => {
@@ -570,7 +589,8 @@ const CalendarContainer = () => {
                 };
                 const dueIso = toEndOfDayIso(form.dueDate);
                 const endIso = toEndOfDayIso(form.endDate);
-                const createdTask = await taskService.create({
+                const taskSvc = await getTaskService();
+                const createdTask = await taskSvc.create({
                     title: form.title,
                     description: form.description || null,
                     startDate: when.toISOString(),
@@ -921,22 +941,67 @@ const CalendarContainer = () => {
             </div>
             {addModalOpen && (
                 addDefaultTab === "activity" ? (
-                    <CreateActivityModal
-                        isOpen={addModalOpen}
-                        onClose={() => setAddModalOpen(false)}
-                        onSave={async (createdActivity) => {
-                            console.log('Activity created:', createdActivity);
-                            await refreshTodosForRange();
-                            setAddModalOpen(false);
-                            addToast({ 
-                                title: "Activity created successfully", 
-                                description: "The activity has been added",
-                                variant: "success" 
-                            });
-                        }}
-                        initialData={{
-                            text: "",
-                            key_area_id: (() => {
+                    <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                        <CreateActivityModal
+                            isOpen={addModalOpen}
+                            onClose={() => setAddModalOpen(false)}
+                            onSave={async (createdActivity) => {
+                                console.log('Activity created:', createdActivity);
+                                await refreshTodosForRange();
+                                setAddModalOpen(false);
+                                addToast({ 
+                                    title: "Activity created successfully", 
+                                    description: "The activity has been added",
+                                    variant: "success" 
+                                });
+                            }}
+                            initialData={{
+                                text: "",
+                                key_area_id: (() => {
+                                    try {
+                                        const toDateOnly = (iso) => {
+                                            if (!iso) return null;
+                                            const d = new Date(iso);
+                                            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                        };
+                                        const baseDate = addDate || new Date();
+                                        const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+                                        const inRange = (t) => {
+                                            let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
+                                            let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
+                                            if (!start && !end) return false;
+                                            if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
+                                            if (!start) start = end; if (!end) end = start;
+                                            return start <= dayOnly && dayOnly <= end;
+                                        };
+                                        const candidate = (Array.isArray(todos) ? todos : []).find(inRange);
+                                        return candidate?.keyAreaId || "";
+                                    } catch { return ""; }
+                                })(),
+                                taskId: (() => {
+                                    // Preselect a task visible on the selected day if possible (editable by user)
+                                    try {
+                                        const toDateOnly = (iso) => {
+                                            if (!iso) return null;
+                                            const d = new Date(iso);
+                                            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                        };
+                                        const baseDate = addDate || new Date();
+                                        const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+                                        const inRange = (t) => {
+                                            let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
+                                            let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
+                                            if (!start && !end) return false;
+                                            if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
+                                            if (!start) start = end; if (!end) end = start;
+                                            return start <= dayOnly && dayOnly <= end;
+                                        };
+                                        const candidate = (Array.isArray(todos) ? todos : []).find(inRange);
+                                        return candidate?.id || "";
+                                    } catch { return ""; }
+                                })(),
+                            }}
+                            dayTaskIds={(() => {
                                 try {
                                     const toDateOnly = (iso) => {
                                         if (!iso) return null;
@@ -953,69 +1018,28 @@ const CalendarContainer = () => {
                                         if (!start) start = end; if (!end) end = start;
                                         return start <= dayOnly && dayOnly <= end;
                                     };
-                                    const candidate = (Array.isArray(todos) ? todos : []).find(inRange);
-                                    return candidate?.keyAreaId || "";
-                                } catch { return ""; }
-                            })(),
-                            taskId: (() => {
-                                // Preselect a task visible on the selected day if possible (editable by user)
-                                try {
-                                    const toDateOnly = (iso) => {
-                                        if (!iso) return null;
-                                        const d = new Date(iso);
-                                        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                                    };
-                                    const baseDate = addDate || new Date();
-                                    const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
-                                    const inRange = (t) => {
-                                        let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
-                                        let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
-                                        if (!start && !end) return false;
-                                        if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
-                                        if (!start) start = end; if (!end) end = start;
-                                        return start <= dayOnly && dayOnly <= end;
-                                    };
-                                    const candidate = (Array.isArray(todos) ? todos : []).find(inRange);
-                                    return candidate?.id || "";
-                                } catch { return ""; }
-                            })(),
-                        }}
-                        dayTaskIds={(() => {
-                            try {
-                                const toDateOnly = (iso) => {
-                                    if (!iso) return null;
-                                    const d = new Date(iso);
-                                    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                                };
-                                const baseDate = addDate || new Date();
-                                const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
-                                const inRange = (t) => {
-                                    let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
-                                    let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
-                                    if (!start && !end) return false;
-                                    if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
-                                    if (!start) start = end; if (!end) end = start;
-                                    return start <= dayOnly && dayOnly <= end;
-                                };
-                                return (Array.isArray(todos) ? todos : []).filter(inRange).map((t) => String(t.id));
-                            } catch { return []; }
-                        })()}
-                    />
+                                    return (Array.isArray(todos) ? todos : []).filter(inRange).map((t) => String(t.id));
+                                } catch { return []; }
+                            })()}
+                        />
+                    </Suspense>
                 ) : (
-                    <CreateTaskModal
-                        isOpen={addModalOpen}
-                        onClose={() => setAddModalOpen(false)}
-                        onSave={async (createdTask) => {
-                            await refreshTodosForRange();
-                            setAddModalOpen(false);
-                        }}
-                        initialData={{
-                            date: (() => {
-                                const d = addDate || new Date();
-                                return d.toISOString().slice(0, 10);
-                            })(),
-                        }}
-                    />
+                    <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                        <CreateTaskModal
+                            isOpen={addModalOpen}
+                            onClose={() => setAddModalOpen(false)}
+                            onSave={async (createdTask) => {
+                                await refreshTodosForRange();
+                                setAddModalOpen(false);
+                            }}
+                            initialData={{
+                                date: (() => {
+                                    const d = addDate || new Date();
+                                    return d.toISOString().slice(0, 10);
+                                })(),
+                            }}
+                        />
+                    </Suspense>
                 )
             )}
             {appointmentModalOpen && appointmentInitialStart && (

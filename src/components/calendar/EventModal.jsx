@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
-import keyAreaService from "../../services/keyAreaService";
-import { getGoals } from "../../services/goalService";
+// Load keyAreaService on demand so it can be code-split
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
 import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 
 const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEventDeleted }) => {
@@ -42,9 +48,13 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
     useEffect(() => {
         (async () => {
             try {
+                const kaSvc = await getKeyAreaService();
                 const [kas, gs] = await Promise.all([
-                    keyAreaService.list({ includeTaskCount: false }).catch(() => []),
-                    getGoals().catch(() => []),
+                    kaSvc.list({ includeTaskCount: false }).catch(() => []),
+                    // Dynamically import goalService so it can be code-split away
+                    // from the initial bundle. Some consumers already use
+                    // dynamic import; doing it here avoids keeping goals in main.
+                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
                 ]);
                 setKeyAreas(Array.isArray(kas) ? kas : []);
                 setGoals(Array.isArray(gs) ? gs : []);

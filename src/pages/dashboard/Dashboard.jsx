@@ -13,8 +13,15 @@ import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
 import WeeklyTrendBars from "../../components/dashboard/widgets/WeeklyTrendBars.jsx";
 
 // Real API Services
-import { getGoals } from "../../services/goalService";
-import activityService from "../../services/activityService";
+// goalService will be dynamically imported where needed to allow code-splitting
+// Load activityService on demand to keep it out of the main chunk
+let _activityService = null;
+const getActivityService = async () => {
+    if (_activityService) return _activityService;
+    const mod = await import("../../services/activityService");
+    _activityService = mod?.default || mod;
+    return _activityService;
+};
 import calendarService from "../../services/calendarService";
 
 // Fallback data for when API is unavailable
@@ -337,27 +344,20 @@ export default function Dashboard() {
     // Dark mode disabled; keep theme as light while retaining the button UI
     const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
 
-    // Close Widgets dropdown on outside click / Escape
-    const widgetsDetailsRef = useRef(null);
+    // Dashboard will listen for prefs updates dispatched by Navbar widget control
     useEffect(() => {
-        function handlePointerDown(e) {
-            const el = widgetsDetailsRef.current;
-            if (el && el.open && !el.contains(e.target)) {
-                el.open = false;
+        const handler = (e) => {
+            try {
+                const widgets = e?.detail?.widgets;
+                if (widgets) {
+                    setPrefs((p) => ({ ...p, widgets: { ...p.widgets, ...widgets } }));
+                }
+            } catch (err) {
+                console.warn('dashboard prefs handler error', err);
             }
-        }
-        function handleKey(e) {
-            if (e.key === "Escape") {
-                const el = widgetsDetailsRef.current;
-                if (el && el.open) el.open = false;
-            }
-        }
-        document.addEventListener("pointerdown", handlePointerDown);
-        document.addEventListener("keydown", handleKey);
-        return () => {
-            document.removeEventListener("pointerdown", handlePointerDown);
-            document.removeEventListener("keydown", handleKey);
         };
+        window.addEventListener('dashboard-prefs-updated', handler);
+        return () => window.removeEventListener('dashboard-prefs-updated', handler);
     }, []);
 
     // (top summary layout handled below nearer the JSX so it has current prefs)
@@ -383,7 +383,8 @@ export default function Dashboard() {
             // Load Goals
             try {
                 console.log("Loading goals...");
-                const goalsData = await getGoals();
+                const mod = await import("../../services/goalService");
+                const goalsData = await mod.getGoals();
                 console.log("Goals loaded:", goalsData);
                 
                 // Transform goals data for dashboard display
@@ -410,7 +411,8 @@ export default function Dashboard() {
             // Load Activity Feed
             try {
                 console.log("Loading activities...");
-                const activitiesData = await activityService.list();
+                const activitySvc = await getActivityService();
+                const activitiesData = await activitySvc.list();
                 console.log("Activities loaded:", activitiesData);
                 
                 // Transform activity data for dashboard display
@@ -519,6 +521,30 @@ export default function Dashboard() {
     const [quickAddOpen, setQuickAddOpen] = useState(null); // 'task'|'goal'|'stroke'|'note'|'appointment'
     const [message, setMessage] = useState("");
     const [quickAddLoading, setQuickAddLoading] = useState(false);
+
+    // Listen for global quick-add events from Navbar (or other components)
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const t = (e?.detail && e.detail.type) || e?.type || null;
+                if (t) {
+                    setQuickAddOpen(t);
+                    // Ensure any existing message is cleared
+                    setMessage("");
+                    // Allow focus to happen when input mounts
+                    setTimeout(() => {
+                        const el = document.getElementById('quickAddInput');
+                        if (el) el.focus();
+                    }, 80);
+                }
+            } catch (err) {
+                console.warn('open-quickadd handler error', err);
+            }
+        };
+
+        window.addEventListener('open-quickadd', handler);
+        return () => window.removeEventListener('open-quickadd', handler);
+    }, []);
     
     // Refresh dashboard data
     const refreshDashboardData = async () => {
@@ -556,11 +582,23 @@ export default function Dashboard() {
                     
                 case 'task':
                     // Create activity entry for now (until task service is integrated)
-                    await activityService.create({
-                        text: `New task: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
+                    const activitySvc = await getActivityService();
+                    await activitySvc.create({ text: `New task: ${inputValue.trim()}`, taskId: null });
                     setMessage(`✅ Task "${inputValue}" added to activity feed!`);
+                    break;
+
+                case 'activity':
+                    // Create a free-form activity (same as note)
+                    const activitySvc2 = await getActivityService();
+                    await activitySvc2.create({ text: `${inputValue.trim()}`, taskId: null });
+                    setMessage(`✅ Activity "${inputValue}" added to activity feed!`);
+                    break;
+
+                case 'stroke':
+                    // Use activity endpoint to record a recognition/stroke
+                    const activitySvc3 = await getActivityService();
+                    await activitySvc3.create({ text: `Stroke: ${inputValue.trim()}`, taskId: null });
+                    setMessage(`✅ Stroke for "${inputValue}" sent!`);
                     break;
                     
                 case 'appointment':
@@ -580,10 +618,8 @@ export default function Dashboard() {
                     
                 case 'note':
                     // Create as activity for now
-                    await activityService.create({
-                        text: `Note: ${inputValue.trim()}`,
-                        taskId: null,
-                    });
+                    const activitySvc4 = await getActivityService();
+                    await activitySvc4.create({ text: `Note: ${inputValue.trim()}`, taskId: null });
                     setMessage(`✅ Note "${inputValue}" saved!`);
                     break;
                     
@@ -712,7 +748,8 @@ export default function Dashboard() {
     }
 
     // Determine which widgets are visible and keep their selection order
-    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
+    // quickAdd is handled separately (top fixed widget and non-draggable)
+    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k] && k !== 'quickAdd');
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
@@ -750,7 +787,17 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <QuickAddBar onOpen={(t) => setQuickAddOpen(t)} message={message} />
+                    <QuickAddBar
+                        onOpen={(t) => {
+                            try {
+                                const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                            } catch (err) {
+                                console.warn('quickAdd dispatch error', err);
+                            }
+                        }}
+                        message={message}
+                    />
                 </div>
             );
         }
@@ -1099,43 +1146,30 @@ export default function Dashboard() {
                             <FaBars />
                         </button>
                     </div>
-                    {/* Widget toggles dropdown on the right */}
-                    <div className="relative ml-auto w-full sm:w-auto">
-                        <details ref={widgetsDetailsRef} className="relative">
-                            <summary className="px-3 py-1 bg-[Canvas] border rounded cursor-pointer text-[CanvasText] w-full sm:w-auto text-center sm:text-left">
-                                Widgets
-                            </summary>
-                            <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-[Canvas] border rounded shadow p-0 z-40 max-h-96 overflow-hidden text-[CanvasText]">
-                                <div className="px-3 py-2 border-b flex items-center justify-between">
-                                    <div className="font-medium text-sm">Widgets</div>
-                                    <div className="text-xs opacity-70">Show / hide</div>
-                                </div>
-                                <div className="p-2 max-h-80 overflow-auto">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                                        {Object.keys(prefs.widgets).map((k) => (
-                                            <label
-                                                key={k}
-                                                className="flex items-center justify-between px-2 py-2 rounded cursor-pointer"
-                                            >
-                                                <span className="capitalize text-sm">{k.replace(/([A-Z])/g, " $1")}</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={prefs.widgets[k]}
-                                                    onChange={() => toggleWidget(k)}
-                                                    className="h-4 w-4"
-                                                />
-                                            </label>
-                                        ))}
-                                    </div>
-
-                                    
-                                </div>
-                            </div>
-                        </details>
-                    </div>
+                    {/* Widgets control moved to Navbar (keeps header slim) */}
                 </div>
 
-                {/* Unified Widget Grid - All widgets in draggable layout */}
+                {/* Quick Add fixed widget at top (non-draggable) */}
+                {prefs.widgets.quickAdd && (
+                    <div className="mb-3">
+                        <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                            <QuickAddBar
+                                onOpen={(t) => {
+                                    try {
+                                        // Map lightweight quick types to the modal manager's types
+                                        const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                        window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                                    } catch (err) {
+                                        console.warn('quickAdd dispatch error', err);
+                                    }
+                                }}
+                                message={message}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
                 {visibleWidgetKeys.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-max">
                         {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}

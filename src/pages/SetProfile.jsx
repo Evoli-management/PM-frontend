@@ -5,7 +5,6 @@ import { PersonalInformation } from '../components/profile/PersonalInformation';
 import { SecuritySettings } from '../components/profile/SecuritySettings';
 import { Preferences } from '../components/profile/Preferences';
 import { Integrations } from '../components/profile/Integrations';
-import { Privacy } from '../components/profile/Privacy';
 import { Toast } from '../components/profile/UIComponents';
 import { FaBars } from 'react-icons/fa';
 
@@ -81,8 +80,6 @@ export default function ProfileSetting() {
                 return <Preferences showToast={showToast} />;
             case "Integrations":
                 return <Integrations showToast={showToast} />;
-            case "Privacy":
-                return <Privacy showToast={showToast} />;
             case "Teams & Members":
                 return <TeamsTab showToast={showToast} />;
             default:

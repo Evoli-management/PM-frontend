@@ -43,7 +43,6 @@ export const Integrations = ({ showToast }) => {
             
             setIntegrations(updates);
         } catch (error) {
-            console.log('Failed to load sync status:', error);
             // Fallback to localStorage
             const saved = localStorage.getItem('userIntegrations');
             if (saved) {
@@ -148,7 +147,7 @@ export const Integrations = ({ showToast }) => {
         config, 
         settings 
     }) => (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-white rounded-lg p-6">
             <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
                     <div className="text-2xl">{icon}</div>
@@ -193,7 +192,7 @@ export const Integrations = ({ showToast }) => {
             </div>
             
             {config.connected && settings && (
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                <div className="mt-4 pt-4 space-y-3">
                     {settings.map((setting, index) => (
                         <Toggle
                             key={index}
@@ -267,7 +266,7 @@ export const Integrations = ({ showToast }) => {
             </Section>
             
             {/* Save Button */}
-            <div className="flex justify-end pt-6 border-t border-gray-200">
+            <div className="flex justify-end pt-6">
                 <LoadingButton
                     onClick={saveIntegrations}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
