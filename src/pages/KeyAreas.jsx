@@ -1,4 +1,4 @@
-const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
+const SortableKeyAreaRow = ({ ka, idx, moveKeyArea, onOpen }) => {
     const {
         attributes,
         listeners,
@@ -10,6 +10,7 @@ const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
             ref={setNodeRef}
             {...attributes}
             className={`flex items-center px-4 py-3 transition-transform ease-in-out duration-200 bg-white hover:bg-slate-50 ${isDragging ? 'z-10 shadow-lg' : ''}`}
+            onClick={() => { if (!isDragging && onOpen) onOpen(ka); }}
             style={{ touchAction: 'manipulation' }}
             tabIndex={0}
             aria-label={`Key Area: ${ka.title}`}
@@ -44,37 +45,18 @@ const SortableKeyAreaRow = ({ ka, idx, moveKeyArea }) => {
                     <span className="ml-2 text-xs text-slate-500 cursor-inherit">{ka.taskCount} tasks</span>
                 )}
             </div>
-            {/* Up/Down buttons for accessibility */}
-            <div className="flex items-center gap-1 ml-2">
-                <button
-                    type="button"
-                    className="p-1 rounded focus:outline-none"
-                    aria-label="Move up"
-                    disabled={idx === 0}
-                    onClick={() => moveKeyArea(idx, idx - 1)}
-                >
-                    <svg width="16" height="16" fill="none"><path d="M8 4l-4 6h8l-4-6z" fill="#64748b" /></svg>
-                </button>
-                <button
-                    type="button"
-                    className="p-1 rounded focus:outline-none"
-                    aria-label="Move down"
-                    disabled={false}
-                    onClick={() => moveKeyArea(idx, idx + 1)}
-                >
-                    <svg width="16" height="16" fill="none"><path d="M8 12l4-6H4l4 6z" fill="#64748b" /></svg>
-                </button>
-            </div>
+            {/* removed explicit up/down reorder buttons - row click opens the key area; reordering handled via drag/drop */}
         </div>
     );
 };
 
-const FixedKeyAreaRow = ({ ka }) => {
+const FixedKeyAreaRow = ({ ka, onOpen }) => {
     return (
         <div
-            className="flex items-center px-4 py-3 bg-slate-50 opacity-80 cursor-default"
+            className="flex items-center px-4 py-3 bg-slate-50 opacity-80 cursor-pointer"
             tabIndex={0}
             aria-label={`Key Area: ${ka.title} (Fixed)`}
+            onClick={() => onOpen && onOpen(ka)}
         >
             {/* Fixed icon */}
             <span className="mr-3 text-slate-400" title="Fixed position">
@@ -121,7 +103,6 @@ import {
     FaChevronUp,
     FaChevronDown,
     FaLock,
-    FaListUl,
     FaExclamationCircle,
 } from "react-icons/fa";
 import {
@@ -524,9 +505,9 @@ const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelec
                 <SortableContext items={keyAreas.filter(ka => !ka.is_fixed).map(ka => ka.id)}>
                     {keyAreas.map((ka, idx) => (
                         ka.is_fixed ? (
-                            <FixedKeyAreaRow key={ka.id} ka={ka} />
+                            <FixedKeyAreaRow key={ka.id} ka={ka} onOpen={openKA} />
                         ) : (
-                            <SortableKeyAreaRow key={ka.id} ka={ka} idx={idx} moveKeyArea={moveKeyArea} />
+                            <SortableKeyAreaRow key={ka.id} ka={ka} idx={idx} moveKeyArea={moveKeyArea} onOpen={openKA} />
                         )
                     ))}
                 </SortableContext>
@@ -4699,12 +4680,6 @@ export default function KeyAreas() {
                                                 </div>
                                             </div>
                                             <div className="mt-6 flex items-center gap-2">
-                                                <button
-                                                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-2 py-1 text-sm border border-slate-200"
-                                                    onClick={() => openKA(ideaForShow)}
-                                                >
-                                                    <FaListUl /> Open Lists
-                                                </button>
                                                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs border border-slate-200">
                                                     Position: 10
                                                 </span>
@@ -4735,6 +4710,7 @@ export default function KeyAreas() {
                                                             ka.is_default ? '' : 'hover:bg-slate-50 cursor-grab active:cursor-grabbing'
                                                         }`}
                                                         draggable={!ka.is_default}
+                                                        onClick={(e) => { if (dragKAId) return; openKA(ka); }}
                                                         onDragStart={(e) => {
                                                             if (ka.is_default) return;
                                                             setDragKAId(String(ka.id));
@@ -4784,40 +4760,12 @@ export default function KeyAreas() {
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-1">
-                                                            <button
-                                                                className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 px-2 py-1 text-xs"
-                                                                onClick={() => openKA(ka)}
-                                                            >
-                                                                <FaListUl /> Open Lists
-                                                            </button>
-                                                            {!ka.is_default && (
-                                                                <>
-                                                                    <button
-                                                                        type="button"
-                                                                        title="Move up"
-                                                                        className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
-                                                                        onClick={() => reorderKA(ka, "up")}
-                                                                    >
-                                                                        <FaChevronUp />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        title="Move down"
-                                                                        className="rounded-md bg-white font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 px-2 py-1 text-xs border border-slate-200"
-                                                                        onClick={() => reorderKA(ka, "down")}
-                                                                    >
-                                                                        <FaChevronDown />
-                                                                    </button>
-                                                                </>
-                                                            )}
+                                                            {/* Row click opens lists; keep lightweight edit/delete actions only */}
                                                             <button
                                                                 className="rounded-md bg-white text-slate-700 hover:bg-slate-50 flex items-center justify-center p-2 text-xs border border-slate-200"
                                                                 title="Edit"
                                                                 aria-label="Edit key area"
-                                                                onClick={() => {
-                                                                    setEditing(ka);
-                                                                    setShowForm(true);
-                                                                }}
+                                                                onClick={(e) => { e.stopPropagation(); setEditing(ka); setShowForm(true); }}
                                                             >
                                                                 <FaEdit />
                                                             </button>
@@ -4826,8 +4774,7 @@ export default function KeyAreas() {
                                                                 title={
                                                                     ka.is_default || (ka.title || "").toLowerCase() === "ideas"
                                                                         ? "Cannot delete the Ideas key area"
-                                                                        : typeof ka.taskCount === "number" &&
-                                                                            ka.taskCount > 0
+                                                                        : typeof ka.taskCount === "number" && ka.taskCount > 0
                                                                           ? `${ka.taskCount} task(s) present`
                                                                           : undefined
                                                                 }
@@ -4837,7 +4784,7 @@ export default function KeyAreas() {
                                                                         ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
                                                                         : "bg-white text-red-600 hover:bg-red-50 border-red-200"
                                                                 }`}
-                                                                onClick={() => onDeleteKA(ka)}
+                                                                onClick={(e) => { e.stopPropagation(); onDeleteKA(ka); }}
                                                             >
                                                                 <FaTrash />
                                                             </button>
@@ -5141,10 +5088,10 @@ export default function KeyAreas() {
                                                                 })()}
                                                             </select>
                                                         </div>
-                                                        {/* Respons. */}
+                                                        {/* Assignee */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
-                                                                Respons.
+                                                                Assignee
                                                             </label>
                                                             <select
                                                                 name="assignee"
@@ -5577,10 +5524,10 @@ export default function KeyAreas() {
                                                                     ))}
                                                             </select>
                                                         </div>
-                                                        {/* Respons. */}
+                                                        {/* Assignee */}
                                                         <div className="flex flex-col">
                                                             <label className="text-xs font-semibold text-slate-700">
-                                                                Respons.
+                                                                Assignee
                                                             </label>
                                                             <select
                                                                 name="assignee"

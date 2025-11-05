@@ -308,7 +308,7 @@ export default function CreateTaskModal({
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Respons.</label>
+                                <label className="text-xs font-semibold text-slate-700">Assignee</label>
                                 <select name="assignee" className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.assignee} onChange={handleInputChange}>
                                     <option value="">— Unassigned —</option>
                                     <option value="Me">Me</option>

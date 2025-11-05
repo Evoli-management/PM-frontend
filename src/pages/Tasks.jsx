@@ -827,7 +827,7 @@ export default function Tasks() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-blue-900">Responsible</label>
+                                                <label className="block text-xs text-blue-900">Assignee</label>
                                                 <input
                                                     value={massEdit.assignee}
                                                     onChange={(e) =>
@@ -1295,7 +1295,7 @@ export default function Tasks() {
                                                     </div>
                                                     <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5">
                                                         <label className="text-xs font-semibold text-slate-900 block">
-                                                            Responsible
+                                                            Assignee
                                                         </label>
                                                         <input
                                                             value={editModal.form?.assignee || ""}
