@@ -3875,7 +3875,7 @@ export default function KeyAreas() {
                                                                             onChange={selectAllVisible}
                                                                         />
                                                                     </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
+                                                                    <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">
                                                                         Task
                                                                     </th>
                                                                     <th className="px-3 py-2 text-left font-semibold">
