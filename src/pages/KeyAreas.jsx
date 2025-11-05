@@ -99,7 +99,7 @@ const FixedKeyAreaRow = ({ ka }) => {
 };
 
 // src/pages/KeyAreas.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import {
@@ -270,6 +270,31 @@ import activityService from "../services/activityService";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import CreateActivityModal from "../components/modals/CreateActivityModal.jsx";
 // ...existing code...
+
+// Some modules expect async getters named `getTaskService`, `getKeyAreaService`,
+// and `getActivityService`. Provide lightweight lazy wrappers that return the
+// already-imported service instances. This mirrors the lazy import pattern
+// used elsewhere but avoids duplicating dynamic imports in this large file.
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    _taskService = taskService;
+    return _taskService;
+};
+
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    _keyAreaService = keyAreaService;
+    return _keyAreaService;
+};
+
+let _activityService = null;
+const getActivityService = async () => {
+    if (_activityService) return _activityService;
+    _activityService = activityService;
+    return _activityService;
+};
 
 // Normalize backend task status to UI status
 const mapTaskStatusToUi = (s) => {
@@ -561,7 +586,7 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
                                         onClick={() => onSelect && onSelect(t)}
                                         className="flex-1 text-left"
                                     >
-                                        <div className="font-medium truncate text-slate-900">{t.title}</div>
+                                        <div className={`font-medium truncate ${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{t.title}</div>
                                         <div className="text-[11px] text-slate-500 mt-0.5 truncate capitalize">
                                             {String(t.status || "open").replace("_", " ")}
                                         </div>
@@ -1099,7 +1124,14 @@ function TaskFullView({
     selectedKA = null,
     users = [],
     allTasks = [],
+    // optional saving activity set passed from parent to coordinate saving indicators
+    savingActivityIds: savingActivityIdsProp = undefined,
+    setSavingActivityIds: setSavingActivityIdsProp = undefined,
 }) {
+    // Provide a local fallback so TaskFullView can be used standalone during testing.
+    const [savingActivityIdsLocal, setSavingActivityIdsLocal] = useState(new Set());
+    const savingActivityIds = savingActivityIdsProp ?? savingActivityIdsLocal;
+    const setSavingActivityIds = setSavingActivityIdsProp ?? setSavingActivityIdsLocal;
     const [tab, setTab] = useState(initialTab || "activities");
     const [isEditing, setIsEditing] = useState(false);
     const [form, setForm] = useState(task || null);
@@ -1407,13 +1439,14 @@ function TaskFullView({
                 const startD = toDateOnly(vt?.start_date) || "—";
                 const deadlineD = toDateOnly(vt?.deadline) || "—";
                 const endD = toDateOnly(vt?.end_date) || "—";
+                const completedD = toDateOnly(vt?.completionDate || vt?.completion_date) || "—";
                 const durationText = vt?.start_date && vt?.end_date ? formatDuration(vt.start_date, vt.end_date) : "—";
                 return (
                     <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-white">
                         <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2">
                             <div className="text-sm">
                                 {/* Row 1: Labels in exact order */}
-                                <div className="grid grid-cols-10 gap-x-1">
+                                <div className="grid grid-cols-11 gap-x-1">
                                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Assignee</div>
                                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Status</div>
                                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Priority</div>
@@ -1424,9 +1457,10 @@ function TaskFullView({
                                     <div className="text-[11px] uppercase tracking-wide text-slate-500">End date</div>
                                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Deadline</div>
                                     <div className="text-[11px] uppercase tracking-wide text-slate-500">Duration</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Completed</div>
                                 </div>
                                 {/* Row 2: Values aligned under each label */}
-                                <div className="grid grid-cols-10 gap-x-1 mt-0.5">
+                                <div className="grid grid-cols-11 gap-x-1 mt-0.5">
                                     {/* Assignee value */}
                                     <div className="text-slate-900 truncate min-w-0">{assignee}</div>
                                     {/* Status value */}
@@ -1480,6 +1514,8 @@ function TaskFullView({
                                     <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">
                                         {durationText}
                                     </div>
+                                    {/* Completed value */}
+                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{completedD}</div>
                                 </div>
                             </div>
                         </div>
@@ -3445,6 +3481,8 @@ export default function KeyAreas() {
                                     selectedKA={selectedKA}
                                     users={users}
                                     allTasks={allTasks}
+                                    savingActivityIds={savingActivityIds}
+                                    setSavingActivityIds={setSavingActivityIds}
                                     readOnly={
                                         Boolean(selectedKA?.is_default) &&
                                         (selectedKA?.title || "").toLowerCase() !== "ideas"
@@ -3977,7 +4015,7 @@ export default function KeyAreas() {
                                                                                         })()}
                                                                                         <button
                                                                                             type="button"
-                                                                                            className="text-blue-700 hover:underline font-semibold"
+                                                                                            className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
                                                                                             title="Click to open task"
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
