@@ -492,8 +492,8 @@ const CreateActivityModal = ({ isOpen, onClose, onSave, initialData = {}, attach
                                     )}
                                 </div>
                             )}
-                            <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Respons.</label>
+                                <div className="flex flex-col">
+                                <label className="text-xs font-semibold text-slate-700">Assignee</label>
                                 {readOnly ? (
                                     <input
                                         className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-slate-50 text-slate-700"
