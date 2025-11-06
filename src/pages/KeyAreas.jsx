@@ -287,6 +287,33 @@ const mapTaskStatusToUi = (s) => {
     return "open";
 };
 
+// Map UI status back to backend canonical values
+const mapUiStatusToServer = (s) => {
+    const v = String(s || 'open').toLowerCase();
+    if (v === 'open') return 'todo';
+    if (v === 'in_progress') return 'in_progress';
+    if (v === 'done') return 'completed';
+    if (v === 'blocked') return 'cancelled';
+    return 'todo';
+};
+
+// Normalize activity record from backend to UI-friendly shape
+const normalizeActivity = (a) => {
+    if (!a) return a;
+    return {
+        ...a,
+        id: a.id,
+        text: a.text || a.activity_name || "",
+        assignee: a.assignee || a.assignee_name || "",
+        priority: a.priority ?? a.priority_level ?? null,
+        status: mapTaskStatusToUi(a.status),
+        completionDate: a.completionDate || a.completion_date || null,
+        start_date: a.startDate || a.start_date || null,
+        end_date: a.endDate || a.end_date || null,
+        deadline: a.deadline || a.dueDate || a.due_date || null,
+    };
+};
+
 const api = {
     async listKeyAreas() {
         try {
@@ -657,7 +684,7 @@ function TaskSlideOver({
         (async () => {
             try {
                 const list = await (await getActivityService()).list({ taskId: task.id });
-                setTaskActivities(Array.isArray(list) ? list : []);
+                setTaskActivities(Array.isArray(list) ? list.map(normalizeActivity) : []);
             } catch (e) {
                 console.error("Failed to load activities", e);
                 setTaskActivities([]);
@@ -678,10 +705,10 @@ function TaskSlideOver({
                 if (activitiesTarget === "new") {
                     const list = await (await getActivityService()).list();
                     // Unattached activities: filter those without taskId
-                    setTaskActivities((Array.isArray(list) ? list : []).filter((a) => !a.taskId));
+                    setTaskActivities((Array.isArray(list) ? list.map(normalizeActivity) : []).filter((a) => !a.taskId));
                 } else {
                     const list = await (await getActivityService()).list({ taskId: activitiesTarget });
-                    setTaskActivities(Array.isArray(list) ? list : []);
+                    setTaskActivities(Array.isArray(list) ? list.map(normalizeActivity) : []);
                 }
             } catch (e) {
                 console.error("Failed to load activities", e);
@@ -698,7 +725,7 @@ function TaskSlideOver({
             if (tid && String(tid) !== String(task.id)) return; // ignore events for other tasks
             try {
                 const list = await (await getActivityService()).list({ taskId: task.id });
-                setTaskActivities(Array.isArray(list) ? list : []);
+                setTaskActivities(Array.isArray(list) ? list.map(normalizeActivity) : []);
             } catch (err) {
                 // ignore
             }
@@ -731,6 +758,34 @@ function TaskSlideOver({
             window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
         } catch (e) {
             console.error("Failed to delete activity", e);
+        }
+    };
+    const setActivityStatus = async (id, status) => {
+        if (savingActivityIds.has(id)) return;
+        const prev = Array.isArray(taskActivities) ? [...taskActivities] : [];
+        const next = prev.map((a) => (a.id === id ? { ...a, status, completed: status === 'done' ? true : a.completed } : a));
+        // optimistic
+        setTaskActivities(next);
+        setSavingActivityIds((s) => new Set([...s, id]));
+            try {
+                const svc = await getActivityService();
+                const serverStatus = mapUiStatusToServer(status);
+                const updated = await svc.update(id, {
+                    status: serverStatus,
+                    completed: status === 'done',
+                    completionDate: status === 'done' ? new Date().toISOString() : null,
+                });
+                const norm = normalizeActivity(updated || {});
+                setTaskActivities((prev) => prev.map((a) => (a.id === id ? norm : a)));
+            } catch (e) {
+            console.error('Failed to update activity status', e);
+            setTaskActivities(prev);
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
         }
     };
 
@@ -1039,32 +1094,81 @@ function TaskSlideOver({
                                     <div className="inline-block align-middle ml-3 text-xs text-slate-500">Saving...</div>
                                 )}
                             </div>
-                            <div>
+                            <div className="mt-3 overflow-x-auto">
                                 {taskActivities && taskActivities.length > 0 ? (
-                                    <div className="mt-2 space-y-2">
-                                        {taskActivities.map((a) => (
-                                            <div
-                                                key={a.id}
-                                                className="flex items-start justify-between p-2 border rounded bg-white"
-                                            >
-                                                <div className="flex-1">
-                                                    <div className="text-sm text-slate-800">{a.text}</div>
-                                                    <div className="text-xs text-slate-500 mt-1">
-                                                        {/* createdAt removed */}
-                                                    </div>
-                                                </div>
-                                                <div className="ml-3 flex items-start">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeActivity(a.id)}
-                                                        className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Assignee</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Status</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Priority</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Start date</th>
+                                                <th className="px-3 py-2 text-left font-semibold">End date</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Deadline</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Duration</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Completed</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {taskActivities.map((a) => (
+                                                <tr key={a.id} className="bg-white border-b border-slate-100">
+                                                    <td className="px-3 py-2 align-top">
+                                                        <div className="flex items-center gap-3">
+                                                            {/* Activity icon: keep the exact inline SVG requested */}
+                                                            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
+                                                            <div className="flex flex-col">
+                                                                <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text}</div>
+                                                                <div className="text-xs text-slate-500">{a.note || ""}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2 align-top text-slate-700">{a.assignee || "—"}</td>
+                                                    <td className="px-3 py-2 align-top">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
+                                                            <select value={a.status || 'open'} onChange={(e)=> setActivityStatus(a.id, e.target.value)} className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
+                                                                <option value="open">Open</option>
+                                                                <option value="in_progress">In progress</option>
+                                                                <option value="done">Done</option>
+                                                            </select>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2 align-top">
+                                                        {(() => {
+                                                            const lvl = getPriorityLevel(a.priority);
+                                                            return (
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${lvl === 3 ? 'text-red-600 border-red-100' : lvl === 1 ? 'text-emerald-600 border-emerald-100' : 'text-slate-700 border-slate-100'}`}>
+                                                                    {lvl === 3 ? 'High' : lvl === 1 ? 'Low' : 'Normal'}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </td>
+                                                    <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || '—'}</td>
+                                                    <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
+                                                    <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
+                                                    <td className="px-3 py-2 align-top">{formatDuration(a.start_date, a.end_date)}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                        {a.completionDate ? new Date(a.completionDate).toLocaleString() : '—'}
+                                                    </td>
+                                                    <td className="px-3 py-2 align-top">
+                                                        <div className="flex items-center gap-2">
+                                                            <button type="button" onClick={() => {/* tag handler (TBD) */}} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Tags">
+                                                                <FaTag className="w-4 h-4" />
+                                                            </button>
+                                                            <button type="button" onClick={() => removeActivity(a.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md" title="Delete">
+                                                                <FaTrash className="w-4 h-4" />
+                                                            </button>
+                                                            <button type="button" onClick={() => createTaskFromActivity(a)} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Convert to task">
+                                                                <FaAngleDoubleLeft className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 ) : (
                                     <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
                                 )}
@@ -1192,7 +1296,11 @@ function TaskFullView({
         if (savingActivityIds.has(id)) return;
 
         const prev = Array.isArray(list) ? [...list] : [];
-        const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+        const next = prev.map((a) =>
+            a.id === id
+                ? { ...a, completed: !a.completed, completionDate: !a.completed ? new Date().toISOString() : null }
+                : a,
+        );
         // optimistic update
         setList(next);
 
@@ -1201,7 +1309,7 @@ function TaskFullView({
         try {
             const svc = await getActivityService();
             const item = next.find((a) => a.id === id);
-            await svc.update(id, { completed: !!item.completed });
+            await svc.update(id, { completed: !!item.completed, completionDate: item.completed ? new Date().toISOString() : null });
             addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
         } catch (e) {
             console.error("Failed to update activity completion", e);
@@ -1217,15 +1325,56 @@ function TaskFullView({
             });
         }
     };
+    const setActivityStatus = async (id, status) => {
+        // scoped to TaskFullView: update activity status and set completed when status === 'done'
+        if (savingActivityIds.has(id)) return;
+        const prev = Array.isArray(list) ? [...list] : [];
+        const next = prev.map((a) =>
+            a.id === id
+                ? {
+                      ...a,
+                      status,
+                      completed: status === 'done' ? true : a.completed,
+                      completionDate: status === 'done' ? new Date().toISOString() : a.completionDate || null,
+                  }
+                : a,
+        );
+        // optimistic update
+        setList(next);
+        setSavingActivityIds((s) => new Set([...s, id]));
+        try {
+            const svc = await getActivityService();
+            const serverStatus = mapUiStatusToServer(status);
+            const updated = await svc.update(id, {
+                status: serverStatus,
+                completed: status === 'done',
+                completionDate: status === 'done' ? new Date().toISOString() : null,
+            });
+            // replace with canonical server object (normalized)
+            const norm = normalizeActivity(updated || {});
+            setList((prevList) => prevList.map((a) => (a.id === id ? norm : a)));
+        } catch (e) {
+            console.error('Failed to update activity status', e);
+            setList(prev);
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
+        }
+    };
     const setPriorityValue = (id, value) => {
         // set priority explicitly via icon click; icons stay visible regardless of value
         setList(list.map((a) => (a.id === id ? { ...a, priority: value } : a)));
     };
     const createTaskFromActivity = (item) => {
-        // lightweight hook for future integration
+        // Ask user to confirm conversion. Only proceed when user confirms.
+        const confirmed = window.confirm("Convert this activity into a task? OK = convert, Cancel = abort");
+        if (!confirmed) return; // user cancelled, do nothing
         try {
             window.dispatchEvent(
-                new CustomEvent("ka-create-task-from-activity", { detail: { taskId: task.id, activity: item } }),
+                new CustomEvent("ka-create-task-from-activity", { detail: { taskId: task.id, activity: item, remove: true } }),
             );
         } catch {}
     };
@@ -1532,139 +1681,83 @@ function TaskFullView({
                     {list.length === 0 ? (
                         <EmptyState title="No activities for this task yet." hint="Add a new activity below." />
                     ) : (
-                        <ul className="space-y-2">
-                            {list.map((a) => {
-                                const title = a.text || a.activity_name || "";
-                                const isOpen = openActivityRows.has(a.id);
-                                return (
-                                    <li
-                                        key={a.id}
-                                        className="bg-slate-50 border border-slate-200 rounded-lg p-2"
-                                        onMouseEnter={() => closeOnHoverDifferent(a.id)}
-                                    >
-                                        <div
-                                            className="text-sm text-slate-800 flex items-start gap-2 cursor-pointer select-none"
-                                            onClick={() => toggleRow(a.id)}
-                                            role="button"
-                                            aria-expanded={isOpen ? "true" : "false"}
-                                            title={isOpen ? "Hide details" : "Show details"}
-                                        >
-                                            {/* Complete toggle */}
-                                            <button
-                                                type="button"
-                                                disabled={savingActivityIds.has(a.id)}
-                                                className={`mt-0.5 ${a.completed ? 'text-blue-600' : 'text-slate-500'} ${savingActivityIds.has(a.id) ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
-                                                title={savingActivityIds.has(a.id) ? 'Saving...' : (a.completed ? "Mark incomplete" : "Mark completed")}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleCompleted(a.id);
-                                                }}
-                                            >
-                                                {savingActivityIds.has(a.id) ? (
-                                                    <FaSpinner className="w-4 h-4 animate-spin" />
-                                                ) : a.completed ? (
-                                                    <FaCheckCircle className="w-4 h-4" />
-                                                ) : (
-                                                    <FaRegCircle className="w-4 h-4" />
-                                                )}
-                                            </button>
-
-                                            {/* Reorder handle (visual) */}
-                                            <span className="mt-0.5 text-[#4DC3D8]" title="Drag to reorder">
-                                                <FaAlignJustify className="w-4 h-4" />
-                                            </span>
-                                            <div className="flex-1">
-                                                <div className="w-full font-medium text-slate-800 truncate">
-                                                    {title || "Untitled activity"}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Assignee</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Status</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Priority</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Start date</th>
+                                        <th className="px-3 py-2 text-left font-semibold">End date</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Deadline</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Duration</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Completed</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {list.map((a) => (
+                                        <tr key={a.id} className="bg-white border-b border-slate-100">
+                                            <td className="px-3 py-2 align-top">
+                                                <div className="flex items-center gap-3">
+                                                    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
+                                                    <div className="flex flex-col">
+                                                        <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text || a.activity_name || 'Untitled activity'}</div>
+                                                    </div>
                                                 </div>
-                                                {/* createdAt removed */}
-                                            </div>
-                                            {/* Tag icon (placeholder) */}
-                                            <button
-                                                type="button"
-                                                className="p-1 rounded hover:bg-slate-100 text-[#4DC3D8]"
-                                                title="Tag"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    // placeholder for tag picker
-                                                }}
-                                            >
-                                                <FaTag className="w-4 h-4" />
-                                            </button>
-                                            {/* Priority indicator (single icon like task) */}
-                                            {(() => {
-                                                const eff =
-                                                    a.priority !== undefined && a.priority !== null && a.priority !== ""
-                                                        ? a.priority
-                                                        : task?.priority;
-                                                const lvl = getPriorityLevel(eff);
-                                                if (lvl === 2) return null; // hide when normal/medium
-                                                const color = lvl === 3 ? "text-red-600" : "text-emerald-600";
-                                                const label = lvl === 3 ? "high" : "low";
-                                                return (
-                                                    <span
-                                                        className={`mt-0.5 inline-block text-sm font-bold ${color}`}
-                                                        title={`Priority: ${label}`}
-                                                    >
-                                                        !
-                                                    </span>
-                                                );
-                                            })()}
-                                            {/* Delete */}
-                                            <button
-                                                type="button"
-                                                className="p-1 rounded hover:bg-slate-100 text-red-600"
-                                                title="Delete activity"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeActivity(a.id);
-                                                }}
-                                            >
-                                                <FaTrash className="w-4 h-4" />
-                                            </button>
-                                            {/* Edit activity */}
-                                            <button
-                                                type="button"
-                                                className="p-1 rounded hover:bg-slate-100 text-slate-700"
-                                                title="Edit activity"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    window.dispatchEvent(
-                                                        new CustomEvent("ka-open-activity-editor", {
-                                                            detail: { activity: a, taskId: task.id },
-                                                        }),
+                                            </td>
+                                            <td className="px-3 py-2 align-top text-slate-700">{a.assignee || '—'}</td>
+                                            <td className="px-3 py-2 align-top">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
+                                                    <select value={a.status || 'open'} onChange={(e)=> setActivityStatus(a.id, e.target.value)} className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
+                                                        <option value="open">Open</option>
+                                                        <option value="in_progress">In progress</option>
+                                                        <option value="done">Done</option>
+                                                    </select>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2 align-top">
+                                                {(() => {
+                                                    const eff = a.priority !== undefined && a.priority !== null && a.priority !== '' ? a.priority : task?.priority;
+                                                    const lvl = getPriorityLevel(eff);
+                                                    return (
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${lvl === 3 ? 'text-red-600 border-red-100' : lvl === 1 ? 'text-emerald-600 border-emerald-100' : 'text-slate-700 border-slate-100'}`}>
+                                                            {lvl === 3 ? 'High' : lvl === 1 ? 'Low' : 'Normal'}
+                                                        </span>
                                                     );
-                                                }}
-                                            >
-                                                <FaEdit className="w-4 h-4" />
-                                            </button>
-                                            {/* Create as task (disabled if already created) */}
-                                            <button
-                                                type="button"
-                                                className={`p-1 rounded hover:bg-slate-100 ${
-                                                    a.created_task_id
-                                                        ? "text-slate-300 cursor-not-allowed"
-                                                        : "text-slate-700"
-                                                }`}
-                                                title={
-                                                    a.created_task_id
-                                                        ? "Already created a task from this activity"
-                                                        : "Create as task"
-                                                }
-                                                disabled={!!a.created_task_id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (a.created_task_id) return;
-                                                    createTaskFromActivity(a);
-                                                }}
-                                            >
-                                                <FaAngleDoubleLeft className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                                                })()}
+                                            </td>
+                                            <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || '—'}</td>
+                                            <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
+                                            <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
+                                            <td className="px-3 py-2 align-top">{formatDuration(a.start_date, a.end_date)}</td>
+                                            <td className="px-3 py-2 align-top text-slate-800">
+                                                {a.completionDate ? new Date(a.completionDate).toLocaleString() : '—'}
+                                            </td>
+                                            <td className="px-3 py-2 align-top">
+                                                <div className="flex items-center gap-2">
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); /* tag placeholder */ }} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Tags">
+                                                        <FaTag className="w-4 h-4" />
+                                                    </button>
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="p-1 text-red-600 hover:bg-red-50 rounded-md" title="Delete">
+                                                        <FaTrash className="w-4 h-4" />
+                                                    </button>
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('ka-open-activity-editor',{detail:{activity:a,taskId:task.id}})); }} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Edit">
+                                                        <FaEdit className="w-4 h-4" />
+                                                    </button>
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); if (!a.created_task_id) createTaskFromActivity(a); }} className={`p-1 rounded-md ${a.created_task_id ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50'}`} title={a.created_task_id ? 'Already created a task from this activity' : 'Convert to task'} disabled={!!a.created_task_id}>
+                                                        <FaAngleDoubleLeft className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                     <div className="mt-3 flex items-center gap-2">
                         <button
@@ -2230,7 +2323,7 @@ export default function KeyAreas() {
         try {
             const svc = await getActivityService();
             const list = await svc.list({ taskId });
-            setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: Array.isArray(list) ? list : [] }));
+            setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
         } catch (e) {
             console.error("Failed to refresh activities", e);
             setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: [] }));
@@ -2245,7 +2338,7 @@ export default function KeyAreas() {
                 allTasks.map(async (t) => {
                     try {
                         const list = await svc.list({ taskId: t.id });
-                        return [String(t.id), Array.isArray(list) ? list : []];
+                        return [String(t.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
                     } catch {
                         return [String(t.id), []];
                     }
@@ -2298,11 +2391,11 @@ export default function KeyAreas() {
             const lvl = getPriorityLevel(activity.priority ?? parent.priority ?? "med");
             const prio = lvl === 3 ? "high" : lvl === 1 ? "low" : "med";
 
-            // Map activity fields into a new task
+            // Map activity fields into a new task (use activity text as title)
             const payload = {
                 key_area_id: kaId,
-                title: (activity.activity_name || "").trim() || "Untitled activity",
-                description: (activity.notes || "").trim() || `Created from activity in task "${parent.title || ""}"`,
+                title: (activity.text || activity.activity_name || "").trim() || "Untitled activity",
+                description: (activity.notes || activity.text || "").trim() || `Created from activity in task "${parent.title || ""}"`,
                 status: "open",
                 priority: prio,
                 category: parent.category || "Key Areas",
@@ -2331,13 +2424,32 @@ export default function KeyAreas() {
                     return { ...prev, [key]: arr };
                 });
 
-                // Ask whether to convert (remove the activity) or just copy
-                const shouldRemove = window.confirm(
+                // Determine whether to remove the original activity. If the event provided
+                // an explicit `remove` flag use it, otherwise fall back to a confirmation.
+                const shouldRemove = typeof detail.remove === 'boolean' ? detail.remove : window.confirm(
                     "Task created. Do you want to remove the original activity (convert)?",
                 );
                 if (shouldRemove) {
+                    try {
+                        const svc = await getActivityService();
+                        await svc.remove(activity.id);
+                    } catch (err) {
+                        console.error('Failed to remove activity after convert', err);
+                    }
                     setActivitiesByTask((prev) => {
                         const arr = (prev[key] || []).filter((a) => String(a.id) !== String(activity.id));
+                        return { ...prev, [key]: arr };
+                    });
+                    // notify other views
+                    window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId } }));
+                } else {
+                    // Keep the activity but mark it as having an associated created task
+                    setActivitiesByTask((prev) => {
+                        const arr = (prev[key] || []).map((a) =>
+                            String(a.id) === String(activity.id)
+                                ? { ...a, created_task_id: created.id, created_task_at: Date.now() }
+                                : a,
+                        );
                         return { ...prev, [key]: arr };
                     });
                 }
@@ -2887,7 +2999,7 @@ export default function KeyAreas() {
                 (t || []).map(async (row) => {
                     try {
                         const list = await svc.list({ taskId: row.id });
-                        return [String(row.id), Array.isArray(list) ? list : []];
+                        return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
                     } catch {
                         return [String(row.id), []];
                     }
@@ -3137,7 +3249,7 @@ export default function KeyAreas() {
                 if (tid) {
                     try {
                         const list = await svc.list({ taskId: tid });
-                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list : [] }));
+                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
                     } catch {}
                 }
                 window.dispatchEvent(
@@ -3155,7 +3267,7 @@ export default function KeyAreas() {
                         const list = await svc.list({ taskId: activityAttachTaskId });
                         setActivitiesByTask((prev) => ({
                             ...prev,
-                            [String(activityAttachTaskId)]: Array.isArray(list) ? list : [],
+                            [String(activityAttachTaskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [],
                         }));
                     } catch {}
                 }
@@ -4148,13 +4260,17 @@ export default function KeyAreas() {
                                                                                                 const toggleComplete = async (id) => {
                                                                                                     if (savingActivityIds.has(id)) return;
                                                                                                     const prev = Array.isArray(list) ? [...list] : [];
-                                                                                                    const next = prev.map((a) => (a.id === id ? { ...a, completed: !a.completed } : a));
+                                                                                                    const next = prev.map((a) =>
+                                                                                                        a.id === id
+                                                                                                            ? { ...a, completed: !a.completed, completionDate: !a.completed ? new Date().toISOString() : null }
+                                                                                                            : a,
+                                                                                                    );
                                                                                                     setList(next);
                                                                                                     setSavingActivityIds((s) => new Set([...s, id]));
                                                                                                     try {
                                                                                                         const svc = await getActivityService();
                                                                                                         const item = next.find((a) => a.id === id);
-                                                                                                        await svc.update(id, { completed: !!item.completed });
+                                                                                                        await svc.update(id, { completed: !!item.completed, completionDate: item.completed ? new Date().toISOString() : null });
                                                                                                         addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
                                                                                                     } catch (e) {
                                                                                                         console.error("Failed to update activity completion", e);
@@ -4949,7 +5065,7 @@ export default function KeyAreas() {
                                                                 Deadline
                                                             </label>
                                                             <div className="relative mt-1">
-                                                                <input
+                                                                   <input
                                                                     type="date"
                                                                     name="deadline"
                                                                     value={toDateOnly(taskForm.deadline)}
