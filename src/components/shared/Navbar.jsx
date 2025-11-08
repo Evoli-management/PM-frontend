@@ -171,7 +171,7 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-md sticky top-0 z-40 border-b border-gray-200"
+            className="bg-white text-black shadow-sm z-40 border-b border-gray-200"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
