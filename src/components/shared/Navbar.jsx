@@ -42,32 +42,32 @@ export default function Navbar() {
             return {};
         }
     });
-    
+
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
     const isPublicRoute = publicRoutes.includes(location.pathname);
-    
+
     useEffect(() => {
         // Check if user is authenticated by looking for access token
         const token = localStorage.getItem("access_token");
         setIsAuthenticated(!!token);
-        
+
         // Fetch user profile for avatar if authenticated
         if (token) {
             fetchUserProfile();
         }
     }, [location]);
-    
+
     // Listen for profile updates to refresh avatar
     useEffect(() => {
         const handleProfileUpdate = () => {
             fetchUserProfile();
         };
-        
+
         window.addEventListener('profileUpdated', handleProfileUpdate);
         return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
     }, []);
-    
+
     const fetchUserProfile = async () => {
         try {
             const profile = await userProfileService.getProfile();
@@ -158,12 +158,12 @@ export default function Navbar() {
         window.addEventListener('dashboard-prefs-updated', handler);
         return () => window.removeEventListener('dashboard-prefs-updated', handler);
     }, []);
-    
+
     // Don't render navbar on public pages
     if (isPublicRoute) {
         return null;
     }
-    
+
     // Only render navbar on authenticated pages
     if (!isAuthenticated) {
         return null;
@@ -171,17 +171,17 @@ export default function Navbar() {
 
     return (
         <header
-            className="text-white"
-            style={{
-                background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
-            }}
+            className="bg-white text-black shadow-md sticky top-0 z-40 border-b border-gray-200"
+            // style={{
+            //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
+            // }}
         >
             <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
                     <Link to="/" className="font-bold tracking-wide flex items-center gap-2">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
-                            className="h-10 object-contain"
+                            className="hidden md:block h-10 object-contain"
                             style={{ maxHeight: '44px' }}
                         />
                         <span className="sr-only">Practical Manager</span>
@@ -320,8 +320,8 @@ export default function Navbar() {
                         >
                             <span className="w-8 h-8 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
                                 {userProfile?.avatarUrl ? (
-                                    <img 
-                                        src={userProfile.avatarUrl} 
+                                    <img
+                                        src={userProfile.avatarUrl}
                                         alt="Profile Avatar"
                                         className="w-full h-full object-cover rounded-full"
                                         onError={(e) => {
@@ -331,7 +331,7 @@ export default function Navbar() {
                                         }}
                                     />
                                 ) : null}
-                                <FaUser 
+                                <FaUser
                                     className={`w-5 h-5 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
                                 />
                             </span>
