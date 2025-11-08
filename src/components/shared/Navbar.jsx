@@ -197,7 +197,7 @@ export default function Navbar() {
                                 aria-expanded={openWidgets ? "true" : "false"}
                                 title="Widgets"
                             >
-                                <FaTh className="w-5 h-5" />
+                                <FaTh className="text-black w-5 h-5" />
                             </button>
 
                             {openWidgets && (
@@ -237,7 +237,7 @@ export default function Navbar() {
                             title="Quick Actions"
                             aria-label="Quick Actions"
                         >
-                            <FaBolt className="w-5 h-5" />
+                            <FaBolt className="text-black w-5 h-5" />
                             <span className="sr-only">Quick Actions</span>
                         </button>
 
@@ -354,7 +354,7 @@ export default function Navbar() {
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
                                     onClick={() => setOpen(false)}
                                 >
-                                    👤 Profile & Settings
+                                   Profile & Settings
                                 </Link>
                                 <div className="border-t border-gray-200 my-1"></div>
                                 <button
