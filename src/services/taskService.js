@@ -54,11 +54,24 @@ const taskService = {
         // We use a cache-busting query param instead.
         try {
             const res = await apiClient.get(base, { params });
-            return res.data.map((t) => ({
-                ...t,
-                status: mapStatusFromApi(t.status),
-                priority: mapPriorityFromApi(t.priority),
-            }));
+            return res.data.map((t) => {
+                // normalize possible goal id shapes into `goal_id` so UI can reliably look up titles
+                const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+                let gid = null;
+                if (rawGoal) {
+                    if (typeof rawGoal === 'object' && rawGoal !== null) {
+                        gid = rawGoal.id || rawGoal.goal_id || null;
+                    } else {
+                        gid = rawGoal;
+                    }
+                }
+                return {
+                    ...t,
+                    status: mapStatusFromApi(t.status),
+                    priority: mapPriorityFromApi(t.priority),
+                    goal_id: gid || null,
+                };
+            });
         } catch (e) {
             const status = e?.response?.status;
             const data = e?.response?.data;
@@ -73,7 +86,16 @@ const taskService = {
     async get(id) {
         const res = await apiClient.get(`${base}/${id}`);
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
+        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+        let gid = null;
+        if (rawGoal) {
+            if (typeof rawGoal === 'object' && rawGoal !== null) {
+                gid = rawGoal.id || rawGoal.goal_id || null;
+            } else {
+                gid = rawGoal;
+            }
+        }
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null };
     },
     async create(payload) {
         const res = await apiClient.post(base, {
@@ -82,7 +104,16 @@ const taskService = {
             priority: mapPriorityToApi(payload.priority),
         });
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
+        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+        let gid = null;
+        if (rawGoal) {
+            if (typeof rawGoal === 'object' && rawGoal !== null) {
+                gid = rawGoal.id || rawGoal.goal_id || null;
+            } else {
+                gid = rawGoal;
+            }
+        }
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null };
     },
     async update(id, payload) {
         const data = { ...payload };
@@ -90,7 +121,16 @@ const taskService = {
         if (data.priority) data.priority = mapPriorityToApi(data.priority);
         const res = await apiClient.put(`${base}/${id}`, data);
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
+        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+        let gid = null;
+        if (rawGoal) {
+            if (typeof rawGoal === 'object' && rawGoal !== null) {
+                gid = rawGoal.id || rawGoal.goal_id || null;
+            } else {
+                gid = rawGoal;
+            }
+        }
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null };
     },
     async remove(id) {
         const res = await apiClient.delete(`${base}/${id}`);

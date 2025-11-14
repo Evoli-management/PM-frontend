@@ -1,6 +1,6 @@
 import React, { useState, Suspense } from "react";
 const CreateTaskModal = React.lazy(() => import("./CreateTaskModal.jsx"));
-const CreateActivityModal = React.lazy(() => import("./CreateActivityModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("./CreateActivityFormModal.jsx"));
 
 export default function CalendarCreateModal({ 
     isOpen, 

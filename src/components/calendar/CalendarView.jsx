@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from "react";
 const CreateTaskModal = React.lazy(() => import("../modals/CreateTaskModal.jsx"));
-const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 
 const CalendarView = () => {
     const [view, setView] = useState("monthly");

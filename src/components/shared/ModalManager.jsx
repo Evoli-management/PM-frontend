@@ -2,7 +2,7 @@ import React, { useEffect, useState, Suspense } from "react";
 // Lazy-load modal components to reduce initial bundle size
 const CreateTaskModal = React.lazy(() => import("../modals/CreateTaskModal.jsx"));
 const CalendarCreateModal = React.lazy(() => import("../modals/CalendarCreateModal.jsx"));
-const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 const GoalForm = React.lazy(() => import("../goals/GoalForm.jsx"));
 const DontForgetComposer = React.lazy(() => import("../tasks/DontForgetComposer.jsx"));
 // Load taskService on demand to allow code-splitting

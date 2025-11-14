@@ -1,317 +1,56 @@
-const SortableKeyAreaRow = ({ ka, idx, moveKeyArea, onOpen }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        isDragging,
-    } = useSortable({ id: ka.id });
-    return (
-        <div
-            ref={setNodeRef}
-            {...attributes}
-            className={`flex items-center px-4 py-3 transition-transform ease-in-out duration-200 bg-white hover:bg-slate-50 ${isDragging ? 'z-10 shadow-lg' : ''}`}
-            onClick={() => { if (!isDragging && onOpen) onOpen(ka); }}
-            style={{ touchAction: 'manipulation' }}
-            tabIndex={0}
-            aria-label={`Key Area: ${ka.title}`}
-        >
-            {/* Drag handle */}
-            <span
-                {...listeners}
-                className={`mr-3 select-none cursor-grab hover:cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
-                title="Drag to reorder"
-                aria-label="Drag handle"
-                role="button"
-                tabIndex={0}
-            >
-                <svg width="20" height="20" fill="none">
-                    {/* Only show debug marker in development mode */}
-                    {process.env.NODE_ENV === 'development' ? (
-                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">{idx + 1}</text>
-                    ) : null}
-                    <text x="10" y="15" textAnchor="middle" fontSize="18" fill="#64748b">⠿</text>
-                </svg>
-            </span>
-            {/* Key Area name and metadata (draggable area) */}
-            <div
-                {...listeners}
-                role="button"
-                aria-label={`Drag ${ka.title}`}
-                className={`flex-1 min-w-0 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab hover:cursor-grab'}`}
-                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-            >
-                <span className="font-medium text-slate-700 truncate cursor-inherit">{ka.title}</span>
-                {ka.taskCount !== undefined && (
-                    <span className="ml-2 text-xs text-slate-500 cursor-inherit">{ka.taskCount} tasks</span>
-                )}
-            </div>
-            {/* removed explicit up/down reorder buttons - row click opens the key area; reordering handled via drag/drop */}
-        </div>
-    );
-};
-
-const FixedKeyAreaRow = ({ ka, onOpen }) => {
-    return (
-        <div
-            className="flex items-center px-4 py-3 bg-slate-50 opacity-80 cursor-pointer"
-            tabIndex={0}
-            aria-label={`Key Area: ${ka.title} (Fixed)`}
-            onClick={() => onOpen && onOpen(ka)}
-        >
-            {/* Fixed icon */}
-            <span className="mr-3 text-slate-400" title="Fixed position">
-                <svg width="20" height="20" fill="none">
-                    <circle cx="10" cy="10" r="8" stroke="#94a3b8" strokeWidth="2" />
-                    {/* Only show debug marker in development mode */}
-                    {process.env.NODE_ENV === 'development' ? (
-                        <text x="3" y="15" textAnchor="start" fontSize="10" fill="#94a3b8">★</text>
-                    ) : null}
-                    <text x="10" y="15" textAnchor="middle" fontSize="10" fill="#94a3b8">★</text>
-                </svg>
-            </span>
-            {/* Key Area name and metadata */}
-            <div className="flex-1 min-w-0">
-                <span className="font-medium text-slate-700 truncate">{ka.title}</span>
-                {ka.taskCount !== undefined && (
-                    <span className="ml-2 text-xs text-slate-500">{ka.taskCount} tasks</span>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// src/pages/KeyAreas.jsx
-import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import Sidebar from "../components/shared/Sidebar.jsx";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useToast } from '../components/shared/ToastProvider.jsx';
+import Sidebar from '../components/shared/Sidebar';
+import TaskFormModal from '../components/key-areas/TaskFormModal';
+import CreateTaskModal from '../components/key-areas/CreateTaskModal';
+import KeyAreasList from '../components/key-areas/KeyAreasList';
+import CreateActivityFormModal from '../components/modals/CreateActivityFormModal';
+import KeyAreaModal from '../components/key-areas/KeyAreaModal';
+import EditTaskModal from '../components/key-areas/EditTaskModal';
+import EditActivityModal from '../components/key-areas/EditActivityModal';
+import EmptyState from '../components/goals/EmptyState.jsx';
+import TaskRow from '../components/key-areas/TaskRow';
+import ActivityList from '../components/key-areas/ActivityList';
+import TaskSlideOver from '../components/key-areas/TaskSlideOver';
+import TaskFullView from '../components/key-areas/TaskFullView';
+import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
-    FaSearch,
-    FaPlus,
-    FaBars,
-    FaChevronLeft,
-    FaTimes,
-    FaSave,
-    FaStop,
-    FaEllipsisV,
-    FaCheckCircle,
-    FaRegCircle,
-    FaAlignJustify,
-    FaTag,
-    FaTrash,
-    FaEdit,
-    FaAngleDoubleLeft,
-    FaChevronUp,
-    FaChevronDown,
-    FaLock,
-    FaExclamationCircle,
-} from "react-icons/fa";
-import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-} from "@dnd-kit/core";
+    safeParseDate,
+    toIsoMidnightOrNull,
+    nullableString,
+    computeEisenhowerQuadrant,
+    getPriorityLevel,
+    toDateOnly,
+    formatDuration,
+    mapUiStatusToServer,
+    mapServerStatusToUi,
+    normalizeActivity,
+} from '../utils/keyareasHelpers';
 
-// InlineAddActivity removed per UI simplification
-
-// Small UI helpers for table chips/indicators
-const EmptyState = ({ title = "List is empty.", hint = "" }) => (
-    <div className="p-4 rounded-lg bg-slate-50 text-slate-600 border border-slate-200">
-        <div className="text-sm font-medium">{title}</div>
-        {hint ? <div className="text-xs text-slate-500 mt-1">{hint}</div> : null}
-        {/* Only show debug border in development mode */}
-        {process.env.NODE_ENV === 'development' ? (
-            <div className="absolute inset-0 border-2 border-dashed border-blue-300 pointer-events-none" />
-        ) : null}
-    </div>
-);
-
-const StatusIndicator = ({ status = "open" }) => {
-    const s = String(status).toLowerCase();
-    const color =
-        s === "done" || s === "closed"
-            ? "bg-emerald-500"
-            : s === "in_progress"
-              ? "bg-blue-500"
-              : s === "blocked"
-                ? "bg-red-500"
-                : "bg-slate-400"; // open/other
-    return <span className={`inline-block w-2.5 h-2.5 rounded-full ${color}`} aria-hidden="true" />;
-};
-
-const PriorityBadge = ({ priority = "med" }) => {
-    const p = String(priority).toLowerCase();
-    const map = {
-        high: { cls: "text-red-700 bg-red-50 border-red-200", label: "High" },
-        med: { cls: "text-amber-700 bg-amber-50 border-amber-200", label: "Normal" },
-        low: { cls: "text-emerald-700 bg-emerald-50 border-emerald-200", label: "Low" },
-    };
-    const m = map[p] || map.med;
-    return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${m.cls}`}>{m.label}</span>
-    );
-};
-
-const QuadrantBadge = ({ q = 4 }) => {
-    const n = Number(q) || 4;
-    const map = {
-        1: { cls: "text-white bg-red-600", label: "Q1" },
-        2: { cls: "text-white bg-amber-600", label: "Q2" },
-        3: { cls: "text-white bg-blue-600", label: "Q3" },
-        4: { cls: "text-white bg-emerald-600", label: "Q4" },
-    };
-    const m = map[n] || map[4];
-    return (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${m.cls}`}>
-            {m.label}
-        </span>
-    );
-};
-
-// normalize a date value (ISO string or YYYY-MM-DD) to YYYY-MM-DD
-const toDateOnly = (val) => {
-    if (!val) return "";
-    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return "";
-    return d.toISOString().slice(0, 10);
-};
-
-// Normalize a UI date value to ISO date-time at midnight UTC expected by BE (@IsDateString date-time)
-const toIsoMidnightOrNull = (val, allowUndefined = false) => {
-    if (val === undefined) return allowUndefined ? undefined : null;
-    if (val === null || val === "") return null;
-    const dOnly = toDateOnly(val);
-    return dOnly ? `${dOnly}T00:00:00.000Z` : null;
-};
-
-// Coerce empty string to null for optional strings; optionally allow undefined passthrough
-const nullableString = (val, allowUndefined = false) => {
-    if (val === undefined) return allowUndefined ? undefined : null;
-    if (val === null) return null;
-    const s = String(val);
-    return s.trim() === "" ? null : s;
-};
-
-// format duration between two ISO timestamps (start, end)
-const formatDuration = (startIso, endIso) => {
-    if (!startIso || !endIso) return "—";
-    const start = new Date(toDateOnly(startIso)).getTime();
-    const end = new Date(toDateOnly(endIso)).getTime();
-    if (isNaN(start) || isNaN(end)) return "—";
-    const days = Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24)));
-    return `${days}d`;
-};
-
-// Priority normalization: accepts string ("low"|"med"|"high") or number/number-string (1|2|3)
-const getPriorityLevel = (val) => {
-    if (val === undefined || val === null || val === "") return 2;
-    if (typeof val === "number") return [1, 2, 3].includes(val) ? val : 2;
-    const v = String(val).toLowerCase();
-    if (v === "1" || v === "low") return 1;
-    if (v === "3" || v === "high") return 3;
-    return 2; // med or default
-};
-
-// Activity helpers (client-only fields retained for UI but not persisted)
-// Backend shape: { id, text, taskId, createdAt, updatedAt }
-
-// very small heuristic for quadrant based on priority and time
-const computeEisenhowerQuadrant = ({ deadline, end_date, priority = "med" }) => {
-    const important = priority === "high" || priority === "med";
-    const dueSoon = (() => {
-        const ref = deadline || end_date;
-        if (!ref) return false;
-        const diff = new Date(ref).getTime() - Date.now();
-        return diff <= 1000 * 60 * 60 * 24 * 2; // within 2 days
-    })();
-    if (important && dueSoon) return 1;
-    if (important && !dueSoon) return 2;
-    if (!important && dueSoon) return 3;
-    return 4;
-};
-
-// Pick a decorative image for a Key Area title from public assets
-const kaImageFor = (title = "") => {
-    const t = String(title).toLowerCase();
-    if (t.includes("marketing")) return "/key-area.png";
-    if (t.includes("sales")) return "/team.png";
-    if (t.includes("product")) return "/goals.png";
-    if (t.includes("idea")) return "/ideas.png";
-    return "/key-area.png"; // fallback
-};
-
-// Backend service for Key Areas (no localStorage fallback)
-import keyAreaService from "../services/keyAreaService";
-import usersService from "../services/usersService";
-import taskService from "../services/taskService";
-import activityService from "../services/activityService";
-import { useToast } from "../components/shared/ToastProvider.jsx";
-import CreateActivityModal from "../components/modals/CreateActivityModal.jsx";
-// ...existing code...
-
-// Some modules expect async getters named `getTaskService`, `getKeyAreaService`,
-// and `getActivityService`. Provide lightweight lazy wrappers that return the
-// already-imported service instances. This mirrors the lazy import pattern
-// used elsewhere but avoids duplicating dynamic imports in this large file.
+// Lazy getters for services to allow code-splitting and avoid circular imports
 let _taskService = null;
 const getTaskService = async () => {
     if (_taskService) return _taskService;
-    _taskService = taskService;
+    const mod = await import('../services/taskService');
+    _taskService = mod.default || mod;
     return _taskService;
 };
 
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
     if (_keyAreaService) return _keyAreaService;
-    _keyAreaService = keyAreaService;
+    const mod = await import('../services/keyAreaService');
+    _keyAreaService = mod.default || mod;
     return _keyAreaService;
 };
 
 let _activityService = null;
 const getActivityService = async () => {
     if (_activityService) return _activityService;
-    _activityService = activityService;
+    const mod = await import('../services/activityService');
+    _activityService = mod.default || mod;
     return _activityService;
-};
-
-// Normalize backend task status to UI status
-const mapTaskStatusToUi = (s) => {
-    const v = String(s || "todo").toLowerCase();
-    if (v === "todo") return "open";
-    if (v === "in_progress") return "in_progress";
-    if (v === "completed") return "done";
-    if (v === "cancelled" || v === "canceled") return "blocked";
-    return "open";
-};
-
-// Map UI status back to backend canonical values
-const mapUiStatusToServer = (s) => {
-    const v = String(s || 'open').toLowerCase();
-    if (v === 'open') return 'todo';
-    if (v === 'in_progress') return 'in_progress';
-    if (v === 'done') return 'completed';
-    if (v === 'blocked') return 'cancelled';
-    return 'todo';
-};
-
-// Normalize activity record from backend to UI-friendly shape
-const normalizeActivity = (a) => {
-    if (!a) return a;
-    return {
-        ...a,
-        id: a.id,
-        text: a.text || a.activity_name || "",
-        assignee: a.assignee || a.assignee_name || "",
-        priority: a.priority ?? a.priority_level ?? null,
-        status: mapTaskStatusToUi(a.status),
-        completionDate: a.completionDate || a.completion_date || null,
-        start_date: a.startDate || a.start_date || null,
-        end_date: a.endDate || a.end_date || null,
-        deadline: a.deadline || a.dueDate || a.due_date || null,
-    };
 };
 
 const api = {
@@ -328,7 +67,18 @@ const api = {
         }
     },
     async listGoals() {
-        return [];
+        try {
+            const mod = await import('../services/goalService');
+            const fn = mod?.getGoals || mod?.default?.getGoals || mod?.default;
+            if (typeof fn === 'function') {
+                return await fn();
+            }
+            // fallback: call default export if it returns an object with getGoals
+            return [];
+        } catch (e) {
+            console.error('Failed to load goals', e);
+            return [];
+        }
     },
     async updateKeyArea(id, data) {
         // Only update via backend; no local fallbacks
@@ -480,6 +230,8 @@ const api = {
         return true;
     },
 };
+
+// Shared helpers (imported from utils/keyareasHelpers)
 
 // Minimal placeholders to keep non-list views functional
 const KanbanView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSelect = () => {}, onStatusChange = () => {} }) => {
@@ -637,1379 +389,9 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
     );
 };
 
-/* --------------------------- Slide Over (Edit) --------------------------- */
-function TaskSlideOver({
-    task,
-    goals,
-    onClose,
-    onSave,
-    onDelete,
-    readOnly = false,
-    activitiesByTask = {},
-    onAddActivity,
-    onDeleteActivity,
-    onClearActivities,
-    initialTab = "details",
-    hideActivitiesTab = false,
-    listNames = {},
-    kaId = null,
-    listNumbers = [],
-}) {
-    const [form, setForm] = useState(null);
-    const [activeTab, setActiveTab] = useState("details"); // details | activities
-    const [taskActivities, setTaskActivities] = useState([]);
-    const [newActivity, setNewActivity] = useState("");
-    // Allow attaching activities to this task or keep as 'new' (unattached)
-    const [activitiesTarget, setActivitiesTarget] = useState("new"); // String(task.id) | "new"
+/* SlideOver is now extracted to src/components/key-areas/TaskSlideOver.jsx */
 
-    useEffect(() => {
-        if (!task) {
-            setForm(null);
-            setTaskActivities([]);
-            return;
-        }
-
-        setActiveTab(hideActivitiesTab ? "details" : initialTab || "details");
-        setForm({
-            ...task,
-            attachmentsFiles: task.attachments
-                ? task.attachments
-                      .split(",")
-                      .filter(Boolean)
-                      .map((n) => ({ name: n }))
-                : [],
-        });
-        // default target to this task when opening
-        setActivitiesTarget(String(task.id));
-        (async () => {
-            try {
-                const list = await (await getActivityService()).list({ taskId: task.id });
-                setTaskActivities(Array.isArray(list) ? list.map(normalizeActivity) : []);
-            } catch (e) {
-                console.error("Failed to load activities", e);
-                setTaskActivities([]);
-            }
-        })();
-    }, [task, initialTab, hideActivitiesTab]);
-
-    // If asked to hide activities, ensure we stay on details
-    useEffect(() => {
-        if (hideActivitiesTab && activeTab !== "details") setActiveTab("details");
-    }, [hideActivitiesTab, activeTab]);
-
-    // When switching target (this task vs new), load that list from backend
-    useEffect(() => {
-        if (!task) return;
-        (async () => {
-            try {
-                if (activitiesTarget === "new") {
-                    const list = await (await getActivityService()).list();
-                    // Unattached activities: filter those without taskId
-                    setTaskActivities((Array.isArray(list) ? list.map(normalizeActivity) : []).filter((a) => !a.taskId));
-                } else {
-                    const list = await (await getActivityService()).list({ taskId: activitiesTarget });
-                    setTaskActivities(Array.isArray(list) ? list.map(normalizeActivity) : []);
-                }
-            } catch (e) {
-                console.error("Failed to load activities", e);
-                setTaskActivities([]);
-            }
-        })();
-    }, [activitiesTarget, task]);
-
-    // When activities are updated elsewhere (e.g., via global composer), refresh this task's list
-    useEffect(() => {
-        if (!task?.id) return;
-        const handler = async (e) => {
-            const tid = e?.detail?.taskId;
-            if (tid && String(tid) !== String(task.id)) return; // ignore events for other tasks
-            try {
-                const list = await (await getActivityService()).list({ taskId: task.id });
-                setTaskActivities(Array.isArray(list) ? list.map(normalizeActivity) : []);
-            } catch (err) {
-                // ignore
-            }
-        };
-        window.addEventListener("ka-activities-updated", handler);
-        return () => window.removeEventListener("ka-activities-updated", handler);
-    }, [task?.id]);
-
-    const addActivity = async () => {
-        const text = (newActivity || "").trim();
-        if (!text) return;
-        try {
-            const created = await (await getActivityService()).create({
-                text,
-                taskId: activitiesTarget === "new" ? null : activitiesTarget,
-            });
-            setTaskActivities((prev) => [...prev, created]);
-            // notify parent to refresh
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
-        } catch (e) {
-            console.error("Failed to add activity", e);
-        }
-        setNewActivity("");
-    };
-
-    const removeActivity = async (id) => {
-        try {
-            await (await getActivityService()).remove(id);
-            setTaskActivities((prev) => prev.filter((a) => a.id !== id));
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
-        } catch (e) {
-            console.error("Failed to delete activity", e);
-        }
-    };
-    const setActivityStatus = async (id, status) => {
-        if (savingActivityIds.has(id)) return;
-        const prev = Array.isArray(taskActivities) ? [...taskActivities] : [];
-        const next = prev.map((a) => (a.id === id ? { ...a, status, completed: status === 'done' ? true : a.completed } : a));
-        // optimistic
-        setTaskActivities(next);
-        setSavingActivityIds((s) => new Set([...s, id]));
-            try {
-                const svc = await getActivityService();
-                const serverStatus = mapUiStatusToServer(status);
-                const updated = await svc.update(id, {
-                    status: serverStatus,
-                    completed: status === 'done',
-                    completionDate: status === 'done' ? new Date().toISOString() : null,
-                });
-                const norm = normalizeActivity(updated || {});
-                setTaskActivities((prev) => prev.map((a) => (a.id === id ? norm : a)));
-            } catch (e) {
-            console.error('Failed to update activity status', e);
-            setTaskActivities(prev);
-        } finally {
-            setSavingActivityIds((s) => {
-                const copy = new Set(s);
-                copy.delete(id);
-                return copy;
-            });
-        }
-    };
-
-    const clearActivities = async () => {
-        if (!confirm("Clear all activities for this selection?")) return;
-        try {
-            // delete each activity shown
-            const ids = (taskActivities || []).map((a) => a.id);
-            const _svc = await getActivityService();
-            await Promise.all(ids.map((id) => _svc.remove(id)));
-            setTaskActivities([]);
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
-        } catch (e) {
-            console.error("Failed to clear activities", e);
-        }
-    };
-
-    if (!task || !form) return null;
-
-    const listNameFor = (n) => {
-        if (!kaId) return `List ${n}`;
-        const names = listNames[String(kaId)] || {};
-        return names[String(n)] || `List ${n}`;
-    };
-
-    const submit = (e) => {
-        e.preventDefault();
-        if (readOnly) return;
-        const attachmentsNames = (form.attachmentsFiles || []).map((f) => f.name || f).filter(Boolean);
-        const payload = {
-            ...form,
-            attachments: attachmentsNames.join(",") || null,
-            start_date: form.start_date ? toDateOnly(form.start_date) : null,
-            deadline: form.deadline ? toDateOnly(form.deadline) : null,
-            end_date: form.end_date ? toDateOnly(form.end_date) : null,
-        };
-        onSave(payload);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
-            <div className="relative w-full max-w-3xl">
-                <div className="bg-slate-50 rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                        <h3 className="text-lg font-bold text-slate-900">Task</h3>
-                        <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" onClick={onClose}>
-                            <FaTimes />
-                        </button>
-                    </div>
-
-                    {/* Tabs (single source of truth below) */}
-
-                    {/* Tabs: Details (default). Hide Activities tab when requested */}
-                    {!hideActivitiesTab && (
-                        <div className="px-4 pt-3 border-b border-slate-200 bg-white">
-                            <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                                <button
-                                    className={`px-3 py-1 rounded-md text-sm font-semibold ${activeTab === "details" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
-                                    onClick={() => setActiveTab("details")}
-                                    type="button"
-                                >
-                                    Details
-                                </button>
-                                <button
-                                    className={`px-3 py-1 rounded-md text-sm font-semibold ${activeTab === "activities" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
-                                    onClick={() => setActiveTab("activities")}
-                                    type="button"
-                                >
-                                    Activities
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === "details" ? (
-                        hideActivitiesTab ? (
-                            <form onSubmit={submit} className="p-3">
-                                <div className="grid md:grid-cols-3 gap-2 items-stretch text-sm">
-                                    {/* Left column: Title + Description + Meta */}
-                                    <div className="md:col-span-2 h-full flex flex-col">
-                                        <div className="grid grid-rows-[auto_1fr] gap-1 flex-1">
-                                            <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                                <div className="text-[10px] uppercase tracking-wide text-slate-500">
-                                                    Title
-                                                </div>
-                                                <textarea
-                                                    rows={2}
-                                                    className="mt-1 w-full rounded-md border border-slate-300 bg-white p-2 text-base leading-snug"
-                                                    value={form.title || ""}
-                                                    onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
-                                                    placeholder="Enter a descriptive task name…"
-                                                    disabled={readOnly}
-                                                />
-                                            </div>
-                                            <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                                <div className="text-[10px] uppercase tracking-wide text-slate-500">
-                                                    Description
-                                                </div>
-                                                <textarea
-                                                    rows={4}
-                                                    className="mt-1.5 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                    value={form.description || ""}
-                                                    onChange={(e) =>
-                                                        setForm((s) => ({ ...s, description: e.target.value }))
-                                                    }
-                                                    placeholder="Add more context…"
-                                                    disabled={readOnly}
-                                                />
-                                                {/* Meta inline */}
-                                                <div className="mt-2 border-t border-slate-200 pt-2">
-                                                    <div className="grid md:grid-cols-3 gap-2">
-                                                        <div>
-                                                            <div className="text-[11px] text-slate-600">
-                                                                Linked Goal
-                                                            </div>
-                                                            <select
-                                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                                value={form.goal_id || ""}
-                                                                onChange={(e) =>
-                                                                    setForm((s) => ({ ...s, goal_id: e.target.value }))
-                                                                }
-                                                                disabled={readOnly}
-                                                            >
-                                                                <option value="">— None —</option>
-                                                                {goals.map((g) => (
-                                                                    <option key={g.id} value={g.id}>
-                                                                        {g.title}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-[11px] text-slate-600">Tags</div>
-                                                            <input
-                                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                                value={form.tags || ""}
-                                                                onChange={(e) =>
-                                                                    setForm((s) => ({ ...s, tags: e.target.value }))
-                                                                }
-                                                                placeholder="comma,separated"
-                                                                disabled={readOnly}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-[11px] text-slate-600">{`List (Tab) — ${listNameFor(form.list_index || 1)}`}</div>
-                                                            <select
-                                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                                value={String(form.list_index || 1)}
-                                                                onChange={(e) =>
-                                                                    setForm((s) => ({
-                                                                        ...s,
-                                                                        list_index: Number(e.target.value || 1),
-                                                                    }))
-                                                                }
-                                                                disabled={readOnly}
-                                                            >
-                                                                {(listNumbers && listNumbers.length
-                                                                    ? listNumbers
-                                                                    : Array.from({ length: 10 }, (_, i) => i + 1)
-                                                                ).map((n) => (
-                                                                    <option key={n} value={String(n)}>
-                                                                        {listNameFor(n)}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {!readOnly && (
-                                            <div className="mt-1.5 flex items-center gap-2">
-                                                <button className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 px-2.5 py-1.5 text-xs">
-                                                    <FaSave /> Save changes
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs"
-                                                    onClick={onClose}
-                                                >
-                                                    Close
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {/* Right column: Summary & Schedule */}
-                                    <div className="grid grid-rows-[1fr_1fr] gap-1.5 h-full">
-                                        <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">
-                                                Summary
-                                            </div>
-                                            <div className="mb-1.5">
-                                                <div className="text-[11px] text-slate-600">Assignee</div>
-                                                <input
-                                                    className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                    value={form.assignee || ""}
-                                                    onChange={(e) =>
-                                                        setForm((s) => ({ ...s, assignee: e.target.value }))
-                                                    }
-                                                    disabled={readOnly}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-1.5">
-                                                <div>
-                                                    <div className="text-[11px] text-slate-600">Status</div>
-                                                    <select
-                                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                        value={form.status || "open"}
-                                                        onChange={(e) =>
-                                                            setForm((s) => ({ ...s, status: e.target.value }))
-                                                        }
-                                                        disabled={readOnly}
-                                                    >
-                                                        <option value="open">Open</option>
-                                                        <option value="in_progress">In Progress</option>
-                                                        <option value="done">Done</option>
-                                                        <option value="cancelled">Cancelled</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <div className="text-[11px] text-slate-600">Priority</div>
-                                                    <select
-                                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                        value={form.priority || "med"}
-                                                        onChange={(e) =>
-                                                            setForm((s) => ({ ...s, priority: e.target.value }))
-                                                        }
-                                                        disabled={readOnly}
-                                                    >
-                                                        <option value="low">Low</option>
-                                                        <option value="med">Medium</option>
-                                                        <option value="high">High</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">
-                                                Schedule
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1.5">
-                                                {[
-                                                    { key: "start_date", label: "Start" },
-                                                    { key: "end_date", label: "End date" },
-                                                    { key: "deadline", label: "Deadline" },
-                                                ].map((f) => (
-                                                    <div key={f.key}>
-                                                        <div className="text-[11px] text-slate-600">{f.label}</div>
-                                                        <input
-                                                            type="date"
-                                                            className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm"
-                                                            value={toDateOnly(form[f.key]) || ""}
-                                                            onChange={(e) =>
-                                                                setForm((s) => ({ ...s, [f.key]: e.target.value }))
-                                                            }
-                                                            disabled={readOnly}
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {/* Footer for readOnly state */}
-                                {readOnly && (
-                                    <div className="mt-3 flex items-center">
-                                        <button
-                                            type="button"
-                                            onClick={onClose}
-                                            className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
-                                        >
-                                            Close
-                                        </button>
-                                    </div>
-                                )}
-                            </form>
-                        ) : (
-                            <form onSubmit={submit} className="p-4 max-h-[80vh] overflow-auto">
-                                {/* ...existing detailed layout with attachments/recurrence... */}
-                            </form>
-                        )
-                    ) : (
-                        <div className="p-4 max-h-[80vh] overflow-auto">
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold">Your activities</div>
-                                <div className="text-xs text-slate-500">Attach to a task or keep as new</div>
-                            </div>
-
-                            <div className="mt-3">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        window.dispatchEvent(
-                                            new CustomEvent("ka-open-activity-composer", {
-                                                detail: { taskId: task?.id },
-                                            }),
-                                        )
-                                    }
-                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                                >
-                                    Add Activity
-                                </button>
-                                {savingActivityIds && savingActivityIds.size > 0 && (
-                                    <div className="inline-block align-middle ml-3 text-xs text-slate-500">Saving...</div>
-                                )}
-                            </div>
-                            <div className="mt-3 overflow-x-auto">
-                                {taskActivities && taskActivities.length > 0 ? (
-                                    <table className="min-w-full text-sm">
-                                        <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                            <tr>
-                                                <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Assignee</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Start date</th>
-                                                <th className="px-3 py-2 text-left font-semibold">End date</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Deadline</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Duration</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Completed</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {taskActivities.map((a) => (
-                                                <tr key={a.id} className="bg-white border-b border-slate-100">
-                                                    <td className="px-3 py-2 align-top">
-                                                        <div className="flex items-center gap-3">
-                                                            {/* Activity icon: keep the exact inline SVG requested */}
-                                                            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
-                                                            <div className="flex flex-col">
-                                                                <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text}</div>
-                                                                <div className="text-xs text-slate-500">{a.note || ""}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2 align-top text-slate-700">{a.assignee || "—"}</td>
-                                                    <td className="px-3 py-2 align-top">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                            <select value={a.status || 'open'} onChange={(e)=> setActivityStatus(a.id, e.target.value)} className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
-                                                                <option value="open">Open</option>
-                                                                <option value="in_progress">In progress</option>
-                                                                <option value="done">Done</option>
-                                                            </select>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2 align-top">
-                                                        {(() => {
-                                                            const lvl = getPriorityLevel(a.priority);
-                                                            return (
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${lvl === 3 ? 'text-red-600 border-red-100' : lvl === 1 ? 'text-emerald-600 border-emerald-100' : 'text-slate-700 border-slate-100'}`}>
-                                                                    {lvl === 3 ? 'High' : lvl === 1 ? 'Low' : 'Normal'}
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                    </td>
-                                                    <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || '—'}</td>
-                                                    <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
-                                                    <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
-                                                    <td className="px-3 py-2 align-top">{formatDuration(a.start_date, a.end_date)}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-800">
-                                                        {a.completionDate ? new Date(a.completionDate).toLocaleString() : '—'}
-                                                    </td>
-                                                    <td className="px-3 py-2 align-top">
-                                                        <div className="flex items-center gap-2">
-                                                            <button type="button" onClick={() => {/* tag handler (TBD) */}} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Tags">
-                                                                <FaTag className="w-4 h-4" />
-                                                            </button>
-                                                            <button type="button" onClick={() => removeActivity(a.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md" title="Delete">
-                                                                <FaTrash className="w-4 h-4" />
-                                                            </button>
-                                                            <button type="button" onClick={() => createTaskFromActivity(a)} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Convert to task">
-                                                                <FaAngleDoubleLeft className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
-                                )}
-                            </div>
-
-                            <div className="mt-4 flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="ml-auto rounded-lg text-sm text-slate-700 hover:underline"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/* ------------------------ Full Page Task Detail View ------------------------ */
-function TaskFullView({
-    task,
-    goals,
-    kaTitle,
-    readOnly = false,
-    onBack,
-    onSave,
-    onDelete,
-    activitiesByTask = {},
-    onUpdateActivities,
-    initialTab = "activities",
-    listNames = {},
-    kaId = null,
-    listNumbers = [],
-    selectedKA = null,
-    users = [],
-    allTasks = [],
-    // optional saving activity set passed from parent to coordinate saving indicators
-    savingActivityIds: savingActivityIdsProp = undefined,
-    setSavingActivityIds: setSavingActivityIdsProp = undefined,
-}) {
-    // Provide a local fallback so TaskFullView can be used standalone during testing.
-    const [savingActivityIdsLocal, setSavingActivityIdsLocal] = useState(new Set());
-    const savingActivityIds = savingActivityIdsProp ?? savingActivityIdsLocal;
-    const setSavingActivityIds = setSavingActivityIdsProp ?? setSavingActivityIdsLocal;
-    const [tab, setTab] = useState(initialTab || "activities");
-    const [isEditing, setIsEditing] = useState(false);
-    const [form, setForm] = useState(task || null);
-    const [menuOpen, setMenuOpen] = useState(false);
-    const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-    const menuRef = useRef(null);
-    const [newActivity, setNewActivity] = useState("");
-    const [showDetailsPopup, setShowDetailsPopup] = useState(false);
-    const [openActivityRows, setOpenActivityRows] = useState(new Set());
-    const [activityModal, setActivityModal] = useState({ open: false, item: null });
-
-    useEffect(() => {
-        setTab(initialTab || "activities");
-    }, [initialTab]);
-
-    // Removed: global activity composer listener belongs to KeyAreas component
-
-    useEffect(() => {
-        setForm(task || null);
-    }, [task]);
-
-    useEffect(() => {
-        if (!menuOpen) return;
-        const onClick = (e) => {
-            if (!menuRef.current) return;
-            if (!menuRef.current.contains(e.target)) setMenuOpen(false);
-        };
-        const onKey = (e) => e.key === "Escape" && setMenuOpen(false);
-        document.addEventListener("mousedown", onClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("mousedown", onClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    }, [menuOpen]);
-
-    if (!task) return null;
-
-    const list = activitiesByTask[String(task.id)] || [];
-
-    const setList = (next) => {
-        const payload = typeof next === "function" ? next(list) : next;
-        onUpdateActivities && onUpdateActivities(String(task.id), payload);
-    };
-
-    const addActivity = async (text) => {
-        const t = (text || "").trim();
-        if (!t) return;
-        try {
-            const svc = await getActivityService();
-            const created = await svc.create({ text: t, taskId: task.id });
-            setList([...(list || []), created]);
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
-        } catch (e) {
-            console.error("Failed to add activity", e);
-        }
-    };
-    const removeActivity = async (id) => {
-        try {
-            const svc = await getActivityService();
-            await svc.remove(id);
-            setList(list.filter((a) => a.id !== id));
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
-        } catch (e) {
-            console.error("Failed to delete activity", e);
-        }
-        setOpenActivityRows((prev) => {
-            const copy = new Set(prev);
-            copy.delete(id);
-            return copy;
-        });
-    };
-    const { addToast } = useToast ? useToast() : { addToast: () => {} };
-
-    const toggleCompleted = async (id) => {
-        // avoid duplicate saves
-        if (savingActivityIds.has(id)) return;
-
-        const prev = Array.isArray(list) ? [...list] : [];
-        const next = prev.map((a) =>
-            a.id === id
-                ? { ...a, completed: !a.completed, completionDate: !a.completed ? new Date().toISOString() : null }
-                : a,
-        );
-        // optimistic update
-        setList(next);
-
-        // mark as saving
-        setSavingActivityIds((s) => new Set([...s, id]));
-        try {
-            const svc = await getActivityService();
-            const item = next.find((a) => a.id === id);
-            await svc.update(id, { completed: !!item.completed, completionDate: item.completed ? new Date().toISOString() : null });
-            addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
-        } catch (e) {
-            console.error("Failed to update activity completion", e);
-            // rollback
-            setList(prev);
-            addToast && addToast({ title: "Failed to update activity", variant: "error" });
-        } finally {
-            // remove saving flag
-            setSavingActivityIds((s) => {
-                const copy = new Set(s);
-                copy.delete(id);
-                return copy;
-            });
-        }
-    };
-    const setActivityStatus = async (id, status) => {
-        // scoped to TaskFullView: update activity status and set completed when status === 'done'
-        if (savingActivityIds.has(id)) return;
-        const prev = Array.isArray(list) ? [...list] : [];
-        const next = prev.map((a) =>
-            a.id === id
-                ? {
-                      ...a,
-                      status,
-                      completed: status === 'done' ? true : a.completed,
-                      completionDate: status === 'done' ? new Date().toISOString() : a.completionDate || null,
-                  }
-                : a,
-        );
-        // optimistic update
-        setList(next);
-        setSavingActivityIds((s) => new Set([...s, id]));
-        try {
-            const svc = await getActivityService();
-            const serverStatus = mapUiStatusToServer(status);
-            const updated = await svc.update(id, {
-                status: serverStatus,
-                completed: status === 'done',
-                completionDate: status === 'done' ? new Date().toISOString() : null,
-            });
-            // replace with canonical server object (normalized)
-            const norm = normalizeActivity(updated || {});
-            setList((prevList) => prevList.map((a) => (a.id === id ? norm : a)));
-        } catch (e) {
-            console.error('Failed to update activity status', e);
-            setList(prev);
-        } finally {
-            setSavingActivityIds((s) => {
-                const copy = new Set(s);
-                copy.delete(id);
-                return copy;
-            });
-        }
-    };
-    const setPriorityValue = (id, value) => {
-        // set priority explicitly via icon click; icons stay visible regardless of value
-        setList(list.map((a) => (a.id === id ? { ...a, priority: value } : a)));
-    };
-    const createTaskFromActivity = (item) => {
-        // Ask user to confirm conversion. Only proceed when user confirms.
-        const confirmed = window.confirm("Convert this activity into a task? OK = convert, Cancel = abort");
-        if (!confirmed) return; // user cancelled, do nothing
-        try {
-            window.dispatchEvent(
-                new CustomEvent("ka-create-task-from-activity", { detail: { taskId: task.id, activity: item, remove: true } }),
-            );
-        } catch {}
-    };
-    const toggleRow = (id) => {
-        // Open activity in read-only modal instead of inline expansion
-        const activity = list.find(a => a.id === id);
-        if (activity) {
-            setActivityModal({ open: true, item: activity });
-        }
-    };
-
-    // When hovering another activity, do nothing (inline details removed)
-    const closeOnHoverDifferent = (id) => {
-        // No-op: inline details removed
-    };
-    const updateField = (id, field, value) => {
-        setList(list.map((a) => (a.id === id ? { ...a, [field]: value } : a)));
-    };
-    const clearActivities = () => {
-        if (!confirm("Clear all activities for this task?")) return;
-        onUpdateActivities && onUpdateActivities(String(task.id), []);
-    };
-
-    const listNameFor = (n) => {
-        if (!kaId) return `List ${n}`;
-        const names = listNames[String(kaId)] || {};
-        return names[String(n)] || `List ${n}`;
-    };
-
-    // Save handler for details tab
-    const save = async () => {
-        if (onSave) {
-            await onSave(form);
-        }
-        setIsEditing(false);
-        // Close the details card after saving
-        if (onBack) onBack();
-    };
-
-    return (
-        <div className="bg-white rounded-xl border border-slate-200">
-            {/* Header: row 1 (back + title + actions), row 2 (Key Area pill fully left-aligned) */}
-            <div className="p-2 border-b border-slate-200">
-                <div className="flex items-start gap-2">
-                    {onBack && (
-                        <button
-                            type="button"
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            aria-label="Back"
-                            onClick={onBack}
-                            style={{ minWidth: 36, minHeight: 36 }}
-                        >
-                            <FaChevronLeft />
-                        </button>
-                    )}
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                            {(() => {
-                                const lvl = getPriorityLevel(form?.priority ?? task?.priority);
-                                if (lvl === 2) return null; // hide for medium
-                                const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
-                                const label = lvl === 3 ? "High" : "Low";
-                                return (
-                                    <span
-                                        className={`mt-0.5 inline-block text-sm font-bold ${cls}`}
-                                        title={`Priority: ${label}`}
-                                    >
-                                        !
-                                    </span>
-                                );
-                            })()}
-                            <div className="relative truncate font-bold text-slate-900 text-base md:text-lg pl-6 z-10">
-                                {/* subtle stop icon behind the task name, with left padding to avoid overlap */}
-                                <FaStop
-                                    className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px] text-[#4DC3D8]"
-                                    aria-hidden="true"
-                                />
-                                <span className="relative z-10">{form?.title || task?.title || "Untitled task"}</span>
-                            </div>
-                            {/* Ellipsis menu next to the title */}
-                            <div className="relative shrink-0 z-50" ref={menuRef}>
-                                <button
-                                    type="button"
-                                    aria-haspopup="menu"
-                                    aria-expanded={menuOpen ? "true" : "false"}
-                                    className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600"
-                                    onClick={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        const gap = 6; // slight offset below/right
-                                        const menuWidth = 160; // Tailwind w-40
-                                        // Preferred position: right and just below the dots
-                                        let top = rect.bottom + window.scrollY + gap;
-                                        let left = rect.right + window.scrollX + gap;
-                                        // If it overflows right edge, flip to left side of the button
-                                        const viewportRight = window.scrollX + window.innerWidth - gap;
-                                        if (left + menuWidth > viewportRight) {
-                                            left = rect.left + window.scrollX - menuWidth - gap;
-                                        }
-                                        setMenuPos({ top, left });
-                                        setMenuOpen((s) => !s);
-                                    }}
-                                    title="More actions"
-                                >
-                                    <FaEllipsisV />
-                                </button>
-                                {menuOpen && (
-                                    <div
-                                        role="menu"
-                                        className="fixed w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
-                                        style={{ top: menuPos.top, left: menuPos.left }}
-                                    >
-                                        <button
-                                            role="menuitem"
-                                            className="block w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-                                            onClick={() => {
-                                                setMenuOpen(false);
-                                                // Open unified Task modal in edit mode
-                                                window.dispatchEvent(
-                                                    new CustomEvent("ka-open-task-editor", { detail: { task } }),
-                                                );
-                                            }}
-                                        >
-                                            Edit details
-                                        </button>
-                                        {!readOnly && (
-                                            <button
-                                                role="menuitem"
-                                                className="block w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50"
-                                                onClick={() => {
-                                                    setMenuOpen(false);
-                                                    if (!confirm("Delete this task?")) return;
-                                                    onDelete && onDelete(task);
-                                                }}
-                                            >
-                                                Delete task
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {/* Key Area tracking pill below, fully left-aligned with its icon */}
-                {kaTitle && (
-                    <div className="pt-2">
-                        <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
-                            <img
-                                alt="Key Areas"
-                                className="w-4 h-4 object-contain opacity-70"
-                                src={`${import.meta.env.BASE_URL}key-area.png`}
-                                onError={(e) => {
-                                    if (e?.currentTarget) e.currentTarget.src = "/key-area.png";
-                                }}
-                            />
-                            <span className="font-medium truncate max-w-full" title={kaTitle}>
-                                {kaTitle}
-                            </span>
-                        </div>
-                    </div>
-                )}
-            </div>
-            {/* Professional summary card under header */}
-            {(() => {
-                const vt = form || task;
-                const assignee = vt?.assignee || "—";
-                const statusText = String(vt?.status || "open").replace("_", " ");
-                const priorityLabel = (() => {
-                    const p = String(vt?.priority || "med").toLowerCase();
-                    if (p === "med" || p === "medium") return "Normal";
-                    if (p === "low") return "Low";
-                    if (p === "high") return "High";
-                    return p;
-                })();
-                const q = computeEisenhowerQuadrant({
-                    deadline: vt?.deadline,
-                    end_date: vt?.end_date,
-                    priority: String(vt?.priority || "med").toLowerCase(),
-                });
-                const goalTitle = (() => {
-                    const id = vt?.goal_id;
-                    if (!id) return "—";
-                    const g = (goals || []).find((x) => String(x.id) === String(id));
-                    return g?.title || `#${id}`;
-                })();
-                const rawTags = vt?.tags || "";
-                const tagsArr = rawTags
-                    .split(",")
-                    .map((t) => t.trim())
-                    .filter(Boolean);
-                const tags = tagsArr.length ? tagsArr : null;
-                const startD = toDateOnly(vt?.start_date) || "—";
-                const deadlineD = toDateOnly(vt?.deadline) || "—";
-                const endD = toDateOnly(vt?.end_date) || "—";
-                const completedD = toDateOnly(vt?.completionDate || vt?.completion_date) || "—";
-                const durationText = vt?.start_date && vt?.end_date ? formatDuration(vt.start_date, vt.end_date) : "—";
-                return (
-                    <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-white">
-                        <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2">
-                            <div className="text-sm">
-                                {/* Row 1: Labels in exact order */}
-                                <div className="grid grid-cols-11 gap-x-1">
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Assignee</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Status</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Priority</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Quadrant</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Goal</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Tags</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">End date</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Deadline</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Duration</div>
-                                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Completed</div>
-                                </div>
-                                {/* Row 2: Values aligned under each label */}
-                                <div className="grid grid-cols-11 gap-x-1 mt-0.5">
-                                    {/* Assignee value */}
-                                    <div className="text-slate-900 truncate min-w-0">{assignee}</div>
-                                    {/* Status value */}
-                                    <div className="text-slate-900 capitalize truncate min-w-0 inline-flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />
-                                        {statusText}
-                                    </div>
-                                    {/* Priority value */}
-                                    <div className="text-slate-900 truncate min-w-0 inline-flex items-center gap-1 whitespace-nowrap">
-                                        <span>{priorityLabel}</span>
-                                        {(() => {
-                                            const lvl = getPriorityLevel(vt?.priority || "med");
-                                            if (lvl === 2) return null;
-                                            const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
-                                            const label = lvl === 3 ? "High" : "Low";
-                                            return (
-                                                <span
-                                                    className={`inline-block text-sm font-bold ${cls}`}
-                                                    title={`Priority: ${label}`}
-                                                >
-                                                    !
-                                                </span>
-                                            );
-                                        })()}
-                                    </div>
-                                    {/* Quadrant value */}
-                                    <div className="min-w-0">
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-medium">{`Q${q}`}</span>
-                                    </div>
-                                    {/* Goal value */}
-                                    <div className="text-slate-900 truncate min-w-0" title={goalTitle}>
-                                        {goalTitle}
-                                    </div>
-                                    {/* Tags value (compact) */}
-                                    <div className="text-slate-900 truncate min-w-0">
-                                        {(() => {
-                                            if (!tags) return "—";
-                                            const maxTags = 2;
-                                            const shown = tags.slice(0, maxTags);
-                                            const extra = Math.max(0, tags.length - shown.length);
-                                            return `${shown.join(", ")}${extra ? `, +${extra}` : ""}`;
-                                        })()}
-                                    </div>
-                                    {/* Start Date value */}
-                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{startD}</div>
-                                    {/* End date value */}
-                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{endD}</div>
-                                    {/* Deadline value */}
-                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{deadlineD}</div>
-                                    {/* Duration value */}
-                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">
-                                        {durationText}
-                                    </div>
-                                    {/* Completed value */}
-                                    <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{completedD}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-            {/* Local tabs for Activities / Details */}
-            <div className="px-2 pt-2 border-b border-slate-200 bg-white">
-                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                    <button
-                        type="button"
-                        className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === "activities" ? "bg-white text-slate-900 shadow" : "text-slate-700 hover:bg-slate-200"}`}
-                        onClick={() => setTab("activities")}
-                    >
-                        <span className="inline-flex items-center gap-1">
-                            <svg
-                                className={`w-4 h-4 ${tab === "activities" ? "text-[#4DC3D8]" : ""}`}
-                                viewBox="0 0 448 512"
-                                xmlns="http://www.w3.org/2000/svg"
-                                aria-hidden="true"
-                                focusable="false"
-                                fill="currentColor"
-                            >
-                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
-                            </svg>
-                            Activities
-                        </span>
-                    </button>
-                </div>
-            </div>
-            {tab === "activities" ? (
-                <div className="p-4">
-                    {list.length === 0 ? (
-                        <EmptyState title="No activities for this task yet." hint="Add a new activity below." />
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                    <tr>
-                                        <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Assignee</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Status</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Start date</th>
-                                        <th className="px-3 py-2 text-left font-semibold">End date</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Deadline</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Duration</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Completed</th>
-                                        <th className="px-3 py-2 text-left font-semibold">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {list.map((a) => (
-                                        <tr key={a.id} className="bg-white border-b border-slate-100">
-                                            <td className="px-3 py-2 align-top">
-                                                <div className="flex items-center gap-3">
-                                                    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
-                                                    <div className="flex flex-col">
-                                                        <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text || a.activity_name || 'Untitled activity'}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2 align-top text-slate-700">{a.assignee || '—'}</td>
-                                            <td className="px-3 py-2 align-top">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                    <select value={a.status || 'open'} onChange={(e)=> setActivityStatus(a.id, e.target.value)} className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
-                                                        <option value="open">Open</option>
-                                                        <option value="in_progress">In progress</option>
-                                                        <option value="done">Done</option>
-                                                    </select>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2 align-top">
-                                                {(() => {
-                                                    const eff = a.priority !== undefined && a.priority !== null && a.priority !== '' ? a.priority : task?.priority;
-                                                    const lvl = getPriorityLevel(eff);
-                                                    return (
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${lvl === 3 ? 'text-red-600 border-red-100' : lvl === 1 ? 'text-emerald-600 border-emerald-100' : 'text-slate-700 border-slate-100'}`}>
-                                                            {lvl === 3 ? 'High' : lvl === 1 ? 'Low' : 'Normal'}
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </td>
-                                            <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || '—'}</td>
-                                            <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
-                                            <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
-                                            <td className="px-3 py-2 align-top">{formatDuration(a.start_date, a.end_date)}</td>
-                                            <td className="px-3 py-2 align-top text-slate-800">
-                                                {a.completionDate ? new Date(a.completionDate).toLocaleString() : '—'}
-                                            </td>
-                                            <td className="px-3 py-2 align-top">
-                                                <div className="flex items-center gap-2">
-                                                    <button type="button" onClick={(e) => { e.stopPropagation(); /* tag placeholder */ }} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Tags">
-                                                        <FaTag className="w-4 h-4" />
-                                                    </button>
-                                                    <button type="button" onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="p-1 text-red-600 hover:bg-red-50 rounded-md" title="Delete">
-                                                        <FaTrash className="w-4 h-4" />
-                                                    </button>
-                                                    <button type="button" onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('ka-open-activity-editor',{detail:{activity:a,taskId:task.id}})); }} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Edit">
-                                                        <FaEdit className="w-4 h-4" />
-                                                    </button>
-                                                    <button type="button" onClick={(e) => { e.stopPropagation(); if (!a.created_task_id) createTaskFromActivity(a); }} className={`p-1 rounded-md ${a.created_task_id ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50'}`} title={a.created_task_id ? 'Already created a task from this activity' : 'Convert to task'} disabled={!!a.created_task_id}>
-                                                        <FaAngleDoubleLeft className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    <div className="mt-3 flex items-center gap-2">
-                        <button
-                            type="button"
-                            className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                            onClick={() =>
-                                window.dispatchEvent(
-                                    new CustomEvent("ka-open-activity-composer", { detail: { taskId: task?.id } }),
-                                )
-                            }
-                        >
-                            Add Activity
-                        </button>
-                    </div>
-                </div>
-            ) : (
-                <div className="p-2 grid md:grid-cols-3 gap-2 items-stretch">
-                    {/* Left column: Title + Description */}
-                    <div className="md:col-span-2 h-full flex flex-col text-sm">
-                        <div className="grid grid-rows-[auto_1fr] gap-1 flex-1">
-                            <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                <div className="text-[10px] uppercase tracking-wide text-slate-500">Title</div>
-                                <textarea
-                                    rows={2}
-                                    className="mt-1 w-full rounded-md border border-slate-300 bg-white p-2 text-base leading-snug disabled:bg-slate-100 disabled:text-slate-700"
-                                    value={isEditing && !readOnly ? (form.title ?? "") : (task.title ?? "")}
-                                    onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
-                                    placeholder="Enter a descriptive task name…"
-                                    readOnly={!isEditing || readOnly}
-                                    disabled={!isEditing || readOnly}
-                                />
-                            </div>
-                            <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                                <div className="text-[10px] uppercase tracking-wide text-slate-500">Description</div>
-                                <textarea
-                                    rows={5}
-                                    className="mt-1.5 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                    value={isEditing && !readOnly ? form.description || "" : task.description || ""}
-                                    onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
-                                    placeholder="Add more context…"
-                                    readOnly={!isEditing || readOnly}
-                                    disabled={!isEditing || readOnly}
-                                />
-                                {/* Meta (moved here) */}
-                                <div className="mt-2 border-t border-slate-200 pt-2">
-                                    <div className="grid md:grid-cols-3 gap-2">
-                                        {/* Linked Goal */}
-                                        <div>
-                                            <div className="text-[11px] text-slate-600">Linked Goal</div>
-                                            <select
-                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                                value={isEditing && !readOnly ? form.goal_id || "" : task.goal_id || ""}
-                                                onChange={(e) => setForm((s) => ({ ...s, goal_id: e.target.value }))}
-                                                disabled={!isEditing || readOnly}
-                                            >
-                                                <option value="">— None —</option>
-                                                {goals.map((g) => (
-                                                    <option key={g.id} value={g.id}>
-                                                        {g.title}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        {/* Tags */}
-                                        <div>
-                                            <div className="text-[11px] text-slate-600">Tags</div>
-                                            <input
-                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                                value={isEditing && !readOnly ? form.tags || "" : task.tags || ""}
-                                                onChange={(e) => setForm((s) => ({ ...s, tags: e.target.value }))}
-                                                placeholder="comma,separated"
-                                                readOnly={!isEditing || readOnly}
-                                                disabled={!isEditing || readOnly}
-                                            />
-                                        </div>
-                                        {/* List (Tab) */}
-                                        <div>
-                                            <div className="text-[11px] text-slate-600">{`List (Tab) — ${listNameFor((isEditing && !readOnly ? form.list_index || 1 : task.list_index || 1) || 1)}`}</div>
-                                            <select
-                                                className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                                value={String(
-                                                    isEditing && !readOnly
-                                                        ? form.list_index || 1
-                                                        : task.list_index || 1,
-                                                )}
-                                                onChange={(e) =>
-                                                    setForm((s) => ({
-                                                        ...s,
-                                                        list_index: Number(e.target.value || 1),
-                                                    }))
-                                                }
-                                                disabled={!isEditing || readOnly}
-                                            >
-                                                {(listNumbers && listNumbers.length
-                                                    ? listNumbers
-                                                    : Array.from({ length: 10 }, (_, i) => i + 1)
-                                                ).map((n) => (
-                                                    <option key={n} value={String(n)}>
-                                                        {listNameFor(n)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {isEditing && !readOnly ? (
-                            <div className="mt-1.5 flex items-center gap-2">
-                                <button
-                                    className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
-                                    onClick={save}
-                                >
-                                    <FaSave /> Save changes
-                                </button>
-                                <button
-                                    className="px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs"
-                                    onClick={() => {
-                                        setIsEditing(false);
-                                        setForm(task);
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        ) : null}
-                    </div>
-
-                    {/* Right column: Summary, Schedule, Meta */}
-                    <div className="grid grid-rows-[1fr_1fr] gap-1.5 h-full text-sm">
-                        {/* Summary */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Summary</div>
-                            {/* Assignee */}
-                            <div className="mb-1.5">
-                                <div className="text-[11px] text-slate-600">Assignee</div>
-                                <input
-                                    className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                    value={isEditing && !readOnly ? form.assignee || "" : task.assignee || ""}
-                                    onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))}
-                                    readOnly={!isEditing || readOnly}
-                                    disabled={!isEditing || readOnly}
-                                />
-                            </div>
-                            {/* Status & Priority */}
-                            <div className="grid grid-cols-2 gap-1.5">
-                                <div>
-                                    <div className="text-[11px] text-slate-600">Status</div>
-                                    <select
-                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                        value={isEditing && !readOnly ? form.status || "open" : task.status || "open"}
-                                        onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
-                                        disabled={!isEditing || readOnly}
-                                    >
-                                        <option value="open">Open</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="done">Done</option>
-                                        <option value="cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <div className="text-[11px] text-slate-600">Priority</div>
-                                    <select
-                                        className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                        value={isEditing && !readOnly ? form.priority || "med" : task.priority || "med"}
-                                        onChange={(e) => setForm((s) => ({ ...s, priority: e.target.value }))}
-                                        disabled={!isEditing || readOnly}
-                                    >
-                                        <option value="low">Low</option>
-                                        <option value="med">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Schedule */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
-                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Schedule</div>
-                            <div className="grid grid-cols-3 gap-1.5">
-                                {[
-                                    { key: "start_date", label: "Start" },
-                                    { key: "end_date", label: "End date" },
-                                    { key: "deadline", label: "Deadline" },
-                                ].map((f) => (
-                                    <div key={f.key}>
-                                        <div className="text-[11px] text-slate-600">{f.label}</div>
-                                        <input
-                                            type="date"
-                                            className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm disabled:bg-slate-100 disabled:text-slate-700"
-                                            value={
-                                                isEditing && !readOnly
-                                                    ? toDateOnly(form[f.key]) || ""
-                                                    : toDateOnly(task[f.key]) || ""
-                                            }
-                                            onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                                            readOnly={!isEditing || readOnly}
-                                            disabled={!isEditing || readOnly}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* (Meta moved to left column) */}
-                    </div>
-
-                    {/* Bottom Edit/Delete actions removed per request */}
-                </div>
-            )}
-            {showDetailsPopup && (
-                <TaskSlideOver
-                    task={task}
-                    goals={goals}
-                    listNames={listNames}
-                    kaId={selectedKA?.id}
-                    listNumbers={availableListNumbers}
-                    readOnly={readOnly}
-                    initialTab="details"
-                    hideActivitiesTab
-                    onClose={() => setShowDetailsPopup(false)}
-                    onSave={async (payload) => {
-                        if (onSave) await onSave(payload);
-                        setShowDetailsPopup(false);
-                    }}
-                    onDelete={async (tsk) => {
-                        if (onDelete) await onDelete(tsk);
-                        setShowDetailsPopup(false);
-                    }}
-                />
-            )}
-            {/* Read-only activity modal */}
-            {activityModal.open && activityModal.item && (
-                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
-                    <CreateActivityModal
-                        isOpen={activityModal.open}
-                        onClose={() => setActivityModal({ open: false, item: null })}
-                        onSave={() => {}} // no-op: read-only
-                        activityId={activityModal.item.id}
-                        initialData={{
-                            taskId: activityModal.item.task_id || activityModal.item.taskId || "",
-                            text: activityModal.item.text || activityModal.item.activity_name || "",
-                            title: activityModal.item.text || activityModal.item.activity_name || "",
-                        }}
-                        attachedTaskId={activityModal.item.task_id || activityModal.item.taskId || null}
-                        readOnly={true}
-                    />
-                </Suspense>
-            )}
-        </div>
-    );
-}
+/* Full page TaskFullView has been moved to src/components/key-areas/TaskFullView.jsx */
 
 /* --------------------------------- Screen -------------------------------- */
 export default function KeyAreas() {
@@ -2103,6 +485,7 @@ export default function KeyAreas() {
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [showTaskComposer, setShowTaskComposer] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState(null);
+    const [editingActivityViaTaskModal, setEditingActivityViaTaskModal] = useState(null); // { id, taskId }
     const [showActivityComposer, setShowActivityComposer] = useState(false);
     const [editingActivityId, setEditingActivityId] = useState(null);
     const [showTaskHelp, setShowTaskHelp] = useState(false);
@@ -2118,15 +501,48 @@ export default function KeyAreas() {
     const [showMassEdit, setShowMassEdit] = useState(false);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
+
+    // Build a stable lookup map from any possible goal id key to the goal title.
+    // This avoids repeated array scans in TaskRow and makes lookups resilient
+    // to different id field names returned by the backend (_id, id, goalId, goal_id).
+    const goalTitleMap = React.useMemo(() => {
+        const m = new Map();
+        try {
+            (goals || []).forEach((g) => {
+                const title = g && (g.title || g.name || g.label) ;
+                const ids = [g && g.id, g && g._id, g && g.goalId, g && g.goal_id];
+                ids.forEach((id) => {
+                    if (id !== undefined && id !== null) m.set(String(id), title || "");
+                });
+            });
+        } catch (_) {}
+        return m;
+    }, [goals]);
+
+    // If goals load after tasks, force a shallow update to allTasks so TaskRow re-renders
+    // and can resolve titles via the freshly-populated goalTitleMap.
+    useEffect(() => {
+        try {
+            if (goals && goals.length && allTasks && allTasks.length) {
+                // shallow copy to trigger subscribers without changing identity of items
+                setAllTasks((prev) => (Array.isArray(prev) ? prev.slice() : prev));
+            }
+        } catch (_) {}
+    }, [goals.length]);
+    
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
     // Toasts and saving state for activity updates
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
     const [savingActivityIds, setSavingActivityIds] = useState(new Set());
+    const [isSavingActivity, setIsSavingActivity] = useState(false);
 
     // Open global activity composer on request (from various UI spots)
     useEffect(() => {
         const handler = (e) => {
             const tid = e?.detail?.taskId ?? null;
+            // debug: log event reception
+            // eslint-disable-next-line no-console
+            console.log('ka-open-activity-composer received', { tid });
                 // Reset form and editing state for new activity
                 setEditingActivityId(null);
                 setActivityForm({
@@ -2165,6 +581,8 @@ export default function KeyAreas() {
                 return "normal";
             };
             setTaskForm({
+                // include id so edit modals receive a usable identifier for update flows
+                id: task.id || task.taskId || task.task_id || task._id || null,
                 title: task.title || "",
                 description: task.description || "",
                 list_index: task.list_index || 1,
@@ -2198,7 +616,18 @@ export default function KeyAreas() {
         return () => window.removeEventListener("ka-open-task-editor", handler);
     }, [selectedKA]);
 
-    // Open activity editor (reuse Add Activity modal) populated for editing
+    // Debug: log when the composer visibility changes so we can confirm
+    useEffect(() => {
+        // eslint-disable-next-line no-console
+        console.log('showActivityComposer changed', { showActivityComposer });
+    }, [showActivityComposer]);
+
+    // control whether the external EditActivityModal is shown directly
+    const [showEditActivityModal, setShowEditActivityModal] = useState(false);
+
+    // Open activity editor — instead of the activity modal we reuse the Task composer modal
+    // to give the activity a richer edit surface. We map activity -> taskForm and set
+    // `editingActivityViaTaskModal` so the task submit handler knows to persist to activity service.
     useEffect(() => {
         const handler = (e) => {
             const activity = e?.detail?.activity;
@@ -2210,6 +639,33 @@ export default function KeyAreas() {
                 if (!Number.isNaN(n)) return n === 3 ? "high" : n === 1 ? "low" : "normal";
                 return String(v || "normal").toLowerCase();
             };
+            // Populate taskForm with activity values so the Task composer UI is reused
+            setTaskForm({
+                // include id when mapping an activity into the task form so the modal
+                // can distinguish update vs create when saving.
+                id: activity.id || activity.activityId || activity.activity_id || null,
+                title: activity.text || activity.activity_name || "",
+                description: activity.notes || "",
+                list_index: 1,
+                category: "Key Areas",
+                goal_id: "",
+                start_date: toDateOnly(activity.date_start) || "",
+                deadline: toDateOnly(activity.deadline) || "",
+                end_date: toDateOnly(activity.date_end) || "",
+                status: activity.completed ? "done" : "open",
+                priority: mapPriority(activity.priority),
+                tags: "",
+                recurrence: "",
+                attachments: "",
+                attachmentsFiles: [],
+                assignee: activity.responsible || "",
+                key_area_id: selectedKA?.id || "",
+                list: "",
+                finish_date: toDateOnly(activity.completionDate) || "",
+                duration: activity.duration || "",
+                _endAuto: false,
+            });
+            // Also set activityForm so the dedicated activity editor modal can be used
             setActivityForm({
                 title: activity.text || activity.activity_name || "",
                 description: activity.notes || "",
@@ -2221,12 +677,15 @@ export default function KeyAreas() {
                 start_date: toDateOnly(activity.date_start) || "",
                 end_date: toDateOnly(activity.date_end) || "",
                 deadline: toDateOnly(activity.deadline) || "",
-                finish_date: toDateOnly(activity.finish_date) || "",
+                finish_date: toDateOnly(activity.completionDate) || "",
                 duration: activity.duration || "",
                 _endAuto: false,
             });
-            setEditingActivityId(activity.id);
-            setShowActivityComposer(true);
+            // track that we're editing an activity
+            setEditingActivityViaTaskModal({ id: activity.id, taskId: tid ? String(tid) : null });
+            setEditingTaskId(null);
+            // open external EditActivityModal directly instead of the Task composer
+            setShowEditActivityModal(true);
         };
         window.addEventListener("ka-open-activity-editor", handler);
         return () => window.removeEventListener("ka-open-activity-editor", handler);
@@ -2323,6 +782,10 @@ export default function KeyAreas() {
         try {
             const svc = await getActivityService();
             const list = await svc.list({ taskId });
+            // Diagnostic: log result length so we can tell if backend returned items
+            try {
+                console.info('KeyAreas.refreshActivitiesForTask', { taskId: String(taskId), returned: Array.isArray(list) ? list.length : 0 });
+            } catch (__) {}
             setActivitiesByTask((prev) => ({ ...prev, [String(taskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
         } catch (e) {
             console.error("Failed to refresh activities", e);
@@ -2333,11 +796,13 @@ export default function KeyAreas() {
     const refreshAllActivities = async () => {
         if (!Array.isArray(allTasks) || allTasks.length === 0) return;
         try {
+            try { console.info('KeyAreas.refreshAllActivities starting', { taskCount: allTasks.length }); } catch (__) {}
             const svc = await getActivityService();
             const entries = await Promise.all(
                 allTasks.map(async (t) => {
                     try {
                         const list = await svc.list({ taskId: t.id });
+                        try { console.info('KeyAreas.refreshAllActivities.item', { taskId: String(t.id), returned: Array.isArray(list) ? list.length : 0 }); } catch (__) {}
                         return [String(t.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
                     } catch {
                         return [String(t.id), []];
@@ -2345,6 +810,7 @@ export default function KeyAreas() {
                 }),
             );
             const grouped = Object.fromEntries(entries);
+            try { console.info('KeyAreas.refreshAllActivities completed', { loadedTaskKeys: Object.keys(grouped).length }); } catch (__) {}
             setActivitiesByTask(grouped);
         } catch (e) {
             console.error("Failed to load activities for tasks", e);
@@ -2363,6 +829,28 @@ export default function KeyAreas() {
         window.addEventListener("ka-activities-updated", handler);
         return () => window.removeEventListener("ka-activities-updated", handler);
     }, []);
+
+    // Ensure activities for the currently selected full-task view are loaded.
+    // When a user clicks a task to open the full view, we may not have primed
+    // activitiesByTask for that single task (for example when viewing 'All' or
+    // when selectedKA is null). Load activities on demand when selectedTaskFull changes.
+    useEffect(() => {
+        if (!selectedTaskFull || !selectedTaskFull.id) return;
+        const key = String(selectedTaskFull.id);
+        try {
+            const existing = activitiesByTask[key];
+            if (!Array.isArray(existing) || existing.length === 0) {
+                // fire-and-forget; helper already logs errors
+                refreshActivitiesForTask(selectedTaskFull.id).catch((err) => {
+                    console.error('Failed to load activities for selectedTaskFull', err);
+                });
+            }
+        } catch (e) {
+            // defensive: still attempt to fetch
+            refreshActivitiesForTask(selectedTaskFull.id).catch((err) => console.error(err));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedTaskFull && selectedTaskFull.id]);
 
     // Create task from activity / Convert activity to task
     useEffect(() => {
@@ -2651,7 +1139,11 @@ export default function KeyAreas() {
     useEffect(() => {
         if (!showTaskComposer) return;
         const onKey = (e) => {
-            if (e.key === "Escape") setShowTaskComposer(false);
+            if (e.key === "Escape") {
+                setShowTaskComposer(false);
+                setEditingTaskId(null);
+                setEditingActivityViaTaskModal(null);
+            }
         };
         document.addEventListener("keydown", onKey);
         return () => document.removeEventListener("keydown", onKey);
@@ -2991,6 +1483,7 @@ export default function KeyAreas() {
         setSelectedTaskFull(null);
         setSelectedKA(ka);
         const t = await api.listTasks(ka.id);
+        try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0 }); } catch (__) {}
         setAllTasks(t);
         // refresh activities for these tasks
         try {
@@ -3013,7 +1506,8 @@ export default function KeyAreas() {
         setSearchTerm("");
         setQuadrant("all");
         setView("list");
-        setShowTaskComposer(false);
+    setShowTaskComposer(false);
+    setEditingActivityViaTaskModal(null);
         setExpandedActivityRows(new Set());
         setOpenActivityDetails(new Set());
         setEditingActivity(null);
@@ -3119,6 +1613,46 @@ export default function KeyAreas() {
         return arr;
     }, [allTasks, taskTab, searchTerm, quadrant]);
 
+    // Debug traces removed: temporary logging used during goal/title load debugging cleared.
+
+    // Build a visible-tasks array that includes a pre-resolved goal title when possible.
+    const visibleTasksWithResolvedGoal = React.useMemo(() => {
+        try {
+            return (visibleTasks || []).map((t) => {
+                const existing = t.resolvedGoalTitle || null;
+                if (existing) return { ...t, resolvedGoalTitle: existing };
+                // determine goal id from several shapes
+                const gid = t.goal_id ?? t.goalId ?? (t.goal && (t.goal.id || t.goal.goal_id)) ?? null;
+                if (gid === null || gid === undefined) return { ...t, resolvedGoalTitle: null };
+                // lookup in the goalTitleMap (supports Map or plain object)
+                let resolved = null;
+                try {
+                    if (goalTitleMap && typeof goalTitleMap.get === 'function') resolved = goalTitleMap.get(String(gid)) || null;
+                    else if (goalTitleMap) resolved = goalTitleMap[String(gid)] || null;
+                } catch (_) {
+                    resolved = null;
+                }
+                return { ...t, resolvedGoalTitle: resolved };
+            });
+        } catch (_) {
+            return visibleTasks || [];
+        }
+    }, [visibleTasks, goalTitleMap]);
+
+    // Targeted, rate-limited diagnostic: log tasks that reference a goal but have no resolved title.
+    React.useEffect(() => {
+        try {
+            const missing = (visibleTasksWithResolvedGoal || []).filter((t) => {
+                const hasRef = !!(t.goal_id || t.goalId || (t.goal && (t.goal.id || t.goal.goal_id)));
+                return hasRef && !t.resolvedGoalTitle;
+            }).slice(0, 10).map((t) => ({ id: t.id, title: t.title, goalRef: t.goal_id || t.goalId || (t.goal && (t.goal.id || t.goal.goal_id)) }));
+            if (missing && missing.length) {
+                // use console.info for targeted diagnostics (kept small)
+                console.info('KeyAreas: tasks with goal ref but missing resolved title', { time: new Date().toISOString(), count: missing.length, sample: missing });
+            }
+        } catch (_) {}
+    }, [visibleTasksWithResolvedGoal, goals.length]);
+
     // Selection helpers
     const isSelected = (id) => selectedIds.has(id);
     const toggleSelect = (id) => {
@@ -3188,9 +1722,9 @@ export default function KeyAreas() {
     };
 
     const onCreateTask = async (e) => {
-        e.preventDefault();
-        if (!selectedKA && !editingTaskId) return;
-        const f = new FormData(e.currentTarget);
+    e.preventDefault();
+    if (!selectedKA && !editingTaskId && !editingActivityViaTaskModal) return;
+    const f = new FormData(e.currentTarget);
         const title = (f.get("title") || "").toString().trim();
         if (!title) return;
 
@@ -3222,6 +1756,48 @@ export default function KeyAreas() {
             goal,
             finish_date,
         };
+        // Determine whether this submission is intended to edit an activity.
+        // Prefer explicit FormData marker (set when opening via activity editor) as a fallback
+        const isEditingActivity = !!editingActivityViaTaskModal || !!f.get('__editing_activity');
+        // If we're editing an activity via the Task modal, translate payload and update the activity instead
+        if (isEditingActivity) {
+            try {
+                const svc = await getActivityService();
+                const activityId = (editingActivityViaTaskModal && editingActivityViaTaskModal.id) || null;
+                // If state lost, attempt to find id via form (not ideal) — fallback: abort
+                if (!activityId) {
+                    console.error("No activity id available for activity edit");
+                    alert("Could not determine which activity to update.");
+                    return;
+                }
+                const mapPriorityToNum = (p) => {
+                    const s = String(p || "normal").toLowerCase();
+                    if (s === "low") return 1;
+                    if (s === "high") return 3;
+                    return 2;
+                };
+                const body = {
+                    text: title,
+                    completed: (f.get("status") || "open").toString() === "done",
+                    priority: mapPriorityToNum(priority),
+                };
+                // attach to task if available
+                const tid = editingActivityViaTaskModal.taskId || activityAttachTaskId || null;
+                if (tid) body.taskId = tid;
+                await svc.update(activityId, body);
+                // refresh activity lists
+                if (body.taskId) await refreshActivitiesForTask(body.taskId);
+                else await refreshAllActivities();
+                window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true, taskId: body.taskId || undefined } }));
+                setEditingActivityViaTaskModal(null);
+                setShowTaskComposer(false);
+                return;
+            } catch (err) {
+                console.error("Failed to update activity via task modal", err);
+                alert("Could not save activity.");
+                return;
+            }
+        }
         if (editingTaskId) {
             // Update existing task
             const updated = await api.updateTask(editingTaskId, { id: editingTaskId, ...payload });
@@ -3231,7 +1807,8 @@ export default function KeyAreas() {
             setAllTasks((prev) => [...prev, created]);
         }
         setEditingTaskId(null);
-        setShowTaskComposer(false);
+    setShowTaskComposer(false);
+    setEditingActivityViaTaskModal(null);
     };
 
     // Create Activity using the same UI fields; persist only supported backend fields
@@ -3335,11 +1912,69 @@ export default function KeyAreas() {
             })(),
             eisenhower_quadrant: q,
         };
+        // payload prepared for update
         const saved = await api.updateTask(payload.id, payload);
+    // server returned updated task in `saved`
         // Update UI immediately with server payload (already normalized by api.updateTask)
         setAllTasks((prev) => prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)));
         await refreshActivitiesForTask(saved.id);
         setSelectedTask(null);
+    };
+
+    // Handler for ActivityFormModal onSave -> accept normalized payload from modal
+    const handleActivityModalSave = async (payload) => {
+        setIsSavingActivity(true);
+        try {
+            const svc = await getActivityService();
+            // Normalize incoming payload for API shape
+            const body = {
+                text: (payload.text || payload.activity_name || payload.title || "").trim(),
+                completed: !!payload.completed,
+            };
+            // Allow task attachment if provided
+            if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
+
+            if (payload.id) {
+                // update
+                const updated = await svc.update(payload.id, body);
+                // refresh the task bucket if attached
+                const tid = body.taskId || payload.taskId || payload.task_id || activityAttachTaskId || null;
+                if (tid) {
+                    try {
+                        const list = await svc.list({ taskId: tid });
+                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            } else {
+                // create
+                if (payload.taskId) body.taskId = payload.taskId;
+                const created = await svc.create(body);
+                const tid = body.taskId || activityAttachTaskId || null;
+                if (tid) {
+                    try {
+                        const list = await svc.list({ taskId: tid });
+                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            }
+
+            // notify other views and close modal
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+            setShowActivityComposer(false);
+            setEditingActivityId(null);
+            setActivityAttachTaskId(null);
+        } catch (err) {
+            console.error("Failed to save activity from modal", err);
+            // If the server returned validation messages, log them to help debugging
+            console.error('Save activity error response data:', err?.response?.data);
+            alert("Could not save activity.");
+        } finally {
+            setIsSavingActivity(false);
+        }
     };
 
     const handleDeleteTask = async (task) => {
@@ -3391,6 +2026,35 @@ export default function KeyAreas() {
                     <div
                         className="fixed inset-0 bg-black/40 z-30 md:hidden"
                         onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+                {/* External EditActivityModal rendered directly when requested */}
+                {showEditActivityModal && editingActivityViaTaskModal && (
+                    <EditActivityModal
+                        isOpen={true}
+                        initialData={(function(){
+                            try {
+                                const id = editingActivityViaTaskModal.id;
+                                const taskId = editingActivityViaTaskModal.taskId;
+                                if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
+                                    const found = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
+                                    if (found) return found;
+                                }
+                            } catch {}
+                            return activityForm || {};
+                        })()}
+                        keyAreas={keyAreas}
+                        users={users}
+                        goals={goals}
+                        tasks={allTasks}
+                        availableLists={availableListNumbers}
+                        onSave={async (payload) => {
+                            await handleActivityModalSave(payload);
+                            setEditingActivityViaTaskModal(null);
+                            setShowEditActivityModal(false);
+                        }}
+                        onCancel={() => { setShowEditActivityModal(false); setEditingActivityViaTaskModal(null); }}
+                        isSaving={isSavingActivity}
                     />
                 )}
                 <main
@@ -3562,23 +2226,23 @@ export default function KeyAreas() {
                             )}
                         </div>
                         {/* Title block removed; title now shown inline with Back */}
-                        {selectedTaskFull && selectedKA && (
+                        {selectedTaskFull && (
                             <div className="mb-4">
                                 <TaskFullView
                                     task={selectedTaskFull}
                                     goals={goals}
-                                    kaTitle={selectedKA?.title}
+                                    kaTitle={(selectedKA && selectedKA.title) || (keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id)) || {}).title}
                                     listNames={listNames}
-                                    kaId={selectedKA?.id}
+                                    kaId={(selectedKA && selectedKA.id) || selectedTaskFull.key_area_id}
                                     listNumbers={availableListNumbers}
-                                    selectedKA={selectedKA}
+                                    selectedKA={selectedKA || keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id))}
                                     users={users}
                                     allTasks={allTasks}
                                     savingActivityIds={savingActivityIds}
                                     setSavingActivityIds={setSavingActivityIds}
                                     readOnly={
-                                        Boolean(selectedKA?.is_default) &&
-                                        (selectedKA?.title || "").toLowerCase() !== "ideas"
+                                        Boolean((selectedKA && selectedKA.is_default) || (selectedTaskFull && ((keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id)) || {}).is_default))) &&
+                                        (((selectedKA && (selectedKA.title || "").toLowerCase()) || ((keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id)) || {}).title || "").toLowerCase()) !== "ideas")
                                     }
                                     onBack={() => setSelectedTaskFull(null)}
                                     onSave={async (payload) => {
@@ -4039,8 +2703,20 @@ export default function KeyAreas() {
                                                                         });
                                                                     return (
                                                                         <React.Fragment key={t.id}>
-                                                                            <tr
-                                                                                className="border-t border-slate-200 hover:bg-slate-50"
+                                                                            <TaskRow
+                                                                                t={t}
+                                                                                goals={goals}
+                                                                                goalMap={goalTitleMap}
+                                                                                q={q}
+                                                                                isSelected={isSelected(t.id)}
+                                                                                onToggleSelect={() => toggleSelect(t.id)}
+                                                                                onOpenTask={(task) => { setSelectedTaskFull(task); setTaskFullInitialTab("activities"); }}
+                                                                                onStatusChange={(val) => handleTaskStatusChange(t.id, val)}
+                                                                                onToggleActivitiesRow={() => toggleActivitiesRow(t.id)}
+                                                                                activityCount={(activitiesByTask[String(t.id)] || []).length}
+                                                                                getPriorityLevel={getPriorityLevel}
+                                                                                toDateOnly={toDateOnly}
+                                                                                formatDuration={formatDuration}
                                                                                 onMouseEnter={() => {
                                                                                     if (
                                                                                         expandedActivityRows &&
@@ -4055,592 +2731,27 @@ export default function KeyAreas() {
                                                                                                 )
                                                                                             )
                                                                                         ) {
-                                                                                            setExpandedActivityRows(
-                                                                                                new Set(),
-                                                                                            );
+                                                                                            setExpandedActivityRows(new Set());
                                                                                         }
                                                                                     }
                                                                                 }}
-                                                                            >
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        aria-label={`Select ${t.title}`}
-                                                                                        checked={isSelected(t.id)}
-                                                                                        onChange={() =>
-                                                                                            toggleSelect(t.id)
-                                                                                        }
-                                                                                    />
-                                                                                </td>
-                                                                                <td
-                                                                                    className="px-3 py-2 align-top cursor-pointer"
-                                                                                    onClick={() => {
-                                                                                        setSelectedTaskFull(t);
-                                                                                        setTaskFullInitialTab(
-                                                                                            "activities",
-                                                                                        );
-                                                                                    }}
-                                                                                    title="Open task"
-                                                                                >
-                                                                                    <div className="flex items-start gap-2">
-                                                                                        {(() => {
-                                                                                            const lvl =
-                                                                                                getPriorityLevel(
-                                                                                                    t.priority,
-                                                                                                );
-                                                                                            if (lvl === 2) return null; // hide for medium
-                                                                                            const cls =
-                                                                                                lvl === 3
-                                                                                                    ? "text-red-600"
-                                                                                                    : "text-emerald-600";
-                                                                                            const label =
-                                                                                                lvl === 3
-                                                                                                    ? "High"
-                                                                                                    : "Low";
-                                                                                            return (
-                                                                                                <span
-                                                                                                    className={`mt-0.5 inline-block text-sm font-bold ${cls}`}
-                                                                                                    title={`Priority: ${label}`}
-                                                                                                >
-                                                                                                    !
-                                                                                                </span>
-                                                                                            );
-                                                                                        })()}
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
-                                                                                            title="Click to open task"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                setSelectedTaskFull(t);
-                                                                                                setTaskFullInitialTab(
-                                                                                                    "activities",
-                                                                                                );
-                                                                                            }}
-                                                                                        >
-                                                                                            {t.title}
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.assignee || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <StatusIndicator
-                                                                                            status={t.status || "open"}
-                                                                                        />
-                                                                                        <div>
-                                                                                            <select
-                                                                                                aria-label={`Change status for ${t.title}`}
-                                                                                                className="rounded-md border border-slate-300 bg-white p-1 text-sm"
-                                                                                                value={String(t.status || "open").toLowerCase()}
-                                                                                                onChange={(e) => handleTaskStatusChange(t.id, e.target.value)}
-                                                                                            >
-                                                                                                <option value="open">Open</option>
-                                                                                                <option value="in_progress">In progress</option>
-                                                                                                <option value="done">Done</option>
-                                                                                            </select>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <PriorityBadge
-                                                                                        priority={t.priority || "med"}
-                                                                                    />
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top">
-                                                                                    <QuadrantBadge q={q} />
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.goal_id ? (
-                                                                                        `#${t.goal_id}`
-                                                                                    ) : (
-                                                                                        <span className="text-slate-500">
-                                                                                            Trap
-                                                                                        </span>
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top max-w-[240px]">
-                                                                                    <span className="block truncate text-slate-800">
-                                                                                        {(t.tags || "")
-                                                                                            .split(",")
-                                                                                            .filter(Boolean)
-                                                                                            .slice(0, 4)
-                                                                                            .join(", ") || "—"}
-                                                                                    </span>
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.start_date) || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.end_date) || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {toDateOnly(t.deadline) || "—"}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {formatDuration(
-                                                                                        t.start_date || t.deadline,
-                                                                                        t.end_date,
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-slate-800">
-                                                                                    {t.completionDate ? (
-                                                                                        <span>{new Date(t.completionDate).toLocaleString()}</span>
-                                                                                    ) : (
-                                                                                        <span className="text-slate-500">—</span>
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 align-top text-center w-16">
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        title="Show activities inline"
-                                                                                        onClick={() =>
-                                                                                            toggleActivitiesRow(t.id)
-                                                                                        }
-                                                                                        className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-semibold min-w-[1.5rem] border ${
-                                                                                            expandedActivityRows.has(
-                                                                                                t.id,
-                                                                                            )
-                                                                                                ? "bg-blue-100 text-blue-700 border-blue-200"
-                                                                                                : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-                                                                                        }`}
-                                                                                    >
-                                                                                        {(() => {
-                                                                                            const c = (
-                                                                                                activitiesByTask[
-                                                                                                    String(t.id)
-                                                                                                ] || []
-                                                                                            ).length;
-                                                                                            return c || 0;
-                                                                                        })()}
-                                                                                    </button>
-                                                                                </td>
-                                                                            </tr>
+                                                                                expandedActivity={expandedActivityRows.has(t.id)}
+                                                                            />
                                                                             {expandedActivityRows.has(t.id) && (
                                                                                 <tr className="bg-slate-50">
                                                                                     <td className="px-3 py-2" />
-                                                                                    <td
-                                                                                        colSpan={14}
-                                                                                        className="px-0 py-2"
-                                                                                    >
+                                                                                    <td colSpan={14} className="px-0 py-2">
                                                                                         <div className="ml-6 pl-6 border-l-2 border-slate-200">
-                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
-                                                                                                Activities
-                                                                                            </div>
-                                                                                            {(() => {
-                                                                                                const taskKey = String(
-                                                                                                    t.id,
-                                                                                                );
-                                                                                                const list = (
-                                                                                                    activitiesByTask[
-                                                                                                        taskKey
-                                                                                                    ] || []
-                                                                                                ).slice();
-                                                                                                const setList = (
-                                                                                                    updater,
-                                                                                                ) => {
-                                                                                                    const nextList =
-                                                                                                        typeof updater ===
-                                                                                                        "function"
-                                                                                                            ? updater(
-                                                                                                                  list,
-                                                                                                              )
-                                                                                                            : updater;
-                                                                                                    setActivitiesByTask(
-                                                                                                        (prev) => ({
-                                                                                                            ...prev,
-                                                                                                            [taskKey]:
-                                                                                                                nextList,
-                                                                                                        }),
-                                                                                                    );
-                                                                                                };
-
-                                                                                                const toggleComplete = async (id) => {
-                                                                                                    if (savingActivityIds.has(id)) return;
-                                                                                                    const prev = Array.isArray(list) ? [...list] : [];
-                                                                                                    const next = prev.map((a) =>
-                                                                                                        a.id === id
-                                                                                                            ? { ...a, completed: !a.completed, completionDate: !a.completed ? new Date().toISOString() : null }
-                                                                                                            : a,
-                                                                                                    );
-                                                                                                    setList(next);
-                                                                                                    setSavingActivityIds((s) => new Set([...s, id]));
-                                                                                                    try {
-                                                                                                        const svc = await getActivityService();
-                                                                                                        const item = next.find((a) => a.id === id);
-                                                                                                        await svc.update(id, { completed: !!item.completed, completionDate: item.completed ? new Date().toISOString() : null });
-                                                                                                        addToast && addToast({ title: item.completed ? "Marked completed" : "Marked incomplete", variant: "success" });
-                                                                                                    } catch (e) {
-                                                                                                        console.error("Failed to update activity completion", e);
-                                                                                                        setList(prev);
-                                                                                                        addToast && addToast({ title: "Failed to update activity", variant: "error" });
-                                                                                                    } finally {
-                                                                                                        setSavingActivityIds((s) => {
-                                                                                                            const copy = new Set(s);
-                                                                                                            copy.delete(id);
-                                                                                                            return copy;
-                                                                                                        });
-                                                                                                    }
-                                                                                                };
-                                                                                                const remove = async (
-                                                                                                    id,
-                                                                                                ) => {
-                                                                                                    try {
-                                                                                                        const svc = await getActivityService();
-                                                                                                        await svc.remove(id);
-                                                                                                        setList(list.filter((a) => a.id !== id));
-                                                                                                        window.dispatchEvent(
-                                                                                                            new CustomEvent(
-                                                                                                                "ka-activities-updated",
-                                                                                                                {
-                                                                                                                    detail: {
-                                                                                                                        refresh: true,
-                                                                                                                    },
-                                                                                                                },
-                                                                                                            ),
-                                                                                                        );
-                                                                                                    } catch (e) {
-                                                                                                        console.error(
-                                                                                                            "Failed to delete activity",
-                                                                                                            e,
-                                                                                                        );
-                                                                                                    }
-                                                                                                };
-                                                                                                const move = (
-                                                                                                    id,
-                                                                                                    dir,
-                                                                                                ) => {
-                                                                                                    const idx =
-                                                                                                        list.findIndex(
-                                                                                                            (a) =>
-                                                                                                                a.id ===
-                                                                                                                id,
-                                                                                                        );
-                                                                                                    if (idx < 0) return;
-                                                                                                    const swapIdx =
-                                                                                                        dir === "up"
-                                                                                                            ? idx - 1
-                                                                                                            : idx + 1;
-                                                                                                    if (
-                                                                                                        swapIdx < 0 ||
-                                                                                                        swapIdx >=
-                                                                                                            list.length
-                                                                                                    )
-                                                                                                        return;
-                                                                                                    const copy =
-                                                                                                        list.slice();
-                                                                                                    const tmp =
-                                                                                                        copy[idx];
-                                                                                                    copy[idx] =
-                                                                                                        copy[swapIdx];
-                                                                                                    copy[swapIdx] = tmp;
-                                                                                                    setList(copy);
-                                                                                                };
-                                                                                                const updateField = (
-                                                                                                    id,
-                                                                                                    field,
-                                                                                                    value,
-                                                                                                ) => {
-                                                                                                    setList(
-                                                                                                        list.map((a) =>
-                                                                                                            a.id === id
-                                                                                                                ? {
-                                                                                                                      ...a,
-                                                                                                                      [field]:
-                                                                                                                          value,
-                                                                                                                  }
-                                                                                                                : a,
-                                                                                                        ),
-                                                                                                    );
-                                                                                                };
-
-                                                                                                const toggleDetails = (
-                                                                                                    id,
-                                                                                                ) => {
-                                                                                                    setOpenActivityDetails(
-                                                                                                        (prev) => {
-                                                                                                            const next =
-                                                                                                                new Set(
-                                                                                                                    prev,
-                                                                                                                );
-                                                                                                            if (
-                                                                                                                next.has(
-                                                                                                                    id,
-                                                                                                                )
-                                                                                                            )
-                                                                                                                next.delete(
-                                                                                                                    id,
-                                                                                                                );
-                                                                                                            else
-                                                                                                                next.add(
-                                                                                                                    id,
-                                                                                                                );
-                                                                                                            return next;
-                                                                                                        },
-                                                                                                    );
-                                                                                                };
-
-                                                                                                const addNew = async (
-                                                                                                    name,
-                                                                                                ) => {
-                                                                                                    const text = (
-                                                                                                        name || ""
-                                                                                                    ).trim();
-                                                                                                    if (!text) return;
-                                                                                                    try {
-                                                                                                        const svc = await getActivityService();
-                                                                                                        const created = await svc.create({ text, taskId: t.id });
-                                                                                                        setList([...(list || []), created]);
-                                                                                                        window.dispatchEvent(
-                                                                                                            new CustomEvent(
-                                                                                                                "ka-activities-updated",
-                                                                                                                {
-                                                                                                                    detail: {
-                                                                                                                        refresh: true,
-                                                                                                                    },
-                                                                                                                },
-                                                                                                            ),
-                                                                                                        );
-                                                                                                    } catch (e) {
-                                                                                                        console.error(
-                                                                                                            "Failed to add activity",
-                                                                                                            e,
-                                                                                                        );
-                                                                                                    }
-                                                                                                };
-
-                                                                                                return (
-                                                                                                    <div className="space-y-2">
-                                                                                                        {/* Activities rows */}
-                                                                                                        {list.length ===
-                                                                                                        0 ? (
-                                                                                                            <EmptyState
-                                                                                                                title="No activities for this task yet."
-                                                                                                                hint="Add a new activity below."
-                                                                                                            />
-                                                                                                        ) : (
-                                                                                                            <div>
-                                                                                                                {list.map(
-                                                                                                                    (
-                                                                                                                        a,
-                                                                                                                        index,
-                                                                                                                    ) => (
-                                                                                                                        <div
-                                                                                                                            key={
-                                                                                                                                a.id
-                                                                                                                            }
-                                                                                                                            className="bg-white rounded border border-slate-200 p-2 mb-2"
-                                                                                                                        >
-                                                                                                                            {/* Basic row */}
-                                                                                                                            <div className="flex items-center">
-                                                                                                                                                                <button
-                                                                                                                                                                    type="button"
-                                                                                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                                                                                    className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500'} ${savingActivityIds.has(a.id) ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
-                                                                                                                                                                    title={savingActivityIds.has(a.id) ? 'Saving...' : (a.completed ? "Unmark" : "Mark completed")}
-                                                                                                                                                                    onClick={() => toggleComplete(a.id)}
-                                                                                                                                                                >
-                                                                                                                                                                    {savingActivityIds.has(a.id) ? (
-                                                                                                                                                                        <FaSpinner className="animate-spin" />
-                                                                                                                                                                    ) : a.completed ? (
-                                                                                                                                                                        <FaCheckCircle />
-                                                                                                                                                                    ) : (
-                                                                                                                                                                        <FaRegCircle />
-                                                                                                                                                                    )}
-                                                                                                                                                                </button>
-                                                                                                                                <span
-                                                                                                                                    className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]"
-                                                                                                                                    title="Drag handle"
-                                                                                                                                >
-                                                                                                                                    <FaAlignJustify />
-                                                                                                                                </span>
-                                                                                                                                <div className="relative flex-1">
-                                                                                                                                    <div
-                                                                                                                                        className={`w-full border rounded px-2 py-1 pr-16 bg-white ${
-                                                                                                                                            a.completed
-                                                                                                                                                ? "line-through text-slate-500"
-                                                                                                                                                : "text-slate-800"
-                                                                                                                                        }`}
-                                                                                                                                    >
-                                                                                                                                        {(
-                                                                                                                                            a.text ||
-                                                                                                                                            a.activity_name ||
-                                                                                                                                            ""
-                                                                                                                                        ).trim() ||
-                                                                                                                                            "Untitled activity"}
-                                                                                                                                    </div>
-                                                                                                                                    <button
-                                                                                                                                        type="button"
-                                                                                                                                        className="absolute right-14 top-1.5 text-[#4DC3D8]"
-                                                                                                                                        title="Tag"
-                                                                                                                                    >
-                                                                                                                                        <FaTag />
-                                                                                                                                    </button>
-                                                                                                                                </div>
-                                                                                                                                <div className="ml-2 flex items-center gap-2 text-slate-600">
-                                                                                                                                    {/* Priority indicator (single icon like task); hide for medium */}
-                                                                                                                                    {(() => {
-                                                                                                                                        const eff =
-                                                                                                                                            a.priority ??
-                                                                                                                                            t.priority ??
-                                                                                                                                            2;
-                                                                                                                                        const lvl =
-                                                                                                                                            getPriorityLevel(
-                                                                                                                                                eff,
-                                                                                                                                            );
-                                                                                                                                        if (
-                                                                                                                                            lvl ===
-                                                                                                                                            2
-                                                                                                                                        )
-                                                                                                                                            return null; // hide on medium/normal
-                                                                                                                                        const cls =
-                                                                                                                                            lvl ===
-                                                                                                                                            3
-                                                                                                                                                ? "text-red-600"
-                                                                                                                                                : "text-emerald-600";
-                                                                                                                                        const label =
-                                                                                                                                            lvl ===
-                                                                                                                                            3
-                                                                                                                                                ? "high"
-                                                                                                                                                : "low";
-                                                                                                                                        return (
-                                                                                                                                            <span
-                                                                                                                                                className={`inline-block text-sm font-bold ${cls}`}
-                                                                                                                                                title={`Priority: ${label}`}
-                                                                                                                                            >
-                                                                                                                                                !
-                                                                                                                                            </span>
-                                                                                                                                        );
-                                                                                                                                    })()}
-                                                                                                                                    <button
-                                                                                                                                        type="button"
-                                                                                                                                        className="text-red-600"
-                                                                                                                                        title="Delete activity"
-                                                                                                                                        onClick={() =>
-                                                                                                                                            remove(
-                                                                                                                                                a.id,
-                                                                                                                                            )
-                                                                                                                                        }
-                                                                                                                                    >
-                                                                                                                                        <FaTrash />
-                                                                                                                                    </button>
-                                                                                                                                    {/* Edit activity (opens the global editor modal) */}
-                                                                                                                                    <button
-                                                                                                                                        type="button"
-                                                                                                                                        className="text-slate-700"
-                                                                                                                                        title="Edit activity"
-                                                                                                                                        onClick={() => {
-                                                                                                                                            try {
-                                                                                                                                                window.dispatchEvent(
-                                                                                                                                                    new CustomEvent(
-                                                                                                                                                        "ka-open-activity-editor",
-                                                                                                                                                        {
-                                                                                                                                                            detail: {
-                                                                                                                                                                activity:
-                                                                                                                                                                    a,
-                                                                                                                                                                taskId: t.id,
-                                                                                                                                                            },
-                                                                                                                                                        },
-                                                                                                                                                    ),
-                                                                                                                                                );
-                                                                                                                                            } catch {}
-                                                                                                                                        }}
-                                                                                                                                    >
-                                                                                                                                        <FaEdit />
-                                                                                                                                    </button>
-                                                                                                                                    <button
-                                                                                                                                        type="button"
-                                                                                                                                        className={
-                                                                                                                                            a.created_task_id
-                                                                                                                                                ? "text-slate-300 cursor-not-allowed"
-                                                                                                                                                : "text-slate-700"
-                                                                                                                                        }
-                                                                                                                                        title={
-                                                                                                                                            a.created_task_id
-                                                                                                                                                ? "Already created a task from this activity"
-                                                                                                                                                : "Create as task"
-                                                                                                                                        }
-                                                                                                                                        disabled={
-                                                                                                                                            !!a.created_task_id
-                                                                                                                                        }
-                                                                                                                                        onClick={() => {
-                                                                                                                                            if (
-                                                                                                                                                a.created_task_id
-                                                                                                                                            )
-                                                                                                                                                return;
-                                                                                                                                            try {
-                                                                                                                                                window.dispatchEvent(
-                                                                                                                                                    new CustomEvent(
-                                                                                                                                                        "ka-create-task-from-activity",
-                                                                                                                                                        {
-                                                                                                                                                            detail: {
-                                                                                                                                                                taskId: t.id,
-                                                                                                                                                                activity:
-                                                                                                                                                                    a,
-                                                                                                                                                            },
-                                                                                                                                                        },
-                                                                                                                                                    ),
-                                                                                                                                                );
-                                                                                                                                            } catch {}
-                                                                                                                                        }}
-                                                                                                                                    >
-                                                                                                                                        <FaAngleDoubleLeft />
-                                                                                                                                    </button>
-                                                                                                                                    <div className="flex flex-col ml-1">
-                                                                                                                                        <button
-                                                                                                                                            type="button"
-                                                                                                                                            className="text-slate-500 disabled:opacity-40"
-                                                                                                                                            title="Move up"
-                                                                                                                                            onClick={() =>
-                                                                                                                                                move(
-                                                                                                                                                    a.id,
-                                                                                                                                                    "up",
-                                                                                                                                                )
-                                                                                                                                            }
-                                                                                                                                            disabled={
-                                                                                                                                                index ===
-                                                                                                                                                0
-                                                                                                                                            }
-                                                                                                                                        >
-                                                                                                                                            <FaChevronUp />
-                                                                                                                                        </button>
-                                                                                                                                        <button
-                                                                                                                                            type="button"
-                                                                                                                                            className="text-slate-500 disabled:opacity-40"
-                                                                                                                                            title="Move down"
-                                                                                                                                            onClick={() =>
-                                                                                                                                                move(
-                                                                                                                                                    a.id,
-                                                                                                                                                    "down",
-                                                                                                                                                )
-                                                                                                                                            }
-                                                                                                                                            disabled={
-                                                                                                                                                index ===
-                                                                                                                                                list.length -
-                                                                                                                                                    1
-                                                                                                                                            }
-                                                                                                                                        >
-                                                                                                                                            <FaChevronDown />
-                                                                                                                                        </button>
-                                                                                                                                    </div>
-                                                                                                                                </div>
-                                                                                                                            </div>
-                                                                                                                            {/* Message row */}
-                                                                                                                            <div
-                                                                                                                                className="mt-1 text-xs text-amber-700"
-                                                                                                                                id={`activity-message-${a.id}`}
-                                                                                                                            ></div>
-                                                                                                                        </div>
-                                                                                                                    ),
-                                                                                                                )}
-                                                                                                            </div>
-                                                                                                        )}
-                                                                                                        {/* Inline add activity removed */}
-                                                                                                    </div>
-                                                                                                );
-                                                                                            })()}
+                                                                                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Activities</div>
+                                                                                            <ActivityList
+                                                                                                task={t}
+                                                                                                activitiesByTask={activitiesByTask}
+                                                                                                setActivitiesByTask={setActivitiesByTask}
+                                                                                                savingActivityIds={savingActivityIds}
+                                                                                                setSavingActivityIds={setSavingActivityIds}
+                                                                                                getPriorityLevel={getPriorityLevel}
+                                                                                                addToast={addToast}
+                                                                                            />
                                                                                         </div>
                                                                                     </td>
                                                                                 </tr>
@@ -4685,6 +2796,8 @@ export default function KeyAreas() {
                                                     setTaskForm((s) => ({
                                                         ...s,
                                                         list_index: taskTab,
+                                                        // Prefill key area with the currently selected Key Area when creating a new task
+                                                        key_area_id: selectedKA?.id || s.key_area_id || s.keyAreaId || "",
                                                     }));
                                                     setShowTaskComposer(true);
                                                 }}
@@ -4766,993 +2879,109 @@ export default function KeyAreas() {
                                 </div>
                             </>
                         )}
-                        {/* LIST: Key Areas */}
                         {!selectedKA && (
-                            <div>
-                                {loading ? (
-                                    <div className="text-slate-700">Loading…</div>
-                                ) : showOnlyIdeas ? (
-                                    // render Ideas as a single centered full-width card
-                                    <div className="flex justify-center">
-                                        <div
-                                            key={ideaForShow.id}
-                                            className="w-full max-w-3xl bg-white rounded-2xl shadow border border-slate-200 p-6 flex flex-col"
-                                        >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <h3 className="text-xl font-bold text-slate-900">
-                                                            {ideaForShow.title}
-                                                        </h3>
-                                                        {ideaForShow.is_default && (
-                                                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                                                <FaLock /> Locked
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-sm text-slate-600 mt-2">
-                                                        {ideaForShow.description || "—"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="mt-6 flex items-center gap-2">
-                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs border border-slate-200">
-                                                    Position: 10
-                                                </span>
-                                                <p className="text-sm text-slate-700 ml-2">
-                                                    This Key Area is read-only (cannot edit or delete).
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="bg-white border border-slate-200 rounded-xl">
-                                        <ol className="divide-y divide-slate-200">
-                                            {filteredKAs
-                                                .slice()
-                                                .sort((a, b) => {
-                                                    // Ideas/default areas always go to the end
-                                                    const aIsIdeas = (a.title || "").toLowerCase() === "ideas" || a.is_default;
-                                                    const bIsIdeas = (b.title || "").toLowerCase() === "ideas" || b.is_default;
-                                                    if (aIsIdeas && !bIsIdeas) return 1;
-                                                    if (!aIsIdeas && bIsIdeas) return -1;
-                                                    // For non-Ideas areas, sort by position
-                                                    return (a.position || 0) - (b.position || 0);
-                                                })
-                                                .map((ka, idx) => (
-                                                    <li
-                                                        key={ka.id}
-                                                        className={`flex items-center justify-between px-3 py-2 rounded-md ${
-                                                            ka.is_default ? '' : 'hover:bg-slate-50 cursor-grab active:cursor-grabbing'
-                                                        }`}
-                                                        draggable={!ka.is_default}
-                                                        onClick={(e) => { if (dragKAId) return; openKA(ka); }}
-                                                        onDragStart={(e) => {
-                                                            if (ka.is_default) return;
-                                                            setDragKAId(String(ka.id));
-                                                            e.dataTransfer.effectAllowed = "move";
-                                                        }}
-                                                        onDragOver={(e) => {
-                                                            if (ka.is_default) return;
-                                                            e.preventDefault();
-                                                            e.dataTransfer.dropEffect = "move";
-                                                        }}
-                                                        onDrop={async (e) => {
-                                                            e.preventDefault();
-                                                            if (!dragKAId || String(dragKAId) === String(ka.id)) return;
-                                                            await reorderByDrop(String(dragKAId), String(ka.id));
-                                                            setDragKAId(null);
-                                                        }}
-                                                        onDragEnd={() => setDragKAId(null)}
-                                                    >
-                                                        <div className="flex items-center gap-3 min-w-0">
-                                                            <span 
-                                                                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold shrink-0"
-                                                                style={{ 
-                                                                    backgroundColor: ka.color ? `${ka.color}66` : '#e2e8f0',
-                                                                    color: ka.color || '#334155'
-                                                                }}
-                                                            >
-                                                                {ka.position && ka.position > 0 ? ka.position : idx + 1}
-                                                            </span>
-                                                            <div className="min-w-0 select-none">
-                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                    <span 
-                                                                        className="font-semibold truncate cursor-inherit text-slate-700"
-                                                                    >
-                                                                        {ka.title}
-                                                                    </span>
-                                                                    {ka.is_default && (
-                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                                                            <FaLock /> Locked
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {ka.description ? (
-                                                                    <div className="text-xs text-slate-600 truncate">
-                                                                        {ka.description}
-                                                                    </div>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            {/* Row click opens lists; keep lightweight edit/delete actions only */}
-                                                            <button
-                                                                className="rounded-md bg-white text-slate-700 hover:bg-slate-50 flex items-center justify-center p-2 text-xs border border-slate-200"
-                                                                title="Edit"
-                                                                aria-label="Edit key area"
-                                                                onClick={(e) => { e.stopPropagation(); setEditing(ka); setShowForm(true); }}
-                                                            >
-                                                                <FaEdit />
-                                                            </button>
-                                                            <button
-                                                                disabled={ka.is_default || (ka.title || "").toLowerCase() === "ideas"}
-                                                                title={
-                                                                    ka.is_default || (ka.title || "").toLowerCase() === "ideas"
-                                                                        ? "Cannot delete the Ideas key area"
-                                                                        : typeof ka.taskCount === "number" && ka.taskCount > 0
-                                                                          ? `${ka.taskCount} task(s) present`
-                                                                          : undefined
-                                                                }
-                                                                aria-label="Delete key area"
-                                                                className={`rounded-md flex items-center justify-center p-2 text-xs border ${
-                                                                    ka.is_default || (ka.title || "").toLowerCase() === "ideas"
-                                                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed border-slate-200"
-                                                                        : "bg-white text-red-600 hover:bg-red-50 border-red-200"
-                                                                }`}
-                                                                onClick={(e) => { e.stopPropagation(); onDeleteKA(ka); }}
-                                                            >
-                                                                <FaTrash />
-                                                            </button>
-                                                        </div>
-                                                    </li>
-                                                ))}
-                                        </ol>
-                                    </div>
-                                )}
-
-                                {/* Info message removed per request */}
-                            </div>
+                            <KeyAreasList
+                                loading={loading}
+                                showOnlyIdeas={showOnlyIdeas}
+                                ideaForShow={ideaForShow}
+                                filteredKAs={filteredKAs}
+                                dragKAId={dragKAId}
+                                openKA={openKA}
+                                reorderByDrop={reorderByDrop}
+                                setDragKAId={setDragKAId}
+                                setEditing={setEditing}
+                                setShowForm={setShowForm}
+                                onDeleteKA={onDeleteKA}
+                            />
                         )}
                         {/* DETAIL: Tabs */}
                         {selectedKA && (
                             <div className="mt-4 space-y-4">
                                 {/* Composer — rendered from left card; show form only when requested */}
                                 {showTaskComposer && (
-                                    <div
-                                        className="fixed inset-0 bg-black/40 z-50 grid place-items-center"
-                                        onClick={() => setShowTaskComposer(false)}
-                                    >
-                                        <div
-                                            ref={composerModalRef}
-                                            className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {/* Header strip */}
-                                            <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
-                                                {editingTaskId ? "Edit Task" : "Add Task"}
-                                            </div>
-                                            <form onSubmit={onCreateTask} className="p-4 md:p-6">
-                                                {/* Task name field under header */}
-                                                <div className="mb-4">
-                                                    <label className="sr-only" htmlFor="ka-task-title">
-                                                        Task name
-                                                    </label>
-                                                    <input
-                                                        id="ka-task-title"
-                                                        name="title"
-                                                        required
-                                                        value={taskForm.title}
-                                                        onChange={(e) =>
-                                                            setTaskForm((s) => ({ ...s, title: e.target.value }))
+                                    <>
+                                        {editingTaskId ? (
+                                            // Use external EditTaskModal when editing a task
+                                            <EditTaskModal
+                                                isOpen={true}
+                                                // ensure we always pass a definitive id into the modal's initialData
+                                                initialData={{ ...(taskForm || {}), id: editingTaskId || taskForm?.id || null }}
+                                                onSave={async (payload) => {
+                                                    await handleSaveTask(payload);
+                                                    setEditingTaskId(null);
+                                                    setShowTaskComposer(false);
+                                                }}
+                                                onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); }}
+                                                isSaving={false}
+                                            />
+                                        ) : editingActivityViaTaskModal ? (
+                                            // Use external EditActivityModal when editing an activity via task modal
+                                            <EditActivityModal
+                                                isOpen={true}
+                                                initialData={(function(){
+                                                    try {
+                                                        const id = editingActivityViaTaskModal.id;
+                                                        const taskId = editingActivityViaTaskModal.taskId;
+                                                        if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
+                                                            const found = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
+                                                            if (found) return found;
                                                         }
-                                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        placeholder="Task name"
-                                                    />
-                                                </div>
-                                                {/* Two-column layout */}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                                                    {/* Left column */}
-                                                    <div className="grid gap-3 content-start">
-                                                        {/* Description */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Description
-                                                            </label>
-                                                            <input
-                                                                name="description"
-                                                                value={taskForm.description}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        description: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-9 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="Brief description"
-                                                            />
-                                                        </div>
-                                                        {/* Start date */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Start date
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="start_date"
-                                                                    value={toDateOnly(taskForm.start_date)}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            start_date: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                    ref={(el) => (taskForm._startRef = el)}
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={() => {
-                                                                        try {
-                                                                            taskForm._startRef?.focus();
-                                                                            taskForm._startRef?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                taskForm._startRef?.focus();
-                                                                                taskForm._startRef?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        {/* End date */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                End date
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="end_date"
-                                                                    value={toDateOnly(taskForm.end_date)}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            end_date: e.target.value,
-                                                                            _endAuto: false,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                    ref={(el) => (taskForm._endRef = el)}
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={() => {
-                                                                        try {
-                                                                            taskForm._endRef?.focus();
-                                                                            taskForm._endRef?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                taskForm._endRef?.focus();
-                                                                                taskForm._endRef?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        {/* Deadline */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Deadline
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                   <input
-                                                                    type="date"
-                                                                    name="deadline"
-                                                                    value={toDateOnly(taskForm.deadline)}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            deadline: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                    ref={(el) => (taskForm._dueRef = el)}
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={() => {
-                                                                        try {
-                                                                            taskForm._dueRef?.focus();
-                                                                            taskForm._dueRef?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                taskForm._dueRef?.focus();
-                                                                                taskForm._dueRef?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                            <p className="mt-1 text-[11px] text-slate-500">
-                                                                No later than
-                                                            </p>
-                                                        </div>
-                                                        {/* Duration */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Duration
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    name="duration"
-                                                                    value={taskForm.duration || ""}
-                                                                    onChange={(e) =>
-                                                                        setTaskForm((s) => ({
-                                                                            ...s,
-                                                                            duration: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                    placeholder="e.g., 1h, 1d"
-                                                                />
-                                                                <span className="absolute inset-y-0 right-2 grid place-items-center text-base">
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {/* Right column */}
-                                                    <div className="grid gap-3 content-start">
-                                                        {/* Key Area */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Key Area
-                                                            </label>
-                                                            <select
-                                                                name="key_area_id"
-                                                                value={taskForm.key_area_id || selectedKA?.id || ""}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        key_area_id: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                {/* Current selection first */}
-                                                                {selectedKA && !taskForm.key_area_id && (
-                                                                    <option value={selectedKA.id}>
-                                                                        {selectedKA.name}
-                                                                    </option>
-                                                                )}
-                                                                {/* Other KAs */}
-                                                                {keyAreas
-                                                                    .filter(
-                                                                        (ka) =>
-                                                                            !selectedKA ||
-                                                                            String(ka.id) !== String(selectedKA.id),
-                                                                    )
-                                                                    .map((ka) => (
-                                                                        <option key={ka.id} value={ka.id}>
-                                                                            {ka.title || ka.name}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
-                                                        </div>
-                                                        {/* List */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                List
-                                                            </label>
-                                                            <select
-                                                                name="list_index"
-                                                                value={taskForm.list_index || 1}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        list_index: Number(e.target.value),
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                {(() => {
-                                                                    const kaId = taskForm.key_area_id || selectedKA?.id;
-                                                                    const names = kaId ? (listNames[String(kaId)] || {}) : {};
-                                                                    // Get lists with custom names
-                                                                    const namedLists = Object.keys(names).map(Number).filter(Boolean);
-                                                                    // Get lists that have tasks
-                                                                    const listsWithTasks = kaId 
-                                                                        ? Array.from(new Set((allTasks || [])
-                                                                            .filter(t => String(t.key_area_id) === String(kaId))
-                                                                            .map(t => t.list_index || 1)))
-                                                                        : [];
-                                                                    // Combine and ensure at least List 1 exists
-                                                                    const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
-                                                                    return allNumbers.map((n) => (
-                                                                        <option key={n} value={n}>
-                                                                            {names[String(n)] || `List ${n}`}
-                                                                        </option>
-                                                                    ));
-                                                                })()}
-                                                            </select>
-                                                        </div>
-                                                        {/* Assignee */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Assignee
-                                                            </label>
-                                                            <select
-                                                                name="assignee"
-                                                                value={taskForm.assignee}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        assignee: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                <option value="">— Unassigned —</option>
-                                                                {users?.map((u) => (
-                                                                    <option key={u.id} value={u.name}>
-                                                                        {u.name}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        {/* Priority */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Priority
-                                                            </label>
-                                                            <select
-                                                                name="priority"
-                                                                value={taskForm.priority}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({
-                                                                        ...s,
-                                                                        priority: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                <option value="high">High</option>
-                                                                <option value="normal">Normal</option>
-                                                                <option value="low">Low</option>
-                                                            </select>
-                                                        </div>
-                                                        {/* Goal */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Goal
-                                                            </label>
-                                                            <select
-                                                                name="goal"
-                                                                value={taskForm.goal || ""}
-                                                                onChange={(e) =>
-                                                                    setTaskForm((s) => ({ ...s, goal: e.target.value }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                <option value="">— Select Goal —</option>
-                                                                {goals.map((goal) => (
-                                                                    <option key={goal.id} value={goal.id}>
-                                                                        {goal.title}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {/* Footer actions */}
-                                                <div className="mt-6 flex items-center justify-between">
-                                                    {showTaskHelp ? (
-                                                        <div className="text-xs text-slate-600">
-                                                            • OK saves the task • Cancel closes without saving • Dates
-                                                            use your local timezone.
-                                                        </div>
-                                                    ) : (
-                                                        <span />
-                                                    )}
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="submit"
-                                                            className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
-                                                        >
-                                                            <FaSave /> {editingTaskId ? "Save" : "OK"}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setShowTaskComposer(false);
-                                                                setEditingTaskId(null);
-                                                            }}
-                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowTaskHelp((v) => !v)}
-                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                                        >
-                                                            Help
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                            {/* Close button (corner X) */}
-                                            <button
-                                                type="button"
-                                                className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100"
-                                                onClick={() => setShowTaskComposer(false)}
-                                                aria-label="Close"
-                                            >
-                                                <FaTimes />
-                                            </button>
-                                        </div>
-                                    </div>
+                                                    } catch {}
+                                                    return activityForm || {};
+                                                })()}
+                                                keyAreas={keyAreas}
+                                                users={users}
+                                                goals={goals}
+                                                tasks={allTasks}
+                                                availableLists={availableListNumbers}
+                                                onSave={async (payload) => {
+                                                    await handleActivityModalSave(payload);
+                                                    setEditingActivityViaTaskModal(null);
+                                                    setShowEditActivityModal(false);
+                                                }}
+                                                onCancel={() => { setShowEditActivityModal(false); setEditingActivityViaTaskModal(null); }}
+                                                isSaving={isSavingActivity}
+                                            />
+                                        ) : (
+                                            // Use a dedicated CreateTaskModal component for creating tasks
+                                            <CreateTaskModal
+                                                isOpen={true}
+                                                initialData={taskForm}
+                                                keyAreas={keyAreas}
+                                                users={users}
+                                                goals={goals}
+                                                availableLists={availableListNumbers}
+                                                onSave={async (payload) => {
+                                                    try {
+                                                        const created = await api.createTask(payload);
+                                                        setAllTasks((prev) => [...prev, created]);
+                                                    } catch (err) {
+                                                        console.error('Failed to create task from modal', err);
+                                                    }
+                                                    setEditingTaskId(null);
+                                                    setShowTaskComposer(false);
+                                                    setEditingActivityViaTaskModal(null);
+                                                }}
+                                                onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); setEditingActivityViaTaskModal(null); }}
+                                                isSaving={false}
+                                            />
+                                        )}
+                                    </>
                                 )}
 
                                 {showActivityComposer && (
-                                    <div
-                                        className="fixed inset-0 bg-black/40 z-50 grid place-items-center"
-                                        onClick={() => setShowActivityComposer(false)}
-                                    >
-                                        <div
-                                            className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {/* Header strip */}
-                                            <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
-                                                {editingActivityId ? "Edit Activity" : "Add Activity"}
-                                            </div>
-                                            <form onSubmit={onCreateActivity} className="p-4 md:p-6">
-                                                {/* Activity name field under header */}
-                                                <div className="mb-4">
-                                                    <label className="sr-only" htmlFor="ka-activity-title">
-                                                        Activity name
-                                                    </label>
-                                                    <input
-                                                        id="ka-activity-title"
-                                                        name="title"
-                                                        required
-                                                        value={activityForm.title}
-                                                        onChange={(e) =>
-                                                            setActivityForm((s) => ({ ...s, title: e.target.value }))
-                                                        }
-                                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        placeholder="Activity name"
-                                                    />
-                                                </div>
-                                                {/* Two-column layout */}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                                                    {/* Left column */}
-                                                    <div className="grid gap-3 content-start">
-                                                        {/* Description */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Description
-                                                            </label>
-                                                            <input
-                                                                name="description"
-                                                                value={activityForm.description}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        description: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-9 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                placeholder="Brief description"
-                                                            />
-                                                        </div>
-                                                        {/* Start date */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Start date
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="start_date"
-                                                                    value={toDateOnly(activityForm.start_date)}
-                                                                    onChange={(e) =>
-                                                                        setActivityForm((s) => ({
-                                                                            ...s,
-                                                                            start_date: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={(e) => {
-                                                                        try {
-                                                                            const el =
-                                                                                e.currentTarget.previousElementSibling;
-                                                                            el?.focus();
-                                                                            el?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                const el =
-                                                                                    e.currentTarget
-                                                                                        .previousElementSibling;
-                                                                                el?.focus();
-                                                                                el?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        {/* End date */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                End date
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="end_date"
-                                                                    value={toDateOnly(activityForm.end_date)}
-                                                                    onChange={(e) =>
-                                                                        setActivityForm((s) => ({
-                                                                            ...s,
-                                                                            end_date: e.target.value,
-                                                                            _endAuto: false,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={(e) => {
-                                                                        try {
-                                                                            const el =
-                                                                                e.currentTarget.previousElementSibling;
-                                                                            el?.focus();
-                                                                            el?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                const el =
-                                                                                    e.currentTarget
-                                                                                        .previousElementSibling;
-                                                                                el?.focus();
-                                                                                el?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        {/* Deadline */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Deadline
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    type="date"
-                                                                    name="deadline"
-                                                                    value={toDateOnly(activityForm.deadline)}
-                                                                    onChange={(e) =>
-                                                                        setActivityForm((s) => ({
-                                                                            ...s,
-                                                                            deadline: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon"
-                                                                />
-                                                                <span
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-label="Open date picker"
-                                                                    onClick={(e) => {
-                                                                        try {
-                                                                            const el =
-                                                                                e.currentTarget.previousElementSibling;
-                                                                            el?.focus();
-                                                                            el?.showPicker?.();
-                                                                        } catch {}
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" || e.key === " ") {
-                                                                            try {
-                                                                                const el =
-                                                                                    e.currentTarget
-                                                                                        .previousElementSibling;
-                                                                                el?.focus();
-                                                                                el?.showPicker?.();
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
-                                                                    className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none"
-                                                                >
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                            <p className="mt-1 text-[11px] text-slate-500">
-                                                                No later than
-                                                            </p>
-                                                        </div>
-                                                        {/* Duration */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Duration
-                                                            </label>
-                                                            <div className="relative mt-1">
-                                                                <input
-                                                                    name="duration"
-                                                                    value={activityForm.duration || ""}
-                                                                    onChange={(e) =>
-                                                                        setActivityForm((s) => ({
-                                                                            ...s,
-                                                                            duration: e.target.value,
-                                                                        }))
-                                                                    }
-                                                                    className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                    placeholder="e.g., 1h, 1d"
-                                                                />
-                                                                <span className="absolute inset-y-0 right-2 grid place-items-center text-base">
-                                                                    📅
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {/* Right column */}
-                                                    <div className="grid gap-3 content-start">
-                                                        {/* Key Area */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Key Area
-                                                            </label>
-                                                            <select
-                                                                name="key_area_id"
-                                                                value={activityForm.key_area_id || selectedKA?.id || ""}
-                                                                onChange={(e) => {
-                                                                    const nextKa = e.target.value;
-                                                                    setActivityForm((s) => ({ ...s, key_area_id: nextKa }));
-                                                                    // If current attached task is not in the new KA, clear it
-                                                                    const inKa = (allTasks || []).some(
-                                                                        (t) => String(t.key_area_id) === String(nextKa) && String(t.id) === String(activityAttachTaskId),
-                                                                    );
-                                                                    if (!inKa) setActivityAttachTaskId("");
-                                                                }}
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                {/* Ensure current KA is shown first */}
-                                                                {selectedKA && (
-                                                                    <option value={selectedKA.id}>
-                                                                        {selectedKA.title || selectedKA.name}
-                                                                    </option>
-                                                                )}
-                                                                {keyAreas
-                                                                    .filter((ka) => !selectedKA || String(ka.id) !== String(selectedKA.id))
-                                                                    .map((ka) => (
-                                                                        <option key={ka.id} value={ka.id}>
-                                                                            {ka.title || ka.name}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
-                                                        </div>
-                                                        {/* List */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                List
-                                                            </label>
-                                                            <select
-                                                                name="list_index"
-                                                                value={activityForm.list_index || 1}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        list_index: Number(e.target.value),
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                {(() => {
-                                                                    const kaId = activityForm.key_area_id || selectedKA?.id;
-                                                                    const names = kaId ? (listNames[String(kaId)] || {}) : {};
-                                                                    // Get lists with custom names
-                                                                    const namedLists = Object.keys(names).map(Number).filter(Boolean);
-                                                                    // Get lists that have tasks
-                                                                    const listsWithTasks = kaId 
-                                                                        ? Array.from(new Set((allTasks || [])
-                                                                            .filter(t => String(t.key_area_id) === String(kaId))
-                                                                            .map(t => t.list_index || 1)))
-                                                                        : [];
-                                                                    // Combine and ensure at least List 1 exists
-                                                                    const allNumbers = Array.from(new Set([1, ...namedLists, ...listsWithTasks])).sort((a, b) => a - b);
-                                                                    return allNumbers.map((n) => (
-                                                                        <option key={n} value={n}>
-                                                                            {names[String(n)] || `List ${n}`}
-                                                                        </option>
-                                                                    ));
-                                                                })()}
-                                                            </select>
-                                                        </div>
-                                                        {/* Task (dropdown, auto-select current task) */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Task
-                                                            </label>
-                                                            <select
-                                                                name="task_id"
-                                                                value={activityAttachTaskId || ""}
-                                                                onChange={(e) => setActivityAttachTaskId(e.target.value)}
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                {!activityAttachTaskId && (
-                                                                    <option value="">— Select task —</option>
-                                                                )}
-                                                                {(allTasks || [])
-                                                                    .filter((x) => String(x.key_area_id) === String(activityForm.key_area_id || selectedKA?.id))
-                                                                    .map((t) => (
-                                                                        <option key={t.id} value={t.id}>
-                                                                            {t.title || t.name || `#${t.id}`}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
-                                                        </div>
-                                                        {/* Assignee */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Assignee
-                                                            </label>
-                                                            <select
-                                                                name="assignee"
-                                                                value={activityForm.assignee}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        assignee: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                <option value="">— Unassigned —</option>
-                                                                {users?.map((u) => (
-                                                                    <option key={u.id} value={u.name}>
-                                                                        {u.name}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        {/* Priority */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Priority
-                                                            </label>
-                                                            <select
-                                                                name="priority"
-                                                                value={activityForm.priority}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        priority: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                <option value="high">High</option>
-                                                                <option value="normal">Normal</option>
-                                                                <option value="low">Low</option>
-                                                            </select>
-                                                        </div>
-                                                        {/* Goal */}
-                                                        <div className="flex flex-col">
-                                                            <label className="text-xs font-semibold text-slate-700">
-                                                                Goal
-                                                            </label>
-                                                            <select
-                                                                name="goal"
-                                                                value={activityForm.goal || ""}
-                                                                onChange={(e) =>
-                                                                    setActivityForm((s) => ({
-                                                                        ...s,
-                                                                        goal: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            >
-                                                                <option value="">— Select Goal —</option>
-                                                                {goals.map((goal) => (
-                                                                    <option key={goal.id} value={goal.id}>
-                                                                        {goal.title}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {/* Footer actions */}
-                                                <div className="mt-6 flex items-center justify-between">
-                                                    <span />
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="submit"
-                                                            className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
-                                                        >
-                                                            <FaSave /> {editingActivityId ? "Save" : "OK"}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setShowActivityComposer(false);
-                                                                setEditingActivityId(null);
-                                                                setActivityAttachTaskId(null);
-                                                            }}
-                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                                            disabled
-                                                        >
-                                                            Help
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                            {/* Close button (corner X) */}
-                                            <button
-                                                type="button"
-                                                className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100"
-                                                onClick={() => setShowActivityComposer(false)}
-                                                aria-label="Close"
-                                            >
-                                                <FaTimes />
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <CreateActivityFormModal
+                                        isOpen={showActivityComposer}
+                                        initialData={activityForm}
+                                        onSave={handleActivityModalSave}
+                                        onCancel={() => { setShowActivityComposer(false); setEditingActivityId(null); setActivityAttachTaskId(null); }}
+                                        isSaving={isSavingActivity}
+                                        keyAreas={keyAreas}
+                                        users={users}
+                                        goals={goals}
+                                        tasks={allTasks}
+                                        availableLists={availableListNumbers}
+                                    />
                                 )}
 
                                 {/* Tasks list rendering moved inside the Task Lists card above */}
@@ -5761,125 +2990,15 @@ export default function KeyAreas() {
                             </div>
                         )}
                         {/* Create/Edit KA Modal */}
-                        {showForm && (
-                            <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
-                                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h2 className="text-lg font-bold text-slate-900">
-                                            {editing ? "Edit Key Area" : "New Key Area"}
-                                        </h2>
-                                        <button
-                                            className="p-2 rounded-lg hover:bg-slate-50"
-                                            onClick={() => {
-                                                setShowForm(false);
-                                                setEditing(null);
-                                            }}
-                                        >
-                                            <FaTimes />
-                                        </button>
-                                    </div>
-                                    <form onSubmit={onSaveKA} className="grid gap-3">
-                                        <div>
-                                            <label className="text-sm font-semibold text-slate-900">Title *</label>
-                                            <input
-                                                name="title"
-                                                required
-                                                defaultValue={editing?.title || ""}
-                                                readOnly={
-                                                    Boolean(editing?.is_default) ||
-                                                    (editing?.title || "").toLowerCase() === "ideas"
-                                                }
-                                                disabled={
-                                                    Boolean(editing?.is_default) ||
-                                                    (editing?.title || "").toLowerCase() === "ideas"
-                                                }
-                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400 disabled:bg-slate-100 disabled:text-slate-700"
-                                                placeholder="e.g., Finance"
-                                            />
-                                            {Boolean(editing?.is_default) ||
-                                            (editing?.title || "").toLowerCase() === "ideas" ? (
-                                                <p className="text-xs text-slate-600 mt-1">
-                                                    The "Ideas" key area cannot be renamed.
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-semibold text-slate-900">Description</label>
-                                            <textarea
-                                                name="description"
-                                                rows={3}
-                                                defaultValue={editing?.description || ""}
-                                                className="mt-1 w-full rounded-lg border-slate-300 focus:ring-2 focus:ring-slate-400"
-                                                placeholder="What belongs to this area?"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-semibold text-slate-900">Color</label>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="color"
-                                                    name="color"
-                                                    defaultValue={editing?.color || "#3B82F6"}
-                                                    className="w-12 h-10 rounded-lg border border-slate-300 cursor-pointer"
-                                                    title="Choose color for this Key Area"
-                                                />
-                                                <div className="flex flex-wrap gap-2">
-                                                    {[
-                                                        "#3B82F6", // Blue
-                                                        "#10B981", // Green
-                                                        "#F59E0B", // Amber
-                                                        "#8B5CF6", // Purple
-                                                        "#EC4899", // Pink
-                                                        "#06B6D4", // Cyan
-                                                        "#84CC16", // Lime
-                                                        "#F97316", // Orange
-                                                    ].map((color) => (
-                                                        <button
-                                                            key={color}
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                const form = e.currentTarget.closest('form');
-                                                                const colorInput = form?.querySelector('input[name="color"]');
-                                                                if (colorInput) {
-                                                                    colorInput.value = color;
-                                                                    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                                                    colorInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                                                }
-                                                            }}
-                                                            className="w-6 h-6 rounded-full border-2 border-white shadow hover:scale-110 transition-transform"
-                                                            style={{ backgroundColor: color }}
-                                                            aria-label={`Choose ${color}`}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2">
-                                                <FaSave /> Save
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setShowForm(false);
-                                                    setEditing(null);
-                                                }}
-                                                className="px-3 py-2 rounded-lg bg-white border text-slate-700 hover:bg-slate-50 font-semibold"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                        <div className="text-xs text-slate-700 flex items-start gap-2">
-                                            <FaExclamationCircle className="mt-0.5" />
-                                            <span>
-                                                “Ideas” is locked and always at position 10. Enforce max 10 on server
-                                                too.
-                                            </span>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        )}
+                        <KeyAreaModal
+                            isOpen={showForm}
+                            editing={editing}
+                            onSave={onSaveKA}
+                            onCancel={() => {
+                                setShowForm(false);
+                                setEditing(null);
+                            }}
+                        />
                     </div>
                 </main>
             </div>
