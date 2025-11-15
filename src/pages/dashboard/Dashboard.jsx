@@ -3,6 +3,25 @@ import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
 import DashboardContainer from "../../components/dashboard/DashboardContainer";
 import { FaGripVertical, FaBars } from "react-icons/fa";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import DashboardTile from "../../components/dashboard/DashboardTile";
 // Reusable dashboard widgets
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
@@ -180,11 +199,53 @@ function EChart({ data = [], labels = [] }) {
     );
 }
 
+// SortableWidget wrapper component for drag functionality
+function SortableWidget({ id, children }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="group relative">
+            {/* Drag handle */}
+            <div 
+                {...attributes} 
+                {...listeners}
+                className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10 cursor-grab active:cursor-grabbing"
+            >
+                <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+            </div>
+            {children}
+        </div>
+    );
+}
+
 export default function Dashboard() {
     const [loading, setLoading] = useState(true);
-    const [draggedWidget, setDraggedWidget] = useState(null);
-    const [dragOverIndex, setDragOverIndex] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    
+    // Enhanced drag and drop sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
     
     useEffect(() => {
         const timer = setTimeout(() => setLoading(false), 400);
@@ -293,56 +354,7 @@ export default function Dashboard() {
         });
     };
 
-    // Drag and drop handlers for widget reordering
-    const handleWidgetDragStart = (e, widgetKey, index) => {
-        setDraggedWidget({ key: widgetKey, index });
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/html", e.target);
-        e.target.style.opacity = "0.6";
-    };
 
-    const handleWidgetDragEnd = (e) => {
-        e.target.style.opacity = "1";
-        setDraggedWidget(null);
-        setDragOverIndex(null);
-    };
-
-    const handleWidgetDragOver = (e, index) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setDragOverIndex(index);
-    };
-
-    const handleWidgetDragLeave = (e) => {
-        // Only clear dragOverIndex if we're leaving the entire droppable area
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-            setDragOverIndex(null);
-        }
-    };
-
-    const handleWidgetDrop = (e, targetIndex) => {
-        e.preventDefault();
-        setDragOverIndex(null);
-        
-        if (!draggedWidget || draggedWidget.index === targetIndex) {
-            return;
-        }
-
-        setPrefs((p) => {
-            const currentOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
-            const draggedKey = currentOrder[draggedWidget.index];
-            
-            // Remove the dragged widget
-            const newOrder = currentOrder.filter((_, i) => i !== draggedWidget.index);
-            
-            // Insert at new position
-            newOrder.splice(targetIndex, 0, draggedKey);
-            
-            return { ...p, widgetOrder: newOrder };
-        });
-        
-        setDraggedWidget(null);
-    };
     // Dark mode disabled; keep theme as light while retaining the button UI
     const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
 
@@ -547,6 +559,61 @@ export default function Dashboard() {
         window.addEventListener('open-quickadd', handler);
         return () => window.removeEventListener('open-quickadd', handler);
     }, []);
+    
+    // Handle drag end event
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+
+        if (active.id !== over?.id && over) {
+            const oldIndex = visibleWidgetKeys.indexOf(active.id);
+            const newIndex = visibleWidgetKeys.indexOf(over.id);
+            
+            // Ensure valid indices
+            if (oldIndex === -1 || newIndex === -1) {
+                console.warn('Invalid drag operation: widget not found in visible widgets');
+                return;
+            }
+            
+            const newOrder = arrayMove(visibleWidgetKeys, oldIndex, newIndex);
+            
+            // Update the complete widget order (including hidden widgets)
+            const allWidgets = prefs.widgetOrder || [];
+            const updatedOrder = [...allWidgets];
+            
+            // Remove the dragged widget from its old position
+            const draggedWidget = active.id;
+            const oldPositionInFullOrder = updatedOrder.indexOf(draggedWidget);
+            if (oldPositionInFullOrder !== -1) {
+                updatedOrder.splice(oldPositionInFullOrder, 1);
+            }
+            
+            // Insert it at the new position relative to visible widgets
+            const targetWidget = over.id;
+            const targetPositionInFullOrder = updatedOrder.indexOf(targetWidget);
+            if (targetPositionInFullOrder !== -1) {
+                // Insert after the target widget if dragging down, before if dragging up
+                const insertIndex = newIndex > oldIndex ? targetPositionInFullOrder + 1 : targetPositionInFullOrder;
+                updatedOrder.splice(insertIndex, 0, draggedWidget);
+            } else {
+                // Fallback: add at the end
+                updatedOrder.push(draggedWidget);
+            }
+            
+            // Update preferences state
+            const newPrefs = { 
+                ...prefs,
+                widgetOrder: updatedOrder
+            };
+            setPrefs(newPrefs);
+            
+            // Save to localStorage
+            try {
+                localStorage.setItem('pm:dashboard:prefs', JSON.stringify(newPrefs));
+            } catch (error) {
+                console.warn('Failed to save dashboard preferences:', error);
+            }
+        }
+    };
     
     // Refresh dashboard data
     const refreshDashboardData = async () => {
@@ -755,72 +822,47 @@ export default function Dashboard() {
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
-        const isDragging = draggedWidget?.key === key;
-        const isDragOver = dragOverIndex === index;
-        
-        const dragClasses = `
-            dashboard-widget-item group relative
-            ${isDragging ? 'dashboard-widget-dragging' : 'dashboard-widget-draggable'}
-            ${isDragOver ? 'dashboard-widget-drag-over' : ''}
-        `.trim();
-
-        // Common drag props
-        const dragProps = {
-            draggable: true,
-            onDragStart: (e) => handleWidgetDragStart(e, key, index),
-            onDragEnd: handleWidgetDragEnd,
-            onDragOver: (e) => handleWidgetDragOver(e, index),
-            onDragLeave: handleWidgetDragLeave,
-            onDrop: (e) => handleWidgetDrop(e, index),
-            className: dragClasses
-        };
-
-        // Common grip icon
-        const GripIcon = () => (
-            <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
-                <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
-            </div>
-        );
-
         const isCompactWidget = ['myDay', 'goals', 'enps', 'strokes', 'productivity'].includes(key);
         const gridClass = isCompactWidget ? 'col-span-1' : 'col-span-1 md:col-span-2';
 
         if (key === "quickAdd") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <QuickAddBar
-                        onOpen={(t) => {
-                            try {
-                                const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
-                                window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
-                            } catch (err) {
-                                console.warn('quickAdd dispatch error', err);
-                            }
-                        }}
-                        message={message}
-                    />
-                </div>
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
+                        <QuickAddBar
+                            onOpen={(t) => {
+                                try {
+                                    const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                    window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                                } catch (err) {
+                                    console.warn('quickAdd dispatch error', err);
+                                }
+                            }}
+                            message={message}
+                        />
+                    </div>
+                </SortableWidget>
             );
         }
 
         if (key === "myDay") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
-                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
-                        <div className="text-xs font-medium opacity-80">tasks</div>
-                        <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
-                    </StatsCard>
-                </div>
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
+                        <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
+                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                            <div className="text-xs font-medium opacity-80">tasks</div>
+                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                        </StatsCard>
+                    </div>
+                </SortableWidget>
             );
         }
 
         if (key === "goals") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="Your active goals" className="h-full">
                         <div className="flex items-center justify-between mb-2">
                             <div />
@@ -886,13 +928,14 @@ export default function Dashboard() {
                         )}
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "enps") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="eNPS Snapshot" className="h-full">
                         <div className="flex items-start justify-between">
                             <div />
@@ -906,24 +949,26 @@ export default function Dashboard() {
                         </a>
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "strokes") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="Strokes" className="h-full">
                         <StrokesPanel strokes={strokes} />
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "productivity") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
                         <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
                         <div className="text-xs font-medium opacity-80">productive</div>
@@ -934,13 +979,14 @@ export default function Dashboard() {
                         </div>
                     </StatsCard>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "calendarPreview") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="Calendar Preview (Today)" className="h-full">
                         <div className="flex items-center justify-between mb-2">
                             <div />
@@ -974,13 +1020,14 @@ export default function Dashboard() {
                         )}
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "activity") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="What's New" className="h-full">
                         <div className="flex items-center justify-between mb-2">
                             <div />
@@ -1024,13 +1071,14 @@ export default function Dashboard() {
                         )}
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "suggestions") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="Suggestions" className="h-full">
                         <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                             <li>Recommend goal: "Automate weekly reporting" (template)</li>
@@ -1039,13 +1087,14 @@ export default function Dashboard() {
                         </ul>
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "teamOverview") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={gridClass}>
                     <DashboardTile title="Team Performance Overview" className="h-full">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div className="p-3 border rounded">Team goals completion: 68%</div>
@@ -1058,6 +1107,7 @@ export default function Dashboard() {
                         </div>
                     </DashboardTile>
                 </div>
+                </SortableWidget>
             );
         }
 
@@ -1169,9 +1219,20 @@ export default function Dashboard() {
                 {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
                 {visibleWidgetKeys.length > 0 && (
                     <div className="h-full">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-6 auto-rows-fr h-full">
-                            {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
-                        </div>
+                        <DndContext 
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext 
+                                items={visibleWidgetKeys} 
+                                strategy={rectSortingStrategy}
+                            >
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-6 auto-rows-fr h-full">
+                                    {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
                     </div>
                 )}
 
