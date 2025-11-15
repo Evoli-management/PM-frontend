@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import authService from "../services/authService";
 
 export default function VerifyEmail() {
     const { search } = useLocation();
@@ -9,13 +8,15 @@ export default function VerifyEmail() {
     const [resendEmail, setResendEmail] = useState("");
     const [resending, setResending] = useState(false);
     const [resendMsg, setResendMsg] = useState("");
+    const [cooldown, setCooldown] = useState(0);
 
     useEffect(() => {
+        // Pre-fill email from sessionStorage if available
         try {
             const cached = sessionStorage.getItem("recent_registration_email") || "";
-            if (cached) setResendEmail(cached);
+            if (cached && !resendEmail) setResendEmail(cached);
         } catch {}
-    }, []);
+    }, [resendEmail]);
 
     useEffect(() => {
         const params = new URLSearchParams(search);
@@ -24,16 +25,17 @@ export default function VerifyEmail() {
             setStatus("Missing token");
             return;
         }
-        authService
-            .verifyEmail(token)
-            .then(() => {
+        (async () => {
+            try {
+                const auth = await import("../services/authService");
+                await auth.default.verifyEmail(token);
                 setStatus("Email verified successfully. Redirecting to login…");
                 setTimeout(() => navigate("/login"), 1200);
-            })
-            .catch((e) => {
+            } catch (e) {
                 const msg = e?.response?.data?.message || "Verification failed";
                 setStatus(typeof msg === "string" ? msg : "Verification failed");
-            });
+            }
+        })();
     }, [search, navigate]);
 
     const handleResend = async (e) => {
@@ -46,14 +48,22 @@ export default function VerifyEmail() {
         }
         setResending(true);
         try {
-            const res = await authService.resendVerification(email);
+            const { default: auth } = await import("../services/authService");
+            const res = await auth.resendVerification(email);
             setResendMsg(res?.message || "If the account exists, we sent a new email.");
+            setCooldown(30); // 30 seconds cooldown
         } catch (err) {
             const msg = err?.response?.data?.message || "Failed to resend email";
             setResendMsg(typeof msg === "string" ? msg : "Failed to resend email");
         } finally {
             setResending(false);
         }
+    useEffect(() => {
+        if (cooldown > 0) {
+            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [cooldown]);
     };
 
     return (
@@ -71,13 +81,14 @@ export default function VerifyEmail() {
                             onChange={(e) => setResendEmail(e.target.value)}
                             className="mt-1 w-full border rounded px-3 py-2"
                         />
+                        <span className="text-xs text-gray-500 block mt-1">You can change your email if you made a typo.</span>
                     </label>
                     <button
                         type="submit"
-                        disabled={resending}
-                        className={`w-full ${resending ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"} text-white rounded px-4 py-2`}
+                        disabled={resending || cooldown > 0}
+                        className={`w-full ${(resending || cooldown > 0) ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"} text-white rounded px-4 py-2`}
                     >
-                        {resending ? "Sending…" : "Resend verification email"}
+                        {resending ? "Sending…" : cooldown > 0 ? `Wait ${cooldown}s` : "Resend verification email"}
                     </button>
                     {resendMsg && <p className="text-sm text-gray-700">{resendMsg}</p>}
                 </form>

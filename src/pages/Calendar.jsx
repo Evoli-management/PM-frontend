@@ -23,7 +23,7 @@ export default function Calendar() {
                         onClick={() => setMobileSidebarOpen(false)}
                     />
                 )}
-                <main className={`flex-1 min-w-0 w-full transition-all md:ml-[3mm]`}>
+                <main className={`flex-1 min-w-0 w-full transition-all md:ml-[1mm]`}>
                     <div className="max-w-full overflow-x-hidden">
                         <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
                             <div className="flex items-center gap-3">
