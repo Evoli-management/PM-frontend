@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
+import DashboardContainer from "../../components/dashboard/DashboardContainer";
 import { FaGripVertical, FaBars } from "react-icons/fa";
+import DashboardTile from "../../components/dashboard/DashboardTile";
 // Reusable dashboard widgets
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
@@ -781,7 +783,7 @@ export default function Dashboard() {
         );
 
         const isCompactWidget = ['myDay', 'goals', 'enps', 'strokes', 'productivity'].includes(key);
-        const gridClass = isCompactWidget ? 'col-span-1' : 'col-span-full md:col-span-2';
+        const gridClass = isCompactWidget ? 'col-span-1' : 'col-span-1 md:col-span-2';
 
         if (key === "quickAdd") {
             return (
@@ -819,9 +821,9 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">Your active goals</h2>
+                    <DashboardTile title="Your active goals" className="h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <div />
                             <div className="flex items-center gap-2">
                                 <button 
                                     className="px-2 py-1 border rounded text-sm" 
@@ -845,7 +847,7 @@ export default function Dashboard() {
                                 <a href="#/goals" className="text-sm text-blue-600">View all</a>
                             </div>
                         </div>
-                        
+
                         {dataLoading.goals ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="text-sm text-[CanvasText] opacity-70">Loading goals...</div>
@@ -882,7 +884,7 @@ export default function Dashboard() {
                                 ))}
                             </ul>
                         )}
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -891,9 +893,9 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                    <DashboardTile title="eNPS Snapshot" className="h-full">
                         <div className="flex items-start justify-between">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">eNPS Snapshot</h2>
+                            <div />
                             <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
                                 <span title="eNPS measures employee net promoter score; range -100 to +100">ℹ️</span>
                                 <button className="px-2 py-1 border rounded text-[CanvasText]" title="Export eNPS report">Export</button>
@@ -902,7 +904,7 @@ export default function Dashboard() {
                         <a href="#/enps">
                             <EnpsChart data={enpsData} labels={enpsData.map((_, i) => `W${i + 1}`)} />
                         </a>
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -911,12 +913,9 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
-                        </div>
+                    <DashboardTile title="Strokes" className="h-full">
                         <StrokesPanel strokes={strokes} />
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -942,12 +941,12 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                    <DashboardTile title="Calendar Preview (Today)" className="h-full">
                         <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Calendar Preview (Today)</h2>
+                            <div />
                             <a href="#/calendar" className="text-sm text-blue-600">Open Calendar</a>
                         </div>
-                        
+
                         {dataLoading.calendar ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="text-sm text-[CanvasText] opacity-70">Loading calendar...</div>
@@ -973,7 +972,7 @@ export default function Dashboard() {
                                 getCountdownBadge={getCountdownBadge} 
                             />
                         )}
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -982,9 +981,9 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                    <DashboardTile title="What's New" className="h-full">
                         <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What's New</h2>
+                            <div />
                             <div className="flex items-center gap-2">
                                 <select className="border rounded text-sm bg-[Canvas]" value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} title="Filter feed">
                                     <option value="all">All</option>
@@ -995,7 +994,7 @@ export default function Dashboard() {
                                 <a href="#/notifications" className="text-sm text-blue-600">Open Feed</a>
                             </div>
                         </div>
-                        
+
                         {dataLoading.activity ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="text-sm text-[CanvasText] opacity-70">Loading activities...</div>
@@ -1017,13 +1016,13 @@ export default function Dashboard() {
                             })} 
                             onItemClick={(it) => setDrillItem(it)} 
                         />
-                        
+
                         {!dataLoading.activity && recentActivity.length === 0 && (
                             <div className="text-[CanvasText] opacity-70 text-center py-4">
                                 No recent activity. Start working on your goals to see updates here!
                             </div>
                         )}
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -1032,14 +1031,13 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
+                    <DashboardTile title="Suggestions" className="h-full">
                         <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                             <li>Recommend goal: "Automate weekly reporting" (template)</li>
                             <li>Next best action: Finish API tests before lunch</li>
                             <li>Insight: You're most productive in the morning (9–12)</li>
                         </ul>
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -1048,8 +1046,7 @@ export default function Dashboard() {
             return (
                 <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
                     <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Team Performance Overview</h3>
+                    <DashboardTile title="Team Performance Overview" className="h-full">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div className="p-3 border rounded">Team goals completion: 68%</div>
                             <div className="p-3 border rounded">Avg workload: 32h/week</div>
@@ -1059,7 +1056,7 @@ export default function Dashboard() {
                         <div className="mt-3 flex justify-end">
                             <button className="px-3 py-1 border rounded text-sm" title="Export team report">Export report</button>
                         </div>
-                    </div>
+                    </DashboardTile>
                 </div>
             );
         }
@@ -1134,7 +1131,7 @@ export default function Dashboard() {
                     onClick={() => setMobileSidebarOpen(false)}
                 />
             )}
-        <main className="flex-1 p-2 md:p-4 text-[CanvasText] min-w-0">
+        <DashboardContainer className="flex-1 p-2 md:p-4 text-[CanvasText] min-w-0" title="Dashboard">
             <div className="w-full max-w-full" style={{ marginTop: '-0.75rem' }}>
                 <div className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -1152,7 +1149,7 @@ export default function Dashboard() {
                 {/* Quick Add fixed widget at top (non-draggable) */}
                 {prefs.widgets.quickAdd && (
                     <div className="mb-3">
-                        <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
+                        <DashboardTile>
                             <QuickAddBar
                                 onOpen={(t) => {
                                     try {
@@ -1165,14 +1162,16 @@ export default function Dashboard() {
                                 }}
                                 message={message}
                             />
-                        </div>
+                        </DashboardTile>
                     </div>
                 )}
 
                 {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
                 {visibleWidgetKeys.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-max">
-                        {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                    <div className="h-full">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-6 auto-rows-fr h-full">
+                            {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                        </div>
                     </div>
                 )}
 
@@ -1246,7 +1245,7 @@ export default function Dashboard() {
                     </div>
                 )}
                 </div>
-            </main>
+            </DashboardContainer>
         </div>
     );
 }

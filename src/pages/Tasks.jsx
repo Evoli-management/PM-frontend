@@ -599,7 +599,7 @@ export default function Tasks() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50">
+        <div className="flex min-h-screen bg-[#EDEDED]">
             <Sidebar 
                 user={{ name: "Hussein" }} 
                 mobileOpen={mobileSidebarOpen}

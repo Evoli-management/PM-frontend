@@ -3376,7 +3376,7 @@ export default function KeyAreas() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-[#EDEDED]">
             <div className="flex w-full overflow-x-hidden">
                 {" "}
                 {/* ensure wrapper hides overflow */}
