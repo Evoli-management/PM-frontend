@@ -13,6 +13,7 @@ export default function DayView({
     events,
     todos,
     activitiesByTask = {},
+    unattachedActivities = [],
     categories,
     onTaskDrop,
     onEventMove,
@@ -99,13 +100,50 @@ export default function DayView({
         return start <= todayOnly && todayOnly <= end;
     };
     const dayTodos = Array.isArray(todos) ? todos.filter(isInRangeToday) : [];
-    const dayActivities = React.useMemo(
-        () =>
-            (dayTodos || []).flatMap((t) =>
-                Array.isArray(activitiesByTask?.[String(t.id)]) ? activitiesByTask[String(t.id)] : [],
-            ),
-        [dayTodos, activitiesByTask],
-    );
+    const dayActivities = React.useMemo(() => {
+        const flatten = (arr) => (Array.isArray(arr) ? arr : []);
+
+        const activityInDay = (a) => {
+            try {
+                const toDateOnlyLocal = (iso) => {
+                    if (!iso && iso !== 0) return null;
+                    try {
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return String(iso);
+                        const d = new Date(iso);
+                        if (isNaN(d.getTime())) return null;
+                        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                    } catch {
+                        return null;
+                    }
+                };
+
+                const start = toDateOnlyLocal(a?.date_start || a?.startDate || a?.date || null);
+                const end = toDateOnlyLocal(a?.date_end || a?.endDate || a?.date_end || null);
+                if (!start && !end) return false;
+                let s = start || end;
+                let e = end || start;
+                if (s && e && s.getTime && e.getTime && s.getTime() > e.getTime()) {
+                    const tmp = s;
+                    s = e;
+                    e = tmp;
+                }
+                if (!s) s = e;
+                if (!e) e = s;
+                const todayStart = new Date(todayOnly.getFullYear(), todayOnly.getMonth(), todayOnly.getDate());
+                return s <= todayStart && todayStart <= e;
+            } catch (err) {
+                return false;
+            }
+        };
+
+        // Gather activities attached to today's todos, then filter by date overlap with today
+        const fromTasks = (dayTodos || []).flatMap((t) => flatten(activitiesByTask?.[String(t.id)])).filter(activityInDay);
+
+        // Include unattached activities only if they overlap today
+        const fromUnattached = flatten(unattachedActivities).filter(activityInDay);
+
+        return [...fromUnattached, ...fromTasks];
+    }, [dayTodos, activitiesByTask, unattachedActivities]);
     const matchesSlot = (startIso, refDate, slot) => {
         try {
             const ev = new Date(startIso);

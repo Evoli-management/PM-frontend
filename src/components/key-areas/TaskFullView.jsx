@@ -13,11 +13,13 @@ import {
     normalizeActivity,
     getStatusColorClass,
     getPriorityColorClass,
+    getQuadrantColorClass,
     getPriorityLabel,
     getInProgressLabel,
 } from '../../utils/keyareasHelpers';
 
 const CreateActivityModal = React.lazy(() => import('../../components/modals/CreateActivityFormModal.jsx'));
+const EditActivityModal = React.lazy(() => import('./EditActivityModal.jsx'));
 
 // dev helper: HMR verification
 if (import.meta && import.meta.hot) {
@@ -40,10 +42,12 @@ export default function TaskFullView({
     task,
     goals,
     kaTitle,
+    isDontForget = false,
     readOnly = false,
     onBack,
     onSave,
     onDelete,
+    onRequestEdit,
     activitiesByTask = {},
     onUpdateActivities,
     initialTab = "activities",
@@ -69,10 +73,17 @@ export default function TaskFullView({
     const [showDetailsPopup, setShowDetailsPopup] = useState(false);
     const [openActivityRows, setOpenActivityRows] = useState(new Set());
     const [activityModal, setActivityModal] = useState({ open: false, item: null });
+    const [localUsers, setLocalUsers] = useState(users || []);
+    const lastNotifiedRef = useRef(null);
 
     useEffect(() => {
         setTab(initialTab || "activities");
     }, [initialTab]);
+
+    // If this is a "Don't forget" task, ensure we don't try to show Activities tab
+    useEffect(() => {
+        if (isDontForget && tab === 'activities') setTab('details');
+    }, [isDontForget, tab]);
 
     useEffect(() => {
         setForm(task || null);
@@ -92,6 +103,14 @@ export default function TaskFullView({
             document.removeEventListener("keydown", onKey);
         };
     }, [menuOpen]);
+
+    // Keep a local copy of users so we can fetch on-demand when opening the
+    // EditActivityModal (mirrors CalendarContainer behavior which preloads users)
+    useEffect(() => {
+        try {
+            if (Array.isArray(users) && users.length) setLocalUsers(users);
+        } catch (e) {}
+    }, [users]);
 
     if (!task) return null;
 
@@ -130,15 +149,44 @@ export default function TaskFullView({
     // Notify parent when local list changes — do this in an effect so we don't
     // trigger parent setState during render of this component (avoids React warning)
     useEffect(() => {
+        let mounted = true;
+        let timer = null;
         try {
-            // Debug: show list contents when notifying parent (helps diagnose missing fields)
-            // eslint-disable-next-line no-console
-            console.log('[TaskFullView] notifying parent for task', String(task.id), 'list:', list);
-            onUpdateActivities && onUpdateActivities(String(task.id), list || []);
+            const parentList = (activitiesByTask && activitiesByTask[String(task.id)]) || [];
+            const lhsIds = Array.isArray(parentList) ? parentList.map((a) => String(a.id)) : [];
+            const rhsIds = Array.isArray(list) ? list.map((a) => String(a.id)) : [];
+            const lhsSorted = Array.from(new Set(lhsIds)).sort();
+            const rhsSorted = Array.from(new Set(rhsIds)).sort();
+            const same = lhsSorted.length === rhsSorted.length && lhsSorted.every((id, i) => id === rhsSorted[i]);
+            const signature = rhsSorted.join(',');
+            if (same) {
+                // nothing to do
+                return () => {};
+            }
+            // If we've already notified for this ID-set recently, skip immediately.
+            if (lastNotifiedRef.current === signature) return () => {};
+
+            // Debounce notifications briefly to allow any parent-side batching/refetch
+            // to settle and avoid an immediate notify -> parent set -> notify cycle.
+            timer = setTimeout(() => {
+                if (!mounted) return;
+                try {
+                    lastNotifiedRef.current = signature;
+                    // eslint-disable-next-line no-console
+                    console.log('[TaskFullView] notifying parent for task', String(task.id), 'list:', list);
+                    onUpdateActivities && onUpdateActivities(String(task.id), list || []);
+                } catch (e) {
+                    console.error('Failed to notify parent of activities change', e);
+                }
+            }, 150);
         } catch (e) {
-            console.error('Failed to notify parent of activities change', e);
+            console.error('Failed to schedule parent notification for activities change', e);
         }
-    }, [list, task && task.id]);
+        return () => {
+            mounted = false;
+            if (timer) clearTimeout(timer);
+        };
+    }, [list, task && task.id, activitiesByTask]);
 
     const addActivity = async (text) => {
         const t = (text || "").trim();
@@ -146,8 +194,10 @@ export default function TaskFullView({
         try {
             const svc = await getActivityService();
             const created = await svc.create({ text: t, taskId: task.id });
-            setList([...(list || []), created]);
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+            const next = ([...(list || []), created]);
+            setList(next);
+            // include taskId and the new list in the event so parents can update without refetching
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true, taskId: String(task.id), list: next } }));
         } catch (e) {
             console.error("Failed to add activity", e);
         }
@@ -156,8 +206,9 @@ export default function TaskFullView({
         try {
             const svc = await getActivityService();
             await svc.remove(id);
-            setList(list.filter((a) => a.id !== id));
-            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true } }));
+            const next = list.filter((a) => a.id !== id);
+            setList(next);
+            window.dispatchEvent(new CustomEvent("ka-activities-updated", { detail: { refresh: true, taskId: String(task.id), list: next } }));
         } catch (e) {
             console.error("Failed to delete activity", e);
         }
@@ -204,6 +255,10 @@ export default function TaskFullView({
             const updated = await svc.update(id, { status: serverStatus, completed: status === 'done', completionDate: status === 'done' ? new Date().toISOString() : null });
             const norm = normalizeActivity(updated || {});
             setList((prevList) => prevList.map((a) => (a.id === id ? norm : a)));
+            // notify parent with the latest list after successful update
+            try {
+                window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list: (Array.isArray(prev) ? prev.map(a => a.id === id ? norm : a) : []) } }));
+            } catch (e) {}
         } catch (e) {
             console.error('Failed to update activity status', e);
             setList(prev);
@@ -225,12 +280,25 @@ export default function TaskFullView({
             window.dispatchEvent(new CustomEvent("ka-create-task-from-activity", { detail: { taskId: task.id, activity: item, remove: true } }));
         } catch {}
     };
-    const toggleRow = (id) => {
+    const toggleRow = async (id) => {
         const activity = list.find(a => a.id === id);
-        if (activity) {
-            // open activity modal in editable mode when toggled from the edit action
-            setActivityModal({ open: true, item: activity, readOnly: false });
-        }
+        if (!activity) return;
+        try {
+            // If we don't have users yet, fetch them so the modal's Assignee select
+            // can be populated and the initial value will match an option.
+            if (!localUsers || localUsers.length === 0) {
+                try {
+                    const mod = await import('../../services/usersService');
+                    const svc = mod?.default || mod;
+                    const fetched = await svc.list().catch(() => []);
+                    setLocalUsers(Array.isArray(fetched) ? fetched : []);
+                } catch (e) {
+                    // ignore fetch failure; modal will still open but assignee options may be empty
+                }
+            }
+        } catch (e) {}
+        // open activity modal in editable mode when toggled from the edit action
+        setActivityModal({ open: true, item: activity, readOnly: false });
     };
 
     const closeOnHoverDifferent = (id) => {};
@@ -269,7 +337,73 @@ export default function TaskFullView({
                                 <span className="relative z-10">{task.title || task.name || 'Task'}</span>
                             </div>
                             <div className="relative shrink-0 z-50">
-                                <button type="button" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((s) => !s)} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600" title="More actions"><FaEllipsisV /></button>
+                                <button
+                                    type="button"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuOpen}
+                                    onClick={(e) => {
+                                        setMenuOpen((s) => !s);
+                                    }}
+                                    className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600"
+                                    title="More actions"
+                                >
+                                    {/* Icon intentionally removed per UX: keep button for accessibility and interaction */}
+                                    <span className="sr-only">More actions</span>
+                                </button>
+                                {menuOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                                        <div
+                                            role="menu"
+                                            ref={menuRef}
+                                            className="absolute right-0 mt-2 w-36 bg-white border border-slate-200 rounded-lg shadow z-50 translate-x-2"
+                                        >
+                                            <button
+                                                role="menuitem"
+                                                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                onClick={() => {
+                                                    setMenuOpen(false);
+                                                    // Prefer delegating edit handling to parent (e.g. DontForget)
+                                                    // which will open the shared EditTaskModal. Fall back to
+                                                    // the component's internal edit mode only when the parent
+                                                    // handler isn't provided.
+                                                    // Debug: log edit request and dispatch a global fallback event
+                                                    // so pages that don't pass `onRequestEdit` can still handle it.
+                                                    try {
+                                                        // eslint-disable-next-line no-console
+                                                        console.log('[TaskFullView] Edit requested for task', task && task.id);
+                                                    } catch (e) {}
+                                                    if (typeof onRequestEdit === 'function') {
+                                                        onRequestEdit(task);
+                                                    } else {
+                                                        // Dispatch a global event as a fallback so parent pages
+                                                        // (like DontForget) can listen and open the shared modal.
+                                                        try {
+                                                            window.dispatchEvent(new CustomEvent('ka-request-edit-task', { detail: task }));
+                                                        } catch (e) {}
+                                                        setIsEditing(true);
+                                                    }
+                                                }}
+                                            >
+                                                Edit details
+                                            </button>
+                                            <button
+                                                role="menuitem"
+                                                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                onClick={async () => {
+                                                    setMenuOpen(false);
+                                                    try {
+                                                        if (typeof onDelete === 'function') await onDelete(task);
+                                                    } catch (e) {
+                                                        console.error('Failed to delete task from full view', e);
+                                                    }
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -278,8 +412,16 @@ export default function TaskFullView({
 
             <div className="pt-2 px-3">
                 <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
-                    <img alt="Key Areas" className="w-4 h-4 object-contain opacity-70" src="/PM-frontend/key-area.png" />
-                    <span className="font-medium truncate max-w-full" title={selectedKA?.title || kaTitle || ''}>{selectedKA?.title || kaTitle || '—'}</span>
+                    <img
+                        alt={isDontForget ? "Don't forget" : "Key Areas"}
+                        className="w-4 h-4 object-contain opacity-70"
+                        src={isDontForget ? '/PM-frontend/dont-forget.png' : '/PM-frontend/key-area.png'}
+                        onError={(e) => {
+                            if (!e?.currentTarget) return;
+                            e.currentTarget.src = isDontForget ? '/dont-forget.png' : '/key-area.png';
+                        }}
+                    />
+                    <span className="font-medium truncate max-w-full" title={selectedKA?.title || kaTitle || ''}>{selectedKA?.title || kaTitle || (isDontForget ? "Don't Forget" : '—')}</span>
                 </div>
             </div>
 
@@ -304,7 +446,8 @@ export default function TaskFullView({
                             {(() => {
                                 const statusUi = mapServerStatusToUi(task.status || '');
                                 const statusColors = getStatusColorClass(statusUi);
-                                const statusLabel = getInProgressLabel(statusUi);
+                                // Map UI status to a human-friendly label
+                                const statusLabel = statusUi === 'open' ? 'Open' : statusUi === 'in_progress' ? 'In Progress' : statusUi === 'done' ? 'Done' : String(statusUi).replace(/_/g, ' ');
                                 return (<div className="text-slate-900 capitalize truncate min-w-0 inline-flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${statusColors.dot}`} aria-hidden="true"></span>{statusLabel}</div>);
                             })()}
                             {(() => {
@@ -316,7 +459,35 @@ export default function TaskFullView({
                                     {isHigh ? <span className="inline-block text-sm font-bold text-red-600" title="Priority: High">!</span> : null}
                                 </div>);
                             })()}
-                            <div className="min-w-0"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-medium">{computeEisenhowerQuadrant ? computeEisenhowerQuadrant(task.priority || null) : 'Q?'}</span></div>
+                            <div className="min-w-0">{
+                                (() => {
+                                    // Prefer server-provided numeric quadrant, fall back to computed value
+                                    let raw = task.eisenhowerQuadrant ?? task.eisenhower_quadrant ?? null;
+                                    if (!raw) {
+                                        try {
+                                            // computeEisenhowerQuadrant expects an object; it returns strings like 'Q1'..'Q4'
+                                            const computed = computeEisenhowerQuadrant ? computeEisenhowerQuadrant({
+                                                deadline: task.deadline || task.dueDate || task.due_date,
+                                                end_date: task.end_date || task.endDate || task.end_date,
+                                                priority: task.priority,
+                                                key_area_id: task.keyAreaId ?? task.key_area_id ?? null,
+                                            }) : null;
+                                            raw = computed || null;
+                                        } catch (e) {
+                                            raw = null;
+                                        }
+                                    }
+                                    let qn = 4;
+                                    if (typeof raw === 'number') qn = Number(raw) || 4;
+                                    else if (typeof raw === 'string') {
+                                        const m = raw.match(/^Q([1-4])$/i);
+                                        if (m) qn = Number(m[1]);
+                                        else if (/^[1-4]$/.test(raw)) qn = Number(raw);
+                                    }
+                                    const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
+                                    return (<span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>);
+                                })()
+                            }</div>
                             <div className="text-slate-900 truncate min-w-0" title={task.goal || '—'}>{task.goal || '—'}</div>
                             <div className="text-slate-900 truncate min-w-0">{(task.tags && task.tags.length) ? (
                                 <div className="flex flex-wrap gap-1">
@@ -347,11 +518,13 @@ export default function TaskFullView({
 
             <div className="px-2 pt-2 border-b border-slate-200 bg-white">
                 <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                    <button type="button" onClick={() => setTab('activities')} className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`}><span className="inline-flex items-center gap-1"><svg className="w-4 h-4 text-[#4DC3D8]" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></button>
+                    {!isDontForget && (
+                        <button type="button" onClick={() => setTab('activities')} className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`}><span className="inline-flex items-center gap-1"><svg className="w-4 h-4 text-[#4DC3D8]" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></button>
+                    )}
                 </div>
             </div>
 
-            {tab === "activities" ? (
+            {tab === "activities" && !isDontForget ? (
                 <div className="p-4">
                     {/* Render activities for this task */}
                     <div className="mb-3">
@@ -365,7 +538,9 @@ export default function TaskFullView({
                                             <th className="px-3 py-2 text-left font-semibold">Assignee</th>
                                             <th className="px-3 py-2 text-left font-semibold">Status</th>
                                             <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Start date</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Goal</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Tags</th>
+                                                    <th className="px-3 py-2 text-left font-semibold">Start date</th>
                                             <th className="px-3 py-2 text-left font-semibold">End date</th>
                                             <th className="px-3 py-2 text-left font-semibold">Deadline</th>
                                             <th className="px-3 py-2 text-left font-semibold">Duration</th>
@@ -385,7 +560,7 @@ export default function TaskFullView({
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 align-top text-slate-700">{a.assignee || '—'}</td>
+                                                <td className="px-3 py-2 align-top text-slate-700">{a.assignee || a.responsible || task.assignee || task.responsible || '—'}</td>
                                                 <td className="px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
                                                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
@@ -397,19 +572,44 @@ export default function TaskFullView({
                                                         </div>
                                                 </td>
                                                 <td className="px-3 py-2 align-top">{(() => { const pScope = a.priority ?? task.priority; const pLabel = getPriorityLabel(pScope); const pColors = getPriorityColorClass(pScope); return (<span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${pColors.badge}`}>{pLabel}</span>); })()}</td>
-                                                <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || '—'}</td>
-                                                <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
-                                                <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
+                                                <td className="px-3 py-2 align-top text-slate-700">{(() => {
+                                                        // Render goal title if available, otherwise fallback to empty string
+                                                        try {
+                                                            const goalId = a.goal || a.goalId || null;
+                                                            if (!goalId) return '';
+                                                            const found = (goals || []).find((g) => String(g.id) === String(goalId));
+                                                            return found ? (found.title || found.name || String(found.id)) : String(goalId);
+                                                        } catch (e) { return String(a.goal || a.goalId || ''); }
+                                                    })()}</td>
+                                                <td className="px-3 py-2 align-top">{(() => {
+                                                        const raw = a.tags || a.tags_list || a.tag || [];
+                                                        const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+                                                        if (!arr || arr.length === 0) return '';
+                                                        return (<div className="flex flex-wrap gap-1">
+                                                            {arr.map((t, i) => {
+                                                                const tt = String(t || '').trim();
+                                                                if (!tt) return null;
+                                                                const lowered = tt.toLowerCase();
+                                                                let cls = 'bg-slate-100 text-slate-700';
+                                                                if (['open','in_progress','done','completed','todo'].includes(lowered)) {
+                                                                    cls = getStatusColorClass(lowered).badge;
+                                                                } else if (['low','normal','high','1','2','3'].includes(lowered)) {
+                                                                    cls = getPriorityColorClass(lowered).badge;
+                                                                }
+                                                                return (<span key={`${tt}-${i}`} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{tt}</span>);
+                                                            })}
+                                                        </div>);
+                                                    })()}</td>
+                                                <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || ''}</td>
+                                                <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || ''}</td>
+                                                <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || ''}</td>
                                                 <td className="px-3 py-2 align-top">{/* duration placeholder */}</td>
-                                                <td className="px-3 py-2 align-top text-slate-800">{a.completionDate ? new Date(a.completionDate).toLocaleString() : '—'}</td>
+                                                <td className="px-3 py-2 align-top text-slate-800">{a.completionDate ? new Date(a.completionDate).toLocaleString() : ''}</td>
                                                 <td className="px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
                                                             {/* Edit action */}
                                                             <button type="button" onClick={() => toggleRow(a.id)} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Edit"><FaEdit className="w-4 h-4" /></button>
-                                                            {/* Tag icon: use a single consistent color regardless of activity status */}
-                                                            <button type="button" onClick={() => {}} className="p-1 hover:bg-slate-50 rounded-md" title="Tags">
-                                                                <FaTag className="w-4 h-4 text-[#4DC3D8]" />
-                                                            </button>
+                                                            {/* Tag button removed from actions column; tags are shown in their own column */}
                                                             <button type="button" onClick={() => removeActivity(a.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md" title="Delete"><FaTrash className="w-4 h-4" /></button>
                                                             <button type="button" onClick={() => createTaskFromActivity(a)} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Convert to task"><FaAngleDoubleLeft className="w-4 h-4" /></button>
                                                         </div>
@@ -451,33 +651,70 @@ export default function TaskFullView({
 
             {activityModal.open && activityModal.item && (
                 <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
-                    <CreateActivityModal
-                        isOpen={activityModal.open}
-                        onClose={() => setActivityModal({ open: false, item: null })}
+                    <EditActivityModal
+                        isOpen={true}
+                        initialData={(() => {
+                            try {
+                                const act = activityModal.item || {};
+                                const parentTask = task || {};
+                                return {
+                                    taskId: act.task_id || act.taskId || "",
+                                    text: act.text || act.activity_name || "",
+                                    title: act.text || act.activity_name || "",
+                                    description: act.description || act.note || '',
+                                    start_date: act.start_date || act.date_start || '',
+                                    end_date: act.end_date || act.date_end || '',
+                                    deadline: act.deadline || '',
+                                    duration: act.duration || '',
+                                    list: act.list_index || act.listIndex || parentTask.list || parentTask.list_index || 1,
+                                    key_area_id: act.key_area_id || act.keyAreaId || parentTask.key_area_id || parentTask.keyAreaId || '',
+                                    assignee: (() => {
+                                        try {
+                                            const raw = act.assignee || parentTask.assignee || '';
+                                            if (!raw) return '';
+                                            // If `raw` is a user id, map to the user's name so the select (which uses names)
+                                            // matches an option. Otherwise, keep the raw value (it may already be a name).
+                                            const found = (users || []).find((u) => String(u.id) === String(raw) || String(u.name) === String(raw));
+                                            return found ? (found.name || '') : raw;
+                                        } catch (e) { return act.assignee || parentTask.assignee || ''; }
+                                    })(),
+                                    priority: act.priority || act.priority_level || 'normal',
+                                    goal: act.goal || act.goalId || '',
+                                    completed: act.completed || false,
+                                };
+                            } catch (e) {
+                                return {};
+                            }
+                        })()}
+                        keyAreas={[]}
+                        users={localUsers}
+                        goals={goals}
+                        tasks={allTasks}
+                        availableLists={listNumbers}
                         onSave={async (saved) => {
-                            // saved may be the full activity returned from the modal or a partial payload
-                            // Debug: log the raw saved payload returned from the modal (or nil if modal returned nothing)
+                            // reuse same save logic as before for the Create modal
                             // eslint-disable-next-line no-console
-                            console.log('[TaskFullView] modal onSave saved:', saved);
+                            console.log('[TaskFullView] EditActivityModal onSave saved:', saved);
                             const activityId = (saved && saved.id) ? saved.id : activityModal.item.id;
                             const prev = Array.isArray(list) ? [...list] : [];
-                            // optimistic update: merge saved fields into local item
                             const optimistic = prev.map((a) => (a.id === activityId ? { ...a, ...(saved || {}) } : a));
                             setList(optimistic);
                             setSavingActivityIds((s) => new Set([...s, activityId]));
                             try {
                                 const svc = await getActivityService();
-                                // If the modal already returned a fully persisted activity (with id), use it.
-                                // Otherwise call update to persist changes.
                                 const updated = saved && saved.id ? saved : await svc.update(activityId, saved || {});
                                 const norm = normalizeActivity(updated || {});
                                 setList((prevList) => prevList.map((a) => (a.id === activityId ? norm : a)));
                                 addToast && addToast({ title: 'Activity saved', variant: 'success' });
-                                window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true } }));
+                                try {
+                                    const nextList = (Array.isArray(list) ? list : []).map((a) => (a.id === activityId ? normalizeActivity((updated || saved) || {}) : a));
+                                    window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list: nextList } }));
+                                } catch (e) {
+                                    window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id) } }));
+                                }
                                 setActivityModal({ open: false, item: null });
                             } catch (e) {
                                 console.error('Failed to save activity', e);
-                                // revert
                                 setList(prev);
                                 addToast && addToast({ title: 'Failed to save activity', variant: 'error' });
                             } finally {
@@ -488,26 +725,8 @@ export default function TaskFullView({
                                 });
                             }
                         }}
-                        activityId={activityModal.item.id}
-                        // Provide a rich initialData object so the edit modal can pre-fill all fields
-                        initialData={{
-                            taskId: activityModal.item.task_id || activityModal.item.taskId || "",
-                            text: activityModal.item.text || activityModal.item.activity_name || "",
-                            title: activityModal.item.text || activityModal.item.activity_name || "",
-                            description: activityModal.item.description || activityModal.item.note || '',
-                            start_date: activityModal.item.start_date || activityModal.item.date_start || '',
-                            end_date: activityModal.item.end_date || activityModal.item.date_end || '',
-                            deadline: activityModal.item.deadline || '',
-                            duration: activityModal.item.duration || '',
-                            list_index: activityModal.item.list_index || activityModal.item.listIndex || 1,
-                            key_area_id: activityModal.item.key_area_id || activityModal.item.keyAreaId || '',
-                            assignee: activityModal.item.assignee || '',
-                            priority: activityModal.item.priority || activityModal.item.priority_level || 'normal',
-                            goal: activityModal.item.goal || activityModal.item.goalId || '',
-                            completed: activityModal.item.completed || false,
-                        }}
-                        attachedTaskId={activityModal.item.task_id || activityModal.item.taskId || null}
-                        readOnly={activityModal.readOnly ?? false}
+                        onCancel={() => setActivityModal({ open: false, item: null })}
+                        isSaving={false}
                     />
                 </Suspense>
             )}

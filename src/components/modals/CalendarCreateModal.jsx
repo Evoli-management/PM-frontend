@@ -1,5 +1,5 @@
 import React, { useState, Suspense } from "react";
-const CreateTaskModal = React.lazy(() => import("./CreateTaskModal.jsx"));
+const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
 const CreateActivityModal = React.lazy(() => import("./CreateActivityFormModal.jsx"));
 
 export default function CalendarCreateModal({ 
@@ -70,24 +70,35 @@ export default function CalendarCreateModal({
                         <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}> 
                             <CreateTaskModal
                                 isOpen={true}
+                                onCancel={onClose}
                                 onClose={onClose}
                                 onSave={handleSave}
-                                initialData={initialData}
-                                preselectedKeyArea={preselectedKeyArea}
+                                initialData={{ ...(initialData || {}), key_area_id: initialData?.key_area_id || preselectedKeyArea || initialData?.keyAreaId }}
                                 renderInline={true}
                             />
                         </Suspense>
                     ) : (
                         <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
                             <CreateActivityModal
-                                isOpen={true}
-                                onClose={onClose}
-                                onSave={handleSave}
-                                initialData={initialData}
-                                preselectedKeyArea={preselectedKeyArea}
-                                preselectedTask={preselectedTask}
-                                renderInline={true}
-                            />
+                                    isOpen={true}
+                                    onCancel={onClose}
+                                    initialData={initialData}
+                                    preselectedKeyArea={preselectedKeyArea}
+                                    preselectedTask={preselectedTask}
+                                    renderInline={true}
+                                    onSave={async (payload) => {
+                                        try {
+                                            const mod = await import('../../services/activityService');
+                                            const svc = mod?.default || mod;
+                                            const toSend = { text: payload.text || payload.title || '', taskId: payload.taskId || payload.task_id || null, ...payload };
+                                            const res = await svc.create(toSend);
+                                            handleSave(res, 'activity');
+                                        } catch (e) {
+                                            console.error('Failed to create activity from calendar modal', e);
+                                            throw e;
+                                        }
+                                    }}
+                                />
                         </Suspense>
                     )}
                 </div>

@@ -140,6 +140,8 @@ const api = {
                 if (p === "low" || p === "medium" || p === "high") return p;
                 return "medium";
             })(),
+            // Accept client-provided list index when creating so server persists list membership
+            listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
         };
     const created = await (await getTaskService()).create(payload);
         // normalize for UI
@@ -153,6 +155,9 @@ const api = {
             assignee: created.assignee ?? payload.assignee ?? null,
             duration: created.duration ?? null,
             key_area_id: created.keyAreaId || payload.keyAreaId,
+            // expose list index to UI under both conventions
+            list_index: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
+            listIndex: typeof created.listIndex !== 'undefined' ? created.listIndex : (typeof created.list_index !== 'undefined' ? created.list_index : 1),
         };
     },
     async updateTask(id, task) {
@@ -164,6 +169,8 @@ const api = {
             startDate: toIsoMidnightOrNull(task.start_date ?? task.startDate, true),
             dueDate: toIsoMidnightOrNull(task.deadline ?? task.due_date ?? task.dueDate, true),
             endDate: toIsoMidnightOrNull(task.end_date ?? task.endDate, true),
+            // Ensure client-side list membership is sent to the backend when present
+            listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
             status: (() => {
                 const s = String(task.status || "").toLowerCase();
                 if (!s) return undefined;
@@ -630,60 +637,94 @@ export default function KeyAreas() {
     // `editingActivityViaTaskModal` so the task submit handler knows to persist to activity service.
     useEffect(() => {
         const handler = (e) => {
+            // Debug: log when the editor event is received and its payload
+            // eslint-disable-next-line no-console
+            console.log('KeyAreas: ka-open-activity-editor received', { detail: e && e.detail });
             const activity = e?.detail?.activity;
             if (!activity) return;
             const tid = e?.detail?.taskId ?? null;
             setActivityAttachTaskId(tid ? String(tid) : null);
+            // Normalize incoming activity fields so aliases are consistent
+            const norm = normalizeActivity(activity || {});
             const mapPriority = (v) => {
                 const n = Number(v);
                 if (!Number.isNaN(n)) return n === 3 ? "high" : n === 1 ? "low" : "normal";
                 return String(v || "normal").toLowerCase();
             };
-            // Populate taskForm with activity values so the Task composer UI is reused
+
+            // Ensure parent task is available in allTasks so the modal can look it up
+            (async () => {
+                try {
+                    const tidVal = tid ? String(tid) : (norm.taskId || norm.task_id || norm.task || null);
+                    if (tidVal) {
+                        const exists = (allTasks || []).some((t) => String(t.id) === String(tidVal));
+                        if (!exists) {
+                            try {
+                                const tsvc = await getTaskService();
+                                const fetched = await tsvc.get(String(tidVal));
+                                if (fetched && fetched.id) {
+                                    setAllTasks((prev) => {
+                                        const copy = Array.isArray(prev) ? prev.slice() : [];
+                                        copy.unshift(fetched);
+                                        return copy;
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                } catch (e) {}
+            })();
+
+            // Populate taskForm with normalized activity values so the Task composer UI is reused
             setTaskForm({
-                // include id when mapping an activity into the task form so the modal
-                // can distinguish update vs create when saving.
-                id: activity.id || activity.activityId || activity.activity_id || null,
-                title: activity.text || activity.activity_name || "",
-                description: activity.notes || "",
-                list_index: 1,
+                id: norm.id || null,
+                title: norm.text || "",
+                description: norm.description || norm.notes || "",
+                list_index: norm.list || norm.list_index || 1,
                 category: "Key Areas",
-                goal_id: "",
-                start_date: toDateOnly(activity.date_start) || "",
-                deadline: toDateOnly(activity.deadline) || "",
-                end_date: toDateOnly(activity.date_end) || "",
-                status: activity.completed ? "done" : "open",
-                priority: mapPriority(activity.priority),
+                goal_id: norm.goal || norm.goalId || norm.goal_id || "",
+                start_date: toDateOnly(norm.start_date) || "",
+                deadline: toDateOnly(norm.deadline) || "",
+                end_date: toDateOnly(norm.end_date) || "",
+                status: norm.completed ? "done" : "open",
+                priority: mapPriority(norm.priority),
                 tags: "",
                 recurrence: "",
                 attachments: "",
                 attachmentsFiles: [],
-                assignee: activity.responsible || "",
-                key_area_id: selectedKA?.id || "",
-                list: "",
-                finish_date: toDateOnly(activity.completionDate) || "",
-                duration: activity.duration || "",
+                assignee: norm.assignee || norm.responsible || "",
+                key_area_id: norm.key_area_id || selectedKA?.id || "",
+                list: norm.list || "",
+                finish_date: toDateOnly(norm.completionDate) || "",
+                duration: norm.duration || "",
                 _endAuto: false,
             });
             // Also set activityForm so the dedicated activity editor modal can be used
             setActivityForm({
-                title: activity.text || activity.activity_name || "",
-                description: activity.notes || "",
-                list: activity.list || "",
-                key_area_id: selectedKA?.id || "",
-                assignee: activity.responsible || "",
-                priority: mapPriority(activity.priority),
-                goal: activity.goal || "",
-                start_date: toDateOnly(activity.date_start) || "",
-                end_date: toDateOnly(activity.date_end) || "",
-                deadline: toDateOnly(activity.deadline) || "",
-                finish_date: toDateOnly(activity.completionDate) || "",
-                duration: activity.duration || "",
+                title: norm.text || "",
+                description: norm.description || norm.notes || "",
+                list: norm.list || "",
+                key_area_id: norm.key_area_id || selectedKA?.id || "",
+                assignee: norm.assignee || norm.responsible || "",
+                priority: mapPriority(norm.priority),
+                goal: norm.goal || "",
+                start_date: toDateOnly(norm.start_date) || "",
+                end_date: toDateOnly(norm.end_date) || "",
+                deadline: toDateOnly(norm.deadline) || "",
+                finish_date: toDateOnly(norm.completionDate) || "",
+                duration: norm.duration || "",
                 _endAuto: false,
             });
             // track that we're editing an activity
             setEditingActivityViaTaskModal({ id: activity.id, taskId: tid ? String(tid) : null });
             setEditingTaskId(null);
+            // make sure any open activity composer (Add Activity) or task composer is closed
+            // so only the dedicated EditActivityModal is shown
+            setShowActivityComposer(false);
+            setShowTaskComposer(false);
+            // Debug: log that we will open the EditActivityModal and the ids involved
+            // eslint-disable-next-line no-console
+            console.log('KeyAreas: opening EditActivityModal', { activityId: activity.id, taskId: tid });
             // open external EditActivityModal directly instead of the Task composer
             setShowEditActivityModal(true);
         };
@@ -2036,12 +2077,42 @@ export default function KeyAreas() {
                             try {
                                 const id = editingActivityViaTaskModal.id;
                                 const taskId = editingActivityViaTaskModal.taskId;
+                                let raw = null;
                                 if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
-                                    const found = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
-                                    if (found) return found;
+                                    raw = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
                                 }
-                            } catch {}
-                            return activityForm || {};
+                                const source = raw || activityForm || {};
+                                const norm = normalizeActivity(source || {});
+                                // Attempt to fall back to parent task values when activity lacks key area/list/assignee
+                                const parentTaskId = taskId ? String(taskId) : (norm.taskId || norm.task_id || norm.task ? String(norm.taskId || norm.task_id || norm.task) : null);
+                                const parent = parentTaskId ? ((allTasks || []).find((t) => String(t.id) === String(parentTaskId)) || null) : null;
+                                const resolvedKeyArea = norm.key_area_id || norm.keyAreaId || norm.keyArea || (parent && (parent.key_area_id || parent.keyAreaId || parent.keyArea)) || '';
+                                const resolvedList = norm.list || norm.list_index || norm.listIndex || (parent && (parent.list || parent.list_index || parent.listIndex)) || '';
+                                const resolvedAssignee = norm.assignee || norm.responsible || (parent && (parent.assignee || parent.responsible)) || '';
+                                return {
+                                    id: norm.id || norm.activityId || null,
+                                    type: 'activity',
+                                    taskId: norm.taskId || norm.task_id || norm.task || '',
+                                    text: norm.text || norm.activity_name || '',
+                                    title: norm.text || norm.activity_name || '',
+                                    description: norm.description || norm.notes || norm.note || '',
+                                    start_date: norm.start_date || norm.startDate || norm.date_start || '',
+                                    startDate: norm.start_date || norm.startDate || norm.date_start || '',
+                                    end_date: norm.end_date || norm.endDate || norm.date_end || '',
+                                    endDate: norm.end_date || norm.endDate || norm.date_end || '',
+                                    deadline: norm.deadline || norm.dueDate || norm.due_date || '',
+                                    duration: norm.duration || norm.duration_minutes || '',
+                                    key_area_id: resolvedKeyArea,
+                                    list: resolvedList,
+                                    list_index: resolvedList,
+                                    assignee: resolvedAssignee,
+                                    priority: norm.priority ?? norm.priority_level ?? undefined,
+                                    goal: norm.goal || norm.goal_id || norm.goalId || undefined,
+                                    completed: norm.completed || false,
+                                };
+                            } catch (e) {
+                                return activityForm || {};
+                            }
                         })()}
                         keyAreas={keyAreas}
                         users={users}
@@ -2253,6 +2324,43 @@ export default function KeyAreas() {
                                     onDelete={async (tsk) => {
                                         await handleDeleteTask(tsk);
                                         setSelectedTaskFull(null);
+                                    }}
+                                    onRequestEdit={async (task) => {
+                                        // Map server task shape into the Task composer form and open the shared EditTaskModal
+                                        const mapPriority = (p) => {
+                                            const v = String(p || "normal").toLowerCase();
+                                            if (v === "med" || v === "medium" || v === "normal") return "normal";
+                                            if (v === "low") return "low";
+                                            if (v === "high") return "high";
+                                            return "normal";
+                                        };
+                                        setTaskForm({
+                                            id: task.id || task.taskId || task.task_id || task._id || null,
+                                            title: task.title || task.name || "",
+                                            description: task.description || "",
+                                            list_index: task.list_index || task.listIndex || 1,
+                                            category: task.category || "Key Areas",
+                                            goal_id: task.goal_id || "",
+                                            start_date: toDateOnly(task.start_date) || toDateOnly(task.startDate) || "",
+                                            deadline: toDateOnly(task.deadline) || toDateOnly(task.dueDate) || "",
+                                            end_date: toDateOnly(task.end_date) || toDateOnly(task.endDate) || "",
+                                            status: task.status || "open",
+                                            priority: mapPriority(task.priority),
+                                            tags: task.tags || "",
+                                            recurrence: task.recurrence || "",
+                                            attachments: task.attachments || "",
+                                            attachmentsFiles: task.attachments
+                                                ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
+                                                : [],
+                                            assignee: task.assignee || "",
+                                            key_area_id: (selectedKA && selectedKA.id) || task.key_area_id || task.keyAreaId || "",
+                                            list: "",
+                                            finish_date: "",
+                                            duration: task.duration || "",
+                                            _endAuto: false,
+                                        });
+                                        setEditingTaskId(task.id);
+                                        setShowTaskComposer(true);
                                     }}
                                     activitiesByTask={activitiesByTask}
                                     onUpdateActivities={(id, nextList) => {
@@ -2668,27 +2776,8 @@ export default function KeyAreas() {
                                                                     <th className="px-3 py-2 text-left font-semibold">
                                                                         Completed
                                                                     </th>
-                                                                    <th
-                                                                        className="px-3 py-2 text-center font-semibold w-16"
-                                                                        title="Activities"
-                                                                    >
-                                                                        <span className="inline-flex items-center justify-center w-full text-slate-700">
-                                                                            <svg
-                                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                                width="16"
-                                                                                height="16"
-                                                                                viewBox="0 0 24 24"
-                                                                                fill="none"
-                                                                                stroke="currentColor"
-                                                                                strokeWidth="2"
-                                                                                strokeLinecap="round"
-                                                                                strokeLinejoin="round"
-                                                                            >
-                                                                                <line x1="3" y1="6" x2="21" y2="6" />
-                                                                                <line x1="3" y1="12" x2="21" y2="12" />
-                                                                                <line x1="3" y1="18" x2="21" y2="18" />
-                                                                            </svg>
-                                                                        </span>
+                                                                    <th className="px-3 py-2 text-center font-semibold w-24" title="Actions">
+                                                                        Actions
                                                                     </th>
                                                                 </tr>
                                                             </thead>
@@ -2736,6 +2825,43 @@ export default function KeyAreas() {
                                                                                     }
                                                                                 }}
                                                                                 expandedActivity={expandedActivityRows.has(t.id)}
+                                                                                onEditClick={() => {
+                                                                                    const mapPriority = (p) => {
+                                                                                        const v = String(p || "normal").toLowerCase();
+                                                                                        if (v === "med" || v === "medium" || v === "normal") return "normal";
+                                                                                        if (v === "low") return "low";
+                                                                                        if (v === "high") return "high";
+                                                                                        return "normal";
+                                                                                    };
+                                                                                    setTaskForm({
+                                                                                        id: t.id || t.taskId || t._id || null,
+                                                                                        title: t.title || t.name || "",
+                                                                                        description: t.description || t.notes || "",
+                                                                                        list_index: t.list_index || t.listIndex || 1,
+                                                                                        category: t.category || "Key Areas",
+                                                                                        goal_id: t.goal_id || t.goalId || t.goal || "",
+                                                                                        start_date: toDateOnly(t.start_date) || toDateOnly(t.startDate) || "",
+                                                                                        deadline: toDateOnly(t.deadline) || toDateOnly(t.dueDate) || "",
+                                                                                        end_date: toDateOnly(t.end_date) || toDateOnly(t.endDate) || "",
+                                                                                        status: t.status || "open",
+                                                                                        priority: mapPriority(t.priority),
+                                                                                        tags: t.tags || "",
+                                                                                        recurrence: t.recurrence || "",
+                                                                                        attachments: t.attachments || "",
+                                                                                        attachmentsFiles: t.attachments
+                                                                                            ? t.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
+                                                                                            : [],
+                                                                                        assignee: t.assignee || "",
+                                                                                        key_area_id: t.key_area_id || t.keyAreaId || selectedKA?.id || "",
+                                                                                        list: "",
+                                                                                        finish_date: t.finish_date || "",
+                                                                                        duration: t.duration || "",
+                                                                                        _endAuto: false,
+                                                                                    });
+                                                                                    setEditingTaskId(t.id);
+                                                                                    setShowTaskComposer(true);
+                                                                                }}
+                                                                                onDeleteClick={() => handleDeleteTask(t)}
                                                                             />
                                                                             {expandedActivityRows.has(t.id) && (
                                                                                 <tr className="bg-slate-50">
@@ -2918,17 +3044,46 @@ export default function KeyAreas() {
                                             // Use external EditActivityModal when editing an activity via task modal
                                             <EditActivityModal
                                                 isOpen={true}
-                                                initialData={(function(){
-                                                    try {
-                                                        const id = editingActivityViaTaskModal.id;
-                                                        const taskId = editingActivityViaTaskModal.taskId;
-                                                        if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
-                                                            const found = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
-                                                            if (found) return found;
+                                                    initialData={(function(){
+                                                        try {
+                                                            const id = editingActivityViaTaskModal.id;
+                                                            const taskId = editingActivityViaTaskModal.taskId;
+                                                            let raw = null;
+                                                            if (taskId && activitiesByTask && activitiesByTask[String(taskId)]) {
+                                                                raw = activitiesByTask[String(taskId)].find(a => String(a.id) === String(id));
+                                                            }
+                                                            const source = raw || activityForm || {};
+                                                            const norm = normalizeActivity(source || {});
+                                                            const parentTaskId = taskId ? String(taskId) : (norm.taskId || norm.task_id || norm.task ? String(norm.taskId || norm.task_id || norm.task) : null);
+                                                            const parent = parentTaskId ? ((allTasks || []).find((t) => String(t.id) === String(parentTaskId)) || null) : null;
+                                                            const resolvedKeyArea = norm.key_area_id || norm.keyAreaId || norm.keyArea || (parent && (parent.key_area_id || parent.keyAreaId || parent.keyArea)) || '';
+                                                            const resolvedList = norm.list || norm.list_index || norm.listIndex || (parent && (parent.list || parent.list_index || parent.listIndex)) || '';
+                                                            const resolvedAssignee = norm.assignee || norm.responsible || (parent && (parent.assignee || parent.responsible)) || '';
+                                    return {
+                                        id: norm.id || norm.activityId || null,
+                                        type: 'activity',
+                                        taskId: norm.taskId || norm.task_id || norm.task || '',
+                                        text: norm.text || norm.activity_name || '',
+                                        title: norm.text || norm.activity_name || '',
+                                        description: norm.description || norm.notes || norm.note || '',
+                                        start_date: norm.start_date || norm.startDate || norm.date_start || '',
+                                        startDate: norm.start_date || norm.startDate || norm.date_start || '',
+                                        end_date: norm.end_date || norm.endDate || norm.date_end || '',
+                                        endDate: norm.end_date || norm.endDate || norm.date_end || '',
+                                        deadline: norm.deadline || norm.dueDate || norm.due_date || '',
+                                        duration: norm.duration || norm.duration_minutes || '',
+                                        key_area_id: resolvedKeyArea,
+                                        list: resolvedList,
+                                        list_index: resolvedList,
+                                        assignee: resolvedAssignee,
+                                        priority: norm.priority ?? norm.priority_level ?? undefined,
+                                        goal: norm.goal || norm.goal_id || norm.goalId || undefined,
+                                        completed: norm.completed || false,
+                                    };
+                                                        } catch (e) {
+                                                            return activityForm || {};
                                                         }
-                                                    } catch {}
-                                                    return activityForm || {};
-                                                })()}
+                                                    })()}
                                                 keyAreas={keyAreas}
                                                 users={users}
                                                 goals={goals}

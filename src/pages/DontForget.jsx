@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
+import { getPriorityLevel } from "../utils/keyareasHelpers";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
 import CreateTaskModal from "../components/key-areas/CreateTaskModal.jsx";
 import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
+import TaskFullView from "../components/key-areas/TaskFullView";
+// Activity composer removed from DontForget: activities are not fetched here
 
 // Lazy getters for services to allow code-splitting
 let _taskService = null;
@@ -41,6 +44,8 @@ const getGoalService = async () => {
     return _goalService;
 };
 
+// Note: activityService loader removed for DontForget (no activity fetching)
+
 export default function DontForget() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -69,8 +74,27 @@ export default function DontForget() {
         } catch {}
     }, [dfListNames]);
 
+    // Optional per-list descriptions shown when a list has no tasks
+    const [dfListDescriptions, setDfListDescriptions] = useState(() => {
+        try {
+            const raw = localStorage.getItem('dfListDescriptions');
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            return {};
+        }
+    });
+    useEffect(() => {
+        try {
+            localStorage.setItem('dfListDescriptions', JSON.stringify(dfListDescriptions));
+        } catch (e) {}
+    }, [dfListDescriptions]);
+
+    // (List descriptions feature removed) dfListDescriptions remains for potential future use
+
     // Key Areas for assignment dialog
     const [dfKeyAreas, setDfKeyAreas] = useState([]);
+    // Backend Key Area id used to persist Don't Forget list names
+    const [dfKeyAreaId, setDfKeyAreaId] = useState(null);
     // Users and goals to pre-populate selects in Create/Edit modals
     const [users, setUsers] = useState([]);
     const [goals, setGoals] = useState([]);
@@ -87,6 +111,58 @@ export default function DontForget() {
             }
         })();
     }, [viewMode]);
+
+    // Load or create a dedicated Key Area for Don't Forget so list names can be persisted
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const svc = await getKeyAreaService();
+                const list = await svc.list({ includeTaskCount: false });
+                if (cancelled) return;
+                // normalize titles to compare (handle "Don't Forget" vs "Dont Forget")
+                const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const targetKey = 'dontforget';
+                const found = (list || []).find((k) => normalize(k.title) === targetKey);
+                const localStored = (() => {
+                    try {
+                        const raw = localStorage.getItem('dfListNames');
+                        return raw ? JSON.parse(raw) : null;
+                    } catch (_) { return null; }
+                })();
+                if (found) {
+                    setDfKeyAreaId(found.id);
+                    // Prefer server listNames but merge local names as fallback
+                    const serverNames = found.listNames || {};
+                    const merged = { ...(localStored || {}), ...(serverNames || {}) };
+                    setDfListNames(merged && Object.keys(merged).length ? merged : (localStored || serverNames || { 1: 'List 1' }));
+                    // If we had local names but server lacks them, persist local names
+                    if (localStored && (!found.listNames || Object.keys(found.listNames || {}).length === 0)) {
+                        try {
+                            await svc.update(found.id, { listNames: localStored });
+                        } catch (e) {
+                            // ignore persistence errors
+                        }
+                    }
+                } else {
+                    // No existing KA named DontForget - create one and persist any local names
+                    const created = await svc.create({ title: "Don't Forget", description: 'Dont Forget lists' });
+                    if (cancelled) return;
+                    setDfKeyAreaId(created.id);
+                    const toUse = (localStored && Object.keys(localStored).length) ? localStored : { 1: 'List 1' };
+                    setDfListNames(toUse);
+                    try {
+                        await svc.update(created.id, { listNames: toUse });
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            } catch (e) {
+                // If key areas cannot be fetched, keep local list names (already set from localStorage)
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     // Fetch current user and goals to pass into modals so dropdowns are pre-populated
     useEffect(() => {
@@ -115,9 +191,8 @@ export default function DontForget() {
     // Assignment modal state
     const [assignModal, setAssignModal] = useState({ open: false, task: null, kaId: "", listIndex: 1 });
 
-    // Load DF tasks from backend when view opens
+    // Load DF tasks from backend on mount (and keep once-updated list for the page)
     useEffect(() => {
-        if (viewMode !== "dont-forget") return;
         let cancelled = false;
         (async () => {
             try {
@@ -129,8 +204,8 @@ export default function DontForget() {
                         name: t.title,
                         assignee: t.assignee || "",
                         status: t.status || "open",
-                        priority: t.priority || "normal",
-                        quadrant: t.eisenhowerQuadrant ? `Q${t.eisenhowerQuadrant}` : "Q3",
+                        priority: getPriorityLevel(t.priority),
+                        quadrant: typeof t.eisenhowerQuadrant !== 'undefined' && t.eisenhowerQuadrant !== null ? Number(t.eisenhowerQuadrant) : 3,
                         goal: "", // not modeled on backend yet
                         tags: "", // not modeled on backend yet
                         start_date: t.startDate ? t.startDate.slice(0, 10) : "",
@@ -142,11 +217,12 @@ export default function DontForget() {
                         time: "",
                         notes: t.description || "",
                         keyArea: "", // DF has no key area
-                        listIndex: 1,
+                        listIndex: t.listIndex || t.list_index || 1,
                         completed: t.status === "done", // FE semantic
                         imported: false,
                     }));
-                    setTasks(mapped);
+                    // Apply any locally-stored DF list overrides so user selections persist
+                    setTasks(applyDfMapTo(mapped));
                 }
             } catch (e) {
                 console.error("Failed to load Don’t Forget tasks", e);
@@ -155,7 +231,86 @@ export default function DontForget() {
         return () => {
             cancelled = true;
         };
-    }, [viewMode]);
+    }, []);
+
+    // Listen for global "open-create-modal" events so DontForget can open its
+    // local composer without relying on ModalManager. This lets the Navbar's
+    // quick-create dispatch still open the composer when DontForget is visible.
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const detail = e?.detail || e;
+                const type = detail?.type || detail;
+                if (String(type) === 'dontforget') {
+                    setViewMode('dont-forget');
+                    setShowComposer(true);
+                }
+            } catch (err) {
+                // ignore
+            }
+        };
+        window.addEventListener('open-create-modal', handler);
+        return () => window.removeEventListener('open-create-modal', handler);
+    }, []);
+
+    // Listen for global 'dontforget-created' events (dispatched by ModalManager)
+    // so that if a task is created via the global composer the DontForget page
+    // still updates its local list. This decouples DontForget from needing the
+    // ModalManager to render the composer itself.
+    useEffect(() => {
+        const handler = (e) => {
+            const created = e && e.detail ? e.detail : null;
+            if (!created) return;
+            try {
+                const mapped = {
+                    id: created.id,
+                    name: created.title,
+                    assignee: created.assignee || "",
+                    status: created.status || "open",
+                    priority: getPriorityLevel(created.priority),
+                    quadrant: typeof created.eisenhowerQuadrant !== 'undefined' && created.eisenhowerQuadrant !== null ? Number(created.eisenhowerQuadrant) : 3,
+                    goal: "",
+                    tags: "",
+                    start_date: created.startDate ? (created.startDate.slice ? created.startDate.slice(0,10) : created.startDate) : "",
+                    dueDate: created.dueDate ? (created.dueDate.slice ? created.dueDate.slice(0,10) : created.dueDate) : "",
+                    end_date: created.endDate ? (created.endDate.slice ? created.endDate.slice(0,10) : created.endDate) : "",
+                    duration: created.duration || "",
+                    time: "",
+                    notes: created.description || "",
+                    keyArea: "",
+                    listIndex: created.listIndex || created.list_index || 1,
+                    completed: created.status === "done" || created.status === "completed",
+                    imported: false,
+                };
+                setTasks((prev) => [...(prev || []), mapped]);
+                // Persist DF list assignment if server didn't include it
+                try {
+                    const assigned = mapped.listIndex || mapped.list_index || 1;
+                    setDfTaskListMap((p) => ({ ...(p || {}), [mapped.id]: assigned }));
+                } catch (e) {}
+            } catch (err) {
+                console.error('Failed to apply dontforget-created event', err);
+            }
+        };
+        window.addEventListener('dontforget-created', handler);
+        return () => window.removeEventListener('dontforget-created', handler);
+    }, []);
+
+    // Activities are loaded on-demand per-task (when opening the full task view)
+    // to avoid fetching activities for every DF task on page load. The
+    // `openFullTaskView` handler fetches activities for the selected task.
+
+    // If URL contains ?task=<id>, open that task in the full view when tasks are loaded
+    useEffect(() => {
+        if (viewMode !== "dont-forget") return;
+        const params = new URLSearchParams(location.search || "");
+        const taskParam = params.get("task");
+        if (!taskParam) return;
+        if (!tasks || tasks.length === 0) return;
+        const found = tasks.find((t) => String(t.id) === String(taskParam));
+        if (found) openFullTaskView(found);
+    }, [location.search, viewMode, tasks]);
+
 
     useEffect(() => {
         const params = new URLSearchParams(location.search || "");
@@ -187,15 +342,53 @@ export default function DontForget() {
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
+    // Full task view state (TaskFullView integration)
+    const [selectedTask, setSelectedTask] = useState(null);
+
+    // Activity -> create-task handler removed: DontForget does not manage activities
+
+    // Activity composer/refresh handlers removed: DontForget does not fetch activities
+
+    // Fallback: listen for global edit requests dispatched by TaskFullView
+    useEffect(() => {
+        if (viewMode !== 'dont-forget') return;
+        const handler = (ev) => {
+            const tsk = ev && ev.detail ? ev.detail : null;
+            if (!tsk) return;
+            try {
+                // eslint-disable-next-line no-console
+                console.log('[DontForget] global ka-request-edit-task received for', tsk && tsk.id);
+            } catch (e) {}
+            const form = {
+                name: tsk.name || "",
+                notes: tsk.notes || "",
+                assignee: tsk.assignee || "",
+                status: tsk.status || "open",
+                priority: getPriorityLevel(tsk.priority),
+                start_date: tsk.start_date || "",
+                end_date: tsk.end_date || "",
+                dueDate: tsk.dueDate || "",
+                duration: tsk.duration || "",
+                keyAreaId: "",
+                listIndex: tsk.listIndex || 1,
+                goal: tsk.goal || "",
+                tags: tsk.tags || "",
+                time: tsk.time || "",
+                completionDate: tsk.completionDate || null,
+            };
+            setEditModal({ open: true, id: tsk.id, form });
+            setMassEditingMode(false);
+        };
+        window.addEventListener('ka-request-edit-task', handler);
+        return () => window.removeEventListener('ka-request-edit-task', handler);
+    }, [viewMode]);
     // When true, the EditTaskModal is being used to edit multiple selected tasks
     const [massEditingMode, setMassEditingMode] = useState(false);
     // Editor modal for DF task details
     const [editModal, setEditModal] = useState({ open: false, id: null, form: null });
 
-    const dontForgetTasks = useMemo(
-        () => tasks.filter((t) => !t.keyArea && (showImported || !t.imported) && (showCompleted || !t.completed)),
-        [tasks, showImported, showCompleted],
-    );
+    // NOTE: moved definition of dontForgetTasks below selectedDfList to avoid TDZ when
+    // selectedDfList is referenced before initialization. See below after getDfListName().
 
     // DF lists available = union of explicit names and any task listIndex values
     const availableDfLists = useMemo(() => {
@@ -209,17 +402,50 @@ export default function DontForget() {
         });
         return Array.from(s).sort((a, b) => a - b);
     }, [tasks, dfListNames]);
+    // Which DF list is currently active/selected in the UI. Default to first available.
+    const [selectedDfList, setSelectedDfList] = useState(() => {
+        try {
+            const raw = Object.keys(dfListNames || {});
+            if (raw && raw.length) return Number(raw.sort((a,b) => a-b)[0]) || 1;
+        } catch {}
+        return 1;
+    });
+    useEffect(() => {
+        if (!availableDfLists || availableDfLists.length === 0) return;
+        if (!availableDfLists.includes(selectedDfList)) setSelectedDfList(availableDfLists[0]);
+    }, [availableDfLists]);
     const getDfListName = (n) => (dfListNames?.[n] ? dfListNames[n] : `List ${n}`);
     const addDfList = () => {
         const max = availableDfLists.length ? Math.max(...availableDfLists) : 0;
         const next = (max || 0) + 1;
-        setDfListNames((prev) => ({ ...(prev || {}), [next]: `List ${next}` }));
+        const nextMap = (prev => ({ ...(prev || {}), [next]: `List ${next}` }))(dfListNames);
+        setDfListNames(nextMap);
+        // Persist to backend if we have a DontForget key area
+        (async () => {
+            if (!dfKeyAreaId) return;
+            try {
+                const svc = await getKeyAreaService();
+                await svc.update(dfKeyAreaId, { listNames: nextMap });
+            } catch (e) {
+                // ignore persistence errors
+            }
+        })();
     };
     const renameDfList = (n) => {
         const current = getDfListName(n);
         const val = prompt("Rename list", current);
         if (val === null) return;
-        setDfListNames((prev) => ({ ...(prev || {}), [n]: val }));
+        const nextMap = { ...(dfListNames || {}), [n]: val };
+        setDfListNames(nextMap);
+        (async () => {
+            if (!dfKeyAreaId) return;
+            try {
+                const svc = await getKeyAreaService();
+                await svc.update(dfKeyAreaId, { listNames: nextMap });
+            } catch (e) {
+                // ignore persistence errors
+            }
+        })();
     };
     // Ellipsis menu per DF list chip (popup like Key Areas)
     const [openDfListMenu, setOpenDfListMenu] = useState(null); // number | null
@@ -249,10 +475,101 @@ export default function DontForget() {
         }
         setDfListNames((prev) => {
             const { [n]: _removed, ...rest } = prev || {};
-            return { ...rest };
+            const next = { ...rest };
+            // Persist deletion to backend if we have a DontForget key area
+            (async () => {
+                if (!dfKeyAreaId) return;
+                try {
+                    const svc = await getKeyAreaService();
+                    await svc.update(dfKeyAreaId, { listNames: next });
+                } catch (e) {
+                    // ignore persistence errors
+                }
+            })();
+            return next;
         });
         setOpenDfListMenu(null);
     };
+
+    // Persist per-task DF list assignments in localStorage as a fallback; the server-provided
+    // `listIndex` (task.listIndex / task.list_index) is now authoritative and preferred when present.
+    const [dfTaskListMap, setDfTaskListMap] = useState(() => {
+        try {
+            const raw = localStorage.getItem('dfTaskListMap');
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            return {};
+        }
+    });
+    useEffect(() => {
+        try {
+            localStorage.setItem('dfTaskListMap', JSON.stringify(dfTaskListMap));
+        } catch (e) {}
+    }, [dfTaskListMap]);
+
+    // Sync changes to dfTaskListMap to server so list membership is persisted across devices.
+    // We skip the initial mount (which loads localStorage) to avoid mass-syncing on page load.
+    const _dfMapMounted = useRef(false);
+    const _prevDfMap = useRef(dfTaskListMap);
+    useEffect(() => {
+        if (!_dfMapMounted.current) {
+            _dfMapMounted.current = true;
+            _prevDfMap.current = dfTaskListMap;
+            return;
+        }
+        const prev = _prevDfMap.current || {};
+        const curr = dfTaskListMap || {};
+        const changed = Object.keys(curr).filter((k) => String(curr[k]) !== String(prev[k]));
+        if (changed.length === 0) {
+            _prevDfMap.current = { ...curr };
+            return;
+        }
+        (async () => {
+            for (const id of changed) {
+                const value = curr[id];
+                try {
+                    // optimistic UI: show saving indicator while syncing
+                    try { markSaving(id, 1200); } catch (e) {}
+                    // send numeric listIndex to server
+                    await (await getTaskService()).update(id, { listIndex: Number(value) });
+                    // update local in-memory tasks to reflect server value
+                    setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, listIndex: Number(value) } : t)));
+                } catch (err) {
+                    // warn but don't block UI
+                    // eslint-disable-next-line no-console
+                    console.warn('[DontForget] Failed to persist listIndex for', id, err);
+                }
+            }
+            _prevDfMap.current = { ...curr };
+        })();
+    }, [dfTaskListMap]);
+
+    const applyDfMapTo = (arr) => (arr || []).map((t) => {
+        // Prefer server-provided listIndex/list_index when available. Fall back to local mapping
+        // stored in `dfTaskListMap` only when server value is absent. This makes the server
+        // authoritative for DontForget list membership across devices.
+        const serverVal = (typeof t.listIndex !== 'undefined' && t.listIndex !== null)
+            ? t.listIndex
+            : (typeof t.list_index !== 'undefined' && t.list_index !== null ? t.list_index : null);
+        const localVal = dfTaskListMap && dfTaskListMap[t.id] ? Number(dfTaskListMap[t.id]) : null;
+        const resolved = serverVal !== null ? serverVal : (localVal !== null ? localVal : 1);
+        return { ...t, listIndex: resolved };
+    });
+
+    // Which DF tasks are visible in the list (filtered by selected DF list)
+    const dontForgetTasks = useMemo(
+        () =>
+            (tasks || []).filter((t) => {
+                if (t.keyArea) return false;
+                if (!(showImported || !t.imported)) return false;
+                if (!(showCompleted || !t.completed)) return false;
+                // Only include tasks that belong to the selected DF list
+                const idx = Number(t.listIndex ?? t.list_index ?? 1);
+                if (selectedDfList && Number(selectedDfList) !== Number(idx)) return false;
+                return true;
+            }),
+        [tasks, showImported, showCompleted, selectedDfList],
+    );
 
     const addDontForgetTask = async (payload) => {
         // Accept either `name` (old composer) or `title` (CreateTaskModal)
@@ -286,39 +603,62 @@ export default function DontForget() {
                 ...(mappedStatus ? { status: mappedStatus } : {}),
                 ...(mappedPriority ? { priority: mappedPriority } : {}),
             };
+            try {
+                // Debug: log payload being sent to the API
+                // eslint-disable-next-line no-console
+                console.log('[DontForget] creating task payload', body);
+            } catch (e) {}
             // support keyArea naming variants
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
             if (payload?.key_area_id) body.keyAreaId = payload.key_area_id;
-            const created = await (await getTaskService()).create(body);
-            // Push to local list
-            if (!payload?.keyAreaId) {
-                setTasks((prev) => [
-                    ...prev,
-                    {
-                        id: created.id,
-                        name: created.title,
-                        assignee: created.assignee || "",
-                        status: created.status || "open",
-                        priority: created.priority || "normal",
-                        quadrant: created.eisenhowerQuadrant
-                            ? `Q${created.eisenhowerQuadrant}`
-                            : payload?.quadrant || "Q3",
-                        goal: payload?.goal || "",
-                        tags: payload?.tags || "",
-                        start_date: created.startDate ? created.startDate.slice(0, 10) : "",
-                        dueDate: created.dueDate ? created.dueDate.slice(0, 10) : "",
-                        end_date: created.endDate ? created.endDate.slice(0, 10) : "",
-                        duration: created.duration || "",
-                        time: payload?.time || "",
-                        notes: created.description || "",
-                        keyArea: "",
-                        listIndex: payload?.listIndex || 1,
-                        completed: created.status === "done",
-                        imported: !!payload?.imported,
-                    },
-                ]);
+                try {
+                    const created = await (await getTaskService()).create(body);
+                    // Debug: log selected listIndex from payload and created response
+                    try { console.log('[DontForget] payload.listIndex', payload?.listIndex, 'payload.list_index', payload?.list_index); } catch (e) {}
+                    // Push to local list
+                    if (!payload?.keyAreaId) {
+                        const newItem = {
+                            id: created.id,
+                            name: created.title,
+                            assignee: created.assignee || "",
+                            status: created.status || "open",
+                            priority: getPriorityLevel(created.priority),
+                            quadrant: (function (v, fallback) {
+                                if (typeof v !== 'undefined' && v !== null) return Number(v);
+                                if (typeof fallback !== 'undefined' && fallback !== null) {
+                                    const s = String(fallback || '').trim();
+                                    if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                                }
+                                return 3;
+                            })(created.eisenhowerQuadrant, payload?.quadrant),
+                            goal: payload?.goal || "",
+                            tags: payload?.tags || "",
+                            start_date: created.startDate ? created.startDate.slice(0, 10) : "",
+                            dueDate: created.dueDate ? created.dueDate.slice(0, 10) : "",
+                            end_date: created.endDate ? created.endDate.slice(0, 10) : "",
+                            duration: created.duration || "",
+                            time: payload?.time || "",
+                            notes: created.description || "",
+                            keyArea: "",
+                            listIndex: payload?.listIndex ?? payload?.list_index ?? selectedDfList ?? 1,
+                            completed: created.status === 'done',
+                            imported: !!payload?.imported,
+                        };
+                        // Debug: show the new item being inserted locally
+                        try { console.log('[DontForget] new DF task item', newItem); } catch (e) {}
+                        setTasks((prev) => [...prev, newItem]);
+                        // Persist the chosen list for this new task so it survives refresh
+                        try {
+                            setDfTaskListMap((prev) => ({ ...(prev || {}), [created.id]: newItem.listIndex }));
+                        } catch (e) {}
+                    }
+                    setDfName("");
+                } catch (err) {
+                // Log detailed API error to console to help debug
+                // eslint-disable-next-line no-console
+                console.error('[DontForget] create task failed', err?.response?.status, err?.response?.data || err.message || err);
+                throw err;
             }
-            setDfName("");
             // no external key area select to reset
         } catch (e) {
             console.error("Failed to create task", e);
@@ -392,10 +732,7 @@ export default function DontForget() {
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
             markSaving(id);
-            try {
-                if (newStatus === 'done') addToast && addToast({ title: 'Marked completed', variant: 'success' });
-                else addToast && addToast({ title: 'Marked open', variant: 'info' });
-            } catch {}
+                // No toast in Don't Forget list to match KeyAreas behavior
         } catch (e) {
             console.error("Failed to update status", e);
         }
@@ -411,7 +748,7 @@ export default function DontForget() {
     };
     const setStatus = async (id, s) => {
         try {
-            await taskService.update(id, { status: s });
+            await (await getTaskService()).update(id, { status: s });
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
@@ -421,13 +758,7 @@ export default function DontForget() {
             );
             markSaving(id);
             // show a success toast for completed tasks
-            try {
-                if (s === 'done') {
-                    addToast && addToast({ title: 'Marked completed', variant: 'success' });
-                } else if (s === 'open') {
-                    addToast && addToast({ title: 'Marked open', variant: 'info' });
-                }
-            } catch {}
+            // No toast in Don't Forget list to match KeyAreas behavior
         } catch (e) {
             console.error('Failed to update status', e);
         }
@@ -436,6 +767,13 @@ export default function DontForget() {
         try {
             await (await getTaskService()).remove(id);
             setTasks((prev) => prev.filter((t) => t.id !== id));
+            // Remove any local DF list mapping for this task
+            try {
+                setDfTaskListMap((prev) => {
+                    const { [id]: _removed, ...rest } = prev || {};
+                    return rest;
+                });
+            } catch (e) {}
         } catch (e) {
             console.error("Failed to delete task", e);
         }
@@ -490,12 +828,18 @@ export default function DontForget() {
                 name: task.name || "",
                 assignee: task.assignee || "",
                 status: task.status || "open",
-                priority: task.priority || "normal",
+                priority: getPriorityLevel(task.priority),
                 start_date: task.start_date || "",
                 end_date: task.end_date || "",
                 dueDate: task.dueDate || "",
                 duration: task.duration || "",
-                quadrant: task.quadrant || "Q3",
+                quadrant: (function normalizeQ(q) {
+                    if (q === undefined || q === null) return 3;
+                    if (typeof q === 'number') return q;
+                    const s = String(q || '').trim();
+                    if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                    return 3;
+                })(task.quadrant),
                 goal: task.goal || "",
                 tags: task.tags || "",
                 time: task.time || "",
@@ -507,6 +851,12 @@ export default function DontForget() {
             },
         });
     };
+
+    // Open the TaskFullView for a DF task (activities are not loaded here)
+    const openFullTaskView = async (task) => {
+        if (!task) return;
+        setSelectedTask({ ...task, title: task.name });
+    };
     const confirmAssignAndOpen = async () => {
         const { task, kaId } = assignModal;
         if (!task || !kaId) return;
@@ -515,6 +865,13 @@ export default function DontForget() {
             await (await getTaskService()).update(task.id, { keyAreaId: kaId });
             // Remove from DF view
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
+            // Remove any local DF list mapping for this task when moving to a Key Area
+            try {
+                setDfTaskListMap((prev) => {
+                    const { [task.id]: _removed, ...rest } = prev || {};
+                    return rest;
+                });
+            } catch (e) {}
             setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 });
             // Navigate and open full task view
             navigate({ pathname: "/key-areas", search: `?ka=${kaId}&openKA=1&task=${task.id}` });
@@ -547,6 +904,12 @@ export default function DontForget() {
             if (form.keyAreaId) {
                 // Task moved to a Key Area: remove from DF list and open it in Key Areas
                 setTasks((prev) => prev.filter((t) => t.id !== id));
+                try {
+                    setDfTaskListMap((prev) => {
+                        const { [id]: _removed, ...rest } = prev || {};
+                        return rest;
+                    });
+                } catch (e) {}
                 navigate({ pathname: "/key-areas", search: `?ka=${form.keyAreaId}&openKA=1&task=${id}` });
             } else {
                 // Update local task (including client-only fields)
@@ -565,10 +928,15 @@ export default function DontForget() {
                                   dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : form.dueDate || "",
                                   duration: updated.duration || form.duration || "",
                                   status: updated.status || form.status || "open",
-                                  priority: updated.priority || form.priority || "normal",
-                                  quadrant: updated.eisenhowerQuadrant
-                                      ? `Q${updated.eisenhowerQuadrant}`
-                                      : form.quadrant || t.quadrant,
+                                  priority: getPriorityLevel(updated.priority ?? form.priority),
+                                  quadrant: (function (v, fallback) {
+                                      if (typeof v !== 'undefined' && v !== null) return Number(v);
+                                      if (typeof fallback !== 'undefined' && fallback !== null) {
+                                          const s = String(fallback || '').trim();
+                                          if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                                      }
+                                      return 3;
+                                  })(updated.eisenhowerQuadrant, form.quadrant || t.quadrant),
                                   goal: form.goal || t.goal,
                                   tags: form.tags || t.tags,
                                   time: form.time || t.time,
@@ -577,6 +945,12 @@ export default function DontForget() {
                             : t,
                     ),
                 );
+                // If listIndex changed, persist it locally
+                try {
+                    if (form.listIndex !== undefined) {
+                        setDfTaskListMap((prev) => ({ ...(prev || {}), [id]: form.listIndex }));
+                    }
+                } catch (e) {}
             }
             setEditModal({ open: false, id: null, form: null });
             markSaving(id);
@@ -595,7 +969,7 @@ export default function DontForget() {
             description: f.notes || "",
             assignee: f.assignee || "",
             status: f.status || "open",
-            priority: f.priority || "normal",
+            priority: getPriorityLevel(f.priority),
             start_date: f.start_date || "",
             end_date: f.end_date || "",
             deadline: f.dueDate || "",
@@ -631,6 +1005,12 @@ export default function DontForget() {
             // If moved to a Key Area, remove from DF and open in Key Areas
             if (payload.key_area_id) {
                 setTasks((prev) => prev.filter((t) => t.id !== id));
+                try {
+                    setDfTaskListMap((prev) => {
+                        const { [id]: _removed, ...rest } = prev || {};
+                        return rest;
+                    });
+                } catch (e) {}
                 navigate({ pathname: "/key-areas", search: `?ka=${payload.key_area_id}&openKA=1&task=${id}` });
             } else {
                 setTasks((prev) =>
@@ -646,8 +1026,15 @@ export default function DontForget() {
                                   dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : payload.deadline || "",
                                   duration: updated.duration || payload.duration || "",
                                   status: updated.status || payload.status || "open",
-                                  priority: updated.priority || payload.priority || "normal",
-                                  quadrant: updated.eisenhowerQuadrant ? `Q${updated.eisenhowerQuadrant}` : payload.quadrant || t.quadrant,
+                                  priority: getPriorityLevel(updated.priority ?? payload.priority),
+                                  quadrant: (function (v, fallback) {
+                                      if (typeof v !== 'undefined' && v !== null) return Number(v);
+                                      if (typeof fallback !== 'undefined' && fallback !== null) {
+                                          const s = String(fallback || '').trim();
+                                          if (/^Q?\d$/.test(s)) return Number(s.replace(/^Q/, '')) || 3;
+                                      }
+                                      return 3;
+                                  })(updated.eisenhowerQuadrant, payload.quadrant || t.quadrant),
                                   goal: payload.goal || t.goal,
                                   tags: payload.tags || t.tags,
                                   time: payload.time || t.time,
@@ -656,6 +1043,12 @@ export default function DontForget() {
                             : t,
                     ),
                 );
+                // Persist any list_index changes from external edit modal
+                try {
+                    if (payload.list_index !== undefined) {
+                        setDfTaskListMap((prev) => ({ ...(prev || {}), [id]: payload.list_index }));
+                    }
+                } catch (e) {}
             }
             setEditModal({ open: false, id: null, form: null });
             markSaving(id);
@@ -719,7 +1112,30 @@ export default function DontForget() {
             // If tasks were moved to a key area, remove them from DF view
             if (payload.key_area_id) {
                 setTasks((prev) => prev.filter((t) => !selectedIds.has(t.id)));
+                // Remove mapping for moved tasks
+                try {
+                    setDfTaskListMap((prev) => {
+                        const next = { ...(prev || {}) };
+                        ids.forEach((id) => {
+                            delete next[id];
+                        });
+                        return next;
+                    });
+                } catch (e) {}
             }
+
+            // If mass edit included list_index updates, persist them
+            try {
+                if (payload.list_index !== undefined) {
+                    setDfTaskListMap((prev) => {
+                        const next = { ...(prev || {}) };
+                        ids.forEach((id) => {
+                            next[id] = payload.list_index;
+                        });
+                        return next;
+                    });
+                }
+            } catch (e) {}
 
             ids.forEach((id) => markSaving(id, 800));
             setEditModal({ open: false, id: null, form: null });
@@ -749,6 +1165,13 @@ export default function DontForget() {
         try {
             await (await getTaskService()).update(task.id, { keyAreaId: payload.key_area_id });
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
+            // Remove any local DF mapping for the moved task
+            try {
+                setDfTaskListMap((prev) => {
+                    const { [task.id]: _removed, ...rest } = prev || {};
+                    return rest;
+                });
+            } catch (e) {}
             setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 });
             navigate({ pathname: "/key-areas", search: `?ka=${payload.key_area_id}&openKA=1&task=${task.id}` });
         } catch (e) {
@@ -773,7 +1196,7 @@ export default function DontForget() {
                 />
             )}
 
-            <main className="flex-1 p-4 sm:p-6">
+            <main className="flex-1 min-w-0 w-full transition-all ml-0 md:ml-[3mm]">
                 {/* Mobile menu button */}
                 <button
                     className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
@@ -781,22 +1204,175 @@ export default function DontForget() {
                 >
                     <FaBars className="h-5 w-5 text-gray-600" />
                 </button>
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    {viewMode === "dont-forget" ? (
-                        <div className="p-6">
-                            {/* Page header */}
-                            <div className="flex items-center gap-3 mb-4">
-                                <img
-                                    alt="Don't forget"
-                                    className="w-8 h-8 object-contain"
-                                    src={`${import.meta.env.BASE_URL}dont-forget.png`}
-                                    onError={(e) => {
-                                        if (e?.currentTarget) e.currentTarget.src = "/dont-forget.png";
+                {selectedTask ? (
+                    <div>
+                        <div className="bg-white rounded-xl border border-slate-200">
+                            <div className="bg-white rounded-xl border border-slate-200">
+                                <TaskFullView
+                                    task={selectedTask}
+                                    goals={goals}
+                                    users={users}
+                                    // DontForget does not fetch activities; provide empty map
+                                    activitiesByTask={{}}
+                                    onBack={() => setSelectedTask(null)}
+                                    onSave={async (payload) => {
+                                        try {
+                                            const updated = await (await getTaskService()).update(selectedTask.id, payload);
+                                            setTasks((prev) => prev.map((t) =>
+                                                t.id === selectedTask.id
+                                                    ? {
+                                                          ...t,
+                                                          name: updated.title,
+                                                          notes: updated.description || t.notes || "",
+                                                          assignee: updated.assignee || t.assignee || "",
+                                                          start_date: updated.startDate ? updated.startDate.slice(0, 10) : t.start_date || "",
+                                                          end_date: updated.endDate ? updated.endDate.slice(0, 10) : t.end_date || "",
+                                                          dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : t.dueDate || "",
+                                                          duration: updated.duration || t.duration || "",
+                                                          status: updated.status || t.status || "open",
+                                                          priority: getPriorityLevel(updated.priority ?? t.priority),
+                                                      }
+                                                    : t
+                                            ));
+                                            setSelectedTask(null);
+                                        } catch (e) {
+                                            console.error('Failed to save task from full view', e);
+                                            throw e;
+                                        }
                                     }}
+                                    onDelete={async (tsk) => {
+                                        await deleteTask(tsk.id);
+                                        setSelectedTask(null);
+                                    }}
+                                    onRequestEdit={(tsk) => {
+                                        try {
+                                            // eslint-disable-next-line no-console
+                                            console.log('[DontForget] onRequestEdit received for task', tsk && tsk.id);
+                                        } catch (e) {}
+                                        const form = {
+                                            name: tsk.name || "",
+                                            notes: tsk.notes || "",
+                                            assignee: tsk.assignee || "",
+                                            status: tsk.status || "open",
+                                            priority: getPriorityLevel(tsk.priority),
+                                            start_date: tsk.start_date || "",
+                                            end_date: tsk.end_date || "",
+                                            dueDate: tsk.dueDate || "",
+                                            duration: tsk.duration || "",
+                                            keyAreaId: "",
+                                            listIndex: tsk.listIndex || 1,
+                                            goal: tsk.goal || "",
+                                            tags: tsk.tags || "",
+                                            time: tsk.time || "",
+                                            completionDate: tsk.completionDate || null,
+                                        };
+                                        setEditModal({ open: true, id: tsk.id, form });
+                                        setMassEditingMode(false);
+                                    }}
+                                    // activity-saving props removed for DontForget
+                                    isDontForget={true}
+                                    kaTitle={"Don't Forget"}
+                                    allTasks={tasks}
+                                    listNumbers={availableDfLists}
+                                    listNames={dfListNames}
                                 />
-                                <h2 className="text-xl font-semibold text-slate-900">Don't Forget</h2>
+
+                                {/* Edit modal must be available while TaskFullView is open */}
+                                <EditTaskModal
+                                    isOpen={Boolean(editModal.open)}
+                                    initialData={_mapEditInitial()}
+                                    onCancel={() => {
+                                        setEditModal({ open: false, id: null, form: null });
+                                        setMassEditingMode(false);
+                                    }}
+                                    onSave={(payload) => {
+                                        if (massEditingMode) return handleMassEditSave(payload);
+                                        return handleEditModalSave(payload);
+                                    }}
+                                    isSaving={editModal.id ? savingIds.has(editModal.id) : false}
+                                    keyAreas={dfKeyAreas}
+                                    availableLists={availableDfLists}
+                                    parentListNames={dfListNames}
+                                    users={users}
+                                    goals={goals}
+                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : undefined}
+                                />
+                                {/* Activity composer removed from DontForget */}
+                                <EditTaskModal
+                                    isOpen={Boolean(assignModal.open)}
+                                    initialData={_mapAssignInitial()}
+                                    onCancel={() => setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 })}
+                                    onSave={(payload) => handleAssignSave({ key_area_id: payload.key_area_id || payload.keyAreaId || assignModal.kaId })}
+                                    isSaving={false}
+                                    keyAreas={dfKeyAreas}
+                                    availableLists={availableDfLists}
+                                    parentListNames={dfListNames}
+                                    users={users}
+                                    goals={goals}
+                                />
                             </div>
-                            <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
+                        </div>
+                    </div>
+                ) : (
+                    <main class="flex-1 min-w-0 w-full transtion-all ml-0 md:ml-[300]">
+                    <div className="overflow-hidden">
+                        {viewMode === "dont-forget" ? (
+                            <div className="max-w-full overflow-x-hidden">
+                                <div className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6">
+                                    <div className="flex items-center gap-2 w-full">
+                                        {/* mobile sidebar toggle */}
+                                        <button
+                                            className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
+                                            onClick={() => setMobileSidebarOpen(true)}
+                                            aria-label="Open menu"
+                                        >
+                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path></svg>
+                                        </button>
+                                        <button
+                                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                            aria-label="Back"
+                                            style={{ minWidth: 36, minHeight: 36 }}
+                                            onClick={() => navigate(-1)}
+                                        >
+                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M34.52 239.03L228.87 44.69c9.37 9.37 24.57 9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path></svg>
+                                        </button>
+
+                                        <div className="inline-flex items-center gap-1">
+                                            <img
+                                                alt="Don't forget"
+                                                className="w-7 h-7 md:w-8 md:h-8 object-contain"
+                                                src={`${import.meta.env.BASE_URL}dont-forget.png`}
+                                                onError={(e) => {
+                                                    if (e?.currentTarget) e.currentTarget.src = "/dont-forget.png";
+                                                }}
+                                            />
+                                            <span className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1" style={{ color: 'rgba(196, 118, 15, 1)' }}>Don't Forget</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="ml-auto flex items-center gap-2">
+                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" className="text-slate-700 mr-2" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
+                                            <input placeholder={`Search tasks in "Don't Forget"…`} className="bg-transparent outline-none text-sm w-40 sm:w-56" value={''} />
+                                        </div>
+                                        <select className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm" title="Focus quadrant">
+                                            <option value="all">All Quadrants</option>
+                                            <option value="1">Q1 • Important &amp; Urgent</option>
+                                            <option value="2">Q2 • Important, Not Urgent</option>
+                                            <option value="3">Q3 • Not Important, Urgent</option>
+                                            <option value="4">Q4 • Not Important, Not Urgent</option>
+                                        </select>
+                                        <div className="relative">
+                                            <button className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50" aria-haspopup="menu" aria-expanded={false}>View
+                                                <svg className="w-4 h-4 transition-transform rotate-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mb-4">
+                                    <div className="max-w-7xl mx-auto p-6">
+                                        <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
                                 {/* Header area */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="col-span-3 md:col-span-2">
@@ -811,9 +1387,14 @@ export default function DontForget() {
                                                 {availableDfLists.map((n) => (
                                                     <div className="relative" key={`df-list-${n}`}>
                                                         <button
-                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition bg-white text-slate-900 border-slate-300 shadow"
+                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition ${
+                                                                selectedDfList === n
+                                                                    ? 'bg-white text-slate-900 border-slate-300 shadow'
+                                                                    : 'bg-transparent text-slate-800 border-transparent hover:bg-slate-200'
+                                                            }`}
                                                             title={`List ${n}`}
                                                             type="button"
+                                                            onClick={() => setSelectedDfList(n)}
                                                         >
                                                             <span>{getDfListName(n)}</span>
                                                             <span
@@ -824,8 +1405,7 @@ export default function DontForget() {
                                                                 role="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    const rect =
-                                                                        e.currentTarget.getBoundingClientRect();
+                                                                    const rect = e.currentTarget.getBoundingClientRect();
                                                                     const scrollX = window.scrollX;
                                                                     const scrollY = window.scrollY;
                                                                     // Match Key Areas: place below the icon, left-aligned
@@ -864,6 +1444,7 @@ export default function DontForget() {
                                                                         left: `${dfListMenuPos.left}px`,
                                                                     }}
                                                                 >
+                                                                    {/* Edit description removed per request */}
                                                                     <button
                                                                         role="menuitem"
                                                                         className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
@@ -889,7 +1470,7 @@ export default function DontForget() {
                                                 <div className="flex items-center">
                                                     <button
                                                         title="Add list"
-                                                        className="px-2 py-1 rounded-lg border bg-white text-slate-800 hover:bg-slate-50"
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border transition bg-transparent text-slate-800 border-transparent hover:bg-slate-200"
                                                         onClick={addDfList}
                                                     >
                                                         <svg
@@ -932,87 +1513,112 @@ export default function DontForget() {
                                     </div>
                                 </div>
                                 {/* Mass edit now uses the shared EditTaskModal component. Click "Mass Edit" to open it pre-filled from the first selected task. */}
-                                <div className="overflow-x-auto -mx-2 sm:mx-0">
-                                    <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
-                                        <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                            <tr>
-                                                <th className="px-2 sm:px-3 py-2 text-left w-8">
-                                                    <input
-                                                        aria-label="Select all visible"
-                                                        type="checkbox"
-                                                        onChange={toggleSelectAllVisible}
-                                                        checked={
-                                                            dontForgetTasks.length > 0 &&
-                                                            dontForgetTasks.every((t) => isSelected(t.id))
-                                                        }
-                                                    />
-                                                </th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Assignee</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white">
-                                            {dontForgetTasks.map((task) => (
-                                                <TaskRow
-                                                    key={task.id}
-                                                    t={{ ...task, title: task.name, deadline: task.dueDate }}
-                                                    q={task.quadrant}
-                                                    goals={goals}
-                                                    goalMap={null}
-                                                    isSelected={isSelected(task.id)}
-                                                    onToggleSelect={() => toggleSelect(task.id)}
-                                                    onOpenTask={() => openDfTaskEditor(task)}
-                                                    onStatusChange={(s) => setStatus(task.id, s)}
-                                                    onToggleActivitiesRow={() => {}}
-                                                    activityCount={0}
-                                                    getPriorityLevel={null}
-                                                    toDateOnly={toDateOnly}
-                                                    formatDuration={formatDurationDays}
-                                                    onMouseEnter={() => {}}
-                                                    expandedActivity={false}
-                                                    isSaving={savingIds.has(task.id)}
-                                                />
-                                            ))}
-
-                                            <tr className="bg-gray-50">
-                                                <td className="px-4 py-3" />
-                                                <td className="pl-2 pr-6 py-3" colSpan={3}>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowComposer(true)}
-                                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                                            title="Open Add Task dialog"
-                                                        >
-                                                            Add Task
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-
-                                            {dontForgetTasks.length === 0 && (
+                                    <div className="overflow-x-auto -mx-2 sm:mx-0">
+                                        <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
+                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                 <tr>
-                                                    <td className="px-6 py-8 text-gray-500" colSpan={4}>
-                                                        No items yet
-                                                    </td>
+                                                    <th className="px-2 sm:px-3 py-2 text-left w-8">
+                                                        <input
+                                                            aria-label="Select all visible"
+                                                            type="checkbox"
+                                                            onChange={toggleSelectAllVisible}
+                                                            checked={
+                                                                dontForgetTasks.length > 0 &&
+                                                                dontForgetTasks.every((t) => isSelected(t.id))
+                                                            }
+                                                        />
+                                                    </th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Assignee</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
+                                                    <th className="px-2 sm:px-3 py-2 text-center font-semibold w-24">Actions</th>
                                                 </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="bg-white">
+                                                {dontForgetTasks.map((task) => (
+                                                    <TaskRow
+                                                        key={task.id}
+                                                        t={{ ...task, title: task.name, deadline: task.dueDate }}
+                                                        q={task.quadrant}
+                                                        goals={goals}
+                                                        goalMap={null}
+                                                        disableOpen={true}
+                                                        isSelected={isSelected(task.id)}
+                                                        onToggleSelect={() => toggleSelect(task.id)}
+                                                        onOpenTask={() => openFullTaskView(task)}
+                                                        onStatusChange={(s) => setStatus(task.id, s)}
+                                                        onToggleActivitiesRow={() => {}}
+                                                        activityCount={0}
+                                                        getPriorityLevel={null}
+                                                        toDateOnly={toDateOnly}
+                                                        formatDuration={formatDurationDays}
+                                                        onMouseEnter={() => {}}
+                                                        expandedActivity={false}
+                                                        onEditClick={() => {
+                                                            const form = {
+                                                                name: task.name || "",
+                                                                notes: task.notes || "",
+                                                                assignee: task.assignee || "",
+                                                                status: task.status || "open",
+                                                                priority: getPriorityLevel(task.priority || undefined),
+                                                                start_date: task.start_date || "",
+                                                                end_date: task.end_date || "",
+                                                                dueDate: task.dueDate || "",
+                                                                duration: task.duration || "",
+                                                                keyAreaId: "",
+                                                                listIndex: task.listIndex || 1,
+                                                                goal: task.goal || "",
+                                                                tags: task.tags || "",
+                                                                time: task.time || "",
+                                                                completionDate: task.completionDate || null,
+                                                            };
+                                                            setEditModal({ open: true, id: task.id, form });
+                                                            setMassEditingMode(false);
+                                                        }}
+                                                        onDeleteClick={() => deleteTask(task.id)}
+                                                    />
+                                                ))}
+
+                                                {/* Footer action: moved out of table into a right-aligned div below */}
+
+                                                {dontForgetTasks.length === 0 && (
+                                                    <tr>
+                                                        <td className="px-6 py-8 text-gray-500" colSpan={13}>
+                                                            {`This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="flex justify-end pr-10 pt-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                // ensure composer defaults to selected DF list
+                                                setShowComposer(true);
+                                            }}
+                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            aria-label="Add task"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                            Add Task
+                                        </button>
+                                    </div>
+
                                     <CreateTaskModal
                                         isOpen={Boolean(showComposer)}
-                                        initialData={{}}
+                                        initialData={{ list_index: selectedDfList || (availableDfLists && availableDfLists[0]) || 1 }}
                                         onSave={(data) => {
                                             // CreateTaskModal returns fields like title, deadline, key_area_id, list_index
                                             // normalize names to the existing addDontForgetTask expectations
@@ -1030,6 +1636,7 @@ export default function DontForget() {
                                             isSaving={false}
                                             keyAreas={dfKeyAreas}
                                             availableLists={availableDfLists}
+                                            parentListNames={dfListNames}
                                             users={users}
                                             goals={goals}
                                     />
@@ -1048,10 +1655,13 @@ export default function DontForget() {
                                     isSaving={editModal.id ? savingIds.has(editModal.id) : false}
                                     keyAreas={dfKeyAreas}
                                     availableLists={availableDfLists}
+                                    parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
                                     modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : undefined}
                                 />
+
+                                {/* Activity composer removed from DontForget */}
 
                                 <EditTaskModal
                                     isOpen={Boolean(assignModal.open)}
@@ -1061,15 +1671,20 @@ export default function DontForget() {
                                     isSaving={false}
                                     keyAreas={dfKeyAreas}
                                     availableLists={availableDfLists}
+                                    parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
                                 />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="p-6 text-gray-500">Select a view.</div>
-                    )}
-                </div>
+                        ) : (
+                            <div className="p-6 text-gray-500">Select a view.</div>
+                        )}
+                    </div>
+                    </main>
+                )}
             </main>
         </div>
     );

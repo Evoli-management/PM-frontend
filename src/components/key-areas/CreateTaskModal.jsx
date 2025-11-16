@@ -36,6 +36,8 @@ export default function CreateTaskModal({
   users = [],
   goals = [],
   availableLists = [1],
+  // parentListNames: optional mapping passed by parent when no key area is selected
+  parentListNames = null,
 }) {
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
@@ -198,6 +200,35 @@ export default function CreateTaskModal({
     };
   }, [isOpen]);
 
+  // When a specific Key Area is selected while creating a task, fetch tasks for that
+  // key area so the List dropdown can include any list_index values already used by
+  // tasks in that area. This keeps the dropdown up-to-date without needing to load
+  // all tasks for the entire workspace.
+  useEffect(() => {
+    if (!isOpen || !keyAreaId) return;
+    let ignore = false;
+    (async () => {
+      try {
+        const tsMod = await import('../../services/taskService').catch(() => null);
+        const taskSvc = tsMod?.default || tsMod;
+        if (!taskSvc) return;
+        const tasksForArea = await taskSvc.list({ keyAreaId }).catch(() => []);
+        if (ignore) return;
+        setAllTasks((prev) => {
+          try {
+            if (_idsOf(prev) === _idsOf(tasksForArea)) return prev;
+          } catch (_) {}
+          return tasksForArea;
+        });
+      } catch (e) {
+        if (!ignore) setAllTasks([]);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, keyAreaId]);
+
   useEffect(() => {
     const kaId = keyAreaId;
     if (!kaId) {
@@ -213,6 +244,18 @@ export default function CreateTaskModal({
       setListNames({});
     }
   }, [keyAreaId, localKeyAreas, keyAreas]);
+
+  // If the availableLists prop updates after the modal opened (for example when
+  // DontForget computes its available lists asynchronously), default the list
+  // index to the first available value so the dropdown reflects the latest data.
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      if ((!listIndex || listIndex === 0) && Array.isArray(availableLists) && availableLists.length) {
+        setListIndex(availableLists[0]);
+      }
+    } catch (_) {}
+  }, [availableLists, isOpen]);
 
   useEffect(() => {
     if (!goals || !Array.isArray(goals)) return;
@@ -256,7 +299,9 @@ export default function CreateTaskModal({
       priority,
       status,
       key_area_id: keyAreaId || null,
+      // include both snake_case and camelCase for compatibility; prefer camelCase server-side
       list_index: listIndex,
+      listIndex: listIndex,
       goal_id: goal || null,
     };
     if (!onSave) {
@@ -272,20 +317,20 @@ export default function CreateTaskModal({
   };
 
   const inputCls =
-    'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100';
+    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50';
   const dateCls = `${inputCls} appearance-none pr-11 no-calendar`;
   const selectCls = `${inputCls} appearance-none pr-10`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      <div className="relative z-10 w-[820px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+  <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
         <style>{`
           .no-calendar::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
           .no-calendar::-webkit-clear-button, .no-calendar::-webkit-inner-spin-button { display: none; -webkit-appearance: none; }
           .no-calendar::-ms-clear { display: none; }
         `}</style>
-        <div className="relative px-5 py-3 border-b border-slate-200">
+  <div className="relative px-5 py-2 border-b border-slate-200">
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
             Create Task
           </h3>
@@ -301,7 +346,7 @@ export default function CreateTaskModal({
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="px-5 pb-5 pt-3 space-y-3">
+  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2">
           <div>
             <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
             <input
@@ -315,13 +360,13 @@ export default function CreateTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="grid grid-rows-6 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-rows-5 gap-0">
               <div>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
                   name="description"
-                  className={`${inputCls} mt-0.5`}
+                  className={`${inputCls} mt-0`}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Brief description"
@@ -330,7 +375,7 @@ export default function CreateTaskModal({
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <input
                     ref={startRef}
                     name="start_date"
@@ -372,7 +417,7 @@ export default function CreateTaskModal({
 
               <div>
                 <label className="text-sm font-medium text-slate-700">End date</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <input
                     ref={endRef}
                     name="end_date"
@@ -443,7 +488,7 @@ export default function CreateTaskModal({
                     📅
                   </button>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">No later than</p>
+                <p className="mt-0 text-xs text-slate-500">No later than</p>
               </div>
 
               <div>
@@ -458,10 +503,10 @@ export default function CreateTaskModal({
               </div>
             </div>
 
-            <div className="grid grid-rows-6 gap-2">
+              <div className="grid grid-rows-5 gap-0">
               <div>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="key_area_id"
                     className={selectCls}
@@ -473,13 +518,13 @@ export default function CreateTaskModal({
                       <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">List</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="list_index"
                     className={selectCls}
@@ -488,6 +533,17 @@ export default function CreateTaskModal({
                   >
                     {
                       (() => {
+                        // If no key area is selected (DontForget flow), prefer the
+                        // `availableLists` prop (computed by the parent) so DF list
+                        // numbers are respected. Otherwise, compute from key area
+                        // listNames and tasks in that area.
+                        if (!keyAreaId) {
+                          const useLists = (availableLists && availableLists.length) ? availableLists : [1];
+                          return useLists.map((n) => (
+                            <option key={n} value={n}>{(parentListNames && parentListNames[n]) || (listNames && listNames[n]) || `List ${n}`}</option>
+                          ));
+                        }
+
                         const named = Object.keys(listNames || {})
                           .map(Number)
                           .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
@@ -504,13 +560,13 @@ export default function CreateTaskModal({
                       })()
                     }
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Assignee</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="assignee"
                     className={selectCls}
@@ -520,13 +576,13 @@ export default function CreateTaskModal({
                     <option value="">— Unassigned —</option>
                     {(usersList || []).map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="priority"
                     className={selectCls}
@@ -537,13 +593,13 @@ export default function CreateTaskModal({
                     <option value={2}>Normal</option>
                     <option value={3}>High</option>
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="goal"
                     className={selectCls}
@@ -555,18 +611,18 @@ export default function CreateTaskModal({
                       <option key={g.id} value={g.id}>{g.title}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="mt-6 flex items-center justify-between">
-            <span />
-            <div className="flex items-center gap-2">
-              <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"><FaSave /> OK</button>
-              <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-            </div>
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
+              Save
+            </button>
+            <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
           </div>
         </form>
       </div>

@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FaSave } from 'react-icons/fa';
+import Modal from '../shared/Modal';
+import { getPriorityLevel } from '../../utils/keyareasHelpers';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -37,6 +39,10 @@ export default function EditActivityModal({
   tasks = [],
   availableLists = [1],
 }) {
+  const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
+  const [localTasks, setLocalTasks] = useState(tasks || []);
+  const [localGoals, setLocalGoals] = useState(goals || []);
+  const [listNamesMap, setListNamesMap] = useState({});
   const [title, setTitle] = useState(initialData.text || initialData.activity_name || '');
   const [description, setDescription] = useState(initialData.notes || initialData.description || '');
   const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate));
@@ -51,7 +57,7 @@ export default function EditActivityModal({
   );
   const [taskId, setTaskId] = useState(initialData.taskId || initialData.task_id || initialData.task || '');
   const [assignee, setAssignee] = useState(initialData.responsible || initialData.assignee || '');
-  const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 2);
+  const [priority, setPriority] = useState(getPriorityLevel(initialData.priority ?? initialData.priority_level ?? 2));
   const [goal, setGoal] = useState(initialData.goal || '');
   const startRef = useRef(null);
   const endRef = useRef(null);
@@ -59,19 +65,69 @@ export default function EditActivityModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    try { console.debug('[EditActivityModal] opening with initialData', initialData, { keyAreasLength: (keyAreas||[]).length, tasksLength: (tasks||[]).length }); } catch (__) {}
     setTitle(initialData.text || initialData.activity_name || '');
     setDescription(initialData.notes || initialData.description || '');
-    setStartDate(safeDate(initialData.date_start || initialData.startDate));
-    setEndDate(safeDate(initialData.date_end || initialData.endDate));
-    setDeadline(safeDate(initialData.deadline || initialData.dueDate));
+  // Try multiple possible date aliases to maximize chance of prefill
+  setStartDate(safeDate(initialData.date_start ?? initialData.dateStart ?? initialData.startDate ?? initialData.start_date ?? initialData.date));
+  setEndDate(safeDate(initialData.date_end ?? initialData.endDate ?? initialData.end_date ?? initialData.date_end));
+  setDeadline(safeDate(initialData.deadline ?? initialData.dueDate ?? initialData.due_date ?? initialData.deadline));
     setDuration(initialData.duration || '');
-    setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || (keyAreas[0] && keyAreas[0].id) || '');
+  setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || (keyAreas[0] && keyAreas[0].id) || '');
     setListIndex(initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1);
-    setTaskId(initialData.taskId || initialData.task_id || initialData.task || '');
-    setAssignee(initialData.responsible || initialData.assignee || '');
-    setPriority(initialData.priority ?? initialData.priority_level ?? 2);
+  setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
+    // If activity doesn't carry an assignee, prefer the parent task's assignee (if available)
+    const initialAssignee = initialData.responsible || initialData.assignee || '';
+    if (initialAssignee) setAssignee(initialAssignee);
+    else {
+      try {
+        const lookupTasks = (localTasks && localTasks.length) ? localTasks : (tasks && tasks.length ? tasks : []);
+        const tid = initialData.taskId || initialData.task_id || initialData.task || null;
+        if (tid) {
+          const parent = lookupTasks.find((t) => String(t.id) === String(tid));
+          if (parent && (parent.assignee || parent.responsible)) setAssignee(parent.assignee || parent.responsible || '');
+        }
+      } catch (e) {}
+    }
+  setPriority(getPriorityLevel(initialData.priority ?? initialData.priority_level ?? 2));
     setGoal(initialData.goal || '');
   }, [isOpen, initialData, keyAreas, availableLists]);
+
+  // Load key areas, tasks and goals when modal opens so Task and List dropdowns
+  // are populated even if parent didn't pass full lists. This mirrors EditTaskModal.
+  useEffect(() => {
+    if (!isOpen) return;
+    let ignore = false;
+    (async () => {
+      try {
+        const kaMod = await import('../../services/keyAreaService');
+        const kaSvc = kaMod?.default || kaMod;
+        const tsMod = await import('../../services/taskService').catch(() => null);
+        const taskSvc = tsMod?.default || tsMod;
+        const goalsMod = await import('../../services/goalService').catch(() => null);
+        const [areas, fetchedTasks, fetchedGoals] = await Promise.all([
+          kaSvc.list({ includeTaskCount: false }).catch(() => []),
+          taskSvc ? taskSvc.list({}).catch(() => []) : Promise.resolve([]),
+          goalsMod && goalsMod.getGoals ? goalsMod.getGoals().catch(() => []) : Promise.resolve([]),
+        ]);
+        if (ignore) return;
+        setLocalKeyAreas(Array.isArray(areas) ? areas : []);
+        setLocalTasks(Array.isArray(fetchedTasks) ? fetchedTasks : []);
+        setLocalGoals(Array.isArray(fetchedGoals) ? fetchedGoals : []);
+        // If a key area is already selected, set list names for it
+        try {
+          const kaId = initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || null;
+          if (kaId) {
+            const selected = (areas || []).find((k) => String(k.id) === String(kaId));
+            if (selected && selected.listNames) setListNamesMap(selected.listNames || {});
+          }
+        } catch (e) {}
+      } catch (e) {
+        // non-fatal
+      }
+    })();
+    return () => { ignore = true; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -91,6 +147,7 @@ export default function EditActivityModal({
       priority,
       goal: goal || null,
     };
+    try { console.debug('[EditActivityModal] onSave payload', payload); } catch (__) {}
     onSave && onSave(payload);
   };
 
@@ -99,18 +156,15 @@ export default function EditActivityModal({
     handleSave();
   };
 
-  // shared styles to match screenshot
+  // compact shared styles (match CreateTask/CreateActivity modals)
   const inputCls =
-    'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100';
+    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50';
   const dateCls = `${inputCls} appearance-none pr-11 no-calendar`;
   const selectCls = `${inputCls} appearance-none pr-10`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* overlay */}
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      {/* dialog */}
-      <div className="relative z-10 w-[820px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+    <Modal open={isOpen} onClose={onCancel}>
+      <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
         {/* hide native date picker icons for inputs with .no-calendar */}
         <style>{`
           .no-calendar::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
@@ -118,282 +172,202 @@ export default function EditActivityModal({
           .no-calendar::-ms-clear { display: none; }
         `}</style>
         {/* header - title centered, divider gray */}
-        <div className="relative px-5 py-3 border-b border-slate-200">
-          <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            Edit Activity
-          </h3>
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              className="p-2 rounded-full text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
-              onClick={onCancel}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+        <div className="relative px-5 py-2 border-b border-slate-200 text-center font-semibold text-slate-900">Edit Activity</div>
 
         {/* body */}
-  <form onSubmit={onSubmit} className="px-5 pb-5 pt-3 space-y-3">
-          {/* Title */}
-          <div>
-            <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">Activity name</label>
-            <input
-              id="ka-activity-title"
-              name="title"
-              required
-              className={`${inputCls} mt-0.5`}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Activity name"
-            />
-          </div>
+  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2">
+        <div className="mb-3">
+          <label className="text-sm font-medium text-slate-700 mb-0 block" htmlFor="ka-activity-title">Activity name</label>
+          <input
+            id="ka-activity-title"
+            name="title"
+            required
+            className={`${inputCls} mt-0 h-9 text-sm`}
+            placeholder="Activity name"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* LEFT column */}
-            <div className="grid grid-rows-6 gap-2">
-              <div>
-                <label className="text-sm font-medium text-slate-700">Description</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-rows-6 gap-2">
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-slate-700">Description</label>
+              <input
+                name="description"
+                className={`${inputCls} mt-0 h-9 text-sm`}
+                placeholder="Brief description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-slate-700">Start date</label>
+              <div className="relative mt-0">
                 <input
-                  name="description"
-                  className={`${inputCls} mt-0.5`}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Brief description"
+                  name="start_date"
+                  type="date"
+                  className={`${dateCls} h-9 pr-10 pl-3 text-sm hide-native-date-icon`}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  ref={startRef}
                 />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Start date</label>
-                <div className="relative mt-0.5">
-                  <input
-                    ref={startRef}
-                    name="start_date"
-                    type="date"
-                    className={dateCls}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        startRef.current?.showPicker?.();
-                        startRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">End date</label>
-                <div className="relative mt-0.5">
-                  <input
-                    ref={endRef}
-                    name="end_date"
-                    type="date"
-                    className={dateCls}
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        endRef.current?.showPicker?.();
-                        endRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Deadline</label>
-                <div className="relative mt-0.5">
-                  <input
-                    ref={deadlineRef}
-                    name="deadline"
-                    type="date"
-                    className={dateCls}
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        deadlineRef.current?.showPicker?.();
-                        deadlineRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-                <p className="mt-0.5 text-xs text-slate-500">No later than</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Duration</label>
-                <input
-                  name="duration"
-                  className={`${inputCls} mt-0.5`}
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="e.g., 1h, 1d"
-                />
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Open date picker"
+                  className="absolute inset-y-0 right-2 grid place-items-center text-sm cursor-pointer select-none"
+                  onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) {} }}
+                >📅</span>
               </div>
             </div>
 
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-slate-700">End date</label>
+              <div className="relative mt-0">
+                <input
+                  name="end_date"
+                  type="date"
+                  className={`${dateCls} h-9 pr-10 pl-3 text-sm hide-native-date-icon`}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  ref={endRef}
+                />
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Open date picker"
+                  className="absolute inset-y-0 right-2 grid place-items-center text-sm cursor-pointer select-none"
+                  onClick={() => { try { endRef.current?.showPicker?.(); endRef.current?.focus(); } catch (__) {} }}
+                >📅</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-slate-700">Deadline</label>
+              <div className="relative mt-0">
+                <input
+                  name="deadline"
+                  type="date"
+                  className={`${dateCls} h-9 pr-10 pl-3 text-sm hide-native-date-icon`}
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  ref={deadlineRef}
+                />
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Open date picker"
+                  className="absolute inset-y-0 right-2 grid place-items-center text-sm cursor-pointer select-none"
+                  onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}
+                >📅</span>
+              </div>
+              <p className="mt-0 text-xs text-slate-500">No later than</p>
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-slate-700">Duration</label>
+              <div className="relative mt-0">
+                <input
+                  name="duration"
+                  className={`${inputCls} h-9 pr-3 pl-3 text-sm`}
+                  placeholder="e.g., 1h, 1d"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+              </div>
+            </div>
+            <div aria-hidden="true" />
+          </div>
+
             {/* RIGHT column */}
-            <div className="grid grid-rows-6 gap-2">
-              <div>
+            <div className="grid grid-rows-6 gap-2 content-start">
+              <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
-                <div className="relative mt-0.5">
-                  <select
-                    name="key_area_id"
-                    className={selectCls}
-                    value={keyAreaId}
-                    onChange={(e) => setKeyAreaId(e.target.value)}
-                  >
+                <div className="relative mt-0">
+                  <select name="key_area_id" className={`${selectCls} mt-0 h-9`} value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
                     <option value="">— Select Key Area —</option>
-                    {keyAreas.map((ka) => (
-                      <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
-                    ))}
+                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (<option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div>
+              <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">List</label>
-                <div className="relative mt-0.5">
-                  <select
-                    name="list_index"
-                    className={selectCls}
-                    value={listIndex}
-                    onChange={(e) => setListIndex(Number(e.target.value))}
-                  >
-                    {availableLists.map((n) => (
-                      <option key={n} value={n}>List {n}</option>
-                    ))}
+                <div className="relative mt-0">
+                  <select name="list_index" className={`${selectCls} mt-0 h-9`} value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))}>
+                    {(availableLists && availableLists.length ? availableLists : [1]).map((n) => {
+                      const namesSource = (Object.keys(listNamesMap || {}).length ? listNamesMap : ((localKeyAreas && localKeyAreas.length) ? (localKeyAreas.find(k => String(k.id) === String(keyAreaId))?.listNames || {}) : {}));
+                      const label = namesSource && (namesSource[n] || namesSource[String(n)]) ? (namesSource[n] || namesSource[String(n)]) : `List ${n}`;
+                      return (<option key={n} value={n}>{label}</option>);
+                    })}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div>
+              <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">Task</label>
-                <div className="relative mt-0.5">
-                  <select
-                    name="task_id"
-                    className={selectCls}
-                    value={taskId}
-                    onChange={(e) => setTaskId(e.target.value)}
-                  >
+                <div className="relative mt-0">
+                  <select name="task_id" className={`${selectCls} mt-0 h-9`} value={taskId} onChange={(e) => setTaskId(e.target.value)}>
                     <option value="">— Select Task —</option>
-                    {tasks.map((t) => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))}
+                    {(localTasks && localTasks.length ? localTasks : tasks).map((t) => (<option key={t.id} value={t.id}>{t.title || t.name}</option>))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div>
+              <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">Assignee</label>
-                <div className="relative mt-0.5">
-                  <select
-                    name="assignee"
-                    className={selectCls}
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                  >
+                <div className="relative mt-0">
+                  <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.name}>{u.name}</option>
-                    ))}
+                    {users.map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div>
+              <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">Priority</label>
-                <div className="relative mt-0.5">
-                  <select
-                    name="priority"
-                    className={selectCls}
-                    value={String(priority)}
-                    onChange={(e) => setPriority(Number(e.target.value))}
-                  >
+                <div className="relative mt-0">
+                  <select name="priority" className={`${selectCls} mt-0 h-9`} value={String(priority)} onChange={(e) => setPriority(Number(e.target.value))}>
                     <option value={1}>Low</option>
                     <option value={2}>Normal</option>
                     <option value={3}>High</option>
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
-              <div>
+              <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">Goal</label>
-                <div className="relative mt-0.5">
-                  <select
-                    name="goal"
-                    className={selectCls}
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                  >
+                <div className="relative mt-0">
+                  <select name="goal" className={`${selectCls} mt-0 h-9`} value={goal} onChange={(e) => setGoal(e.target.value)}>
                     <option value="">— Select Goal —</option>
-                    {goals.map((g) => (
-                      <option key={g.id} value={g.id}>{g.title}</option>
-                    ))}
+                    {goals.map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
             </div>
           </div>
-
           {/* footer */}
-          <div className="mt-2 flex items-center justify-end gap-3">
-            <button
-              type="submit"
-              disabled={isSaving || !title.trim()}
-              onClick={(e) => {
-                // ensure click triggers save even if form submit gets blocked by browser
-                e.preventDefault();
-                if (!isSaving && title.trim()) {
-                  handleSave();
-                }
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-white font-medium shadow-sm hover:bg-blue-700 disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
-            >
-              <FaSave className="h-4 w-4" />
-              Save
+          <div className="flex items-center justify-end gap-2 w-full mt-2">
+            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
+              OK
             </button>
-            <button type="button" onClick={onCancel} className="px-3 py-2 text-slate-700 hover:underline">
-              Cancel
-            </button>
-            <button type="button" disabled className="px-3 py-2 text-slate-400">
-              Help
-            </button>
+            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button>
+            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
           </div>
         </form>
+        <button type="button" className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onCancel}>
+          <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 352 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"></path></svg>
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }

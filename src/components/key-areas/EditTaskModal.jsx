@@ -38,6 +38,8 @@ export default function EditTaskModal({
   users = [],
   goals = [],
   availableLists = [1],
+  // optional mapping of parent list names (used by DontForget)
+  parentListNames = {},
   // optional custom modal title (used for mass-editing banner)
   modalTitle = undefined,
 }) {
@@ -239,7 +241,8 @@ export default function EditTaskModal({
   useEffect(() => {
     const kaId = keyAreaId;
     if (!kaId) {
-      setListNames({});
+      // If no key area selected, prefer parent-provided list names (DontForget flow)
+      setListNames(parentListNames && Object.keys(parentListNames).length ? parentListNames : {});
       return;
     }
     const selectedArea = (localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).find(
@@ -250,7 +253,7 @@ export default function EditTaskModal({
     } else {
       setListNames({});
     }
-  }, [keyAreaId, localKeyAreas, keyAreas]);
+  }, [keyAreaId, localKeyAreas, keyAreas, parentListNames]);
 
   // Merge incoming goals prop into localGoals when it changes so newly-created goals become available
   useEffect(() => {
@@ -301,7 +304,9 @@ export default function EditTaskModal({
       status,
       key_area_id: keyAreaId || null,
       // backend and page expect `list_index` and `goal_id` keys
+      // include both snake_case and camelCase to be explicit and compatible
       list_index: listIndex,
+      listIndex: listIndex,
       goal_id: goal || null,
     };
     // payload prepared for save
@@ -319,7 +324,7 @@ export default function EditTaskModal({
 
   // shared styles to match existing UI
   const inputCls =
-    'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100';
+    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50';
   const dateCls = `${inputCls} appearance-none pr-11 no-calendar`;
   const selectCls = `${inputCls} appearance-none pr-10`;
 
@@ -328,15 +333,15 @@ export default function EditTaskModal({
       {/* overlay */}
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       {/* dialog */}
-      <div className="relative z-10 w-[820px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+  <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
         {/* hide native date picker icons for inputs with .no-calendar */}
         <style>{`
           .no-calendar::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
           .no-calendar::-webkit-clear-button, .no-calendar::-webkit-inner-spin-button { display: none; -webkit-appearance: none; }
           .no-calendar::-ms-clear { display: none; }
         `}</style>
-        {/* header - title centered, divider gray */}
-        <div className="relative px-5 py-3 border-b border-slate-200">
+  {/* header - title centered, divider gray */}
+  <div className="relative px-5 py-2 border-b border-slate-200">
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
             {modalTitle || 'Edit Task'}
           </h3>
@@ -352,8 +357,8 @@ export default function EditTaskModal({
           </div>
         </div>
 
-        {/* body */}
-        <form onSubmit={onSubmit} className="px-5 pb-5 pt-3 space-y-3">
+  {/* body */}
+  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2">
           {/* Title */}
           <div>
             <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
@@ -368,14 +373,14 @@ export default function EditTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {/* LEFT column */}
-            <div className="grid grid-rows-6 gap-2">
+            <div className="grid grid-rows-5 gap-0">
               <div>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
                   name="description"
-                  className={`${inputCls} mt-0.5`}
+                  className={`${inputCls} mt-0`}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Brief description"
@@ -384,7 +389,7 @@ export default function EditTaskModal({
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <input
                     ref={startRef}
                     name="start_date"
@@ -453,7 +458,7 @@ export default function EditTaskModal({
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Deadline</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <input
                     ref={deadlineRef}
                     name="deadline"
@@ -482,7 +487,7 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">No later than</p>
+                <p className="mt-0 text-xs text-slate-500">No later than</p>
               </div>
 
               <div>
@@ -498,10 +503,10 @@ export default function EditTaskModal({
             </div>
 
             {/* RIGHT column */}
-            <div className="grid grid-rows-6 gap-2">
+            <div className="grid grid-rows-5 gap-0">
               <div>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="key_area_id"
                     className={selectCls}
@@ -513,45 +518,54 @@ export default function EditTaskModal({
                       <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">List</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="list_index"
                     className={selectCls}
                     value={listIndex}
                     onChange={(e) => setListIndex(Number(e.target.value))}
                   >
-                    {// compute available lists using listNames and allTasks similar to other modals
-                      (() => {
-                        // prefer listNames for the selected key area
-                        const named = Object.keys(listNames || {})
-                          .map(Number)
-                          .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
-                        const listsWithTasks = (allTasks || [])
-                          .filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index)
-                          .map((t) => t.list_index)
-                          .filter((v, i, arr) => arr.indexOf(v) === i);
-                        const combined = [1, ...named, ...listsWithTasks];
-                        const uniq = [...new Set(combined)].sort((a, b) => a - b);
-                        const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
-                        return toUse.map((n) => (
-                          <option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>
-                        ));
-                      })()
+                      {// compute available lists using listNames and allTasks similar to other modals
+                        (() => {
+                          try {
+                            // Debug: log which listNames/availableLists are being used when the modal is open
+                            // eslint-disable-next-line no-console
+                            console.log('[EditTaskModal] keyAreaId, parentListNames, listNames, availableLists:', keyAreaId, parentListNames, listNames, availableLists);
+                          } catch (e) {}
+                          // prefer listNames for the selected key area
+                          const named = Object.keys(listNames || {})
+                            .map(Number)
+                            .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
+                          const listsWithTasks = (allTasks || [])
+                            .filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index)
+                            .map((t) => t.list_index)
+                            .filter((v, i, arr) => arr.indexOf(v) === i);
+                          const combined = [1, ...named, ...listsWithTasks];
+                          const uniq = [...new Set(combined)].sort((a, b) => a - b);
+                          const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
+                          try {
+                            // eslint-disable-next-line no-console
+                            console.log('[EditTaskModal] computed lists toUse:', toUse);
+                          } catch (e) {}
+                          return toUse.map((n) => (
+                            <option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>
+                          ));
+                        })()
                     }
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Assignee</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="assignee"
                     className={selectCls}
@@ -563,7 +577,7 @@ export default function EditTaskModal({
                       <option key={u.id} value={u.name}>{u.name}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
@@ -571,7 +585,7 @@ export default function EditTaskModal({
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="priority"
                     className={selectCls}
@@ -582,13 +596,13 @@ export default function EditTaskModal({
                     <option value={2}>Normal</option>
                     <option value={3}>High</option>
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
-                <div className="relative mt-0.5">
+                <div className="relative mt-0">
                   <select
                     name="goal"
                     className={selectCls}
@@ -600,38 +614,32 @@ export default function EditTaskModal({
                       <option key={g.id} value={g.id}>{g.title}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
               </div>
             </div>
           </div>
 
           {/* footer */}
-          <div className="mt-2 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-2 w-full">
             <button
               type="submit"
               disabled={isSaving || !title.trim()}
               onClick={(e) => {
-                  // ensure click triggers save even if form submit gets blocked by browser
-                  e.preventDefault();
-                  if (!isSaving && title.trim()) {
-                    handleSave();
-                  } else if (!title.trim()) {
-                    // provide quick feedback in console for disabled reason
-                    console.warn('EditTaskModal: Save not triggered because title is empty');
-                  }
-                }}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-white font-medium shadow-sm hover:bg-blue-700 disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                e.preventDefault();
+                if (!isSaving && title.trim()) {
+                  handleSave();
+                } else if (!title.trim()) {
+                  console.warn('EditTaskModal: Save not triggered because title is empty');
+                }
+              }}
+              className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
             >
-              <FaSave className="h-4 w-4" />
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
               Save
             </button>
-            <button type="button" onClick={onCancel} className="px-3 py-2 text-slate-700 hover:underline">
-              Cancel
-            </button>
-            <button type="button" disabled className="px-3 py-2 text-slate-400">
-              Help
-            </button>
+            <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
           </div>
         </form>
       </div>

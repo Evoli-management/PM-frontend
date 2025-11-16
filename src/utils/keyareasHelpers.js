@@ -64,15 +64,35 @@ export const computeEisenhowerQuadrant = ({ deadline, end_date, priority, key_ar
         else urgent = false;
     }
 
+    // Importance precedence: High priority should mark important even if
+    // the item is in the "Don't Forget" bucket (no key_area_id). Low
+    // priority marks not important. If a key area is assigned, treat
+    // it as more likely important unless explicitly low.
     const isDontForget = !key_area_id;
-    const notImportant = priority === 'low' || isDontForget;
-    const important = priority === 'high' || (!isDontForget && priority !== 'low');
-    const isImportant = notImportant ? false : important;
+    const isHighPriority = priority === 'high';
+    const isLowPriority = priority === 'low';
+    const isImportant = isHighPriority || (!isDontForget && !isLowPriority);
 
     if (isImportant && urgent) return 'Q1';
     if (isImportant && !urgent) return 'Q2';
     if (!isImportant && urgent) return 'Q3';
     return 'Q4';
+};
+
+export const getQuadrantColorClass = (q) => {
+    const n = Number(q) || 4;
+    // Use the same light-badge style as priority/status helpers for consistency
+    switch (n) {
+        case 1:
+            return { badge: 'bg-red-100 text-red-800' };
+        case 2:
+            return { badge: 'bg-amber-100 text-amber-800' };
+        case 3:
+            return { badge: 'bg-blue-100 text-blue-800' };
+        case 4:
+        default:
+            return { badge: 'bg-emerald-100 text-emerald-800' };
+    }
 };
 
 export const getPriorityLevel = (val) => {
@@ -162,11 +182,19 @@ export const normalizeActivity = (a = {}) => {
     const completed = a.completed ?? (String(status).toLowerCase() === "done") ?? false;
     const completionDate = a.completionDate || a.completion_date || a.completed_at || null;
     const date_start = a.startDate || a.date_start || a.date || null;
-    const date_end = a.endDate || a.date_end || null;
+    const date_end = a.endDate || a.date_end || a.end_date || null;
     const deadline = a.deadline || a.dueDate || a.due_date || null;
     const taskId = a.taskId || a.task_id || a.task || null;
     const priority = a.priority ?? a.priority_level ?? 2;
     const created_task_id = a.created_task_id ?? a.createdTaskId ?? null;
+    // assignee normalization: servers/older APIs may use different field names
+    const assignee = a.assignee ?? a.responsible ?? a.owner ?? a.assigned_to ?? a.assignee_name ?? null;
+    // key area / list / goal / notes / duration aliases
+    const key_area_id = a.key_area_id ?? a.keyAreaId ?? a.keyArea ?? a.ka_id ?? null;
+    const list = a.list ?? a.list_index ?? a.listIndex ?? a.parent_list ?? a.list_number ?? null;
+    const goal = a.goal ?? a.goalId ?? a.goal_id ?? a.goal_id ?? null;
+    const notes = a.description ?? a.note ?? a.notes ?? a.activity_notes ?? null;
+    const duration = a.duration ?? a.duration_minutes ?? null;
     return {
         ...a,
         id,
@@ -174,12 +202,31 @@ export const normalizeActivity = (a = {}) => {
         status,
         completed: !!completed,
         completionDate: completionDate || null,
+        // canonical fields
         date_start,
         date_end,
         deadline,
         taskId,
         priority,
         created_task_id,
+        // key area / list / goal / notes / duration
+        key_area_id: key_area_id || null,
+        list: list || null,
+        goal: goal || null,
+        notes: notes || null,
+        duration: duration || null,
+        // assignee aliases
+        assignee: assignee || null,
+        responsible: a.responsible ?? assignee ?? null,
+        owner: a.owner ?? assignee ?? null,
+        assigned_to: a.assigned_to ?? assignee ?? null,
+        // compatibility aliases: some components expect snake_case (start_date/end_date)
+        // while others expect camelCase (startDate/endDate). Provide both to avoid
+        // UI showing empty values when the server/creator returns a different shape.
+        start_date: a.start_date ?? a.startDate ?? date_start,
+        end_date: a.end_date ?? a.endDate ?? date_end,
+        startDate: a.startDate ?? a.start_date ?? date_start,
+        endDate: a.endDate ?? a.end_date ?? date_end,
     };
 };
 

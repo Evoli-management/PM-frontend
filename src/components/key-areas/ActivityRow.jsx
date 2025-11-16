@@ -59,7 +59,15 @@ const ActivityRow = ({
           <button type="button" className="text-red-600" title="Delete activity" onClick={() => remove && remove(a.id)}>
             <FaTrash />
           </button>
-          <button type="button" className="text-slate-700" title="Edit activity" onClick={() => onEdit && onEdit()}>
+          <button
+            type="button"
+            className="text-slate-700"
+            title="Edit activity"
+            onClick={(e) => {
+              try { e.stopPropagation(); } catch (__) {}
+              onEdit && onEdit();
+            }}
+          >
             <FaEdit />
           </button>
           <button

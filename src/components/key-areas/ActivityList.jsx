@@ -110,8 +110,15 @@ export default function ActivityList({
                             remove={remove}
                             onEdit={() => {
                                 try {
+                                    // Debug: log before dispatching the global edit event
+                                    // so we can trace whether the editor or composer flow runs.
+                                    // eslint-disable-next-line no-console
+                                    console.log('ActivityList: dispatching ka-open-activity-editor', { activity: a, taskId: task.id });
                                     window.dispatchEvent(new CustomEvent('ka-open-activity-editor', { detail: { activity: a, taskId: task.id } }));
-                                } catch {}
+                                } catch (err) {
+                                    // eslint-disable-next-line no-console
+                                    console.error('ActivityList: failed to dispatch ka-open-activity-editor', err);
+                                }
                             }}
                             onCreateAsTask={() => {
                                 if (a.created_task_id) return;

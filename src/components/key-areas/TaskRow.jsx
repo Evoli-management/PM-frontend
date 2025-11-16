@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import StatusIndicator from '../ui/StatusIndicator';
 import PriorityBadge from '../ui/PriorityBadge';
-import QuadrantBadge from '../ui/QuadrantBadge';
+import { getQuadrantColorClass } from '../../utils/keyareasHelpers';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 
 const TaskRow = ({
   t,
@@ -21,7 +22,26 @@ const TaskRow = ({
   formatDuration,
   onMouseEnter,
   expandedActivity,
+  onEditClick,
+  onDeleteClick,
+  disableOpen = false,
 }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
   return (
     <tr
       className="border-t border-slate-200 hover:bg-slate-50"
@@ -36,9 +56,9 @@ const TaskRow = ({
         />
       </td>
       <td
-        className="px-3 py-2 align-top cursor-pointer"
-        onClick={() => onOpenTask && onOpenTask(t)}
-        title="Open task"
+        className={`px-3 py-2 align-top ${disableOpen ? '' : 'cursor-pointer'}`}
+        onClick={disableOpen ? undefined : () => onOpenTask && onOpenTask(t)}
+        title={disableOpen ? undefined : 'Open task'}
       >
         <div className="flex items-start gap-2">
           {(() => {
@@ -55,17 +75,21 @@ const TaskRow = ({
               </span>
             );
           })()}
-          <button
-            type="button"
-            className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
-            title="Click to open task"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenTask && onOpenTask(t);
-            }}
-          >
-            {t.title}
-          </button>
+          {disableOpen ? (
+            <span className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 font-semibold'}`}>{t.title}</span>
+          ) : (
+            <button
+              type="button"
+              className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
+              title="Click to open task"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTask && onOpenTask(t);
+              }}
+            >
+              {t.title}
+            </button>
+          )}
           {isSaving && (
             <div className="text-xs text-blue-600 mt-1">Saving...</div>
           )}
@@ -106,7 +130,16 @@ const TaskRow = ({
         })()}
       </td>
       <td className="px-3 py-2 align-top">
-        <QuadrantBadge q={q} />
+        {(() => {
+          let qn = 4;
+          if (typeof q === 'number') qn = Number(q) || 4;
+          else if (typeof q === 'string') {
+            const m = q.match(/^Q?([1-4])$/i);
+            if (m) qn = Number(m[1]);
+          }
+          const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
+          return <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>;
+        })()}
       </td>
       <td className="px-3 py-2 align-top text-slate-800">
         {(() => {
@@ -157,15 +190,38 @@ const TaskRow = ({
       <td className="px-3 py-2 align-top text-slate-800">
         {t.completionDate ? <span>{new Date(t.completionDate).toLocaleString()}</span> : <span className="text-slate-500">—</span>}
       </td>
-      <td className="px-3 py-2 align-top text-center w-16">
-        <button
-          type="button"
-          title="Show activities inline"
-          onClick={onToggleActivitiesRow}
-          className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-semibold min-w-[1.5rem] border ${expandedActivity ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"}`}
-        >
-          {activityCount || 0}
-        </button>
+      <td className="px-3 py-2 align-top text-center w-24">
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            aria-label={`Edit ${t.title}`}
+            title="Edit task"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditClick && onEditClick();
+            }}
+            className="inline-flex items-center justify-center px-2 py-1 rounded text-sm font-medium border bg-white text-slate-700 hover:bg-slate-50"
+          >
+              <FaEdit className="w-3 h-3" />
+          </button>
+
+          <button
+            type="button"
+            aria-label={`Delete ${t.title}`}
+            title="Delete task"
+            onClick={(e) => {
+              e.stopPropagation();
+              // confirm before calling delete handler to avoid accidental removal
+              if (typeof onDeleteClick === 'function') {
+                const ok = window.confirm(`Delete task "${t.title}"?`);
+                if (ok) onDeleteClick();
+              }
+            }}
+            className="inline-flex items-center justify-center px-2 py-1 rounded text-sm font-medium border bg-white text-red-600 hover:bg-red-50"
+          >
+            <FaTrash className="w-3 h-3" />
+          </button>
+        </div>
       </td>
     </tr>
   );
