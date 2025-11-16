@@ -27,10 +27,13 @@ const mapStatusFromApi = (s) => {
 // FE uses: high | normal | low
 // BE expects: high | medium | low
 const mapPriorityToApi = (p) => {
+    // Accept both numeric (1/2/3) and string priorities from the UI
+    const raw = p;
     const v = String(p || "medium").toLowerCase();
-    if (v === "normal") return "medium";
-    if (v === "med") return "medium";
-    if (v === "high" || v === "low" || v === "medium") return v;
+    if (v === "1" || v === "low") return "low";
+    if (v === "2" || v === "normal" || v === "med" || v === "medium") return "medium";
+    if (v === "3" || v === "high") return "high";
+    // Fallback: return original string (may be already valid)
     return v;
 };
 
@@ -54,11 +57,27 @@ const taskService = {
         // We use a cache-busting query param instead.
         try {
             const res = await apiClient.get(base, { params });
-            return res.data.map((t) => ({
-                ...t,
-                status: mapStatusFromApi(t.status),
-                priority: mapPriorityFromApi(t.priority),
-            }));
+            return res.data.map((t) => {
+                // normalize possible goal id shapes into `goal_id` so UI can reliably look up titles
+                const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+                let gid = null;
+                if (rawGoal) {
+                    if (typeof rawGoal === 'object' && rawGoal !== null) {
+                        gid = rawGoal.id || rawGoal.goal_id || null;
+                    } else {
+                        gid = rawGoal;
+                    }
+                }
+                return {
+                    ...t,
+                    status: mapStatusFromApi(t.status),
+                    priority: mapPriorityFromApi(t.priority),
+                    goal_id: gid || null,
+                    // support both camelCase and snake_case from server
+                    list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+                    listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+                };
+            });
         } catch (e) {
             const status = e?.response?.status;
             const data = e?.response?.data;
@@ -73,24 +92,70 @@ const taskService = {
     async get(id) {
         const res = await apiClient.get(`${base}/${id}`);
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
+        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+        let gid = null;
+        if (rawGoal) {
+            if (typeof rawGoal === 'object' && rawGoal !== null) {
+                gid = rawGoal.id || rawGoal.goal_id || null;
+            } else {
+                gid = rawGoal;
+            }
+        }
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
+            list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+            listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+        };
     },
     async create(payload) {
+        // Normalize list index key so backend DTO (which expects camelCase)
+        // receives `listIndex` when callers pass `list_index` from UI components.
+        const body = { ...payload };
+        if (typeof body.listIndex === 'undefined' && typeof body.list_index !== 'undefined') {
+            body.listIndex = body.list_index;
+        }
         const res = await apiClient.post(base, {
-            ...payload,
-            status: mapStatusToApi(payload.status),
-            priority: mapPriorityToApi(payload.priority),
+            ...body,
+            status: mapStatusToApi(body.status),
+            priority: mapPriorityToApi(body.priority),
         });
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
+        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+        let gid = null;
+        if (rawGoal) {
+            if (typeof rawGoal === 'object' && rawGoal !== null) {
+                gid = rawGoal.id || rawGoal.goal_id || null;
+            } else {
+                gid = rawGoal;
+            }
+        }
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
+            list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+            listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+        };
     },
     async update(id, payload) {
         const data = { ...payload };
+        // Accept both snake_case and camelCase for list index coming from UI
+        if (typeof data.listIndex === 'undefined' && typeof data.list_index !== 'undefined') {
+            data.listIndex = data.list_index;
+        }
         if (data.status) data.status = mapStatusToApi(data.status);
         if (data.priority) data.priority = mapPriorityToApi(data.priority);
         const res = await apiClient.put(`${base}/${id}`, data);
         const t = res.data;
-        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority) };
+        const rawGoal = t.goal_id ?? t.goalId ?? t.goal ?? null;
+        let gid = null;
+        if (rawGoal) {
+            if (typeof rawGoal === 'object' && rawGoal !== null) {
+                gid = rawGoal.id || rawGoal.goal_id || null;
+            } else {
+                gid = rawGoal;
+            }
+        }
+        return { ...t, status: mapStatusFromApi(t.status), priority: mapPriorityFromApi(t.priority), goal_id: gid || null,
+            list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+            listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+        };
     },
     async remove(id) {
         const res = await apiClient.delete(`${base}/${id}`);
