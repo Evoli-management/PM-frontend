@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import CreateTaskModal from "../modals/CreateTaskModal.jsx";
-import CreateActivityModal from "../modals/CreateActivityModal.jsx";
+import React, { useState, useEffect, Suspense } from "react";
+const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 
 const CalendarView = () => {
     const [view, setView] = useState("monthly");
@@ -128,18 +128,34 @@ const CalendarView = () => {
 
             {/* Modals for Add Task and Add Activity */}
             {showCreateModal && defaultType === "task" && (
-                <CreateTaskModal
-                    isOpen={showCreateModal}
-                    onClose={() => setShowCreateModal(false)}
-                    initialData={{}}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                    <CreateTaskModal
+                        isOpen={showCreateModal}
+                        onCancel={() => setShowCreateModal(false)}
+                        onClose={() => setShowCreateModal(false)}
+                        initialData={{}}
+                    />
+                </Suspense>
             )}
             {showCreateModal && defaultType === "activity" && (
-                <CreateActivityModal
-                    isOpen={showCreateModal}
-                    onClose={() => setShowCreateModal(false)}
-                    initialData={{ attachedTaskId: modalItem?.attachedTaskId || "" }}
-                />
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                    <CreateActivityModal
+                        isOpen={showCreateModal}
+                        onCancel={() => setShowCreateModal(false)}
+                        initialData={{ taskId: modalItem?.attachedTaskId || "" }}
+                        onSave={async (payload) => {
+                            try {
+                                const mod = await import("../../services/activityService");
+                                const svc = mod?.default || mod;
+                                const toSend = { text: payload.text || payload.title || "", taskId: payload.taskId || payload.task_id || null, ...payload };
+                                await svc.create(toSend);
+                                setShowCreateModal(false);
+                            } catch (e) {
+                                console.error('Failed to create activity from calendar view', e);
+                            }
+                        }}
+                    />
+                </Suspense>
             )}
         </div>
     );

@@ -1,8 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
+import Modal from "../shared/Modal";
 import { useToast } from "../shared/ToastProvider.jsx";
-import keyAreaService from "../../services/keyAreaService";
-import taskService from "../../services/taskService";
-import { getGoals } from "../../services/goalService";
+// Load services on demand to allow them to be code-split from the main bundle
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
+
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
 
 export default function CreateTaskModal({ 
     isOpen, 
@@ -62,10 +76,14 @@ export default function CreateTaskModal({
         (async () => {
             try {
                 console.log('Fetching goals and other data...');
+                const kaSvc = await getKeyAreaService();
+                const ts = await getTaskService();
                 const [areas, goalsData, allTasksData] = await Promise.all([
-                    keyAreaService.list({ includeTaskCount: false }),
-                    getGoals(),
-                    taskService.list({})
+                    kaSvc.list({ includeTaskCount: false }),
+                    // Dynamically import goalService so it can be split from the
+                    // initial bundle when the modal is not used at startup.
+                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
+                    ts.list({}),
                 ]);
                 console.log('Goals fetched:', goalsData);
                 setKeyAreas(Array.isArray(areas) ? areas : []);
@@ -185,13 +203,15 @@ export default function CreateTaskModal({
 
             let result;
             if (isEditMode) {
-                result = await taskService.update(taskId, taskData);
+                const svc = await getTaskService();
+                result = await svc.update(taskId, taskData);
                 addToast({ 
                     title: "Task updated successfully", 
                     variant: "success" 
                 });
             } else {
-                result = await taskService.create(taskData);
+                const svc = await getTaskService();
+                result = await svc.create(taskData);
                 addToast({ 
                     title: "Task created successfully", 
                     variant: "success" 
@@ -214,9 +234,8 @@ export default function CreateTaskModal({
 
     if (!isOpen) return null;
 
-    // New modal markup as requested
     return (
-        <div className="fixed inset-0 bg-black/40 z-50 grid place-items-center">
+        <Modal open={isOpen} onClose={onClose}>
             <div className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden">
                 <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
                     {isEditMode ? "Edit Task" : "Add Task"}
@@ -224,7 +243,7 @@ export default function CreateTaskModal({
                 <form className="p-4 md:p-6" onSubmit={handleSubmit}>
                     <div className="mb-4">
                         <label className="sr-only" htmlFor="ka-task-title">Task name</label>
-                        <input id="ka-task-title" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Task name" value={form.title} name="title" onChange={handleInputChange} />
+                        <input autoFocus id="ka-task-title" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Task name" value={form.title} name="title" onChange={handleInputChange} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         <div className="grid gap-3 content-start">
@@ -289,7 +308,7 @@ export default function CreateTaskModal({
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Respons.</label>
+                                <label className="text-xs font-semibold text-slate-700">Assignee</label>
                                 <select name="assignee" className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.assignee} onChange={handleInputChange}>
                                     <option value="">— Unassigned —</option>
                                     <option value="Me">Me</option>
@@ -336,7 +355,7 @@ export default function CreateTaskModal({
                     ✕
                 </button>
             </div>
-        </div>
+        </Modal>
     );
 
 }

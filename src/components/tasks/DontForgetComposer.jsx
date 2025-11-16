@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaSave, FaTimes } from "react-icons/fa";
-import keyAreaService from "../../services/keyAreaService";
+// Load keyAreaService on demand to reduce initial bundle weight
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
 import usersService from "../../services/usersService";
 
 export default function DontForgetComposer({ open, onClose, onAdd, defaultList = 1 }) {
@@ -57,10 +64,8 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
             setEndAuto(true);
             (async () => {
                 try {
-                    const [kas, us] = await Promise.all([
-                        keyAreaService.list({ includeTaskCount: false }),
-                        usersService.list(),
-                    ]);
+                    const kaSvc = await getKeyAreaService();
+                    const [kas, us] = await Promise.all([kaSvc.list({ includeTaskCount: false }), usersService.list()]);
                     setKeyAreas(kas);
                     setUsers(us);
                 } catch {

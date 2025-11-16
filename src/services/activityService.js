@@ -13,6 +13,10 @@ const activityService = {
         const res = await apiClient.post(base, payload);
         return res.data;
     },
+    async get(id) {
+        const res = await apiClient.get(`${base}/${id}`);
+        return res.data;
+    },
     async update(id, payload) {
         const res = await apiClient.put(`${base}/${id}`, payload);
         return res.data;

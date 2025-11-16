@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { FaChevronDown } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import QuarterView from "./QuarterView";
@@ -7,17 +7,35 @@ import WeekView from "./WeekView";
 import DayView from "./DayView";
 import ListView from "./ListView";
 import EventModal from "./EventModal";
-import CreateTaskModal from "../modals/CreateTaskModal";
-import CreateActivityModal from "../modals/CreateActivityModal";
+const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
+// The activities modal file is named CreateActivityFormModal.jsx in /components/modals
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal"));
+const EditActivityModal = React.lazy(() => import("../key-areas/EditActivityModal.jsx"));
+const EditTaskModal = React.lazy(() => import("../key-areas/EditTaskModal.jsx"));
 import ElephantTaskModal from "./ElephantTaskModal";
 import ElephantTaskInput from "./ElephantTaskInput";
-import taskService from "../../services/taskService";
-import activityService from "../../services/activityService";
+// taskService and activityService are loaded on demand to keep them out of the main chunk
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../../services/taskService");
+    _taskService = mod?.default || mod;
+    return _taskService;
+};
+
+let _activityService = null;
+const getActivityService = async () => {
+    if (_activityService) return _activityService;
+    const mod = await import("../../services/activityService");
+    _activityService = mod?.default || mod;
+    return _activityService;
+};
 import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
+import { normalizeActivity } from '../../utils/keyareasHelpers';
 import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
 
@@ -67,8 +85,14 @@ const CalendarContainer = () => {
     const [view, setView] = useState("day");
     const [events, setEvents] = useState([]);
     const [todos, setTodos] = useState([]);
+    const [keyAreas, setKeyAreas] = useState([]);
+    const [usersList, setUsersList] = useState([]);
+    const [goalsList, setGoalsList] = useState([]);
+    const [availableLists, setAvailableLists] = useState([1]);
+    const [tasksList, setTasksList] = useState([]); // tasks used for modals (may include list_index)
     const [loading, setLoading] = useState(false);
     const [activitiesByTask, setActivitiesByTask] = useState({}); // { taskId: Activity[] }
+    const [unattachedActivities, setUnattachedActivities] = useState([]); // activities not linked to a task
     const [weekActivities, setWeekActivities] = useState([]); // Flat list of activities for Week view
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
@@ -98,6 +122,66 @@ const CalendarContainer = () => {
         } catch {}
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Preload key areas, users and goals so modals have populated dropdowns
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const kaMod = await import('../../services/keyAreaService');
+                const kaSvc = kaMod?.default || kaMod;
+                const areas = await kaSvc.list({ includeTaskCount: false }).catch(() => []);
+                if (!ignore) setKeyAreas(Array.isArray(areas) ? areas : []);
+            } catch (e) {
+                // non-fatal
+                console.warn('Failed to load key areas for calendar', e);
+            }
+            try {
+                const usersMod = await import('../../services/usersService');
+                const usersSvc = usersMod?.default || usersMod;
+                const us = await usersSvc.list().catch(() => []);
+                if (!ignore) setUsersList(Array.isArray(us) ? us : []);
+            } catch (e) {
+                console.warn('Failed to load users for calendar', e);
+            }
+            try {
+                const goalsMod = await import('../../services/goalService');
+                const goalsSvc = goalsMod?.default || goalsMod;
+                const gs = await goalsSvc.getGoals().catch(() => []);
+                if (!ignore) setGoalsList(Array.isArray(gs) ? gs : []);
+            } catch (e) {
+                console.warn('Failed to load goals for calendar', e);
+            }
+            // derive available lists from loaded key areas (max list count across areas)
+            try {
+                const maxLists = (keyAreas || []).reduce((acc, ka) => Math.max(acc, (ka.list_count || 1)), 1);
+                const lists = Array.from({ length: Math.max(1, maxLists) }, (_, i) => i + 1);
+                if (!ignore) setAvailableLists(lists);
+            } catch (e) {
+                if (!ignore) setAvailableLists([1]);
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
+    // When the Add modal is opened, preload tasks from taskService so the
+    // CreateActivityFormModal can filter tasks by key area and list index.
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            if (!addModalOpen) return;
+            try {
+                const svc = await getTaskService();
+                const list = await svc.list();
+                if (!ignore) setTasksList(Array.isArray(list) ? list : []);
+            } catch (e) {
+                if (!ignore) setTasksList([]);
+            }
+        })();
+        return () => { ignore = true; };
+    }, [addModalOpen]);
 
     // Persist view/date
     useEffect(() => {
@@ -193,7 +277,8 @@ const CalendarContainer = () => {
                         const pairs = await Promise.all(
                             uniqueIds.map(async (id) => {
                                 try {
-                                    const list = await activityService.list({ taskId: id });
+                                    const svc = await getActivityService();
+                                    const list = await svc.list({ taskId: id });
                                     return [id, Array.isArray(list) ? list : []];
                                 } catch {
                                     return [id, []];
@@ -213,7 +298,8 @@ const CalendarContainer = () => {
                         const lists = await Promise.all(
                             uniqueIds.map(async (id) => {
                                 try {
-                                    const list = await activityService.list({ taskId: id });
+                                    const svc = await getActivityService();
+                                    const list = await svc.list({ taskId: id });
                                     return Array.isArray(list) ? list : [];
                                 } catch {
                                     return [];
@@ -280,7 +366,8 @@ const CalendarContainer = () => {
                     const pairs = await Promise.all(
                         uniqueIds.map(async (id) => {
                             try {
-                                const list = await activityService.list({ taskId: id });
+                                const svc = await getActivityService();
+                                const list = await svc.list({ taskId: id });
                                 return [id, Array.isArray(list) ? list : []];
                             } catch {
                                 return [id, []];
@@ -298,7 +385,8 @@ const CalendarContainer = () => {
                     const lists = await Promise.all(
                         uniqueIds.map(async (id) => {
                             try {
-                                const list = await activityService.list({ taskId: id });
+                                const svc = await getActivityService();
+                                const list = await svc.list({ taskId: id });
                                 return Array.isArray(list) ? list : [];
                             } catch {
                                 return [];
@@ -466,7 +554,8 @@ const CalendarContainer = () => {
         let task = taskOrId;
         try {
             if (typeof taskOrId === "string") {
-                task = await taskService.get(taskOrId);
+                const svc = await getTaskService();
+                task = await svc.get(taskOrId);
             }
         } catch (e) {
             addToast({ title: "Task not found", variant: "error" });
@@ -493,13 +582,81 @@ const CalendarContainer = () => {
             title: task.title || "",
             description: task.description || "",
             keyAreaId: task.keyAreaId || "",
+            // include both camelCase and snake_case shapes so modals can read either
+            startDate: task.startDate || task.start_date || null,
+            start_date: task.startDate || task.start_date || null,
             date: toDateStr(task.startDate || task.dueDate || task.endDate),
             time: toTimeStr(task.startDate),
-            dueDate: toDateStr(task.dueDate),
+            dueDate: toDateStr(task.dueDate || task.deadline),
+            deadline: toDateStr(task.dueDate || task.deadline),
             endDate: toDateStr(task.endDate),
-            priority: task.priority || "medium",
+            end_date: task.endDate || task.end_date || null,
+            priority: task.priority || task.priority_level || "medium",
+            duration: task.duration || task.duration_minutes || null,
+            list_index: task.list_index || task.listIndex || task.list || 1,
+            list: task.list_index || task.listIndex || task.list || 1,
+            goal: task.goal || task.goal_id || task.goalId || null,
+            goal_id: task.goal || task.goal_id || task.goalId || null,
+            key_area_id: task.keyAreaId || task.key_area_id || null,
             assignee: task.assignee || "",
         };
+        // Ensure tasksList contains the task for this activity so the Task dropdown
+        // in EditActivityModal can show the current selection. Load the single task
+        // if it's not already present in tasksList.
+        try {
+            const activityTaskId = item.taskId || item.task_id || null;
+            if (activityTaskId) {
+                const exists = (tasksList || []).some((t) => String(t.id) === String(activityTaskId));
+                if (!exists) {
+                    try {
+                        const tsvc = await getTaskService();
+                        const fetched = await tsvc.get(String(activityTaskId));
+                        if (fetched && fetched.id) {
+                            setTasksList((prev) => {
+                                const copy = Array.isArray(prev) ? prev.slice() : [];
+                                // prepend so it's available in the dropdown
+                                copy.unshift(fetched);
+                                return copy;
+                            });
+                        }
+                    } catch (e) {
+                        // ignore fetch failure; dropdown will simply not include the task
+                    }
+                }
+            }
+        } catch (e) {
+            // non-fatal
+        }
+        // Ensure the activity's task is present in tasksList so the Task select
+        // in the edit modal can pre-select the correct task.
+        try {
+            const activityTaskId = item.taskId || item.task_id || null;
+            if (activityTaskId) {
+                const exists = (tasksList || []).some((t) => String(t.id) === String(activityTaskId));
+                if (!exists) {
+                    try {
+                        const tsvc = await getTaskService();
+                        const fetched = await tsvc.get(String(activityTaskId));
+                        if (fetched && fetched.id) {
+                            setTasksList((prev) => {
+                                const copy = Array.isArray(prev) ? prev.slice() : [];
+                                // prepend to make it immediately available
+                                copy.unshift(fetched);
+                                return copy;
+                            });
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            }
+        } catch (e) {
+            // non-fatal
+        }
+
+        // Debug info to help trace prefill issues in the browser console
+        try { console.debug('Opening EditActivityModal with item', item, 'tasksList snapshot', tasksList); } catch (__) {}
+
         setEditItem(item);
         setEditModalOpen(true);
     };
@@ -510,18 +667,63 @@ const CalendarContainer = () => {
         let activity = activityOrId;
         try {
             if (typeof activityOrId === "string") {
-                activity = await activityService.get(activityOrId);
+                const svc = await getActivityService();
+                activity = await svc.get(activityOrId);
             }
         } catch (e) {
             addToast({ title: "Activity not found", variant: "error" });
             return;
         }
-        const item = {
+            try { console.debug('[Calendar] openEditActivity - resolved activity (raw)', activityOrId, 'fetched:', activity); } catch (__) {}
+            // Ensure the activity's task is present in tasksList so the Task select
+            // in the edit modal can pre-select the correct task and we can fall back
+            // to the task's assignee when the activity itself has no assignee.
+            try {
+                const activityTaskId = activity?.taskId || activity?.task_id || activity?.task || null;
+                if (activityTaskId) {
+                    const exists = (tasksList || []).some((t) => String(t.id) === String(activityTaskId));
+                    if (!exists) {
+                        try {
+                            const tsvc = await getTaskService();
+                            const fetched = await tsvc.get(String(activityTaskId));
+                            if (fetched && fetched.id) {
+                                setTasksList((prev) => {
+                                    const copy = Array.isArray(prev) ? prev.slice() : [];
+                                    // prepend so it's available in the dropdown
+                                    copy.unshift(fetched);
+                                    return copy;
+                                });
+                                // also merge into localTasks in modal via props when it opens
+                            }
+                        } catch (e) {
+                            // ignore fetch failure
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            // Normalize activity so we get consistent aliases (assignee, start_date, end_date, etc.)
+            const normActivity = normalizeActivity(activity || {});
+            try { console.debug('[Calendar] openEditActivity - normalized activity', normActivity); } catch (__) {}
+
+            const item = {
             id: activity.id,
             type: "activity",
-            taskId: activity.taskId || activity.task_id || "",
-            text: activity.text || activity.title || "",
-            title: activity.text || activity.title || "",
+                taskId: normActivity.taskId || normActivity.task_id || normActivity.task || "",
+                text: normActivity.text || normActivity.title || normActivity.activity_name || "",
+                title: normActivity.text || normActivity.title || normActivity.activity_name || "",
+                description: normActivity.description || normActivity.notes || normActivity.note || '',
+                // use normalized date aliases
+                start_date: normActivity.start_date || normActivity.startDate || normActivity.date_start || '',
+                end_date: normActivity.end_date || normActivity.endDate || normActivity.date_end || '',
+                deadline: normActivity.deadline || normActivity.dueDate || normActivity.due_date || '',
+                duration: normActivity.duration || normActivity.duration_minutes || '',
+                key_area_id: normActivity.key_area_id || normActivity.keyAreaId || normActivity.keyArea || '',
+                list: normActivity.list || normActivity.list_index || normActivity.listIndex || normActivity.parent_list || normActivity.parentList || normActivity.list_number || undefined,
+                assignee: normActivity.assignee || normActivity.responsible || normActivity.owner || normActivity.assigned_to || normActivity.assignee_name || '',
+                priority: normActivity.priority ?? normActivity.priority_level ?? undefined,
+                goal: normActivity.goal || normActivity.goal_id || normActivity.goalId || undefined,
+                completed: normActivity.completed || false,
         };
         setEditItem(item);
         setEditModalOpen(true);
@@ -553,7 +755,10 @@ const CalendarContainer = () => {
         })();
         try {
             if (form.type === "activity") {
-                await activityService.create({ text: form.text || form.title, taskId: form.taskId || null });
+                {
+                    const svc = await getActivityService();
+                    await svc.create({ text: form.text || form.title, taskId: form.taskId || null });
+                }
                 addToast({ title: "Activity added", variant: "success" });
             } else {
                 const toEndOfDayIso = (dateStr) => {
@@ -570,7 +775,8 @@ const CalendarContainer = () => {
                 };
                 const dueIso = toEndOfDayIso(form.dueDate);
                 const endIso = toEndOfDayIso(form.endDate);
-                const createdTask = await taskService.create({
+                const taskSvc = await getTaskService();
+                const createdTask = await taskSvc.create({
                     title: form.title,
                     description: form.description || null,
                     startDate: when.toISOString(),
@@ -893,6 +1099,7 @@ const CalendarContainer = () => {
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
                         todos={todos}
                         activitiesByTask={activitiesByTask}
+                        unattachedActivities={unattachedActivities}
                         loading={loading}
                         categories={EVENT_CATEGORIES}
                         onTaskDrop={handleTaskDrop}
@@ -921,101 +1128,154 @@ const CalendarContainer = () => {
             </div>
             {addModalOpen && (
                 addDefaultTab === "activity" ? (
-                    <CreateActivityModal
-                        isOpen={addModalOpen}
-                        onClose={() => setAddModalOpen(false)}
-                        onSave={async (createdActivity) => {
-                            console.log('Activity created:', createdActivity);
-                            await refreshTodosForRange();
-                            setAddModalOpen(false);
-                            addToast({ 
-                                title: "Activity created successfully", 
-                                description: "The activity has been added",
-                                variant: "success" 
-                            });
-                        }}
-                        initialData={{
-                            text: "",
-                            key_area_id: (() => {
+                    <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                        <CreateActivityModal
+                            isOpen={addModalOpen}
+                            onCancel={() => setAddModalOpen(false)}
+                            initialData={{
+                                text: "",
+                                // Do NOT auto-fill key area or task when creating from calendar; user should choose explicitly.
+                                key_area_id: "",
+                                taskId: "",
+                            }}
+                            tasks={Array.isArray(tasksList) ? tasksList : []}
+                            keyAreas={keyAreas}
+                            users={usersList}
+                            goals={goalsList}
+                            availableLists={availableLists}
+                            onSave={async (payload) => {
                                 try {
-                                    const toDateOnly = (iso) => {
-                                        if (!iso) return null;
-                                        const d = new Date(iso);
-                                        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                    const svc = await getActivityService();
+                                    // Build a payload that matches CreateActivityDto on the backend.
+                                    // The backend uses ValidationPipe with whitelist/forbidNonWhitelisted,
+                                    // so sending unknown keys (key_area_id, list, etc.) will cause a 400.
+                                    const body = {
+                                        text: (payload.text || payload.title || '').trim(),
                                     };
-                                    const baseDate = addDate || new Date();
-                                    const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
-                                    const inRange = (t) => {
-                                        let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
-                                        let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
-                                        if (!start && !end) return false;
-                                        if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
-                                        if (!start) start = end; if (!end) end = start;
-                                        return start <= dayOnly && dayOnly <= end;
-                                    };
-                                    const candidate = (Array.isArray(todos) ? todos : []).find(inRange);
-                                    return candidate?.keyAreaId || "";
-                                } catch { return ""; }
-                            })(),
-                            taskId: (() => {
-                                // Preselect a task visible on the selected day if possible (editable by user)
-                                try {
-                                    const toDateOnly = (iso) => {
-                                        if (!iso) return null;
-                                        const d = new Date(iso);
-                                        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                                    };
-                                    const baseDate = addDate || new Date();
-                                    const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
-                                    const inRange = (t) => {
-                                        let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
-                                        let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
-                                        if (!start && !end) return false;
-                                        if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
-                                        if (!start) start = end; if (!end) end = start;
-                                        return start <= dayOnly && dayOnly <= end;
-                                    };
-                                    const candidate = (Array.isArray(todos) ? todos : []).find(inRange);
-                                    return candidate?.id || "";
-                                } catch { return ""; }
-                            })(),
-                        }}
-                        dayTaskIds={(() => {
-                            try {
-                                const toDateOnly = (iso) => {
-                                    if (!iso) return null;
-                                    const d = new Date(iso);
-                                    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                                };
-                                const baseDate = addDate || new Date();
-                                const dayOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
-                                const inRange = (t) => {
-                                    let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
-                                    let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
-                                    if (!start && !end) return false;
-                                    if (start && end && start > end) { const tmp = start; start = end; end = tmp; }
-                                    if (!start) start = end; if (!end) end = start;
-                                    return start <= dayOnly && dayOnly <= end;
-                                };
-                                return (Array.isArray(todos) ? todos : []).filter(inRange).map((t) => String(t.id));
-                            } catch { return []; }
-                        })()}
-                    />
+                                    // optional fields mapping
+                                    if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
+                                    if (payload.status) body.status = payload.status;
+                                    if (payload.priority) body.priority = payload.priority;
+                                    if (payload.startDate || payload.start_date) body.startDate = payload.startDate || payload.start_date;
+                                    if (payload.endDate || payload.end_date) body.endDate = payload.endDate || payload.end_date;
+                                    if (payload.deadline || payload.dueDate || payload.due_date) body.deadline = payload.deadline || payload.dueDate || payload.due_date;
+                                    if (payload.goalId || payload.goal || payload.goal_id) body.goalId = payload.goalId || payload.goal || payload.goal_id;
+                                    if (typeof payload.completed !== 'undefined') body.completed = Boolean(payload.completed);
+                                    if (payload.completionDate) body.completionDate = payload.completionDate;
+
+                                    const created = await svc.create(body);
+                                    console.log('Activity created:', created);
+                                    // Optimistically refresh activities map for the attached task so UI updates immediately
+                                    const createdTaskId = created?.taskId || created?.task_id || body.taskId || body.task_id || null;
+                                    if (createdTaskId) {
+                                        try {
+                                            const list = await svc.list({ taskId: body.taskId });
+                                            setActivitiesByTask((prev) => ({
+                                                ...prev,
+                                                [String(createdTaskId)]: Array.isArray(list) ? list.map(normalizeActivity) : [],
+                                            }));
+                                        } catch (__) {}
+                                    }
+                                    // If created activity is not attached to a task, add it to unattachedActivities
+                                    if (!createdTaskId) {
+                                        try {
+                                            setUnattachedActivities((prev) => [normalizeActivity(created || {}), ...prev]);
+                                        } catch (__) {}
+                                    }
+                                    await refreshTodosForRange();
+                                    try {
+                                        // notify other parts of the app to refresh activity lists
+                                        window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: body.taskId || undefined } }));
+                                    } catch (__) {}
+                                    setAddModalOpen(false);
+                                    addToast({ title: 'Activity created successfully', description: 'The activity has been added', variant: 'success' });
+                                } catch (e) {
+                                    // Axios errors have response objects with useful info
+                                    console.error('Failed to create activity', e);
+                                    try {
+                                        const details = e?.response?.data || e?.toString();
+                                        addToast({ title: 'Failed to create activity', description: String(details), variant: 'error' });
+                                    } catch (_) {
+                                        addToast({ title: 'Failed to create activity', description: String(e?.message || e), variant: 'error' });
+                                    }
+                                }
+                            }}
+                        />
+                    </Suspense>
                 ) : (
-                    <CreateTaskModal
-                        isOpen={addModalOpen}
-                        onClose={() => setAddModalOpen(false)}
-                        onSave={async (createdTask) => {
-                            await refreshTodosForRange();
-                            setAddModalOpen(false);
-                        }}
-                        initialData={{
-                            date: (() => {
-                                const d = addDate || new Date();
-                                return d.toISOString().slice(0, 10);
-                            })(),
-                        }}
-                    />
+                    <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                        <CreateTaskModal
+                            isOpen={addModalOpen}
+                            onCancel={() => setAddModalOpen(false)}
+                            initialData={{
+                                date: (() => {
+                                    const d = addDate || new Date();
+                                    return d.toISOString().slice(0, 10);
+                                })(),
+                            }}
+                            onSave={async (data) => {
+                                // data follows CreateTaskModal payload (title, description, date, time, dueDate, endDate, key_area_id, list_index, ...)
+                                try {
+                                    const svc = await getTaskService();
+                                    const title = (data.title || data.name || '').trim();
+                                    if (!title) {
+                                        addToast({ title: 'Task title required', variant: 'error' });
+                                        return;
+                                    }
+                                    const toIsoDateTime = (dateStr, timeStr) => {
+                                        try {
+                                            if (!dateStr) return null;
+                                            if (timeStr) return new Date(`${dateStr}T${timeStr}`).toISOString();
+                                            return new Date(dateStr).toISOString();
+                                        } catch { return null; }
+                                    };
+                                    const body = {
+                                        title,
+                                        description: data.description || data.notes || null,
+                                        assignee: data.assignee || null,
+                                        startDate: toIsoDateTime(data.date || data.start_date, data.time) || undefined,
+                                        endDate: data.endDate || data.end_date ? (new Date(data.endDate || data.end_date)).toISOString() : undefined,
+                                        dueDate: data.dueDate || data.deadline ? (new Date(data.dueDate || data.deadline)).toISOString() : undefined,
+                                        status: data.status || 'open',
+                                        priority: data.priority || 'medium',
+                                        keyAreaId: data.key_area_id || data.keyAreaId || undefined,
+                                        listIndex: data.listIndex || data.list_index || undefined,
+                                    };
+                                    const createdTask = await svc.create(body);
+                                    addToast({ title: 'Task added', variant: 'success' });
+
+                                    // If modal provided a date+time, create a calendar event for this task
+                                    try {
+                                        if (data.date && data.time) {
+                                            let start = new Date(`${data.date}T${data.time}`);
+                                            if (!withinBusinessHours(start)) {
+                                                addToast({ title: 'Outside business hours', description: 'Adjusted to business hours', variant: 'warning' });
+                                            }
+                                            const { end } = clampToBusinessHours(start, 60);
+                                            const ev = await calendarService.createEvent({
+                                                title: createdTask.title,
+                                                start: start.toISOString(),
+                                                end: end.toISOString(),
+                                                allDay: false,
+                                                taskId: createdTask.id,
+                                                keyAreaId: body.keyAreaId || undefined,
+                                                kind: 'custom',
+                                            });
+                                            setEvents((prev) => [...prev, ev]);
+                                        }
+                                    } catch (e) {
+                                        console.warn('Failed to create calendar event for new task', e);
+                                    }
+
+                                    await refreshTodosForRange();
+                                    setAddModalOpen(false);
+                                } catch (e) {
+                                    console.error('Failed to create task from calendar modal', e);
+                                    addToast({ title: 'Failed to add', description: String(e?.message || e), variant: 'error' });
+                                }
+                            }}
+                        />
+                    </Suspense>
                 )
             )}
             {appointmentModalOpen && appointmentInitialStart && (
@@ -1054,54 +1314,225 @@ const CalendarContainer = () => {
                 />
             )}
             {editModalOpen && editItem && editItem.type === "task" && (
-                <CreateTaskModal
+                <EditTaskModal
                     isOpen={editModalOpen}
-                    onClose={() => {
+                    onCancel={() => {
                         setEditModalOpen(false);
                         setEditItem(null);
                     }}
-                    onSave={async (updatedTask) => {
-                        await refreshTodosForRange();
-                        setEditModalOpen(false);
-                        setEditItem(null);
-                        addToast({ title: "Task updated", variant: "success" });
-                    }}
-                    taskId={editItem.id}
                     initialData={{
-                        keyAreaId: editItem.keyAreaId || "",
+                        id: editItem.id,
+                        // provide both snake_case and camelCase keys expected by modal
+                        key_area_id: editItem.key_area_id || editItem.keyAreaId || "",
+                        keyAreaId: editItem.key_area_id || editItem.keyAreaId || "",
                         title: editItem.title || "",
                         description: editItem.description || "",
-                        date: editItem.date || "",
+                        start_date: editItem.start_date || editItem.startDate || editItem.date || "",
+                        startDate: editItem.start_date || editItem.startDate || editItem.date || "",
                         time: editItem.time || "09:00",
-                        dueDate: editItem.dueDate || "",
-                        endDate: editItem.endDate || "",
-                        list_index: editItem.list_index || 1,
-                        priority: editItem.priority || "medium",
+                        deadline: editItem.deadline || editItem.dueDate || "",
+                        dueDate: editItem.deadline || editItem.dueDate || "",
+                        end_date: editItem.end_date || editItem.endDate || "",
+                        endDate: editItem.end_date || editItem.endDate || "",
+                        list_index: editItem.list_index || editItem.listIndex || editItem.list || 1,
+                        list: editItem.list_index || editItem.listIndex || editItem.list || 1,
+                        priority: editItem.priority || editItem.priority_level || "medium",
+                        duration: editItem.duration || editItem.duration_minutes || "",
+                        goal: editItem.goal || editItem.goal_id || editItem.goalId || "",
+                        goal_id: editItem.goal || editItem.goal_id || editItem.goalId || "",
                         assignee: editItem.assignee || "",
                         status: editItem.status || "todo",
+                    }}
+                    keyAreas={keyAreas}
+                    users={usersList}
+                    goals={goalsList}
+                    availableLists={availableLists}
+                    onSave={async (payload) => {
+                        try {
+                            const id = editItem.id;
+                            if (!id) return;
+                            const patch = {};
+                            if (payload.title !== undefined) patch.title = payload.title;
+                            if (payload.description !== undefined) patch.description = payload.description;
+                            if (payload.assignee !== undefined) patch.assignee = payload.assignee;
+                            if (payload.status !== undefined) patch.status = payload.status;
+                            if (payload.priority !== undefined) patch.priority = payload.priority;
+                            if (payload.date !== undefined || payload.time !== undefined) {
+                                try {
+                                    if (payload.date && payload.time) patch.startDate = new Date(`${payload.date}T${payload.time}`).toISOString();
+                                    else if (payload.date) patch.startDate = new Date(payload.date).toISOString();
+                                } catch (e) {}
+                            }
+                            if (payload.endDate !== undefined || payload.end_date !== undefined) patch.endDate = payload.endDate ? new Date(payload.endDate).toISOString() : null;
+                            if (payload.dueDate !== undefined || payload.deadline !== undefined) patch.dueDate = payload.dueDate ? new Date(payload.dueDate).toISOString() : null;
+                            if (payload.key_area_id || payload.keyAreaId) patch.keyAreaId = payload.key_area_id || payload.keyAreaId;
+                            if (payload.list_index !== undefined || payload.listIndex !== undefined) patch.listIndex = payload.list_index ?? payload.listIndex;
+
+                            if (Object.keys(patch).length > 0) {
+                                const svc = await getTaskService();
+                                await svc.update(id, patch);
+                            }
+                            await refreshTodosForRange();
+                            setEditModalOpen(false);
+                            setEditItem(null);
+                            addToast({ title: "Task updated", variant: "success" });
+                        } catch (e) {
+                            console.error('Failed to update task from calendar modal', e);
+                            addToast({ title: 'Failed to update', description: String(e?.message || e), variant: 'error' });
+                        }
                     }}
                 />
             )}
             {editModalOpen && editItem && editItem.type === "activity" && (
-                <CreateActivityModal
+                <EditActivityModal
                     isOpen={editModalOpen}
-                    onClose={() => {
+                    onCancel={() => {
                         setEditModalOpen(false);
                         setEditItem(null);
                     }}
-                    onSave={async (updatedActivity) => {
-                        await refreshTodosForRange();
-                        setEditModalOpen(false);
-                        setEditItem(null);
-                        addToast({ title: "Activity updated", variant: "success" });
+                    initialData={(function(){
+                        try {
+                            const parent = (Array.isArray(tasksList) ? tasksList.find((t) => String(t.id) === String(editItem.taskId || editItem.task_id || '')) : null) || null;
+                            return {
+                                id: editItem.id,
+                                // task linkage
+                                task_id: editItem.taskId || editItem.task_id || "",
+                                taskId: editItem.taskId || editItem.task_id || "",
+                                // text/title/description
+                                text: editItem.text || editItem.title || "",
+                                title: editItem.text || editItem.title || "",
+                                description: editItem.description || editItem.notes || editItem.note || '',
+                                // dates - provide both snake_case and camelCase aliases
+                                start_date: editItem.start_date || editItem.startDate || editItem.date || '',
+                                startDate: editItem.start_date || editItem.startDate || editItem.date || '',
+                                end_date: editItem.end_date || editItem.endDate || '',
+                                endDate: editItem.end_date || editItem.endDate || '',
+                                deadline: editItem.deadline || editItem.dueDate || editItem.due_date || '',
+                                duration: editItem.duration || editItem.duration_minutes || '',
+                                // key area / list / task mapping (fall back to parent task when activity lacks them)
+                                key_area_id: editItem.key_area_id || editItem.keyAreaId || editItem.keyArea || (parent && (parent.key_area_id || parent.keyAreaId || parent.keyArea)) || '',
+                                list: editItem.list || editItem.list_index || editItem.listIndex || (parent && (parent.list || parent.list_index || parent.listIndex)) || '',
+                                list_index: editItem.list || editItem.list_index || editItem.listIndex || (parent && (parent.list || parent.list_index || parent.listIndex)) || '',
+                                // assignee/priority/goal/completed
+                                assignee: editItem.assignee || editItem.responsible || (parent && (parent.assignee || parent.responsible)) || '',
+                                priority: editItem.priority ?? editItem.priority_level ?? 2,
+                                goal: editItem.goal || editItem.goal_id || editItem.goalId || '',
+                                completed: typeof editItem.completed !== 'undefined' ? editItem.completed : false,
+                            };
+                        } catch (e) {
+                            return {
+                                id: editItem.id,
+                                task_id: editItem.taskId || editItem.task_id || "",
+                                taskId: editItem.taskId || editItem.task_id || "",
+                                text: editItem.text || editItem.title || "",
+                                title: editItem.text || editItem.title || "",
+                                description: editItem.description || editItem.notes || editItem.note || '',
+                            };
+                        }
+                    })()}
+                    tasks={Array.isArray(tasksList) ? tasksList : []}
+                    keyAreas={keyAreas}
+                    users={usersList}
+                    goals={goalsList}
+                    availableLists={availableLists}
+                    onSave={async (payload) => {
+                        try {
+                            const svc = await getActivityService();
+                            if (editItem.id) {
+                                // Map only allowed update fields to avoid ValidationPipe whitelist errors
+                                // helper: normalize date-only (YYYY-MM-DD) to ISO datetime string
+                                const normDate = (val) => {
+                                    if (val === null) return null;
+                                    if (typeof val === 'string' && val.trim() === '') return null;
+                                    if (!val) return undefined;
+                                    const s = String(val);
+                                    // ISO date only (YYYY-MM-DD)
+                                    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                                        try {
+                                            return new Date(s + 'T00:00:00Z').toISOString();
+                                        } catch { return s; }
+                                    }
+                                    // otherwise try Date parse and toISOString
+                                    try {
+                                        const d = new Date(s);
+                                        if (!isNaN(d.getTime())) return d.toISOString();
+                                    } catch {}
+                                    return s;
+                                };
+                                const normPriority = (p) => {
+                                    if (p === null) return null;
+                                    if (p === undefined) return undefined;
+                                    if (typeof p === 'number') return p === 3 ? 'high' : p === 1 ? 'low' : 'normal';
+                                    const ps = String(p).toLowerCase();
+                                    if (['1','2','3'].includes(ps)) return ps === '3' ? 'high' : ps === '1' ? 'low' : 'normal';
+                                    if (['high','normal','low'].includes(ps)) return ps;
+                                    return undefined;
+                                };
+
+                                const patch = {};
+                                if (payload.text !== undefined) patch.text = payload.text;
+                                if (payload.taskId !== undefined || payload.task_id !== undefined) patch.taskId = (payload.taskId ?? payload.task_id) ? (payload.taskId ?? payload.task_id) : null;
+                                if (payload.status !== undefined) patch.status = payload.status;
+                                if (payload.completed !== undefined) patch.completed = Boolean(payload.completed);
+                                if (payload.completionDate !== undefined) {
+                                    const cd = normDate(payload.completionDate);
+                                    // allow explicitly setting to null
+                                    patch.completionDate = typeof cd === 'undefined' ? undefined : cd;
+                                }
+                                if (payload.priority !== undefined) {
+                                    const pp = normPriority(payload.priority);
+                                    if (pp !== undefined) patch.priority = pp;
+                                }
+                                if (payload.startDate !== undefined || payload.start_date !== undefined) {
+                                    const sd = normDate(payload.startDate ?? payload.start_date);
+                                    patch.startDate = typeof sd === 'undefined' ? undefined : sd;
+                                }
+                                if (payload.endDate !== undefined || payload.end_date !== undefined) {
+                                    const ed = normDate(payload.endDate ?? payload.end_date);
+                                    patch.endDate = typeof ed === 'undefined' ? undefined : ed;
+                                }
+                                if (payload.deadline !== undefined || payload.dueDate !== undefined || payload.due_date !== undefined) {
+                                    const dd = normDate(payload.deadline ?? payload.dueDate ?? payload.due_date);
+                                    patch.deadline = typeof dd === 'undefined' ? undefined : dd;
+                                }
+                                if (payload.goalId !== undefined || payload.goal !== undefined || payload.goal_id !== undefined) patch.goalId = (payload.goalId ?? payload.goal ?? payload.goal_id) ? (payload.goalId ?? payload.goal ?? payload.goal_id) : null;
+                                // Debug: show the exact payload being sent to the backend so we can inspect validation errors
+                                try {
+                                    console.debug('[Calendar] updating activity payload', { id: editItem.id, patch });
+                                } catch (__) {}
+                                await svc.update(editItem.id, patch);
+                            } else {
+                                const toCreate = { text: payload.text || payload.title || '' };
+                                if (payload.taskId || payload.task_id) toCreate.taskId = payload.taskId || payload.task_id;
+                                await svc.create(toCreate);
+                            }
+                                await refreshTodosForRange();
+                                // If the activity belongs to a task, refresh that task's activities immediately
+                                try {
+                                    const tid = editItem?.taskId || editItem?.task_id || null;
+                                    if (tid) {
+                                        const list = await (await getActivityService()).list({ taskId: tid });
+                                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
+                                    }
+                                } catch (__) {}
+                            try {
+                                window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: editItem?.taskId || undefined } }));
+                            } catch (__) {}
+                            setEditModalOpen(false);
+                            setEditItem(null);
+                            addToast({ title: "Activity updated", variant: "success" });
+                        } catch (e) {
+                            try {
+                                // Log richer axios response info when available
+                                console.error('Failed to update/create activity', e, e?.response && e.response.data ? e.response.data : null);
+                                const serverMsg = e?.response?.data?.message || e?.response?.data || e?.message || String(e);
+                                addToast({ title: 'Failed to save activity', description: String(serverMsg), variant: 'error' });
+                            } catch (outer) {
+                                console.error('Failed to update/create activity (and failed to stringify error)', outer, e);
+                                addToast({ title: 'Failed to save activity', description: String(e?.message || e), variant: 'error' });
+                            }
+                        }
                     }}
-                    activityId={editItem.id}
-                    initialData={{
-                        taskId: editItem.taskId || "",
-                        text: editItem.text || editItem.title || "",
-                        title: editItem.text || editItem.title || "",
-                    }}
-                    attachedTaskId={editItem.taskId || null}
                 />
             )}
 

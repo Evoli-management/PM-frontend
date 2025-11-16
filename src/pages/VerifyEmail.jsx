@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import authService from "../services/authService";
 
 export default function VerifyEmail() {
     const { search } = useLocation();
@@ -26,16 +25,17 @@ export default function VerifyEmail() {
             setStatus("Missing token");
             return;
         }
-        authService
-            .verifyEmail(token)
-            .then(() => {
+        (async () => {
+            try {
+                const auth = await import("../services/authService");
+                await auth.default.verifyEmail(token);
                 setStatus("Email verified successfully. Redirecting to login…");
                 setTimeout(() => navigate("/login"), 1200);
-            })
-            .catch((e) => {
+            } catch (e) {
                 const msg = e?.response?.data?.message || "Verification failed";
                 setStatus(typeof msg === "string" ? msg : "Verification failed");
-            });
+            }
+        })();
     }, [search, navigate]);
 
     const handleResend = async (e) => {
@@ -48,7 +48,8 @@ export default function VerifyEmail() {
         }
         setResending(true);
         try {
-            const res = await authService.resendVerification(email);
+            const { default: auth } = await import("../services/authService");
+            const res = await auth.resendVerification(email);
             setResendMsg(res?.message || "If the account exists, we sent a new email.");
             setCooldown(30); // 30 seconds cooldown
         } catch (err) {

@@ -1,11 +1,11 @@
 // src/pages/Goals.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import Sidebar from "../components/shared/Sidebar";
 import Toast from "../components/shared/Toast";
-import { getGoals, createGoal, updateGoal, deleteGoal, completeGoal, archiveGoal } from "../services/goalService";
+// goalService is dynamically imported where needed to allow code-splitting
 import GoalsHeader from "../components/goals/GoalsHeader";
 import GoalList from "../components/goals/GoalList";
-import GoalForm from "../components/goals/GoalForm";
+const GoalForm = React.lazy(() => import("../components/goals/GoalForm"));
 import GoalDetailModal from "../components/goals/GoalDetailModal";
 import KanbanView from "../components/goals/views/KanbanView";
 import ListView from "../components/goals/views/ListView";
@@ -21,7 +21,7 @@ import {
     FaClock,
     FaBars,
 } from "react-icons/fa";
-import { getKeyAreas } from "../services/keyAreaService";
+// keyAreaService helpers are imported on-demand to allow code-splitting
 
 const Goals = () => {
     const [goals, setGoals] = useState([]);
@@ -46,7 +46,8 @@ const Goals = () => {
         try {
             setIsLoading(true);
             setError(null);
-            const data = await getGoals();
+            const mod = await import("../services/goalService");
+            const data = await mod.getGoals();
             setGoals(data);
             setFilteredGoals(data);
         } catch (err) {
@@ -59,7 +60,18 @@ const Goals = () => {
 
     useEffect(() => {
         fetchGoals();
-        getKeyAreas().then(setKeyAreas).catch(console.error);
+        (async () => {
+            try {
+                const mod = await import("../services/keyAreaService");
+                const fn = mod.getKeyAreas || (mod.default && mod.default.getKeyAreas);
+                if (fn) {
+                    const list = await fn();
+                    setKeyAreas(list);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        })();
     }, [fetchGoals]);
 
     useEffect(() => {
@@ -97,7 +109,8 @@ const Goals = () => {
 
     const handleCreateGoal = async (goalData) => {
         try {
-            await createGoal(goalData);
+            const mod = await import("../services/goalService");
+            await mod.createGoal(goalData);
             await fetchGoals();
             showToast("success", "Goal created successfully!");
         } catch (error) {
@@ -110,7 +123,8 @@ const Goals = () => {
     const handleUpdateGoal = async (goalId, updateData) => {
         try {
             console.log("Goals.jsx - Updating goal:", goalId, "with:", updateData);
-            const updatedGoal = await updateGoal(goalId, updateData);
+            const mod = await import("../services/goalService");
+            const updatedGoal = await mod.updateGoal(goalId, updateData);
 
             setGoals((prevGoals) => prevGoals.map((goal) => (goal.id === goalId ? { ...goal, ...updatedGoal } : goal)));
 
@@ -136,16 +150,16 @@ const Goals = () => {
         if (window.confirm("Are you sure you want to delete this goal? This action cannot be undone.")) {
             try {
                 console.log("Goals.jsx - Attempting to delete goal:", goalId);
-
+                const mod = await import("../services/goalService");
                 try {
                     console.log("Trying to archive goal first");
-                    await archiveGoal(goalId);
+                    await mod.archiveGoal(goalId);
                     setGoals(goals.filter((g) => g.id !== goalId));
                     setFilteredGoals(filteredGoals.filter((g) => g.id !== goalId));
                     showToast("success", "Goal has been archived.");
                 } catch (archiveError) {
                     console.log("Archive failed, trying hard delete");
-                    await deleteGoal(goalId);
+                    await mod.deleteGoal(goalId);
                     setGoals(goals.filter((g) => g.id !== goalId));
                     setFilteredGoals(filteredGoals.filter((g) => g.id !== goalId));
                     showToast("success", "Goal has been permanently deleted.");
@@ -363,11 +377,13 @@ const Goals = () => {
 
                 {/* Modal */}
                 {isModalOpen && (
-                    <GoalForm
-                        onClose={() => setIsModalOpen(false)}
-                        onGoalCreated={handleCreateGoal}
-                        keyAreas={keyAreas}
-                    />
+                    <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                        <GoalForm
+                            onClose={() => setIsModalOpen(false)}
+                            onGoalCreated={handleCreateGoal}
+                            keyAreas={keyAreas}
+                        />
+                    </Suspense>
                 )}
                 {selectedGoal && (
                     <GoalDetailModal
