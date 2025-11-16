@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
-import DashboardContainer from "../../components/dashboard/DashboardContainer";
 import { FaGripVertical, FaBars } from "react-icons/fa";
 import {
     DndContext,
@@ -22,7 +21,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import DashboardTile from "../../components/dashboard/DashboardTile";
+
 // Reusable dashboard widgets
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
@@ -863,7 +862,8 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="Your active goals" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
                             <div className="flex items-center gap-2">
@@ -926,7 +926,7 @@ export default function Dashboard() {
                                 ))}
                             </ul>
                         )}
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -936,7 +936,8 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="eNPS Snapshot" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
                         <div className="flex items-start justify-between">
                             <div />
                             <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
@@ -947,7 +948,7 @@ export default function Dashboard() {
                         <a href="#/enps">
                             <EnpsChart data={enpsData} labels={enpsData.map((_, i) => `W${i + 1}`)} />
                         </a>
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -957,9 +958,10 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="Strokes" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">Strokes</h3>
                         <StrokesPanel strokes={strokes} />
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -987,7 +989,8 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="Calendar Preview (Today)" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
                             <a href="#/calendar" className="text-sm text-blue-600">Open Calendar</a>
@@ -1018,7 +1021,7 @@ export default function Dashboard() {
                                 getCountdownBadge={getCountdownBadge} 
                             />
                         )}
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -1028,7 +1031,8 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="What's New" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
                             <div className="flex items-center gap-2">
@@ -1069,7 +1073,7 @@ export default function Dashboard() {
                                 No recent activity. Start working on your goals to see updates here!
                             </div>
                         )}
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -1079,13 +1083,14 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="Suggestions" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">Suggestions</h3>
                         <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                             <li>Recommend goal: "Automate weekly reporting" (template)</li>
                             <li>Next best action: Finish API tests before lunch</li>
                             <li>Insight: You're most productive in the morning (9–12)</li>
                         </ul>
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -1095,7 +1100,8 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={gridClass}>
-                    <DashboardTile title="Team Performance Overview" className="h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                        <h3 className="font-semibold text-blue-700 mb-3">Team Performance Overview</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div className="p-3 border rounded">Team goals completion: 68%</div>
                             <div className="p-3 border rounded">Avg workload: 32h/week</div>
@@ -1105,7 +1111,7 @@ export default function Dashboard() {
                         <div className="mt-3 flex justify-end">
                             <button className="px-3 py-1 border rounded text-sm" title="Export team report">Export report</button>
                         </div>
-                    </DashboardTile>
+                    </div>
                 </div>
                 </SortableWidget>
             );
@@ -1169,74 +1175,79 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="flex min-h-screen bg-[Canvas]">
-            <Sidebar 
-                user={{ name: "Hussein" }} 
-                mobileOpen={mobileSidebarOpen}
-                onMobileClose={() => setMobileSidebarOpen(false)}
-            />
-            {mobileSidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
-                    onClick={() => setMobileSidebarOpen(false)}
+        <div className="min-h-screen bg-[#EDEDED]">
+            <div className="flex w-full overflow-hidden">
+                <Sidebar 
+                    user={{ name: "Hussein" }} 
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
                 />
-            )}
-        <DashboardContainer className="flex-1 p-2 md:p-4 text-[CanvasText] min-w-0" title="Dashboard">
-            <div className="w-full max-w-full" style={{ marginTop: '-0.75rem' }}>
-                <div className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <button
-                            className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
-                            onClick={() => setMobileSidebarOpen(true)}
-                            aria-label="Open sidebar"
-                        >
-                            <FaBars />
-                        </button>
-                    </div>
-                    {/* Widgets control moved to Navbar (keeps header slim) */}
-                </div>
-
-                {/* Quick Add fixed widget at top (non-draggable) */}
-                {prefs.widgets.quickAdd && (
-                    <div className="mb-3">
-                        <DashboardTile>
-                            <QuickAddBar
-                                onOpen={(t) => {
-                                    try {
-                                        // Map lightweight quick types to the modal manager's types
-                                        const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
-                                        window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
-                                    } catch (err) {
-                                        console.warn('quickAdd dispatch error', err);
-                                    }
-                                }}
-                                message={message}
-                            />
-                        </DashboardTile>
-                    </div>
+                {mobileSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
                 )}
+                <main className="flex-1 min-w-0 w-full transition-all md:ml-[1mm]">
+                    <div className="max-w-full overflow-x-hidden">
+                        <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                                    onClick={() => setMobileSidebarOpen(true)}
+                                    aria-label="Open sidebar"
+                                >
+                                    <FaBars />
+                                </button>
+                                <h1 className="text-2xl font-semibold text-blue-700 dark:text-blue-300">Dashboard</h1>
+                            </div>
+                        </div>
+                        <div className="px-2 md:px-4">
 
-                {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
-                {visibleWidgetKeys.length > 0 && (
-                    <div className="h-full">
-                        <DndContext 
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <SortableContext 
-                                items={visibleWidgetKeys} 
-                                strategy={rectSortingStrategy}
-                            >
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-6 auto-rows-fr h-full">
-                                    {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                            {/* Quick Add fixed widget at top (non-draggable) */}
+                            {prefs.widgets.quickAdd && (
+                                <div className="mb-3">
+                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
+                                        <QuickAddBar
+                                            onOpen={(t) => {
+                                                try {
+                                                    // Map lightweight quick types to the modal manager's types
+                                                    const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                                    window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                                                } catch (err) {
+                                                    console.warn('quickAdd dispatch error', err);
+                                                }
+                                            }}
+                                            message={message}
+                                        />
+                                    </div>
                                 </div>
-                            </SortableContext>
-                        </DndContext>
-                    </div>
-                )}
+                            )}
 
-                {/* Footer note intentionally left blank */}
+                            {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
+                            {visibleWidgetKeys.length > 0 && (
+                                <div className="w-full">
+                                    <DndContext 
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={handleDragEnd}
+                                    >
+                                        <SortableContext 
+                                            items={visibleWidgetKeys} 
+                                            strategy={rectSortingStrategy}
+                                        >
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 auto-rows-fr">
+                                                {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                                            </div>
+                                        </SortableContext>
+                                    </DndContext>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </main>
+            </div>
 
                 {/* Quick Add inline form area */}
                 {quickAddOpen && (
@@ -1305,8 +1316,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
-                </div>
-            </DashboardContainer>
         </div>
     );
 }
