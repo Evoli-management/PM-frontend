@@ -1181,7 +1181,7 @@ export default function DontForget() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50">
+        <div className="flex min-h-screen overflow-x-hidden bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50">
             <Sidebar 
                 user={{ name: "Hussein" }} 
                 mobileOpen={mobileSidebarOpen}
@@ -1314,7 +1314,7 @@ export default function DontForget() {
                         </div>
                     </div>
                 ) : (
-                    <main class="flex-1 min-w-0 w-full transtion-all ml-0 md:ml-[300]">
+                    <div className="flex-1 min-w-0 w-full transition-all ml-0 md:ml-[3mm]">
                     <div className="overflow-hidden">
                         {viewMode === "dont-forget" ? (
                             <div className="max-w-full overflow-x-hidden">
@@ -1683,7 +1683,7 @@ export default function DontForget() {
                             <div className="p-6 text-gray-500">Select a view.</div>
                         )}
                     </div>
-                    </main>
+                    </div>
                 )}
             </main>
         </div>
