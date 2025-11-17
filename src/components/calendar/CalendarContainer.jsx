@@ -1282,6 +1282,7 @@ const CalendarContainer = () => {
                 <AppointmentModal
                     startDate={appointmentInitialStart}
                     defaultDurationMinutes={30}
+                    users={usersList}
                     onClose={() => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
@@ -1298,6 +1299,7 @@ const CalendarContainer = () => {
             {modalOpen && selectedEvent && (
                 <AppointmentModal
                     event={selectedEvent}
+                    users={usersList}
                     onClose={() => {
                         setModalOpen(false);
                         setSelectedEvent(null);
