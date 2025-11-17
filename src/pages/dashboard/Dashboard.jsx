@@ -821,13 +821,14 @@ export default function Dashboard() {
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
-        const isCompactWidget = ['myDay', 'goals', 'enps', 'strokes', 'productivity'].includes(key);
-        const gridClass = isCompactWidget ? 'col-span-1' : 'col-span-1 md:col-span-2';
+        // Make all widgets the same size as "What's New" for better visual consistency
+        // Fixed height and consistent sizing for all widgets
+        const widgetClass = 'w-full h-80 min-h-80';
 
         if (key === "quickAdd") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                         <QuickAddBar
                             onOpen={(t) => {
                                 try {
@@ -847,7 +848,7 @@ export default function Dashboard() {
         if (key === "myDay") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                         <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
                             <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
                             <div className="text-xs font-medium opacity-80">tasks</div>
@@ -861,7 +862,7 @@ export default function Dashboard() {
         if (key === "goals") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
                         <div className="flex items-center justify-between mb-2">
@@ -935,7 +936,7 @@ export default function Dashboard() {
         if (key === "enps") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
                         <div className="flex items-start justify-between">
@@ -957,7 +958,7 @@ export default function Dashboard() {
         if (key === "strokes") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">Strokes</h3>
                         <StrokesPanel strokes={strokes} />
@@ -970,7 +971,7 @@ export default function Dashboard() {
         if (key === "productivity") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
                         <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
                         <div className="text-xs font-medium opacity-80">productive</div>
@@ -988,7 +989,7 @@ export default function Dashboard() {
         if (key === "calendarPreview") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
                         <div className="flex items-center justify-between mb-2">
@@ -1030,7 +1031,7 @@ export default function Dashboard() {
         if (key === "activity") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
                         <div className="flex items-center justify-between mb-2">
@@ -1082,7 +1083,7 @@ export default function Dashboard() {
         if (key === "suggestions") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">Suggestions</h3>
                         <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
@@ -1099,7 +1100,7 @@ export default function Dashboard() {
         if (key === "teamOverview") {
             return (
                 <SortableWidget key={key} id={key}>
-                    <div className={gridClass}>
+                    <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
                         <h3 className="font-semibold text-blue-700 mb-3">Team Performance Overview</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -1152,31 +1153,11 @@ export default function Dashboard() {
         gridAutoRows: '1fr',
     };
 
-    const cardWrapper = {
-        minWidth: '120px',
-        minHeight: '100px',
-        display: 'flex',
-        flexDirection: 'column',
-    };
 
-    const cardWrapperLarge = {
-        minWidth: '160px',
-        minHeight: '120px',
-        display: 'flex',
-        flexDirection: 'column',
-    };
-
-    // Compute wrapper style dynamically based on how many top widgets are visible
-    function getWrapperStyle(key) {
-        // For grid layout we let CSS grid handle sizing. Provide a sensible minWidth
-        const isLarge = key === 'goals' || key === 'enps' || key === 'strokes';
-        const base = isLarge ? { ...cardWrapperLarge } : { ...cardWrapper };
-        return { ...base, position: 'relative', width: '100%' };
-    }
 
     return (
-        <div className="min-h-screen bg-[#EDEDED]">
-            <div className="flex w-full overflow-hidden">
+        <div className="min-h-screen h-screen bg-[#EDEDED]">
+            <div className="flex w-full h-full overflow-hidden">
                 <Sidebar 
                     user={{ name: "Hussein" }} 
                     mobileOpen={mobileSidebarOpen}
@@ -1236,7 +1217,7 @@ export default function Dashboard() {
                                             items={visibleWidgetKeys} 
                                             strategy={rectSortingStrategy}
                                         >
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 auto-rows-fr">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                                                 {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
                                             </div>
                                         </SortableContext>
