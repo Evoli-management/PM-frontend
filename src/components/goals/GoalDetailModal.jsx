@@ -1,21 +1,21 @@
 import React, { useState, Suspense } from "react";
 import {
-    FaTimes,
-    FaEdit,
-    FaCheckCircle,
-    FaArchive,
-    FaTrash,
-    FaEye,
-    FaEyeSlash,
-    FaCalendarAlt,
-    FaFlag,
-    FaSave,
-    FaBuilding,
-    FaTrophy,
-    FaBullseye,
-    FaChartPie,
-    FaHistory,
-} from "react-icons/fa";
+    Edit,
+    CheckCircle,
+    Archive,
+    Trash2,
+    Eye,
+    EyeOff,
+    Calendar as CalendarIcon,
+    Flag,
+    Save,
+    Building,
+    Trophy,
+    Target,
+    PieChart,
+    History,
+    X,
+} from "lucide-react";
 const GoalForm = React.lazy(() => import("./GoalForm"));
 
 const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
@@ -59,31 +59,21 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
-            <style>{`
-                @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-                @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-                .animate-fadeIn { animation:fadeIn .2s ease-out; }
-                .animate-slideUp { animation:slideUp .3s ease-out; }
-                .milestone-scroll::-webkit-scrollbar { width:6px; }
-                .milestone-scroll::-webkit-scrollbar-track { background:#f1f5f9; border-radius:3px; }
-                .milestone-scroll::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
-                .milestone-scroll::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
-            `}</style>
-
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/50 transition-opacity" />
+            
             <div
-                className="bg-white rounded-xl w-full max-w-4xl shadow-2xl flex flex-col animate-slideUp"
-                style={{ maxHeight: "90vh", border: "1px solid #e5e7eb" }}
+                className="relative bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] border border-gray-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* HEADER */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
-                            <FaBullseye className="w-5 h-5 text-white" />
+                            <Target className="w-5 h-5 text-white" />
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-gray-900">{goal.title}</h2>
@@ -99,7 +89,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 >
                                     {goal.status}
                                 </span>
-                                {goal.visibility === "private" && <FaEyeSlash className="w-3.5 h-3.5 text-gray-500" />}
+                                {goal.visibility === "private" && <EyeOff className="w-3.5 h-3.5 text-gray-500" />}
                                 {isOverdue && <span className="text-xs font-medium text-red-600">Overdue</span>}
                             </div>
                         </div>
@@ -111,12 +101,12 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                             className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all"
                             title="Edit Goal"
                         >
-                            <FaEdit className="w-4.5 h-4.5" />
+                            <Edit className="w-4.5 h-4.5" />
                         </button>
 
                         {goal.status === "active" && (
                             <button className="p-2.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all" title="Complete">
-                                <FaCheckCircle className="w-4.5 h-4.5" />
+                                <CheckCircle className="w-4.5 h-4.5" />
                             </button>
                         )}
 
@@ -124,12 +114,12 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                             className="p-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all"
                             title={goal.visibility === "public" ? "Make Private" : "Make Public"}
                         >
-                            {goal.visibility === "public" ? <FaEyeSlash className="w-4.5 h-4.5" /> : <FaEye className="w-4.5 h-4.5" />}
+                            {goal.visibility === "public" ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
                         </button>
 
                         {goal.status !== "archived" && (
                             <button className="p-2.5 text-gray-600 hover:text-amber-600 hover:bg-amber-100 rounded-lg transition-all" title="Archive">
-                                <FaArchive className="w-4.5 h-4.5" />
+                                <Archive className="w-4.5 h-4.5" />
                             </button>
                         )}
 
@@ -143,13 +133,13 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                             className="p-2.5 text-red-600 hover:bg-red-100 rounded-lg transition-all"
                             title="Delete"
                         >
-                            <FaTrash className="w-4.5 h-4.5" />
+                            <Trash2 className="w-4.5 h-4.5" />
                         </button>
 
                         <div className="w-px h-7 bg-gray-300 mx-1" />
 
                         <button onClick={onClose} className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                            <FaTimes className="w-5 h-5" />
+                            <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
@@ -184,7 +174,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                                <FaTrophy className="w-4 h-4 text-blue-600" />
+                                                <Trophy className="w-4 h-4 text-blue-600" />
                                                 Progress
                                             </span>
                                             <span className="text-lg font-bold text-blue-600">{progressPercent}%</span>
@@ -217,7 +207,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
 
                                     <div>
                                         <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                            <FaBullseye className="w-5 h-5 text-blue-600" />
+                                            <Target className="w-5 h-5 text-blue-600" />
                                             Goal Details
                                         </h3>
                                         <div className="space-y-4">
@@ -242,8 +232,8 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                                 <option key={a.id} value={a.id}>{a.name}</option>
                                                             ))}
                                                         </select>
-                                                        <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><FaSave className="w-4 h-4" /></button>
-                                                        <button onClick={() => setEditingKeyArea(false)} className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"><FaTimes className="w-4 h-4" /></button>
+                                                        <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><Save className="w-4 h-4" /></button>
+                                                        <button onClick={() => setEditingKeyArea(false)} className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"><X className="w-4 h-4" /></button>
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center justify-between mt-1.5">
@@ -252,7 +242,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                             onClick={() => setEditingKeyArea(true)}
                                                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
                                                         >
-                                                            <FaEdit className="w-3.5 h-3.5" />
+                                                            <Edit className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
                                                 )}
@@ -277,7 +267,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                 <div>
                                                     <label className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Completed On</label>
                                                     <p className="mt-1.5 text-emerald-700 font-medium flex items-center gap-1.5">
-                                                        <FaTrophy className="w-4 h-4" />
+                                                        <Trophy className="w-4 h-4" />
                                                         {completionDate}
                                                     </p>
                                                 </div>
@@ -292,7 +282,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 <div className="space-y-4 pb-6">
                                     <div className="mb-4">
                                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                                            <FaFlag className="w-5 h-5 text-blue-600" />
+                                            <Flag className="w-5 h-5 text-blue-600" />
                                             Milestones ({completedMilestones}/{totalMilestones})
                                         </h3>
                                         <p className="text-sm text-gray-500 mt-1">Track your progress step by step</p>
@@ -311,7 +301,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                                 : "bg-gradient-to-br from-gray-400 to-gray-500"
                                                         }`}
                                                     >
-                                                        {m.done ? <FaCheckCircle className="w-4 h-4" /> : i + 1}
+                                                        {m.done ? <CheckCircle className="w-4 h-4" /> : i + 1}
                                                     </div>
                                                     <div className="flex-1">
                                                         <p className={`font-semibold text-sm ${m.done ? "line-through text-gray-500" : "text-gray-900"}`}>
@@ -319,14 +309,14 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                                         </p>
                                                         {m.dueDate && (
                                                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                                                <FaCalendarAlt className="w-3 h-3" />
+                                                                <CalendarIcon className="w-3 h-3" />
                                                                 {new Date(m.dueDate).toLocaleDateString()}
                                                             </p>
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2 text-xs">
                                                         <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                                                            <FaTrophy className="w-3 h-3" />
+                                                            <Trophy className="w-3 h-3" />
                                                             {m.weight || 1}x Score
                                                         </span>
                                                     </div>
@@ -336,7 +326,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                     ) : (
                                         <div className="text-center py-12">
                                             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                <FaFlag className="w-7 h-7 text-gray-400" />
+                                                <Flag className="w-7 h-7 text-gray-400" />
                                             </div>
                                             <p className="text-gray-600 font-medium">No milestones yet</p>
                                             <p className="text-xs text-gray-500 mt-1">Break your goal into smaller steps</p>
@@ -350,7 +340,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                                 <div className="h-full flex items-center justify-center pb-6">
                                     <div className="text-center">
                                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                                            <FaHistory className="w-8 h-8 text-gray-400" />
+                                            <History className="w-8 h-8 text-gray-400" />
                                         </div>
                                         <p className="text-gray-600 font-medium">Activity log coming soon</p>
                                         <p className="text-sm text-gray-500 mt-1">Track edits, completions, and updates</p>
@@ -363,7 +353,7 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
                         <div className="w-72 border-l border-gray-200 flex flex-col bg-gray-50">
                             <div className="p-4 flex-shrink-0">
                                 <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
-                                    <FaChartPie className="w-4 h-4 text-indigo-600" />
+                                    <PieChart className="w-4 h-4 text-indigo-600" />
                                     Goal Summary
                                 </h4>
                                 <div className="space-y-2 text-sm">

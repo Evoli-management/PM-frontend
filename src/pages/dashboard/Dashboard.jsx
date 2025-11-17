@@ -1122,7 +1122,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="flex min-h-screen bg-[Canvas]">
+        <div className="flex min-h-screen bg-slate-50">
             <Sidebar 
                 user={{ name: "Hussein" }} 
                 mobileOpen={mobileSidebarOpen}

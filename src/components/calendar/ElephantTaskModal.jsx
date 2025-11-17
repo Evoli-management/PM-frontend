@@ -27,7 +27,7 @@ export default function ElephantTaskModal({ isOpen, onClose, onSave, taskId }) {
 
     return (
         <div className="fixed inset-0 z-50 grid place-items-center">
-            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/50" onClick={onClose} />
             <div className="relative bg-white border border-slate-200 rounded-xl shadow-xl w-[92vw] max-w-md p-4">
                 <h2 className="text-lg font-semibold mb-2">Create Elephant Task</h2>
                 <form onSubmit={handleSubmit} className="grid gap-3">

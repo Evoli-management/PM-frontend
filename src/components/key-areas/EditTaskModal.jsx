@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { FaSave } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { Save } from 'lucide-react';
+import { Modal, FormField, Input, Select, DateInput, Button } from '../shared/primitives';
 import usersService from '../../services/usersService';
 
 // ---- helpers (JS only) ----
@@ -331,7 +332,7 @@ export default function EditTaskModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* overlay */}
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
       {/* dialog */}
   <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
         {/* hide native date picker icons for inputs with .no-calendar */}

@@ -1,56 +1,43 @@
 import React, { useState, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-    FaHome,
-    FaCalendarAlt,
-    FaLock,
-    FaChevronDown,
-    FaSearch,
-    FaGripVertical,
-} from "react-icons/fa";
+    Home,
+    Calendar,
+    Lock,
+    ChevronDown,
+    Search,
+    GripVertical,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-react";
 import { isFeatureEnabled } from "../../utils/flags.js";
 
 const navItems = [
-    { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
-    { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
+    { label: "Dashboard", icon: <Home className="w-5 h-5" />, to: "/dashboard", section: "Main" },
+    { label: "Calendar", icon: <Calendar className="w-5 h-5" />, to: "/calendar", section: "Main" },
     {
-        label: "Don't Forget",
-        icon: (
-            <img
-                src={`${import.meta.env.BASE_URL}dont-forget.png`}
-                alt="Don't forget"
-                className="w-6 h-6 object-contain"
-            />
-        ),
-        to: { pathname: "/tasks", search: "?dontforget=1" },
+        label: "Goals & Tracking",
+        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-5 h-5 object-contain" />,
+        to: "/goals",
         section: "Main",
     },
     {
-        label: "Goals & Tracking",
-        icon: <img src={`${import.meta.env.BASE_URL}goals.png`} alt="Goals" className="w-6 h-6 object-contain" />,
-        to: "/goals",
+        label: "Don't Forget",
+        icon: <img src={`${import.meta.env.BASE_URL}dont-forget.png`} alt="Don't Forget" className="w-5 h-5 object-contain" />,
+        to: "/tasks",
         section: "Main",
     },
     {
         label: "Key Areas",
         icon: (
-            <img src={`${import.meta.env.BASE_URL}key-area.png`} alt="Key Areas" className="w-6 h-6 object-contain" />
+            <img src={`${import.meta.env.BASE_URL}key-area.png`} alt="Key Areas" className="w-5 h-5 object-contain" />
         ),
         to: "/key-areas",
         section: "Main",
-        children: [
-            {
-                label: "Ideas",
-                icon: (
-                    <img src={`${import.meta.env.BASE_URL}ideas.png`} alt="Ideas" className="w-6 h-6 object-contain" />
-                ),
-                to: { pathname: "/key-areas", search: "?select=ideas" },
-            },
-        ],
     },
     {
         label: "Team",
-        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
+        icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-5 h-5 object-contain" />,
         to: "/teams",
         section: "Main",
     },
@@ -220,6 +207,11 @@ export default function Sidebar({
             const id = String(x.id || "");
             if (!id || seen.has(id)) return false;
             seen.add(id);
+            
+            // Filter out "Don't Forget" - it's a separate nav item now
+            const title = String(x.title || "").trim().toLowerCase();
+            if (title === "don't forget" || title === "dont forget") return false;
+            
             return true;
         });
         const ideas = arr.filter(
@@ -275,107 +267,93 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} h-screen md:h-[calc(100vh-2rem)] shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-4 md:translate-x-0 md:ml-4 md:mr-2 md:my-4 hidden-mobile`}
+            className={`bg-white ${collapsed ? "w-20" : "w-72"} h-screen md:h-[calc(100vh-2rem)] shadow-xl border border-slate-200 flex flex-col transition-all duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-4 md:translate-x-0 md:ml-4 md:mr-2 md:my-4 hidden-mobile`}
             aria-label="Sidebar"
         >
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
-                <div className="mb-6 flex items-center gap-2 px-2">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
-                    {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
-
-                    <div className="ml-auto flex items-center gap-2">
-                        {mobileOpen && (
-                            <button
-                                className="md:hidden text-blue-700 hover:text-blue-900 focus:outline-none"
-                                aria-label="Close sidebar"
-                                onClick={() => (typeof onMobileClose === "function" ? onMobileClose() : null)}
-                            >
-                                <span className="sr-only">Close</span>
-                                <svg
-                                    className="w-5 h-5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        )}
+            <div className="flex-1 overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-white z-10 border-b border-slate-100 px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-10 h-10 flex-shrink-0" />
+                            {!collapsed && (
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-bold text-lg text-slate-900 truncate">Practical</span>
+                                    <span className="text-xs text-slate-500 truncate">Manager</span>
+                                </div>
+                            )}
+                        </div>
 
                         <button
-                            className="text-blue-700 hover:text-blue-900 focus:outline-none"
+                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
                             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                             onClick={() => {
                                 if (typeof onCollapseToggle === "function") onCollapseToggle();
                                 else setInternalCollapsed((c) => !c);
                             }}
                         >
-                            <svg
-                                className={`w-4 h-4 transform ${collapsed ? "rotate-90" : "rotate-0"}`}
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <path d="M6 9l6 6 6-6" />
-                            </svg>
+                            {collapsed ? (
+                                <ChevronRight className="w-5 h-5 text-slate-600" />
+                            ) : (
+                                <ChevronLeft className="w-5 h-5 text-slate-600" />
+                            )}
                         </button>
                     </div>
+
+                    {/* Search Bar */}
+                    {!collapsed && (
+                        <div className="mt-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search..."
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
                 
-                {!collapsed && (
-                    <div className="mb-4 px-2">
-                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow">
-                            <FaSearch className="text-blue-700 mr-2" />
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search..."
-                                className="bg-transparent outline-none text-sm w-full"
-                            />
-                        </div>
-                    </div>
-                )}
-                
-                <div className={`px-2`}>
-                    <div className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
-                        <nav aria-label="Sidebar navigation">
+                {/* Navigation */}
+                <div className="p-4">
+                    <nav aria-label="Sidebar navigation" className="space-y-1">
                             {navItems
                                 .filter((item) => item.label.toLowerCase().includes(search.toLowerCase()))
                                 .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
                                 .map((item) => {
                                     const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
+                                    const isActive = location.pathname.startsWith(item.to);
 
                                     if (isKeyAreas) {
                                         return (
-                                            <div key={item.label} className="mb-2">
+                                            <div key={item.label}>
                                                 <button
                                                     onClick={(e) => handleKeyAreasClick(e, item)}
                                                     aria-expanded={keyAreasOpen}
-                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${location.pathname.startsWith("/key-areas") ? "bg-white text-blue-700 shadow-inner font-semibold" : "text-gray-800 hover:bg-white"}`}
+                                                    className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-all group focus:outline-none ${
+                                                        isActive 
+                                                            ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-semibold" 
+                                                            : "text-slate-700 hover:bg-slate-50"
+                                                    }`}
                                                 >
-                                                    <span className="text-xl" title={item.label}>
+                                                    <span className="flex-shrink-0" title={item.label}>
                                                         {item.icon}
                                                     </span>
-                                                    {!collapsed && <span>{item.label}</span>}
-                                                    {item.badge && (
-                                                        <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
-                                                            {item.badge}
-                                                        </span>
+                                                    {!collapsed && (
+                                                        <>
+                                                            <span className="flex-1 text-left text-sm">{item.label}</span>
+                                                            <ChevronDown
+                                                                className={`w-4 h-4 transition-transform ${keyAreasOpen ? "rotate-180" : "rotate-0"}`}
+                                                            />
+                                                        </>
                                                     )}
-                                                    <FaChevronDown
-                                                        className={`ml-auto ${keyAreasOpen ? "rotate-180" : "rotate-0"}`}
-                                                    />
                                                 </button>
-
                                                 {!collapsed && keyAreasOpen && (
-                                                    <div className="ml-6 mt-2 space-y-1">
+                                                    <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-slate-200 pl-3">
+                                                        {/* Dynamic Key Areas */}
                                                         {displayKeyAreas &&
                                                             displayKeyAreas.length > 0 &&
                                                             displayKeyAreas.map((ka, index) => {
@@ -383,10 +361,10 @@ export default function Sidebar({
                                                                     location.pathname.startsWith("/key-areas") &&
                                                                     new URLSearchParams(location.search).get("ka") ===
                                                                         String(ka.id);
-                                                                const baseClasses = "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-left w-full";
-                                                                const activeClasses = "text-blue-700 font-semibold bg-white shadow-inner";
-                                                                const inactiveClasses = "text-gray-800 hover:bg-white";
-                                                                const dragOverClasses = dragOverIndex === index ? "bg-blue-100 border-2 border-blue-300 border-dashed" : "";
+                                                                const baseClasses = "flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-left w-full text-sm";
+                                                                const activeClasses = "bg-blue-50 text-blue-700 font-medium";
+                                                                const inactiveClasses = "text-slate-600 hover:bg-slate-50 hover:text-slate-900";
+                                                                const dragOverClasses = dragOverIndex === index ? "bg-blue-100 ring-2 ring-blue-300 ring-inset" : "";
                                                                 
                                                                 const itemClasses = `${baseClasses} ${isActive ? activeClasses : inactiveClasses} ${dragOverClasses}`;
                                                                 const isLocked = !!ka.is_default;
@@ -435,26 +413,26 @@ export default function Sidebar({
                                                                             className={`${itemClasses} group`}
                                                                         >
                                                                             {isDraggable && (
-                                                                                <FaGripVertical 
-                                                                                    className="text-gray-300 hover:text-gray-600 text-xs mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                                                                                <GripVertical 
+                                                                                    className="text-slate-300 group-hover:text-slate-500 w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
                                                                                     title="Drag to reorder"
                                                                                 />
                                                                             )}
                                                                             <span 
-                                                                                className="text-sm flex items-center gap-2 flex-1"
-                                                                                style={{ color: ka.color || '#374151' }}
+                                                                                className="flex items-center gap-2 flex-1 truncate"
+                                                                                style={{ color: isActive ? undefined : (ka.color || '#64748b') }}
                                                                             >
-                                                                                {ka.title}
+                                                                                <span className="truncate">{ka.title}</span>
                                                                                 {isLocked && (
-                                                                                    <span className="ml-2 inline-flex items-center">
+                                                                                    <span className="inline-flex items-center flex-shrink-0">
                                                                                         {isIdeas ? (
                                                                                             <img
                                                                                                 src={`${import.meta.env.BASE_URL}ideas.png`}
                                                                                                 alt="Ideas"
-                                                                                                className="w-4 h-4 object-contain"
+                                                                                                className="w-3.5 h-3.5 object-contain"
                                                                                             />
                                                                                         ) : (
-                                                                                            <FaLock className="text-slate-500 text-xs" />
+                                                                                            <Lock className="w-3 h-3 text-slate-400" />
                                                                                         )}
                                                                                     </span>
                                                                                 )}
@@ -470,17 +448,21 @@ export default function Sidebar({
                                     }
 
                                     return (
-                                        <div key={item.label} className="mb-2">
+                                        <div key={item.label}>
                                             <Link
                                                 to={item.to}
-                                                className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${location.pathname.startsWith(item.to) ? "bg-white text-blue-700 shadow-inner font-semibold" : "text-gray-800 hover:bg-white"}`}
+                                                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group ${
+                                                    isActive 
+                                                        ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-semibold" 
+                                                        : "text-slate-700 hover:bg-slate-50"
+                                                }`}
                                             >
-                                                <span className="text-xl" title={item.label}>
+                                                <span className="flex-shrink-0" title={item.label}>
                                                     {item.icon}
                                                 </span>
-                                                {!collapsed && <span>{item.label}</span>}
-                                                {item.badge && (
-                                                    <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
+                                                {!collapsed && <span className="text-sm flex-1">{item.label}</span>}
+                                                {item.badge && !collapsed && (
+                                                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold">
                                                         {item.badge}
                                                     </span>
                                                 )}
@@ -489,10 +471,7 @@ export default function Sidebar({
                                     );
                                 })}
                         </nav>
-                    </div>
                 </div>
-                
-                {/* Quick Actions removed per request */}
             </div>
         </aside>
     );

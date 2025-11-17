@@ -787,13 +787,19 @@ export default function KeyAreas() {
     const sortForSidebar = React.useCallback((arr) => {
         const items = Array.isArray(arr) ? arr.slice() : [];
         
+        // Filter out "Don't Forget" - it's a separate nav item, not a key area in the sidebar
+        const filteredItems = items.filter(item => {
+            const title = String(item.title || "").trim().toLowerCase();
+            return title !== "don't forget" && title !== "dont forget";
+        });
+        
         // Separate Ideas/default areas from regular areas
-        const regularAreas = items.filter(item => {
+        const regularAreas = filteredItems.filter(item => {
             const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
             return !isIdeas;
         });
         
-        const ideasAreas = items.filter(item => {
+        const ideasAreas = filteredItems.filter(item => {
             const isIdeas = (item.title || "").trim().toLowerCase() === "ideas" || !!item.is_default;
             return isIdeas;
         });
@@ -2142,37 +2148,39 @@ export default function KeyAreas() {
                             style={{ display: selectedTaskFull ? "none" : undefined }}
                         >
                             {!selectedKA ? (
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
-                                    {!showOnlyIdeas && (
-                                        <>
-                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                                <FaSearch className="text-slate-700 mr-2" />
-                                                <input
-                                                    placeholder="Search key areas..."
-                                                    className="bg-transparent outline-none text-sm w-56"
-                                                    value={filter}
-                                                    onChange={(e) => setFilter(e.target.value)}
-                                                />
+                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 w-full">
+                                    <div className="flex items-center justify-between">
+                                        <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
+                                        {!showOnlyIdeas && (
+                                            <div className="flex items-center gap-4">
+                                                <div className="relative flex-1 min-w-[240px]">
+                                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                                    <input
+                                                        placeholder="Search key areas..."
+                                                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        value={filter}
+                                                        onChange={(e) => setFilter(e.target.value)}
+                                                    />
+                                                </div>
+                                                <button
+                                                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg transition-all ${
+                                                        canAdd
+                                                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:shadow-xl"
+                                                            : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                                    }`}
+                                                    onClick={() => canAdd && (setShowForm(true), setEditing(null))}
+                                                    disabled={!canAdd}
+                                                    title={
+                                                        canAdd
+                                                            ? undefined
+                                                            : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
+                                                    }
+                                                >
+                                                    <FaPlus className="w-4 h-4" /> New Key Area
+                                                </button>
                                             </div>
-                                            <button
-                                                className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
-                                                    canAdd
-                                                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                                        : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                                }`}
-                                                onClick={() => canAdd && (setShowForm(true), setEditing(null))}
-                                                disabled={!canAdd}
-                                                title={
-                                                    canAdd
-                                                        ? undefined
-                                                        : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
-                                                }
-                                            >
-                                                <FaPlus /> New Key Area
-                                            </button>
-                                        </>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-2 w-full">
@@ -2218,19 +2226,21 @@ export default function KeyAreas() {
                                         </div>
                                     )}
 
-                                    <div className="ml-auto flex items-center gap-2">
-                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                            <FaSearch className="text-slate-700 mr-2" />
+                                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex-1 flex items-center gap-4">
+                                        {/* Search Input */}
+                                        <div className="relative flex-1 max-w-md">
+                                            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                                             <input
                                                 placeholder={`Search tasks in "${selectedKA.title}"…`}
-                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
+                                                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
                                             />
                                         </div>
 
+                                        {/* Quadrant Filter */}
                                         <select
-                                            className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                                            className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             value={quadrant}
                                             onChange={(e) => setQuadrant(e.target.value)}
                                             title="Focus quadrant"
@@ -2246,7 +2256,7 @@ export default function KeyAreas() {
                                         <div className="relative" ref={viewMenuRef}>
                                             <button
                                                 onClick={() => setShowViewMenu((s) => !s)}
-                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
+                                                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 rounded-lg px-4 py-3 text-sm font-semibold transition-colors"
                                                 aria-haspopup="menu"
                                                 aria-expanded={showViewMenu ? "true" : "false"}
                                             >
@@ -2266,7 +2276,7 @@ export default function KeyAreas() {
                                             {showViewMenu && (
                                                 <div
                                                     role="menu"
-                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
+                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow-lg z-50"
                                                 >
                                                     {[
                                                         { key: "list", label: "List" },

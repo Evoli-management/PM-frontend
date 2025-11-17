@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { FaTimes, FaPlus, FaTrash, FaSave, FaRocket } from "react-icons/fa";
+import { X, Plus, Trash2, Save, Rocket } from "lucide-react";
+import Modal from "../shared/primitives/Modal";
 
 const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
     const [formData, setFormData] = useState({
@@ -109,80 +110,36 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-            <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to { 
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                .animate-fadeIn {
-                    animation: fadeIn 0.2s ease-out;
-                }
-                .animate-slideUp {
-                    animation: slideUp 0.3s ease-out;
-                }
-                
-                /* Custom scrollbar for milestones */
-                .milestone-scroll::-webkit-scrollbar {
-                    width: 6px;
-                }
-                .milestone-scroll::-webkit-scrollbar-track {
-                    background: #f1f5f9;
-                    border-radius: 3px;
-                }
-                .milestone-scroll::-webkit-scrollbar-thumb {
-                    background: #cbd5e1;
-                    border-radius: 3px;
-                }
-                .milestone-scroll::-webkit-scrollbar-thumb:hover {
-                    background: #94a3b8;
-                }
-            `}</style>
-            
-            <div className="bg-white rounded-xl w-full max-w-6xl shadow-2xl flex flex-col animate-slideUp" style={{ maxHeight: '90vh', border: '1px solid #e5e7eb' }}>
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
-                            <FaRocket className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900">
-                                {isEditing ? "Edit Goal" : "Create New Goal"}
-                            </h2>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                {isEditing ? "Update your goal details" : "Set your target and break it down into milestones"}
-                            </p>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={onClose} 
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
-                    >
-                        <FaTimes className="w-5 h-5" />
-                    </button>
+        <Modal 
+            isOpen={true} 
+            onClose={onClose}
+            size="xl"
+            isSaving={isSubmitting}
+        >
+            {/* Custom Header */}
+            <div className="flex items-center gap-3 -mt-4 -mx-6 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
+                    <Rocket className="w-5 h-5 text-white" />
                 </div>
+                <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                        {isEditing ? "Edit Goal" : "Create New Goal"}
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                        {isEditing ? "Update your goal details" : "Set your target and break it down into milestones"}
+                    </p>
+                </div>
+            </div>
 
-                {/* Content - Fixed Height Container */}
-                <div className="flex-1 overflow-hidden">
-                    <div className="h-full flex">
-                        {/* Left Column - Main Info (Scrollable) */}
-                        <div className="flex-1 px-6 py-6 overflow-y-auto">
-                            {errors.general && (
-                                <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r text-red-700 text-sm animate-slideUp">
-                                    <strong className="font-medium">Error:</strong> {errors.general}
-                                </div>
-                            )}
+            {/* Content */}
+            <div className="flex gap-6 -mx-6 px-6">
+                {/* Left Column - Main Info */}
+                <div className="flex-1">
+                    {errors.general && (
+                        <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r text-red-700 text-sm">
+                            <strong className="font-medium">Error:</strong> {errors.general}
+                        </div>
+                    )}
 
                             <div className="space-y-5 max-w-2xl">
                                 {/* Title */}
@@ -318,7 +275,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                                         disabled={milestones.length >= 10}
                                         className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <FaPlus className="w-3 h-3" />
+                                        <Plus className="w-3 h-3" />
                                         Add
                                     </button>
                                 </div>
@@ -345,7 +302,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                                                     disabled={milestones.length === 1}
                                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-sm"
                                                 >
-                                                    <FaTrash className="w-3 h-3" />
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 pl-7">
@@ -378,29 +335,28 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Footer - Fixed */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
-                    >
-                        <FaSave className="w-4 h-4" />
-                        {isSubmitting ? "Saving..." : isEditing ? "Update Goal" : "Save Goal"}
-                    </button>
-                </div>
+            {/* Footer */}
+            <div className="-mx-6 -mb-4 px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                >
+                    <Save className="w-4 h-4" />
+                    {isSubmitting ? "Saving..." : isEditing ? "Update Goal" : "Save Goal"}
+                </button>
             </div>
-        </div>
+        </Modal>
     );
 };
 

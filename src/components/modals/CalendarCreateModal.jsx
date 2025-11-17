@@ -20,7 +20,7 @@ export default function CalendarCreateModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl w-[600px] max-w-[95vw] max-h-[90vh] overflow-hidden">
                 {/* Tab Header */}
                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">

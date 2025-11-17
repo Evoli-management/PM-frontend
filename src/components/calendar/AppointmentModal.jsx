@@ -135,7 +135,7 @@ const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60
 
     return (
         <div 
-            className="fixed inset-0 bg-black/40 z-50 grid place-items-center"
+            className="fixed inset-0 bg-black/50 z-50 grid place-items-center"
             onClick={(e) => {
                 // Close modal when clicking on backdrop
                 if (e.target === e.currentTarget) {

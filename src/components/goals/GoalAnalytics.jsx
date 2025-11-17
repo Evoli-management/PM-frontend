@@ -22,7 +22,7 @@ const GoalsAnalytics = ({ goals, onClose }) => {
         .slice(0, 5);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
             <div className="relative w-full max-w-6xl max-h-[90vh] bg-white rounded-3xl shadow-xl overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">

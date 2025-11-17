@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import Modal from "../shared/Modal";
+import Modal from "../shared/primitives/Modal";
 import { useToast } from "../shared/ToastProvider.jsx";
 // Load services on demand to allow them to be code-split from the main bundle
 let _keyAreaService = null;

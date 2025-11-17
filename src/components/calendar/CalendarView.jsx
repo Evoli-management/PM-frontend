@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense } from "react";
+import { Crown } from "lucide-react";
 const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
 const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 
@@ -39,9 +40,7 @@ const CalendarView = () => {
                 className="w-full flex items-center gap-3 mb-4 bg-gradient-to-r from-sky-100 to-blue-50 border border-sky-200 px-6 py-4 rounded-xl shadow-sm"
                 style={{ minHeight: 56 }}
             >
-                <span className="text-3xl mr-2" title="Your most important task of the day.">
-                    🐘
-                </span>
+                <Crown className="w-8 h-8 text-amber-500 mr-2" title="Your most important task of the day." />
                 <input
                     type="text"
                     value={elephantInput}

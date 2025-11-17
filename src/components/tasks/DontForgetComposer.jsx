@@ -134,7 +134,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
     };
 
     return (
-        <div className="fixed inset-0 bg-black/40 z-50 grid place-items-center" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center" onClick={onClose}>
             <div
                 ref={modalRef}
                 className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden"

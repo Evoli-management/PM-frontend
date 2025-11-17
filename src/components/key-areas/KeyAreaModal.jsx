@@ -18,7 +18,7 @@ export default function KeyAreaModal({ isOpen, editing, onSave, onCancel }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
+        <div className="fixed inset-0 bg-black/50 grid place-items-center z-50">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-[92vw] max-w-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-bold text-slate-900">{editing ? 'Edit Key Area' : 'New Key Area'}</h2>

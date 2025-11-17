@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { FaSave } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { Save } from 'lucide-react';
+import { Modal, FormField, Input, Select, DateInput, Button } from '../shared/primitives';
 import usersService from '../../services/usersService';
 
 // ---- helpers (JS only) ----
@@ -16,15 +17,6 @@ const safeDate = (v) => {
 };
 
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
-
-const IconChevron = (props) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
-    <path
-      fill="currentColor"
-      d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
-    />
-  </svg>
-);
 
 export default function CreateTaskModal({
   isOpen,
@@ -62,11 +54,7 @@ export default function CreateTaskModal({
   const [allTasks, setAllTasks] = useState([]);
   const [listNames, setListNames] = useState({});
   const [localGoals, setLocalGoals] = useState(goals || []);
-
-  const startRef = useRef(null);
-  const endRef = useRef(null);
-  const deadlineRef = useRef(null);
-  const usersLoadedRef = useRef(false);
+  const usersLoadedRef = React.useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -316,316 +304,181 @@ export default function CreateTaskModal({
     handleSave();
   };
 
-  const inputCls =
-    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50';
-  const dateCls = `${inputCls} appearance-none pr-11 no-calendar`;
-  const selectCls = `${inputCls} appearance-none pr-10`;
+  if (!isOpen) return null;
+
+  const priorityOptions = [
+    { value: '1', label: 'Low' },
+    { value: '2', label: 'Normal' },
+    { value: '3', label: 'High' }
+  ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-  <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
-        <style>{`
-          .no-calendar::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
-          .no-calendar::-webkit-clear-button, .no-calendar::-webkit-inner-spin-button { display: none; -webkit-appearance: none; }
-          .no-calendar::-ms-clear { display: none; }
-        `}</style>
-  <div className="relative px-5 py-2 border-b border-slate-200">
-          <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            Create Task
-          </h3>
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              className="p-2 rounded-full text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
-              onClick={onCancel}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onCancel} 
+      title="Create Task"
+      size="lg"
+      isSaving={isSaving}
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleSave}
+            loading={isSaving}
+            icon={<Save className="w-4 h-4" />}
+          >
+            Save Task
+          </Button>
+        </div>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
+        <FormField label="Task name" required>
+          <Input
+            required
+            placeholder="Task name"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={isSaving}
+          />
+        </FormField>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Description">
+            <Input
+              placeholder="Brief description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={isSaving}
+            />
+          </FormField>
+
+          <FormField label="Key Area">
+            <Select
+              value={keyAreaId}
+              onChange={(e) => setKeyAreaId(e.target.value)}
+              placeholder="— Select Key Area —"
+              options={(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map(ka => ({ 
+                value: ka.id, 
+                label: ka.title || ka.name 
+              }))}
+              disabled={isSaving}
+            />
+          </FormField>
         </div>
 
-  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2">
-          <div>
-            <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
-            <input
-              id="ka-task-title"
-              name="title"
-              required
-              className={`${inputCls} mt-0.5`}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Task name"
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField label="Start date">
+            <DateInput
+              value={startDate}
+              onChange={(e) => {
+                const v = e.target.value
+                setStartDate(v)
+                if (endAuto) setEndDate(v)
+              }}
+              disabled={isSaving}
             />
-          </div>
+          </FormField>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div className="grid grid-rows-5 gap-0">
-              <div>
-                <label className="text-sm font-medium text-slate-700">Description</label>
-                <input
-                  name="description"
-                  className={`${inputCls} mt-0`}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Brief description"
-                />
-              </div>
+          <FormField label="End date">
+            <DateInput
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value)
+                setEndAuto(false)
+              }}
+              disabled={isSaving}
+            />
+          </FormField>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">Start date</label>
-                <div className="relative mt-0">
-                  <input
-                    ref={startRef}
-                    name="start_date"
-                    type="date"
-                    className={dateCls}
-                    value={startDate}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setStartDate(v);
-                      // Auto-propagate to end date while endAuto is true
-                      if (endAuto) setEndDate(v);
-                    }}
-                    onInput={(e) => {
-                      const v = e.target.value;
-                      setStartDate(v);
-                      if (endAuto) setEndDate(v);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!startRef.current?.value) {
-                          setStartDate(todayStr);
-                        }
-                        startRef.current?.showPicker?.();
-                        startRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-              </div>
+          <FormField label="Deadline" hint="No later than">
+            <DateInput
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              disabled={isSaving}
+            />
+          </FormField>
+        </div>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">End date</label>
-                <div className="relative mt-0">
-                  <input
-                    ref={endRef}
-                    name="end_date"
-                    type="date"
-                    className={dateCls}
-                    value={endDate}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setEndDate(v);
-                      // User edited end date explicitly — stop auto-syncing
-                      setEndAuto(false);
-                    }}
-                    onInput={(e) => {
-                      const v = e.target.value;
-                      setEndDate(v);
-                      setEndAuto(false);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!endRef.current?.value) {
-                          setEndDate(todayStr);
-                        }
-                        endRef.current?.showPicker?.();
-                        endRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="List">
+            <Select
+              value={listIndex}
+              onChange={(e) => setListIndex(Number(e.target.value))}
+              options={(() => {
+                if (!keyAreaId) {
+                  const useLists = (availableLists && availableLists.length) ? availableLists : [1];
+                  return useLists.map((n) => ({
+                    value: n,
+                    label: (parentListNames && parentListNames[n]) || (listNames && listNames[n]) || `List ${n}`
+                  }));
+                }
+                const named = Object.keys(listNames || {})
+                  .map(Number)
+                  .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
+                const listsWithTasks = (allTasks || [])
+                  .filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index)
+                  .map((t) => t.list_index)
+                  .filter((v, i, arr) => arr.indexOf(v) === i);
+                const combined = [1, ...named, ...listsWithTasks];
+                const uniq = [...new Set(combined)].sort((a, b) => a - b);
+                const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
+                return toUse.map((n) => ({
+                  value: n,
+                  label: (listNames && listNames[n]) || `List ${n}`
+                }));
+              })()}
+              disabled={isSaving}
+            />
+          </FormField>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">Deadline</label>
-                <div className="relative mt-0.5">
-                  <input
-                    ref={deadlineRef}
-                    name="deadline"
-                    type="date"
-                    className={dateCls}
-                    value={deadline}
-                    onChange={(e) => { setDeadline(e.target.value); }}
-                    onInput={(e) => { setDeadline(e.target.value); }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!deadlineRef.current?.value) {
-                          setDeadline(todayStr);
-                        }
-                        deadlineRef.current?.showPicker?.();
-                        deadlineRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-                <p className="mt-0 text-xs text-slate-500">No later than</p>
-              </div>
+          <FormField label="Duration">
+            <Input
+              placeholder="e.g., 1h, 1d"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              disabled={isSaving}
+            />
+          </FormField>
+        </div>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">Duration</label>
-                <input
-                  name="duration"
-                  className={`${inputCls} mt-0.5`}
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="e.g., 1h, 1d"
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField label="Priority">
+            <Select
+              value={String(priority)}
+              onChange={(e) => setPriority(Number(e.target.value))}
+              options={priorityOptions}
+              disabled={isSaving}
+            />
+          </FormField>
 
-              <div className="grid grid-rows-5 gap-0">
-              <div>
-                <label className="text-sm font-medium text-slate-700">Key Area</label>
-                <div className="relative mt-0">
-                  <select
-                    name="key_area_id"
-                    className={selectCls}
-                    value={keyAreaId}
-                    onChange={(e) => setKeyAreaId(e.target.value)}
-                  >
-                    <option value="">— Select Key Area —</option>
-                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (
-                      <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
-                    ))}
-                  </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-              </div>
+          <FormField label="Assignee">
+            <Select
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              placeholder="— Unassigned —"
+              options={(usersList || []).map(u => ({ value: u.name, label: u.name }))}
+              disabled={isSaving}
+            />
+          </FormField>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">List</label>
-                <div className="relative mt-0">
-                  <select
-                    name="list_index"
-                    className={selectCls}
-                    value={listIndex}
-                    onChange={(e) => setListIndex(Number(e.target.value))}
-                  >
-                    {
-                      (() => {
-                        // If no key area is selected (DontForget flow), prefer the
-                        // `availableLists` prop (computed by the parent) so DF list
-                        // numbers are respected. Otherwise, compute from key area
-                        // listNames and tasks in that area.
-                        if (!keyAreaId) {
-                          const useLists = (availableLists && availableLists.length) ? availableLists : [1];
-                          return useLists.map((n) => (
-                            <option key={n} value={n}>{(parentListNames && parentListNames[n]) || (listNames && listNames[n]) || `List ${n}`}</option>
-                          ));
-                        }
-
-                        const named = Object.keys(listNames || {})
-                          .map(Number)
-                          .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
-                        const listsWithTasks = (allTasks || [])
-                          .filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index)
-                          .map((t) => t.list_index)
-                          .filter((v, i, arr) => arr.indexOf(v) === i);
-                        const combined = [1, ...named, ...listsWithTasks];
-                        const uniq = [...new Set(combined)].sort((a, b) => a - b);
-                        const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
-                        return toUse.map((n) => (
-                          <option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>
-                        ));
-                      })()
-                    }
-                  </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Assignee</label>
-                <div className="relative mt-0">
-                  <select
-                    name="assignee"
-                    className={selectCls}
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                  >
-                    <option value="">— Unassigned —</option>
-                    {(usersList || []).map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
-                  </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Priority</label>
-                <div className="relative mt-0">
-                  <select
-                    name="priority"
-                    className={selectCls}
-                    value={String(priority)}
-                    onChange={(e) => setPriority(Number(e.target.value))}
-                  >
-                    <option value={1}>Low</option>
-                    <option value={2}>Normal</option>
-                    <option value={3}>High</option>
-                  </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Goal</label>
-                <div className="relative mt-0">
-                  <select
-                    name="goal"
-                    className={selectCls}
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                  >
-                    <option value="">— Select Goal —</option>
-                    {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
-                      <option key={g.id} value={g.id}>{g.title}</option>
-                    ))}
-                  </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 w-full">
-            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm">
-              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
-              Save
-            </button>
-            <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <FormField label="Goal">
+            <Select
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="— Select Goal —"
+              options={(localGoals && localGoals.length ? localGoals : goals).map(g => ({ 
+                value: g.id, 
+                label: g.title 
+              }))}
+              disabled={isSaving}
+            />
+          </FormField>
+        </div>
+      </form>
+    </Modal>
   );
 }
