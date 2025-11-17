@@ -1515,34 +1515,36 @@ export default function DontForget() {
                                 {/* Mass edit now uses the shared EditTaskModal component. Click "Mass Edit" to open it pre-filled from the first selected task. */}
                                     <div className="overflow-x-auto -mx-2 sm:mx-0">
                                         <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
-                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                                <tr>
-                                                    <th className="px-2 sm:px-3 py-2 text-left w-8">
-                                                        <input
-                                                            aria-label="Select all visible"
-                                                            type="checkbox"
-                                                            onChange={toggleSelectAllVisible}
-                                                            checked={
-                                                                dontForgetTasks.length > 0 &&
-                                                                dontForgetTasks.every((t) => isSelected(t.id))
-                                                            }
-                                                        />
-                                                    </th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Assignee</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
-                                                    <th className="px-2 sm:px-3 py-2 text-center font-semibold w-24">Actions</th>
-                                                </tr>
-                                            </thead>
+                                            {dontForgetTasks.length > 0 && (
+                                                <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                    <tr>
+                                                        <th className="px-2 sm:px-3 py-2 text-left w-8">
+                                                            <input
+                                                                aria-label="Select all visible"
+                                                                type="checkbox"
+                                                                onChange={toggleSelectAllVisible}
+                                                                checked={
+                                                                    dontForgetTasks.length > 0 &&
+                                                                    dontForgetTasks.every((t) => isSelected(t.id))
+                                                                }
+                                                            />
+                                                        </th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Assignee</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
+                                                        <th className="px-2 sm:px-3 py-2 text-center font-semibold w-24">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                            )}
                                             <tbody className="bg-white">
                                                 {dontForgetTasks.map((task) => (
                                                     <TaskRow
