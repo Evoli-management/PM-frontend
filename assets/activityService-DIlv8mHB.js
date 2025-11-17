@@ -1,0 +1,1 @@
+import{e}from"./index-CUvhf67F.js";const s="/activities",c={async list(t={}){return(await e.get(s,{params:t})).data},async create(t){return(await e.post(s,t)).data},async get(t){return(await e.get(`${s}/${t}`)).data},async update(t,a){return(await e.put(`${s}/${t}`,a)).data},async remove(t){return(await e.delete(`${s}/${t}`)).data}};export{c as default};
