@@ -559,49 +559,36 @@ export default function Dashboard() {
         return () => window.removeEventListener('open-quickadd', handler);
     }, []);
     
-    // Handle drag end event
+    // Handle drag end event - Simple swap between two widgets
     const handleDragEnd = (event) => {
         const { active, over } = event;
 
         if (active.id !== over?.id && over) {
-            const oldIndex = visibleWidgetKeys.indexOf(active.id);
-            const newIndex = visibleWidgetKeys.indexOf(over.id);
+            const draggedWidgetId = active.id;
+            const targetWidgetId = over.id;
             
-            // Ensure valid indices
-            if (oldIndex === -1 || newIndex === -1) {
-                console.warn('Invalid drag operation: widget not found in visible widgets');
+            // Get the complete widget order (including hidden widgets)
+            const currentOrder = [...(prefs.widgetOrder || [])];
+            
+            // Find positions of both widgets in the complete order
+            const draggedIndex = currentOrder.indexOf(draggedWidgetId);
+            const targetIndex = currentOrder.indexOf(targetWidgetId);
+            
+            // Ensure both widgets exist in the order
+            if (draggedIndex === -1 || targetIndex === -1) {
+                console.warn('Invalid drag operation: one or both widgets not found in order');
                 return;
             }
             
-            const newOrder = arrayMove(visibleWidgetKeys, oldIndex, newIndex);
-            
-            // Update the complete widget order (including hidden widgets)
-            const allWidgets = prefs.widgetOrder || [];
-            const updatedOrder = [...allWidgets];
-            
-            // Remove the dragged widget from its old position
-            const draggedWidget = active.id;
-            const oldPositionInFullOrder = updatedOrder.indexOf(draggedWidget);
-            if (oldPositionInFullOrder !== -1) {
-                updatedOrder.splice(oldPositionInFullOrder, 1);
-            }
-            
-            // Insert it at the new position relative to visible widgets
-            const targetWidget = over.id;
-            const targetPositionInFullOrder = updatedOrder.indexOf(targetWidget);
-            if (targetPositionInFullOrder !== -1) {
-                // Insert after the target widget if dragging down, before if dragging up
-                const insertIndex = newIndex > oldIndex ? targetPositionInFullOrder + 1 : targetPositionInFullOrder;
-                updatedOrder.splice(insertIndex, 0, draggedWidget);
-            } else {
-                // Fallback: add at the end
-                updatedOrder.push(draggedWidget);
-            }
+            // Simple swap: exchange positions of the two widgets
+            const newOrder = [...currentOrder];
+            newOrder[draggedIndex] = targetWidgetId;
+            newOrder[targetIndex] = draggedWidgetId;
             
             // Update preferences state
             const newPrefs = { 
                 ...prefs,
-                widgetOrder: updatedOrder
+                widgetOrder: newOrder
             };
             setPrefs(newPrefs);
             
