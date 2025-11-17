@@ -8,7 +8,7 @@ export default function Calendar() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-[#EDEDED]">
             <div className="flex w-full overflow-hidden">
                 <Sidebar
                     user={{ name: "User" }}

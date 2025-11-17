@@ -261,7 +261,7 @@ const Goals = () => {
     const stats = getGoalStats();
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="flex min-h-screen bg-[#EDEDED]">
             <Sidebar 
                 mobileOpen={mobileSidebarOpen}
                 onMobileClose={() => setMobileSidebarOpen(false)}
