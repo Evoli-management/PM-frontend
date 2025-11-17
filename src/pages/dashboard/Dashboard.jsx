@@ -808,9 +808,9 @@ export default function Dashboard() {
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
-        // Make all widgets the same size as "What's New" for better visual consistency
-        // Fixed height and consistent sizing for all widgets
-        const widgetClass = 'w-full h-80 min-h-80';
+        // Make all widgets the same size with proper content accommodation
+        // Flexible height to fit content but maintain consistency
+        const widgetClass = 'w-full h-96 min-h-96';
 
         if (key === "quickAdd") {
             return (
@@ -850,7 +850,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
@@ -924,7 +924,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
                         <div className="flex items-start justify-between">
                             <div />
@@ -946,7 +946,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Strokes</h3>
                         <StrokesPanel strokes={strokes} />
                     </div>
@@ -977,7 +977,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
@@ -1019,7 +1019,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
                         <div className="flex items-center justify-between mb-2">
                             <div />
@@ -1045,22 +1045,24 @@ export default function Dashboard() {
                             </div>
                         ) : null}
                         
-                        <ActivityFeed 
-                            items={recentActivity.filter((it) => {
-                                if (activityFilter === "all") return true;
-                                if (activityFilter === "recognitions") return /stroke|recognition|praise/i.test(it.desc);
-                                if (activityFilter === "goals") return /goal|objective|milestone/i.test(it.desc);
-                                if (activityFilter === "tasks") return /task|todo|complete|moved/i.test(it.desc);
-                                return true;
-                            })} 
-                            onItemClick={(it) => setDrillItem(it)} 
-                        />
+                        <div className="flex-1 overflow-y-auto">
+                            <ActivityFeed 
+                                items={recentActivity.filter((it) => {
+                                    if (activityFilter === "all") return true;
+                                    if (activityFilter === "recognitions") return /stroke|recognition|praise/i.test(it.desc);
+                                    if (activityFilter === "goals") return /goal|objective|milestone/i.test(it.desc);
+                                    if (activityFilter === "tasks") return /task|todo|complete|moved/i.test(it.desc);
+                                    return true;
+                                })} 
+                                onItemClick={(it) => setDrillItem(it)} 
+                            />
 
-                        {!dataLoading.activity && recentActivity.length === 0 && (
-                            <div className="text-[CanvasText] opacity-70 text-center py-4">
-                                No recent activity. Start working on your goals to see updates here!
-                            </div>
-                        )}
+                            {!dataLoading.activity && recentActivity.length === 0 && (
+                                <div className="text-[CanvasText] opacity-70 text-center py-4">
+                                    No recent activity. Start working on your goals to see updates here!
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 </SortableWidget>
@@ -1071,7 +1073,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Suggestions</h3>
                         <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                             <li>Recommend goal: "Automate weekly reporting" (template)</li>
@@ -1088,7 +1090,7 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full">
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Team Performance Overview</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div className="p-3 border rounded">Team goals completion: 68%</div>
