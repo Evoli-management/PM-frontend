@@ -65,7 +65,9 @@ const WeekView = ({
     // Use dynamic time slots from working hours, fallback to default if still loading
     const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("08:00", "17:00", slotSize);
     
-    const ITEM_SIZE = 38; // px per time slot row
+    // Compute visual row height based on configured slotSize (minutes).
+    // Keep 30min -> 38px as the reference and scale proportionally.
+    const ITEM_SIZE = Math.round((slotSize / 30) * 38);
     const LIST_HEIGHT_PX = 400; // fixed viewport height for grid scroll
     const weekNum = getWeekNumber(weekStart);
 
@@ -354,7 +356,8 @@ const WeekView = ({
                                                         style={{ flex: "1 1 0", minWidth: 0, height: ITEM_SIZE }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => handleDrop(e, date, slot)}
-                                                        onDoubleClick={() => {
+                                                        onClick={(e) => {
+                                                            try { e.stopPropagation(); } catch {}
                                                             const [h, m] = slot.split(":");
                                                             const dt = new Date(
                                                                 date.getFullYear(),
@@ -379,37 +382,41 @@ const WeekView = ({
                                                                   const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number(sh), Number(sm));
                                                                   const withinSlotMin = evStart ? Math.max(0, Math.min(slotSize, (evStart.getTime() - slotStart.getTime()) / 60000)) : 0;
                                                                   const withinSlotTop = (withinSlotMin / slotSize) * ITEM_SIZE;
-                                                                  return (
-                                                                      <div
-                                                                          key={i}
-                                                                          className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                                          style={{
-                                                                              position: "absolute",
-                                                                              left: 2,
-                                                                              right: 2,
-                                                                              top: 2 + withinSlotTop,
-                                                                              height: heightPx,
-                                                                              zIndex: 5,
-                                                                          }}
-                                                                          draggable
-                                                                          onDragStart={(e) => {
-                                                                              try {
-                                                                                  e.dataTransfer.setData(
-                                                                                      "eventId",
-                                                                                      String(ev.id),
-                                                                                  );
-                                                                                  const dur = ev.end
-                                                                                      ? new Date(ev.end).getTime() -
-                                                                                        new Date(ev.start).getTime()
-                                                                                      : 60 * 60 * 1000;
-                                                                                  e.dataTransfer.setData(
-                                                                                      "durationMs",
-                                                                                      String(Math.max(dur, 0)),
-                                                                                  );
-                                                                                  e.dataTransfer.effectAllowed = "move";
-                                                                              } catch {}
-                                                                          }}
-                                                                      >
+                                                                return (
+                                                                          <div
+                                                                              key={i}
+                                                                              className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${categories[ev.kind]?.color || "bg-gray-200"}`}
+                                                                              style={{
+                                                                                  position: "absolute",
+                                                                                  left: 2,
+                                                                                  right: 2,
+                                                                                  top: 2 + withinSlotTop,
+                                                                                  height: heightPx,
+                                                                                  zIndex: 5,
+                                                                              }}
+                                                                              draggable
+                                                                              onDragStart={(e) => {
+                                                                                  try {
+                                                                                      e.dataTransfer.setData(
+                                                                                          "eventId",
+                                                                                          String(ev.id),
+                                                                                      );
+                                                                                      const dur = ev.end
+                                                                                          ? new Date(ev.end).getTime() -
+                                                                                            new Date(ev.start).getTime()
+                                                                                          : 60 * 60 * 1000;
+                                                                                      e.dataTransfer.setData(
+                                                                                          "durationMs",
+                                                                                          String(Math.max(dur, 0)),
+                                                                                      );
+                                                                                      e.dataTransfer.effectAllowed = "move";
+                                                                                  } catch {}
+                                                                              }}
+                                                                              onClick={(e) => {
+                                                                                  try { e.stopPropagation(); } catch {}
+                                                                                  onEventClick && onEventClick(ev);
+                                                                              }}
+                                                                          >
                                                                           <span className="shrink-0">
                                                                               {categories[ev.kind]?.icon || ""}
                                                                           </span>
