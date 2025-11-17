@@ -2385,7 +2385,10 @@ export default function KeyAreas() {
                                                 </span>
                                                 <button
                                                     type="button"
+                                                    disabled={selectedIds.size === 0}
                                                     onClick={() => {
+                                                        // Only allow entering mass edit when at least one task is selected
+                                                        if (selectedIds.size === 0) return;
                                                         if (showMassEdit) {
                                                             setShowMassEdit(false);
                                                         } else {
@@ -2401,8 +2404,9 @@ export default function KeyAreas() {
                                                             }, 0);
                                                         }
                                                     }}
-                                                    className="bg-green-400 text-white rounded-md px-3 py-1 text-sm hover:bg-green-500"
+                                                    className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                                                     aria-label="mass edit"
+                                                    title={selectedIds.size === 0 ? "Select tasks to enable mass edit" : "Mass edit selected tasks"}
                                                 >
                                                     {showMassEdit ? "Exit Mass Edit" : "Mass Edit"}
                                                 </button>
