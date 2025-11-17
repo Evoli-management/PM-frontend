@@ -13,6 +13,7 @@ export default function DayView({
     events,
     todos,
     activitiesByTask = {},
+    unattachedActivities = [],
     categories,
     onTaskDrop,
     onEventMove,
@@ -27,6 +28,7 @@ export default function DayView({
     onAddTaskOrActivity,
     loading = false,
 }) {
+    const slotSizeMin = 30;
     const { 
         timeSlots, 
         formattedTimeSlots, 
@@ -34,9 +36,13 @@ export default function DayView({
         formatTime,
         formatDate,
         loading: prefsLoading 
-    } = useCalendarPreferences(30);
+    } = useCalendarPreferences(slotSizeMin);
     const [showViewMenu, setShowViewMenu] = React.useState(false);
-    
+
+    // Derive visual row height from slot size so slot sizes scale consistently
+    // Base reference: 30 minutes -> 38px (used historically). Compute proportionally.
+    const SLOT_ROW_PX = Math.round((slotSizeMin / 30) * 38);
+
     // Use dynamic hours from working preferences, fallback to default if still loading
     const hours = timeSlots.length > 0 ? timeSlots : [
         "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -51,8 +57,7 @@ export default function DayView({
     }));
     
     const today = currentDate || new Date();
-    const slotSizeMin = 30;
-    const SLOT_ROW_PX = 38; // visual height per 30-min slot, aligns with WeekView
+    
     const overlapsSlot = (ev, refDate, slot) => {
         try {
             if (!ev?.start || !ev?.end) return matchesSlot(ev?.start, refDate, slot); // fallback to start-only
@@ -99,13 +104,50 @@ export default function DayView({
         return start <= todayOnly && todayOnly <= end;
     };
     const dayTodos = Array.isArray(todos) ? todos.filter(isInRangeToday) : [];
-    const dayActivities = React.useMemo(
-        () =>
-            (dayTodos || []).flatMap((t) =>
-                Array.isArray(activitiesByTask?.[String(t.id)]) ? activitiesByTask[String(t.id)] : [],
-            ),
-        [dayTodos, activitiesByTask],
-    );
+    const dayActivities = React.useMemo(() => {
+        const flatten = (arr) => (Array.isArray(arr) ? arr : []);
+
+        const activityInDay = (a) => {
+            try {
+                const toDateOnlyLocal = (iso) => {
+                    if (!iso && iso !== 0) return null;
+                    try {
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return String(iso);
+                        const d = new Date(iso);
+                        if (isNaN(d.getTime())) return null;
+                        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                    } catch {
+                        return null;
+                    }
+                };
+
+                const start = toDateOnlyLocal(a?.date_start || a?.startDate || a?.date || null);
+                const end = toDateOnlyLocal(a?.date_end || a?.endDate || a?.date_end || null);
+                if (!start && !end) return false;
+                let s = start || end;
+                let e = end || start;
+                if (s && e && s.getTime && e.getTime && s.getTime() > e.getTime()) {
+                    const tmp = s;
+                    s = e;
+                    e = tmp;
+                }
+                if (!s) s = e;
+                if (!e) e = s;
+                const todayStart = new Date(todayOnly.getFullYear(), todayOnly.getMonth(), todayOnly.getDate());
+                return s <= todayStart && todayStart <= e;
+            } catch (err) {
+                return false;
+            }
+        };
+
+        // Gather activities attached to today's todos, then filter by date overlap with today
+        const fromTasks = (dayTodos || []).flatMap((t) => flatten(activitiesByTask?.[String(t.id)])).filter(activityInDay);
+
+        // Include unattached activities only if they overlap today
+        const fromUnattached = flatten(unattachedActivities).filter(activityInDay);
+
+        return [...fromUnattached, ...fromTasks];
+    }, [dayTodos, activitiesByTask, unattachedActivities]);
     const matchesSlot = (startIso, refDate, slot) => {
         try {
             const ev = new Date(startIso);
@@ -298,9 +340,11 @@ export default function DayView({
                                         </td>
                                         <td
                                             className={`border-t border-blue-100 px-2 py-1 align-top relative ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
-                                            style={{ width: "100%", minHeight: 32 }}
+                                            style={{ width: "100%", minHeight: SLOT_ROW_PX }}
                                             {...(!isBoundary && {
-                                                onDoubleClick: () => {
+                                                // Single click on an empty timeslot should open the appointment modal
+                                                onClick: (e) => {
+                                                    try { e.stopPropagation(); } catch {}
                                                     const [hh, mm] = h.split(":");
                                                     const date = new Date(
                                                         today.getFullYear(),
@@ -320,7 +364,7 @@ export default function DayView({
                                                 onDrop: (e) => handleDrop(e, h),
                                             })}
                                         >
-                                            <div style={{ position: "relative", minHeight: 32 }}>
+                                            <div style={{ position: "relative", minHeight: SLOT_ROW_PX }}>
                                                 {renderEvents.map((ev, i) => {
                                                     const isTaskBox = !!ev.taskId;
                                                     // Calculate bar height to span all overlapping slots
@@ -335,7 +379,14 @@ export default function DayView({
                                                         if (slotEndTime > evEnd) break;
                                                         endIdx = j;
                                                     }
-                                                    const barHeight = (endIdx - slotIdx + 1) * 32 - 4; // 32px per slot, minus small gap
+                                                    const barHeightUncapped = (endIdx - slotIdx + 1) * SLOT_ROW_PX - 4; // SLOT_ROW_PX per slot, minus small gap
+                                                    // Cap the visual height to a single slot so appointment bars match the slot size
+                                                    // even if the underlying event spans multiple slots.
+                                                    const barHeight = Math.min(barHeightUncapped, SLOT_ROW_PX - 4);
+                                                    // Stack multiple events that start in the same slot vertically so they don't fully overlap.
+                                                    // Each subsequent event is shifted down slightly (top) but keeps the same slot-sized height.
+                                                    const verticalOffset = i * 6; // px between stacked events
+                                                    const adjustedBarHeight = barHeight;
                                                     // Check if next event starts at the end of this event
                                                     let showBoundary = false;
                                                     if (i < renderEvents.length - 1) {
@@ -346,27 +397,18 @@ export default function DayView({
                                                             showBoundary = true;
                                                         }
                                                     }
+                                                    // Use a composite key (id + start + index) to avoid duplicates when
+                                                    // multiple items share the same id across different data sources.
+                                                    const compositeKey = `${ev.id ?? 'noid'}-${ev.start ?? 'nostart'}-${i}`;
                                                     return (
-                                                        <>
+                                                        <React.Fragment key={compositeKey}>
                                                             <div
-                                                                key={i}
-                                                                className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden group ${
-                                                                    isTaskBox
-                                                                        ? ""
-                                                                        : categories[ev.kind]?.color || "bg-gray-200"
-                                                                }`}
-                                                                style={{
-                                                                    position: "absolute",
-                                                                    left: 0,
-                                                                    right: 0,
-                                                                    top: 0,
-                                                                    height: barHeight,
-                                                                    backgroundColor: isTaskBox ? "#7ED4E3" : undefined,
-                                                                    zIndex: 2,
-                                                                    boxShadow: "0 2px 8px -2px rgba(0,0,0,0.08)",
-                                                                    border: "1.5px solid #2563eb",
-                                                                }}
+                                                                tabIndex={-1}
+                                                                className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden group focus:outline-none focus:ring-0 ${isTaskBox ? "" : "bg-indigo-400"}`}
                                                                 draggable
+                                                                onPointerDown={(e) => { try { e.preventDefault(); } catch {} }}
+                                                                onMouseDown={(e) => { try { e.preventDefault(); } catch {} }}
+                                                                onFocus={(e) => { try { e.currentTarget.blur(); } catch {} }}
                                                                 onDragStart={(e) => {
                                                                     try {
                                                                         e.dataTransfer.setData("eventId", String(ev.id));
@@ -377,7 +419,22 @@ export default function DayView({
                                                                         e.dataTransfer.effectAllowed = "move";
                                                                     } catch {}
                                                                 }}
-                                                                onClick={() => onEventClick(ev)}
+                                                                onClick={(e) => {
+                                                                    try { e.stopPropagation(); } catch {}
+                                                                    onEventClick && onEventClick(ev);
+                                                                }}
+                                                                style={{
+                                                                    outline: "none",
+                                                                    position: "absolute",
+                                                                    left: 0,
+                                                                    right: 0,
+                                                                    top: verticalOffset,
+                                                                    height: adjustedBarHeight,
+                                                                    backgroundColor: isTaskBox ? "#7ED4E3" : undefined,
+                                                                    zIndex: 2,
+                                                                    boxShadow: "0 2px 8px -2px rgba(0,0,0,0.08)",
+                                                                    border: "1.5px solid #2563eb",
+                                                                }}
                                                             >
                                                                 {!isTaskBox && (
                                                                     <span className="shrink-0">
@@ -414,18 +471,8 @@ export default function DayView({
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            {showBoundary && (
-                                                                <div style={{
-                                                                    position: "absolute",
-                                                                    left: 0,
-                                                                    right: 0,
-                                                                    top: barHeight - 2,
-                                                                    height: 4,
-                                                                    background: "#fff",
-                                                                    zIndex: 3,
-                                                                }} />
-                                                            )}
-                                                        </>
+                                                            {/* intentionally keep a single event bar element per event; boundary marker removed */}
+                                                        </React.Fragment>
                                                     );
                                                 })}
                                             </div>

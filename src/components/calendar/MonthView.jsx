@@ -553,9 +553,9 @@ export default function MonthView({
                                                         borderTop: "1px solid rgba(56,189,248,0.1)",
                                                         borderBottom: "1px solid rgba(56,189,248,0.1)"
                                                     }}
-                                                onClick={() => onEventClick && onEventClick({ day: date, hour: h })}
-                                                onDoubleClick={(e) => {
-                                                    e.stopPropagation();
+                                                onClick={(e) => {
+                                                    try { e.stopPropagation(); } catch {}
+                                                    if (onEventClick) onEventClick({ day: date, hour: h });
                                                     if (typeof onQuickCreate === "function") {
                                                         const [hr, min] = h.split(":");
                                                         const dt = new Date(
@@ -567,9 +567,8 @@ export default function MonthView({
                                                             0,
                                                             0,
                                                         );
-                                                        // Default appointment duration: 30 minutes
-                                                        const endDt = new Date(dt.getTime() + 30 * 60000);
-                                                        onQuickCreate({ start: dt, end: endDt });
+                                                        // Default appointment duration handled by AppointmentModal via defaultDurationMinutes
+                                                        onQuickCreate(dt);
                                                     }
                                                 }}
                                                 onDragOver={(e) => {
@@ -598,7 +597,7 @@ export default function MonthView({
                                                         if (task) onTaskDrop(task, dt);
                                                     } catch {}
                                                 }}
-                                                title="Double-click to add appointment"
+                                                title="Click to add appointment"
                                             >
                                                 {/* Display appointment bar if exists for this day/slot */}
                                                 {appointmentsByDaySlot[dayKey]?.[h] && appointmentsByDaySlot[dayKey][h].map((ev, appIdx) => {

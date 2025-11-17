@@ -1,10 +1,9 @@
 import React, { useEffect, useState, Suspense } from "react";
 // Lazy-load modal components to reduce initial bundle size
-const CreateTaskModal = React.lazy(() => import("../modals/CreateTaskModal.jsx"));
+const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
 const CalendarCreateModal = React.lazy(() => import("../modals/CalendarCreateModal.jsx"));
-const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityModal.jsx"));
+const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 const GoalForm = React.lazy(() => import("../goals/GoalForm.jsx"));
-const DontForgetComposer = React.lazy(() => import("../tasks/DontForgetComposer.jsx"));
 // Load taskService on demand to allow code-splitting
 let _taskService = null;
 const getTaskService = async () => {
@@ -54,44 +53,9 @@ export default function ModalManager() {
     };
 
     // Handle Don't Forget composer submissions from the global modal
-    const handleDontForgetAdd = async (payload) => {
-        try {
-            // Map UI values to backend enums where applicable (same mapping used by Tasks.jsx)
-            const statusMap = {
-                open: "todo",
-                "in progress": "in_progress",
-                done: "completed",
-                cancelled: "cancelled",
-            };
-            const mappedStatus = payload?.status ? statusMap[payload.status] : undefined;
-            const mappedPriority = payload?.priority === "normal" ? "medium" : payload?.priority;
-
-            const body = {
-                title: (payload?.name || payload?.title || "").trim(),
-                description: payload?.notes || "",
-                assignee: payload?.assignee || "",
-                startDate: payload?.start_date ? new Date(payload.start_date).toISOString() : undefined,
-                endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : undefined,
-                dueDate: payload?.dueDate ? new Date(payload.dueDate).toISOString() : undefined,
-                duration: payload?.duration ? String(payload.duration) : undefined,
-                ...(mappedStatus ? { status: mappedStatus } : {}),
-                ...(mappedPriority ? { priority: mappedPriority } : {}),
-            };
-            if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
-
-            const svc = await getTaskService();
-            const created = await svc.create(body);
-            addToast({ title: 'Task added to Don\'t Forget', variant: 'success' });
-            close();
-            // Broadcast so tasks page can refresh if open
-            window.dispatchEvent(new CustomEvent('dontforget-created', { detail: created }));
-            // Also emit generic task-created
-            window.dispatchEvent(new CustomEvent('task-created', { detail: created }));
-        } catch (err) {
-            addToast({ title: 'Failed to add task', description: String(err?.message || err), variant: 'error' });
-            throw err;
-        }
-    };
+    // NOTE: DontForgetComposer handling removed here; DontForget page now
+    // manages its own composer and listens for events. Keep other modal
+    // handlers below.
 
     return (
         <>
@@ -107,6 +71,7 @@ export default function ModalManager() {
                 <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
                     <CreateTaskModal
                         isOpen={true}
+                        onCancel={close}
                         onClose={close}
                         onSave={(res) => { addToast({ title: 'Task created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('task-created', { detail: res })); }}
                         renderInline={false}
@@ -119,9 +84,22 @@ export default function ModalManager() {
                 <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
                     <CreateActivityModal
                         isOpen={true}
-                        onClose={close}
-                        onSave={(res) => { addToast({ title: 'Activity created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('activity-created', { detail: res })); }}
+                        onCancel={close}
                         renderInline={false}
+                        onSave={async (payload) => {
+                            try {
+                                const mod = await import('../../services/activityService');
+                                const svc = mod?.default || mod;
+                                const toSend = { text: payload.text || payload.title || '', taskId: payload.taskId || payload.task_id || null, ...payload };
+                                const res = await svc.create(toSend);
+                                addToast({ title: 'Activity created', variant: 'success' });
+                                close();
+                                window.dispatchEvent(new CustomEvent('activity-created', { detail: res }));
+                            } catch (err) {
+                                addToast({ title: 'Failed to create activity', description: String(err?.message || err), variant: 'error' });
+                                throw err;
+                            }
+                        }}
                     />
                 </Suspense>
             )}
@@ -152,16 +130,7 @@ export default function ModalManager() {
             )}
 
             {/* Don't Forget composer */}
-            {modal.type === 'dontforget' && (
-                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
-                    <DontForgetComposer
-                        open={true}
-                        onClose={close}
-                        onAdd={handleDontForgetAdd}
-                        defaultList={1}
-                    />
-                </Suspense>
-            )}
+                {/* Don't Forget composer removed; handled by DontForget page */}
         </>
     );
 }
