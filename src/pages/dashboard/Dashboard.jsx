@@ -1146,7 +1146,7 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-[#EDEDED]">
-            <div className="flex w-full min-h-screen overflow-hidden">
+            <div className="flex w-full min-h-screen">
                 <Sidebar 
                     user={{ name: "Hussein" }} 
                     mobileOpen={mobileSidebarOpen}
@@ -1158,8 +1158,8 @@ export default function Dashboard() {
                         onClick={() => setMobileSidebarOpen(false)}
                     />
                 )}
-                <main className="flex-1 min-w-0 w-full transition-all md:ml-[1mm] overflow-y-auto">
-                    <div className="max-w-full overflow-x-hidden pb-8">
+                <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto">
+                    <div className="max-w-full overflow-x-hidden pb-8 min-h-full">
                         <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
                             <div className="flex items-center gap-3">
                                 <button
