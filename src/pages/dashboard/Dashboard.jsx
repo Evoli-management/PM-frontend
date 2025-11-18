@@ -836,11 +836,20 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                        <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
-                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
-                            <div className="text-xs font-medium opacity-80">tasks</div>
-                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
-                        </StatsCard>
+                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold text-blue-700">My Day</h3>
+                                <span className="text-xs text-[CanvasText] opacity-60" title="Your daily schedule: appointments and tasks">ℹ️</span>
+                            </div>
+                            <div className="flex-1 flex flex-col justify-center items-center">
+                                <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                                <div className="text-xs font-medium opacity-80">tasks</div>
+                                <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                            </div>
+                            <div className="mt-3">
+                                <a href="#/calendar" className="text-sm text-blue-600 hover:text-blue-800">View Calendar</a>
+                            </div>
+                        </div>
                     </div>
                 </SortableWidget>
             );
@@ -959,16 +968,22 @@ export default function Dashboard() {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
-                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
-                        <div className="text-xs font-medium opacity-80">productive</div>
-                        <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
-                        <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
-                            <div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} />
-                            <div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} />
+                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold text-blue-700">Productivity</h3>
+                                <span className="text-xs text-[CanvasText] opacity-60" title="Hours logged this week: productive vs trap">ℹ️</span>
+                            </div>
+                            <div className="flex-1 flex flex-col justify-center items-center">
+                                <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
+                                <div className="text-xs font-medium opacity-80">productive</div>
+                                <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
+                                <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
+                                    <div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} />
+                                    <div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} />
+                                </div>
+                            </div>
                         </div>
-                    </StatsCard>
-                </div>
+                    </div>
                 </SortableWidget>
             );
         }
