@@ -35,7 +35,8 @@ export default function DayView({
         workingHours, 
         formatTime,
         formatDate,
-        loading: prefsLoading 
+        loading: prefsLoading,
+        isWorkingTime,
     } = useCalendarPreferences(slotSizeMin);
     const [showViewMenu, setShowViewMenu] = React.useState(false);
 
@@ -43,12 +44,13 @@ export default function DayView({
     // Base reference: 30 minutes -> 38px (used historically). Compute proportionally.
     const SLOT_ROW_PX = Math.round((slotSizeMin / 30) * 38);
 
-    // Use dynamic hours from working preferences, fallback to default if still loading
-    const hours = timeSlots.length > 0 ? timeSlots : [
-        "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-        "16:00", "16:30", "17:00"
-    ];
+    // Use dynamic hours from preferences, fallback to full-day if still loading
+    const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
+        const h = Math.floor(i / 2);
+        const m = i % 2 === 0 ? "00" : "30";
+        return `${h.toString().padStart(2, '0')}:${m}`;
+    });
+    const hours = timeSlots.length > 0 ? timeSlots : ALL_HOURS;
 
     // Create a formatted hours array for display
     const formattedHours = hours.map(hour => ({
@@ -57,6 +59,74 @@ export default function DayView({
     }));
     
     const today = currentDate || new Date();
+
+    const scrollRef = React.useRef(null);
+    const tableRef = React.useRef(null);
+    const [headerHeight, setHeaderHeight] = React.useState(0);
+    // track current time in ms so we can compute fractional minutes (minutes + seconds/60)
+    const [nowMs, setNowMs] = React.useState(() => Date.now());
+    // measured pixel height of a single slot row in the DOM; fallback to SLOT_ROW_PX
+    const [measuredSlotPx, setMeasuredSlotPx] = React.useState(SLOT_ROW_PX);
+
+    // Update nowMinutes every minute, align to the start of the next minute
+    React.useEffect(() => {
+        // update nowMs every 1 second for smooth per-second tracking in Day view
+        const update = () => setNowMs(Date.now());
+        update();
+        const msUntilNextSecond = 1000 - (Date.now() % 1000);
+        const timeout = setTimeout(() => {
+            update();
+            const interval = setInterval(update, 1000);
+            scrollRef.current && (scrollRef.current._nowInterval = interval);
+        }, msUntilNextSecond);
+        return () => {
+            clearTimeout(timeout);
+            if (scrollRef.current && scrollRef.current._nowInterval) {
+                clearInterval(scrollRef.current._nowInterval);
+            }
+        };
+    }, []);
+
+    // Measure header height so we can offset the now-line below the header
+    React.useEffect(() => {
+        const setHeight = () => {
+            try {
+                const th = tableRef.current?.querySelector('thead');
+                setHeaderHeight(th ? th.offsetHeight : 0);
+            } catch (e) { setHeaderHeight(0); }
+        };
+        setHeight();
+        const ro = new ResizeObserver(setHeight);
+        if (tableRef.current) ro.observe(tableRef.current);
+        window.addEventListener('resize', setHeight);
+        return () => {
+            ro.disconnect();
+            window.removeEventListener('resize', setHeight);
+        };
+    }, []);
+
+    // Measure an actual slot row height from the DOM so px/min calculations use the real size
+    React.useEffect(() => {
+        const el = tableRef.current || scrollRef.current;
+        if (!el) return;
+        const measure = () => {
+            try {
+                const item = el.querySelector('[data-slot-index]');
+                if (item) {
+                    const h = item.getBoundingClientRect().height;
+                    if (h && h > 0) setMeasuredSlotPx(h);
+                }
+            } catch (e) {}
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        window.addEventListener('resize', measure);
+        return () => {
+            ro.disconnect();
+            window.removeEventListener('resize', measure);
+        };
+    }, [tableRef.current, scrollRef.current, hours.length]);
     
     const overlapsSlot = (ev, refDate, slot) => {
         try {
@@ -204,6 +274,7 @@ export default function DayView({
     };
     return (
         <div className="p-0 flex gap-4 w-full max-w-none">
+            
             {/* Left: Calendar day view */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-2">
@@ -263,11 +334,6 @@ export default function DayView({
                                 Loading
                             </span>
                         )}
-                        {workingHours.startTime && workingHours.endTime && (
-                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
-                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
-                            </span>
-                        )}
                     </h2>
                     <div className="flex items-center gap-2">
                         <button
@@ -304,11 +370,13 @@ export default function DayView({
                 </div>
                 <div
                     className="flex flex-col gap-1"
-                    style={{ maxWidth: "100%", maxHeight: "60vh", overflowX: "auto", overflowY: "auto" }}
+                    ref={scrollRef}
+                    style={{ position: 'relative', maxWidth: "100%", maxHeight: "60vh", overflowX: "auto", overflowY: "auto" }}
                 >
                     {/* Keep clean: no empty-state banner when there are no events */}
-                    <table
-                        className="min-w-full border border-blue-100 rounded-lg"
+                        <table
+                        ref={tableRef}
+                        className="min-w-full border border-gray-100 rounded-lg"
                         style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}
                     >
                         <thead>
@@ -333,14 +401,25 @@ export default function DayView({
                                 });
                                 const isBoundary = h === workingHours.endTime; // non-interactive row
                                 const formattedHour = formattedHours.find(fh => fh.value === h);
+                                const isWorking = isWorkingTime ? isWorkingTime(h) : (workingHours.startTime && workingHours.endTime && (() => {
+                                    try {
+                                        const sm = h;
+                                        const [sh, smm] = sm.split(":");
+                                        const startMinutes = parseInt(workingHours.startTime.split(":" )[0]) * 60 + parseInt(workingHours.startTime.split(":" )[1]);
+                                        const endMinutes = parseInt(workingHours.endTime.split(":" )[0]) * 60 + parseInt(workingHours.endTime.split(":" )[1]);
+                                        const slotMinutes = Number(sh) * 60 + Number(smm);
+                                        return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+                                    } catch { return false; }
+                                })());
                                 return (
-                                    <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
-                                        <td className="border-t border-r border-blue-100 px-2 py-1 text-xs w-24 align-top">
-                                            <span>{formattedHour ? formattedHour.display : h}</span>
-                                        </td>
+                                        <tr key={idx} className="bg-white">
+                                            <td className="border-t border-r border-gray-100 px-2 py-1 text-xs w-24 align-top relative">
+                                                {!isWorking && <span className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300/40 rounded-r-md" aria-hidden="true"></span>}
+                                                <span className="pl-2">{formattedHour ? formattedHour.display : h}</span>
+                                            </td>
                                         <td
-                                            className={`border-t border-blue-100 px-2 py-1 align-top relative ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
-                                            style={{ width: "100%", minHeight: SLOT_ROW_PX }}
+                                            className={`border-t border-gray-100 px-2 py-1 align-top relative ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
+                                            style={{ width: "100%", minHeight: SLOT_ROW_PX, boxSizing: 'border-box' }}
                                             {...(!isBoundary && {
                                                 // Single click on an empty timeslot should open the appointment modal
                                                 onClick: (e) => {
@@ -364,7 +443,7 @@ export default function DayView({
                                                 onDrop: (e) => handleDrop(e, h),
                                             })}
                                         >
-                                            <div style={{ position: "relative", minHeight: SLOT_ROW_PX }}>
+                                            <div data-slot-index={idx} style={{ position: "relative", minHeight: SLOT_ROW_PX, boxSizing: 'border-box' }}>
                                                 {renderEvents.map((ev, i) => {
                                                     const isTaskBox = !!ev.taskId;
                                                     // Calculate bar height to span all overlapping slots
@@ -379,10 +458,10 @@ export default function DayView({
                                                         if (slotEndTime > evEnd) break;
                                                         endIdx = j;
                                                     }
-                                                    const barHeightUncapped = (endIdx - slotIdx + 1) * SLOT_ROW_PX - 4; // SLOT_ROW_PX per slot, minus small gap
+                                                    const effectiveRowPx = measuredSlotPx || SLOT_ROW_PX;
+                                                    const barHeightUncapped = (endIdx - slotIdx + 1) * effectiveRowPx - 4; // per-slot px, minus small gap
                                                     // Cap the visual height to a single slot so appointment bars match the slot size
-                                                    // even if the underlying event spans multiple slots.
-                                                    const barHeight = Math.min(barHeightUncapped, SLOT_ROW_PX - 4);
+                                                    const barHeight = Math.min(barHeightUncapped, effectiveRowPx - 4);
                                                     // Stack multiple events that start in the same slot vertically so they don't fully overlap.
                                                     // Each subsequent event is shifted down slightly (top) but keeps the same slot-sized height.
                                                     const verticalOffset = i * 6; // px between stacked events
@@ -432,8 +511,8 @@ export default function DayView({
                                                                     height: adjustedBarHeight,
                                                                     backgroundColor: isTaskBox ? "#7ED4E3" : undefined,
                                                                     zIndex: 2,
-                                                                    boxShadow: "0 2px 8px -2px rgba(0,0,0,0.08)",
-                                                                    border: "1.5px solid #2563eb",
+                                                                    boxShadow: "0 2px 10px -4px rgba(2,6,23,0.06)",
+                                                                    border: "1.5px solid rgba(15,23,42,0.12)",
                                                                 }}
                                                             >
                                                                 {!isTaskBox && (
@@ -482,6 +561,42 @@ export default function DayView({
                             })}
                         </tbody>
                     </table>
+                    {/* Now line: show only when viewing today's date */}
+                    {(() => {
+                        // Only show when today is the same day displayed
+                        if (new Date().toDateString() !== (today || new Date()).toDateString()) return null;
+                        try {
+                            const firstSlot = hours[0] || '00:00';
+                            const lastSlot = hours[hours.length - 1] || '23:30';
+                            const [fh, fm] = firstSlot.split(':').map(Number);
+                            const [lh, lm] = lastSlot.split(':').map(Number);
+                            const startMinutes = fh * 60 + (fm || 0);
+                            const endMinutes = lh * 60 + (lm || 0) + slotSizeMin; // include last slot
+                            const nowDate = new Date(nowMs);
+                            const nowMinutesFloat = nowDate.getHours() * 60 + nowDate.getMinutes() + nowDate.getSeconds() / 60;
+                            if (nowMinutesFloat < startMinutes || nowMinutesFloat > endMinutes) return null;
+                            const pxPerMinute = (measuredSlotPx || SLOT_ROW_PX) / slotSizeMin;
+                            const topPx = headerHeight + (nowMinutesFloat - startMinutes) * pxPerMinute;
+                                return (
+                                <div
+                                    aria-hidden="true"
+                                    className="pointer-events-none"
+                                    style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        right: 0,
+                                        top: 0,
+                                        transform: `translateY(${topPx}px)`,
+                                        height: 2,
+                                        background: '#ef4444', // red
+                                        zIndex: 40,
+                                        transition: 'transform 0.9s linear',
+                                        willChange: 'transform',
+                                    }}
+                                />
+                            );
+                        } catch (e) { return null; }
+                    })()}
                 </div>
                 {/* Removed 'Plan tomorrow' button as requested */}
             </div>

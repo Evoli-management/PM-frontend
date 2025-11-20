@@ -134,7 +134,7 @@ export const getRelativeDateString = (date, dateFormat = 'MM/dd/yyyy') => {
  * @param {number} slotSizeMinutes - Slot size in minutes (default: 30)
  * @returns {Array<string>} - Array of time slots in HH:MM format
  */
-export const generateTimeSlots = (startTime = "08:00", endTime = "17:00", slotSizeMinutes = 30) => {
+export const generateTimeSlots = (startTime = "00:00", endTime = "24:00", slotSizeMinutes = 30) => {
     const startMinutes = timeToMinutes(startTime);
     const endMinutes = timeToMinutes(endTime);
     
@@ -158,12 +158,12 @@ export const generateTimeSlots = (startTime = "08:00", endTime = "17:00", slotSi
 };
 
 /**
- * Generate default business hours (8:00 AM to 5:00 PM)
+ * Generate default full-day slots (00:00 to 24:00)
  * @param {number} slotSizeMinutes - Slot size in minutes (default: 30)
  * @returns {Array<string>} - Array of time slots
  */
 export const getDefaultTimeSlots = (slotSizeMinutes = 30) => {
-    return generateTimeSlots("08:00", "17:00", slotSizeMinutes);
+    return generateTimeSlots("00:00", "24:00", slotSizeMinutes);
 };
 
 /**

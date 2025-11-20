@@ -43,7 +43,8 @@ const WeekView = ({
         formatTime,
         formatDate,
         loading: prefsLoading,
-        updateSlotSize 
+        updateSlotSize,
+        isWorkingTime,
     } = useCalendarPreferences(slotSize);
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -53,6 +54,63 @@ const WeekView = ({
     const tasksScrollRef = useRef(null);
     const [showTasksLeftCue, setShowTasksLeftCue] = useState(false);
     const [showTasksRightCue, setShowTasksRightCue] = useState(false);
+    const weekScrollRef = useRef(null);
+    const listOuterRef = useRef(null);
+    // Track current time as ms so we can compute fractional minutes (minutes + seconds/60)
+    const [nowMs, setNowMs] = useState(() => Date.now());
+    // measured pixel height of a single slot row (read from DOM) — initialize to the same formula used for ITEM_SIZE
+    const [measuredSlotPx, setMeasuredSlotPx] = useState(() => Math.round((slotSize / 30) * 38));
+    const [listScrollTop, setListScrollTop] = useState(0);
+
+    React.useEffect(() => {
+        // Keep nowMs updated every 5 seconds so the now-line can use fractional minutes
+        const update = () => setNowMs(Date.now());
+        update();
+        // align to next full second
+        const msUntilNextSecond = 1000 - (Date.now() % 1000);
+        const timeout = setTimeout(() => {
+            update();
+            const interval = setInterval(update, 5000);
+            weekScrollRef.current && (weekScrollRef.current._nowInterval = interval);
+        }, msUntilNextSecond);
+        return () => {
+            clearTimeout(timeout);
+            if (weekScrollRef.current && weekScrollRef.current._nowInterval) {
+                clearInterval(weekScrollRef.current._nowInterval);
+            }
+        };
+    }, []);
+
+    // Track FixedSizeList outer scroll so the now-line can be positioned relative to visible scroll
+    React.useEffect(() => {
+        const el = listOuterRef.current;
+        if (!el) return;
+        const onScroll = () => setListScrollTop(el.scrollTop || 0);
+        el.addEventListener('scroll', onScroll, { passive: true });
+        // initialize
+        setListScrollTop(el.scrollTop || 0);
+
+        // measure a rendered slot's height so px/min calculations match the DOM
+        const measure = () => {
+            try {
+                const item = el.querySelector('[data-slot-index]');
+                if (item) {
+                    const h = item.getBoundingClientRect().height;
+                    if (h && h > 0) setMeasuredSlotPx(h);
+                }
+            } catch (e) {}
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        window.addEventListener('resize', measure);
+
+        return () => {
+            el.removeEventListener('scroll', onScroll);
+            ro.disconnect();
+            window.removeEventListener('resize', measure);
+        };
+    }, [listOuterRef.current]);
 
     // Calculate week start (Monday)
     const weekStart = new Date(currentDate || new Date());
@@ -62,8 +120,8 @@ const WeekView = ({
         (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
     );
     
-    // Use dynamic time slots from working hours, fallback to default if still loading
-    const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("08:00", "17:00", slotSize);
+    // Use dynamic time slots from preferences; fallback to full-day slots if not available
+    const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("00:00", "24:00", slotSize);
     
     // Compute visual row height based on configured slotSize (minutes).
     // Keep 30min -> 38px as the reference and scale proportionally.
@@ -231,11 +289,7 @@ const WeekView = ({
                             Loading
                         </span>
                     )}
-                    {workingHours.startTime && workingHours.endTime && (
-                        <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
-                            {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
-                        </span>
-                    )}
+                    {/* Working hours indicator removed — calendar now shows full day uniformly */}
                 </h2>
                 <div className="flex items-center gap-2">
                     <button
@@ -277,7 +331,7 @@ const WeekView = ({
                     <div className="no-scrollbar">
                         {/* Table for header and all-day row only */}
                         <table
-                            className="min-w-full border border-blue-100 rounded-lg"
+                            className="min-w-full border border-gray-100 rounded-lg"
                             style={{
                                 width: "100%",
                                 tableLayout: "fixed",
@@ -304,9 +358,9 @@ const WeekView = ({
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr className="bg-gray-50">
+                                <tr>
                                     <td
-                                        className="border-r border-blue-100 px-2 py-2 text-xs text-gray-500"
+                                            className="border-r border-gray-100 px-2 py-2 text-xs text-gray-500"
                                         style={{ width: TIME_COL_PX + "px" }}
                                     >
                                         all day
@@ -314,7 +368,7 @@ const WeekView = ({
                                     {days.map((date, dIdx) => (
                                         <td
                                             key={dIdx}
-                                            className="border-r border-blue-100 px-2 py-2 text-center align-top"
+                                                className="border-r border-gray-100 px-2 py-2 text-center align-top"
                                         >
                                             <span className="text-gray-300">—</span>
                                         </td>
@@ -323,37 +377,43 @@ const WeekView = ({
                             </tbody>
                         </table>
                         {/* Time slots - virtualized as flexbox grid below the table */}
-                        <div className="w-full no-scrollbar" style={{ width: "100%" }}>
+                        <div ref={weekScrollRef} className="w-full no-scrollbar" style={{ position: 'relative', width: "100%" }}>
                             <FixedSizeList
                                 className="no-scrollbar"
                                 height={LIST_HEIGHT_PX}
                                 itemCount={slots.length}
                                 itemSize={ITEM_SIZE}
                                 width={undefined}
+                                outerRef={listOuterRef}
                             >
                                 {({ index, style }) => {
                                     const slot = slots[index];
                                     return (
                                         <div
-                                            key={index}
-                                            style={{ ...style, overflow: "visible" }}
-                                            className={`flex w-full ${index % 2 === 0 ? "bg-blue-50" : "bg-white"}`}
-                                        >
+                                                    key={index}
+                                                    data-slot-index={index}
+                                                    style={{ ...style, overflow: "visible", boxSizing: 'border-box' }}
+                                                    className={`flex w-full bg-white`}
+                                                >
                                             <div
-                                                className="border-r border-blue-100 px-2 py-1 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center"
+                                                className="border-r border-gray-100 px-2 py-1 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
                                                 style={{ width: TIME_COL_PX + "px" }}
                                             >
-                                                {formatTime(slot)}
+                                                {/* Left indicator for non-working hours */}
+                                                {isWorkingTime && !isWorkingTime(slot) && (
+                                                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300/40 rounded-r-md" aria-hidden="true"></span>
+                                                )}
+                                                <span className="pl-2">{formatTime(slot)}</span>
                                             </div>
                                             {days.map((date, dIdx) => {
                                                 const slotEvents = events.filter((ev) =>
                                                     eventMatchesSlot(ev.start, date, slot, slotSize) && !ev.taskId
                                                 );
                                                 return (
-                                                    <div
+                                                        <div
                                                         key={dIdx}
-                                                        className="border-r border-blue-100 px-2 py-1 align-top group flex items-center relative overflow-visible"
-                                                        style={{ flex: "1 1 0", minWidth: 0, height: ITEM_SIZE }}
+                                                        className="border-r border-gray-100 px-2 py-1 align-top group flex items-center relative overflow-visible"
+                                                        style={{ flex: "1 1 0", minWidth: 0, height: ITEM_SIZE, boxSizing: 'border-box' }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => handleDrop(e, date, slot)}
                                                         onClick={(e) => {
@@ -377,11 +437,12 @@ const WeekView = ({
                                                                   const startMs = evStart ? evStart.getTime() : 0;
                                                                   const endMs = evEnd ? evEnd.getTime() : 0;
                                                                   const durMs = endMs > startMs ? endMs - startMs : slotSize * 60000;
-                                                                  const heightPx = Math.max(ITEM_SIZE * (durMs / (slotSize * 60000)) - 4, ITEM_SIZE - 4);
+                                                                  const effectiveRowPx = measuredSlotPx || ITEM_SIZE;
+                                                                  const heightPx = Math.max(effectiveRowPx * (durMs / (slotSize * 60000)) - 4, effectiveRowPx - 4);
                                                                   const [sh, sm] = slot.split(":");
                                                                   const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number(sh), Number(sm));
                                                                   const withinSlotMin = evStart ? Math.max(0, Math.min(slotSize, (evStart.getTime() - slotStart.getTime()) / 60000)) : 0;
-                                                                  const withinSlotTop = (withinSlotMin / slotSize) * ITEM_SIZE;
+                                                                  const withinSlotTop = (withinSlotMin / slotSize) * (measuredSlotPx || ITEM_SIZE);
                                                                 return (
                                                                           <div
                                                                               key={i}
@@ -463,10 +524,57 @@ const WeekView = ({
                                     );
                                 }}
                             </FixedSizeList>
+                            {/* Now line across week view: show only if the week contains today */}
+                            {(() => {
+                                const todayDate = new Date(nowMs);
+                                // only show now-line if today is in the rendered week
+                                const found = days.some(d => (
+                                    d.getFullYear() === todayDate.getFullYear() &&
+                                    d.getMonth() === todayDate.getMonth() &&
+                                    d.getDate() === todayDate.getDate()
+                                ));
+                                if (!found) return null;
+                                try {
+                                    const firstSlot = slots[0] || '00:00';
+                                    const lastSlot = slots[slots.length - 1] || '23:30';
+                                    const [fh, fm] = firstSlot.split(':').map(Number);
+                                    const [lh, lm] = lastSlot.split(':').map(Number);
+                                    const startMinutes = fh * 60 + (fm || 0);
+                                    const endMinutes = lh * 60 + (lm || 0) + slotSize;
+                                    // compute fractional minutes from nowMs
+                                    const nowDate = new Date(nowMs);
+                                    const nowMinutesFloat = nowDate.getHours() * 60 + nowDate.getMinutes() + nowDate.getSeconds() / 60;
+                                    if (nowMinutesFloat < startMinutes || nowMinutesFloat > endMinutes) return null;
+                                    const pxPerMinute = (measuredSlotPx || ITEM_SIZE) / slotSize;
+                                    const topPx = (nowMinutesFloat - startMinutes) * pxPerMinute;
+                                    // adjust by current scrollTop so the line appears at the correct visible position
+                                    const visibleTop = topPx - (listScrollTop || 0);
+                                    // only render if within visible list viewport
+                                    if (visibleTop < 0 || visibleTop > LIST_HEIGHT_PX - 2) return null;
+                                    return (
+                                        <div
+                                            aria-hidden="true"
+                                            style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                right: 0,
+                                                top: 0,
+                                                transform: `translateY(${visibleTop}px)`,
+                                                height: 2,
+                                                background: '#ef4444',
+                                                zIndex: 40,
+                                                pointerEvents: 'none',
+                                                transition: 'transform 4.5s linear',
+                                                willChange: 'transform',
+                                            }}
+                                        />
+                                    );
+                                } catch (e) { return null; }
+                            })()}
                         </div>
                     </div>
                     {/* Two rows: first for Add Task + task list, second for Add Activity + activity list */}
-                    <div className="flex flex-col w-full bg-white border border-blue-100 rounded-b-lg mt-2">
+                    <div className="flex flex-col w-full bg-white border border-gray-100 rounded-b-lg mt-2">
                         {/* Row 1: Add Task + Task List */}
                         <div className="flex w-full border-b border-blue-50">
                             <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>

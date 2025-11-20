@@ -27,7 +27,8 @@ export default function MonthView({
         timeSlots, 
         workingHours, 
         formatTime,
-        loading: prefsLoading 
+        loading: prefsLoading,
+        isWorkingTime,
     } = useCalendarPreferences(30);
     
     // Generate all possible hours (24-hour format)
@@ -37,27 +38,15 @@ export default function MonthView({
         return `${h.toString().padStart(2, '0')}:${m}`;
     });
 
-    // Dynamic working hours based on user preferences
-    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS.filter((h) => {
-        const hour = Number(h.split(":")[0]);
-        return hour >= 8 && hour <= 18;
-    });
+    // Use full-day hours (no working-hours restriction)
+    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS;
 
-    // Use workingHours for start/end hour
-    const WORK_START = workingHours?.startTime ? Number(workingHours.startTime.split(":")[0]) : 8;
-    const WORK_END = workingHours?.endTime ? Number(workingHours.endTime.split(":")[0]) : 17;
+    // Use full-day bounds
+    const WORK_START = 0;
+    const WORK_END = 24;
 
-    // Debug: Log working hours to verify they're being used
-    console.log('MonthView working hours:', { 
-        startTime: workingHours?.startTime, 
-        endTime: workingHours?.endTime, 
-        WORK_START, 
-        WORK_END,
-        timeSlotsLength: timeSlots.length 
-    });
-
-    const [showAllHours, setShowAllHours] = useState(false);
-    const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
+    // Always show full 24 hours
+    const HOURS = ALL_HOURS;
     // Weekday headers are not rendered in this table layout
 
     const today = new Date();
@@ -266,22 +255,7 @@ export default function MonthView({
         return () => clearInterval(interval);
     }, [month]);
 
-    // Auto-scroll to first working hour slot when component loads or working hours change
-    useEffect(() => {
-        if (gridRef.current && !showAllHours && HOURS.length > 0) {
-            // Calculate offset to first working hour slot
-            // Scroll to show the first vertical line (left border) of the first working hour
-            const stickyColumnsWidth = 96 + 80; // Date column (96px) + All day column (80px)
-            const scrollToPosition = stickyColumnsWidth; // Position at the first vertical line of first working hour
-            
-            // Small delay to ensure table is rendered
-            setTimeout(() => {
-                if (gridRef.current) {
-                    gridRef.current.scrollLeft = scrollToPosition;
-                }
-            }, 100);
-        }
-    }, [workingHours.startTime, workingHours.endTime, showAllHours, HOURS.length]);
+    // Auto-scroll behavior removed — calendar shows full day without auto-scrolling to working hours
 
     // Build grid rows: one per day
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -346,11 +320,7 @@ export default function MonthView({
                                 Loading
                             </span>
                         )}
-                        {workingHours.startTime && workingHours.endTime && !showAllHours && (
-                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
-                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
-                            </span>
-                        )}
+                        {/* working-hours indicator removed */}
                     </h2>
                     <div className="flex items-center gap-2">
                         <select
@@ -376,27 +346,7 @@ export default function MonthView({
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-600">
-                        {!showAllHours && (
-                            <span>
-                                Showing working hours ({formatTime(workingHours.startTime) || '8:00 AM'} - {formatTime(workingHours.endTime) || '6:00 PM'})
-                            </span>
-                        )}
-                        {showAllHours && (
-                            <span>Showing all 24 hours</span>
-                        )}
-                    </div>
-                    <label className="text-sm text-gray-600 cursor-pointer flex items-center">
-                        <input
-                            type="checkbox"
-                            checked={showAllHours}
-                            onChange={(e) => setShowAllHours(e.target.checked)}
-                            className="mr-2"
-                        />
-                        Show all hours (24h)
-                    </label>
-                </div>
+                {/* Working-hours indicator and toggle removed — calendar displays full day uniformly */}
                 <div
                     ref={gridRef}
                     className="relative pb-6"
@@ -541,11 +491,26 @@ export default function MonthView({
                                             const leftBorder = isFirstColumn 
                                                 ? "1px solid rgba(56,189,248,0.08)" 
                                                 : "1px solid rgba(56,189,248,0.08)";
-                                            
+                                            // Determine working vs non-working for this hour slot
+                                            let isWorking = true;
+                                            try {
+                                                if (isWorkingTime) {
+                                                    isWorking = isWorkingTime(h);
+                                                } else if (workingHours && workingHours.startTime && workingHours.endTime) {
+                                                    const [sh, sm] = workingHours.startTime.split(":");
+                                                    const [eh, em] = workingHours.endTime.split(":");
+                                                    const startMinutes = Number(sh) * 60 + Number(sm);
+                                                    const endMinutes = Number(eh) * 60 + Number(em);
+                                                    const [hh, mm] = h.split(":");
+                                                    const slotMinutes = Number(hh) * 60 + Number(mm);
+                                                    isWorking = slotMinutes >= startMinutes && slotMinutes < endMinutes;
+                                                }
+                                            } catch { isWorking = true; }
+
                                             return (
                                                 <td
                                                     key={hIdx}
-                                                    className="relative px-1 py-2 text-center align-top w-16 cursor-pointer hover:bg-blue-100"
+                                                    className={`relative px-1 py-2 text-center align-top w-16 cursor-pointer ${isWorking ? '' : 'bg-slate-50'}`}
                                                     style={{ 
                                                         minWidth: 40, 
                                                         borderLeft: leftBorder,

@@ -34,7 +34,6 @@ import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
-import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 import { normalizeActivity } from '../../utils/keyareasHelpers';
 import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
@@ -407,15 +406,8 @@ const CalendarContainer = () => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
-            if (!withinBusinessHours(start)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Schedule only between 08:00 and 17:00",
-                    variant: "warning",
-                });
-                return;
-            }
-            const { end } = clampToBusinessHours(start, defaultMinutes);
+            // No business-hours restriction; compute end as simple duration offset
+            const end = new Date(start.getTime() + defaultMinutes * 60000);
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
             // Try to find a title from todos if not provided
             let title =
@@ -463,15 +455,8 @@ const CalendarContainer = () => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
-            if (!withinBusinessHours(start)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Schedule only between 08:00 and 17:00",
-                    variant: "warning",
-                });
-                return;
-            }
-            const { end } = clampToBusinessHours(start, defaultMinutes);
+            // No business-hours restriction; compute end as simple duration offset
+            const end = new Date(start.getTime() + defaultMinutes * 60000);
             const title =
                 (typeof activityOrObj === "object" && (activityOrObj.text || activityOrObj.title)) ||
                 "Activity";
@@ -790,14 +775,8 @@ const CalendarContainer = () => {
                 // Immediately create a calendar event at the selected time for this new task
                 try {
                     let start = new Date(when);
-                    if (!withinBusinessHours(start)) {
-                        addToast({
-                            title: "Outside business hours",
-                            description: "Adjusted to 08:00",
-                            variant: "warning",
-                        });
-                    }
-                    const { end } = clampToBusinessHours(start, 60); // default 60 minutes
+                    // No business-hours restriction; default event length is 60 minutes
+                    const end = new Date(start.getTime() + 60 * 60000);
                     const ev = await calendarService.createEvent({
                         title: form.title,
                         start: start.toISOString(),
@@ -822,14 +801,7 @@ const CalendarContainer = () => {
     // Double-click now opens appointment modal instead of auto-creating
     const handleQuickCreate = (date) => {
         const start = new Date(date);
-        if (!withinBusinessHours(start)) {
-            addToast({
-                title: "Outside business hours",
-                description: "Use a slot between 08:00 and 17:00",
-                variant: "warning",
-            });
-            return;
-        }
+        // Allow quick-create at any time
         setAppointmentInitialStart(start);
         setAppointmentModalOpen(true);
     };
@@ -837,24 +809,8 @@ const CalendarContainer = () => {
     // Move event (drag existing event into a new slot)
     const handleEventMove = async (eventId, newStartDate, newEndDate) => {
         try {
-            if (!withinBusinessHours(newStartDate)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Allowed window 08:00–17:00",
-                    variant: "error",
-                });
-                return;
-            }
             // Determine end time: use provided newEndDate (resize) or default 30 minutes (move)
             const targetEnd = newEndDate ? newEndDate : new Date(newStartDate.getTime() + 30 * 60 * 1000);
-            if (!withinBusinessHours(targetEnd)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Allowed window 08:00–17:00",
-                    variant: "error",
-                });
-                return;
-            }
             const payload = { start: newStartDate.toISOString(), end: targetEnd.toISOString() };
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
@@ -1212,6 +1168,14 @@ const CalendarContainer = () => {
                                     const d = addDate || new Date();
                                     return d.toISOString().slice(0, 10);
                                 })(),
+                                time: (() => {
+                                    try {
+                                        const d = addDate || new Date();
+                                        const hh = String(d.getHours()).padStart(2, '0');
+                                        const mm = String(d.getMinutes()).padStart(2, '0');
+                                        return `${hh}:${mm}`;
+                                    } catch { return '09:30'; }
+                                })(),
                             }}
                             onSave={async (data) => {
                                 // data follows CreateTaskModal payload (title, description, date, time, dueDate, endDate, key_area_id, list_index, ...)
@@ -1248,10 +1212,8 @@ const CalendarContainer = () => {
                                     try {
                                         if (data.date && data.time) {
                                             let start = new Date(`${data.date}T${data.time}`);
-                                            if (!withinBusinessHours(start)) {
-                                                addToast({ title: 'Outside business hours', description: 'Adjusted to business hours', variant: 'warning' });
-                                            }
-                                            const { end } = clampToBusinessHours(start, 60);
+                                            // No business-hours restriction; default event length is 60 minutes
+                                            const end = new Date(start.getTime() + 60 * 60000);
                                             const ev = await calendarService.createEvent({
                                                 title: createdTask.title,
                                                 start: start.toISOString(),
