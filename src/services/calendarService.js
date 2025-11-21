@@ -80,18 +80,17 @@ const calendarService = {
             
             // Listen for postMessage from popup
             const messageHandler = async (event) => {
-                if (event.data?.res === 'pm-sync' && event.data?.platform === 'google') {
+                // Expecting new payload: { provider: 'google'|'graph', success: true|false }
+                if (event.data && event.data.provider === 'google') {
                     window.removeEventListener('message', messageHandler);
-                    popup.close();
-                    
-                    try {
-                        // Use the access token to perform sync
-                        const syncRes = await apiClient.post(`${base}/sync/google`, {
-                            accessToken: event.data.accessToken
-                        });
-                        resolve(syncRes.data);
-                    } catch (error) {
-                        reject(error);
+                    try { popup.close(); } catch(e) {}
+
+                    if (event.data.success === true) {
+                        // We intentionally do not expect access tokens in the message anymore.
+                        // Resolve so the caller can refresh integration status.
+                        resolve({ success: true });
+                    } else {
+                        reject(new Error('OAuth cancelled by user'));
                     }
                 }
             };
@@ -100,7 +99,7 @@ const calendarService = {
             
             // Handle popup closed without auth
             const checkClosed = setInterval(() => {
-                if (popup.closed) {
+                if (popup && popup.closed) {
                     clearInterval(checkClosed);
                     window.removeEventListener('message', messageHandler);
                     reject(new Error('OAuth cancelled by user'));
@@ -120,18 +119,17 @@ const calendarService = {
             
             // Listen for postMessage from popup
             const messageHandler = async (event) => {
-                if (event.data?.res === 'pm-sync' && event.data?.platform === 'graph') {
+                // Expecting new payload: { provider: 'google'|'graph', success: true|false }
+                if (event.data && event.data.provider === 'graph') {
                     window.removeEventListener('message', messageHandler);
-                    popup.close();
-                    
-                    try {
-                        // Use the access token to perform sync
-                        const syncRes = await apiClient.post(`${base}/sync/microsoft`, {
-                            accessToken: event.data.accessToken
-                        });
-                        resolve(syncRes.data);
-                    } catch (error) {
-                        reject(error);
+                    try { popup.close(); } catch(e) {}
+
+                    if (event.data.success === true) {
+                        // We intentionally do not expect access tokens in the message anymore.
+                        // Resolve so the caller can refresh integration status.
+                        resolve({ success: true });
+                    } else {
+                        reject(new Error('OAuth cancelled by user'));
                     }
                 }
             };
@@ -140,7 +138,7 @@ const calendarService = {
             
             // Handle popup closed without auth
             const checkClosed = setInterval(() => {
-                if (popup.closed) {
+                if (popup && popup.closed) {
                     clearInterval(checkClosed);
                     window.removeEventListener('message', messageHandler);
                     reject(new Error('OAuth cancelled by user'));
