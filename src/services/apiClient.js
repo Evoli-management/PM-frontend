@@ -8,7 +8,7 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ||
 
 const apiClient = axios.create({
     baseURL: apiBase,
-    timeout: 10000,
+    timeout: 30000,
     withCredentials: true,
 });
 

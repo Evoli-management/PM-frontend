@@ -73,30 +73,50 @@ const calendarService = {
         // Get OAuth URL from backend
         const res = await apiClient.get(`${base}/oauth/google`);
         const { authUrl } = res.data;
-        
         return new Promise((resolve, reject) => {
             // Open popup window for OAuth
             const popup = window.open(authUrl, 'google-oauth', 'width=500,height=600,scrollbars=yes,resizable=yes');
-            
+
+            // Determine expected origin for messages (improves security and filters noise)
+            let expectedOrigin;
+            try {
+                expectedOrigin = new URL(authUrl).origin;
+            } catch (e) {
+                expectedOrigin = null;
+            }
+
             // Listen for postMessage from popup
             const messageHandler = async (event) => {
-                // Expecting new payload: { provider: 'google'|'graph', success: true|false }
-                if (event.data && event.data.provider === 'google') {
-                    window.removeEventListener('message', messageHandler);
-                    try { popup.close(); } catch(e) {}
+                const data = event.data || {};
 
-                    if (event.data.success === true) {
-                        // We intentionally do not expect access tokens in the message anymore.
-                        // Resolve so the caller can refresh integration status.
+                // Accept the message if EITHER:
+                //  - it contains a provider field with a known value ('google'|'graph'), OR
+                //  - it comes from the popup origin determined from the authUrl (fallback)
+                const providerPresent = (data && (data.provider === 'google' || data.provider === 'graph'));
+                const originMatches = expectedOrigin && event.origin === expectedOrigin;
+
+                if (!providerPresent && !originMatches) return; // ignore noise
+
+                // At this point the message is relevant
+                window.removeEventListener('message', messageHandler);
+                try { popup && popup.close(); } catch (e) {}
+
+                if (providerPresent) {
+                    // Use explicit provider+success payload when present
+                    if (data.success === true) {
                         resolve({ success: true });
                     } else {
                         reject(new Error('OAuth cancelled by user'));
                     }
+                } else {
+                    // No explicit provider field but origin matched; treat as success
+                    // (the legacy popup posts minimal HTML and may not include provider)
+                    resolve({ success: true });
                 }
             };
-            
+
             window.addEventListener('message', messageHandler);
-            
+
             // Handle popup closed without auth
             const checkClosed = setInterval(() => {
                 if (popup && popup.closed) {
@@ -112,30 +132,42 @@ const calendarService = {
         // Get OAuth URL from backend  
         const res = await apiClient.get(`${base}/oauth/microsoft`);
         const { authUrl } = res.data;
-        
         return new Promise((resolve, reject) => {
             // Open popup window for OAuth
             const popup = window.open(authUrl, 'microsoft-oauth', 'width=500,height=600,scrollbars=yes,resizable=yes');
-            
-            // Listen for postMessage from popup
-            const messageHandler = async (event) => {
-                // Expecting new payload: { provider: 'google'|'graph', success: true|false }
-                if (event.data && event.data.provider === 'graph') {
-                    window.removeEventListener('message', messageHandler);
-                    try { popup.close(); } catch(e) {}
 
-                    if (event.data.success === true) {
-                        // We intentionally do not expect access tokens in the message anymore.
-                        // Resolve so the caller can refresh integration status.
+            // Determine expected origin for messages (improves security and filters noise)
+            let expectedOrigin;
+            try {
+                expectedOrigin = new URL(authUrl).origin;
+            } catch (e) {
+                expectedOrigin = null;
+            }
+
+            const messageHandler = async (event) => {
+                const data = event.data || {};
+                const providerPresent = (data && (data.provider === 'graph' || data.provider === 'google'));
+                const originMatches = expectedOrigin && event.origin === expectedOrigin;
+
+                if (!providerPresent && !originMatches) return;
+
+                window.removeEventListener('message', messageHandler);
+                try { popup && popup.close(); } catch (e) {}
+
+                if (providerPresent) {
+                    if (data.success === true) {
                         resolve({ success: true });
                     } else {
                         reject(new Error('OAuth cancelled by user'));
                     }
+                } else {
+                    // origin matched but no explicit provider - treat as success
+                    resolve({ success: true });
                 }
             };
-            
+
             window.addEventListener('message', messageHandler);
-            
+
             // Handle popup closed without auth
             const checkClosed = setInterval(() => {
                 if (popup && popup.closed) {
