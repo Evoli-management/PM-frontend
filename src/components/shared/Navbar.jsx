@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
 
@@ -31,8 +31,12 @@ export default function Navbar() {
     }, [open, openQuick]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
     const widgetsRef = useRef(null);
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const searchRef = useRef(null);
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem('pm:dashboard:prefs');
@@ -43,6 +47,74 @@ export default function Navbar() {
         }
     });
     const [search, setSearch] = useState("");
+
+    // Handle search functionality
+    const handleSearch = (searchTerm) => {
+        if (!searchTerm.trim()) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+            return;
+        }
+
+        // Define searchable items with their routes and types
+        const searchableItems = [
+            { title: "Dashboard", route: "/dashboard", type: "page", description: "Main dashboard overview" },
+            { title: "Calendar", route: "/calendar", type: "page", description: "View and manage appointments" },
+            { title: "Don't Forget", route: "/tasks?dontforget=1", type: "page", description: "Quick task reminders" },
+            { title: "Goals & Tracking", route: "/goals", type: "page", description: "Manage goals and track progress" },
+            { title: "Key Areas", route: "/key-areas", type: "page", description: "Organize work by key areas" },
+            { title: "Ideas", route: "/key-areas?select=ideas", type: "page", description: "Brainstorm and manage ideas" },
+            { title: "Team", route: "/teams", type: "page", description: "Team collaboration and management" },
+            { title: "Profile Settings", route: "/profile", type: "page", description: "User profile and settings" },
+        ];
+
+        // Filter items based on search term
+        const results = searchableItems.filter(item => 
+            item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.description.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        setSearchResults(results);
+        setShowSearchResults(true);
+    };
+
+    // Handle search input change
+    const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearch(value);
+        handleSearch(value);
+    };
+
+    // Handle search result click
+    const handleSearchResultClick = (route) => {
+        navigate(route);
+        setSearch("");
+        setSearchResults([]);
+        setShowSearchResults(false);
+    };
+
+    // Handle Enter key for search
+    const handleSearchKeyPress = (e) => {
+        if (e.key === 'Enter' && searchResults.length > 0) {
+            handleSearchResultClick(searchResults[0].route);
+        }
+        if (e.key === 'Escape') {
+            setSearch("");
+            setSearchResults([]);
+            setShowSearchResults(false);
+        }
+    };
+
+    // Close search results when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchRef.current && !searchRef.current.contains(e.target)) {
+                setShowSearchResults(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
@@ -188,17 +260,42 @@ export default function Navbar() {
                     </Link>
                     
                     {/* Site-wide search */}
-                    <div className="flex-1 max-w-md mx-4">
+                    <div className="flex-1 max-w-md mx-4 relative" ref={searchRef}>
                         <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 shadow-sm">
                             <FaSearch className="text-gray-500 mr-2" />
                             <input
                                 type="text"
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                onChange={handleSearchChange}
+                                onKeyDown={handleSearchKeyPress}
                                 placeholder="Search across site..."
                                 className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder-gray-500"
                             />
                         </div>
+                        
+                        {/* Search Results Dropdown */}
+                        {showSearchResults && searchResults.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-64 overflow-y-auto">
+                                {searchResults.map((result, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => handleSearchResultClick(result.route)}
+                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                                    >
+                                        <div className="font-medium text-gray-800">{result.title}</div>
+                                        <div className="text-sm text-gray-500">{result.description}</div>
+                                        <div className="text-xs text-blue-600 mt-1">{result.type}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* No Results Message */}
+                        {showSearchResults && search && searchResults.length === 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 px-4 py-3">
+                                <div className="text-gray-500 text-sm">No results found for "{search}"</div>
+                            </div>
+                        )}
                     </div>
                     
                 <div className="relative flex items-center gap-3">
