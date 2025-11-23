@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { FaUser, FaBolt, FaTh } from "react-icons/fa";
+import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
 
 export default function Navbar() {
@@ -42,6 +42,7 @@ export default function Navbar() {
             return {};
         }
     });
+    const [search, setSearch] = useState("");
 
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
@@ -185,6 +186,21 @@ export default function Navbar() {
                         />
                         <span className="sr-only">Practical Manager</span>
                     </Link>
+                    
+                    {/* Site-wide search */}
+                    <div className="flex-1 max-w-md mx-4">
+                        <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 shadow-sm">
+                            <FaSearch className="text-gray-500 mr-2" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search across site..."
+                                className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder-gray-500"
+                            />
+                        </div>
+                    </div>
+                    
                 <div className="relative flex items-center gap-3">
                     {/* Widgets control: only show on Dashboard route */}
                     {location.pathname === '/dashboard' && (
