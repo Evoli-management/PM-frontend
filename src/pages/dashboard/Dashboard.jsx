@@ -2,6 +2,26 @@
 import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/shared/Sidebar";
 import { FaGripVertical, FaBars } from "react-icons/fa";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 // Reusable dashboard widgets
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
@@ -178,11 +198,53 @@ function EChart({ data = [], labels = [] }) {
     );
 }
 
+// SortableWidget wrapper component for drag functionality
+function SortableWidget({ id, children }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="group relative">
+            {/* Drag handle */}
+            <div 
+                {...attributes} 
+                {...listeners}
+                className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10 cursor-grab active:cursor-grabbing"
+            >
+                <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
+            </div>
+            {children}
+        </div>
+    );
+}
+
 export default function Dashboard() {
     const [loading, setLoading] = useState(true);
-    const [draggedWidget, setDraggedWidget] = useState(null);
-    const [dragOverIndex, setDragOverIndex] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    
+    // Enhanced drag and drop sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
     
     useEffect(() => {
         const timer = setTimeout(() => setLoading(false), 400);
@@ -291,56 +353,7 @@ export default function Dashboard() {
         });
     };
 
-    // Drag and drop handlers for widget reordering
-    const handleWidgetDragStart = (e, widgetKey, index) => {
-        setDraggedWidget({ key: widgetKey, index });
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/html", e.target);
-        e.target.style.opacity = "0.6";
-    };
 
-    const handleWidgetDragEnd = (e) => {
-        e.target.style.opacity = "1";
-        setDraggedWidget(null);
-        setDragOverIndex(null);
-    };
-
-    const handleWidgetDragOver = (e, index) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setDragOverIndex(index);
-    };
-
-    const handleWidgetDragLeave = (e) => {
-        // Only clear dragOverIndex if we're leaving the entire droppable area
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-            setDragOverIndex(null);
-        }
-    };
-
-    const handleWidgetDrop = (e, targetIndex) => {
-        e.preventDefault();
-        setDragOverIndex(null);
-        
-        if (!draggedWidget || draggedWidget.index === targetIndex) {
-            return;
-        }
-
-        setPrefs((p) => {
-            const currentOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
-            const draggedKey = currentOrder[draggedWidget.index];
-            
-            // Remove the dragged widget
-            const newOrder = currentOrder.filter((_, i) => i !== draggedWidget.index);
-            
-            // Insert at new position
-            newOrder.splice(targetIndex, 0, draggedKey);
-            
-            return { ...p, widgetOrder: newOrder };
-        });
-        
-        setDraggedWidget(null);
-    };
     // Dark mode disabled; keep theme as light while retaining the button UI
     const toggleTheme = () => setPrefs((p) => (p.theme !== "light" ? { ...p, theme: "light" } : p));
 
@@ -545,6 +558,48 @@ export default function Dashboard() {
         window.addEventListener('open-quickadd', handler);
         return () => window.removeEventListener('open-quickadd', handler);
     }, []);
+    
+    // Handle drag end event - Simple swap between two widgets
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+
+        if (active.id !== over?.id && over) {
+            const draggedWidgetId = active.id;
+            const targetWidgetId = over.id;
+            
+            // Get the complete widget order (including hidden widgets)
+            const currentOrder = [...(prefs.widgetOrder || [])];
+            
+            // Find positions of both widgets in the complete order
+            const draggedIndex = currentOrder.indexOf(draggedWidgetId);
+            const targetIndex = currentOrder.indexOf(targetWidgetId);
+            
+            // Ensure both widgets exist in the order
+            if (draggedIndex === -1 || targetIndex === -1) {
+                console.warn('Invalid drag operation: one or both widgets not found in order');
+                return;
+            }
+            
+            // Simple swap: exchange positions of the two widgets
+            const newOrder = [...currentOrder];
+            newOrder[draggedIndex] = targetWidgetId;
+            newOrder[targetIndex] = draggedWidgetId;
+            
+            // Update preferences state
+            const newPrefs = { 
+                ...prefs,
+                widgetOrder: newOrder
+            };
+            setPrefs(newPrefs);
+            
+            // Save to localStorage
+            try {
+                localStorage.setItem('pm:dashboard:prefs', JSON.stringify(newPrefs));
+            } catch (error) {
+                console.warn('Failed to save dashboard preferences:', error);
+            }
+        }
+    };
     
     // Refresh dashboard data
     const refreshDashboardData = async () => {
@@ -753,75 +808,52 @@ export default function Dashboard() {
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
-        const isDragging = draggedWidget?.key === key;
-        const isDragOver = dragOverIndex === index;
-        
-        const dragClasses = `
-            dashboard-widget-item group relative
-            ${isDragging ? 'dashboard-widget-dragging' : 'dashboard-widget-draggable'}
-            ${isDragOver ? 'dashboard-widget-drag-over' : ''}
-        `.trim();
-
-        // Common drag props
-        const dragProps = {
-            draggable: true,
-            onDragStart: (e) => handleWidgetDragStart(e, key, index),
-            onDragEnd: handleWidgetDragEnd,
-            onDragOver: (e) => handleWidgetDragOver(e, index),
-            onDragLeave: handleWidgetDragLeave,
-            onDrop: (e) => handleWidgetDrop(e, index),
-            className: dragClasses
-        };
-
-        // Common grip icon
-        const GripIcon = () => (
-            <div className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10">
-                <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
-            </div>
-        );
-
-        const isCompactWidget = ['myDay', 'goals', 'enps', 'strokes', 'productivity'].includes(key);
-        const gridClass = isCompactWidget ? 'col-span-1' : 'col-span-full md:col-span-2';
+        // Make all widgets the same size with proper content accommodation
+        // Flexible height to fit content but maintain consistency
+        const widgetClass = 'w-full h-96 min-h-96';
 
         if (key === "quickAdd") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <QuickAddBar
-                        onOpen={(t) => {
-                            try {
-                                const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
-                                window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
-                            } catch (err) {
-                                console.warn('quickAdd dispatch error', err);
-                            }
-                        }}
-                        message={message}
-                    />
-                </div>
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                        <QuickAddBar
+                            onOpen={(t) => {
+                                try {
+                                    const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                    window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                                } catch (err) {
+                                    console.warn('quickAdd dispatch error', err);
+                                }
+                            }}
+                            message={message}
+                        />
+                    </div>
+                </SortableWidget>
             );
         }
 
         if (key === "myDay") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
-                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
-                        <div className="text-xs font-medium opacity-80">tasks</div>
-                        <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
-                    </StatsCard>
-                </div>
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                        <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
+                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                            <div className="text-xs font-medium opacity-80">tasks</div>
+                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                        </StatsCard>
+                    </div>
+                </SortableWidget>
             );
         }
 
         if (key === "goals") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4">Your active goals</h2>
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <div />
                             <div className="flex items-center gap-2">
                                 <button 
                                     className="px-2 py-1 border rounded text-sm" 
@@ -845,7 +877,7 @@ export default function Dashboard() {
                                 <a href="#/goals" className="text-sm text-blue-600">View all</a>
                             </div>
                         </div>
-                        
+
                         {dataLoading.goals ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="text-sm text-[CanvasText] opacity-70">Loading goals...</div>
@@ -884,16 +916,18 @@ export default function Dashboard() {
                         )}
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "enps") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
                         <div className="flex items-start justify-between">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">eNPS Snapshot</h2>
+                            <div />
                             <div className="text-xs text-[CanvasText] opacity-60 flex items-center gap-2">
                                 <span title="eNPS measures employee net promoter score; range -100 to +100">ℹ️</span>
                                 <button className="px-2 py-1 border rounded text-[CanvasText]" title="Export eNPS report">Export</button>
@@ -904,27 +938,27 @@ export default function Dashboard() {
                         </a>
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "strokes") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Strokes</h2>
-                        </div>
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">Strokes</h3>
                         <StrokesPanel strokes={strokes} />
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "productivity") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
                     <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
                         <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
                         <div className="text-xs font-medium opacity-80">productive</div>
@@ -935,19 +969,21 @@ export default function Dashboard() {
                         </div>
                     </StatsCard>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "calendarPreview") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
                         <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">Calendar Preview (Today)</h2>
+                            <div />
                             <a href="#/calendar" className="text-sm text-blue-600">Open Calendar</a>
                         </div>
-                        
+
                         {dataLoading.calendar ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="text-sm text-[CanvasText] opacity-70">Loading calendar...</div>
@@ -975,16 +1011,18 @@ export default function Dashboard() {
                         )}
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "activity") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>
                         <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400">What's New</h2>
+                            <div />
                             <div className="flex items-center gap-2">
                                 <select className="border rounded text-sm bg-[Canvas]" value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} title="Filter feed">
                                     <option value="all">All</option>
@@ -995,7 +1033,7 @@ export default function Dashboard() {
                                 <a href="#/notifications" className="text-sm text-blue-600">Open Feed</a>
                             </div>
                         </div>
-                        
+
                         {dataLoading.activity ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="text-sm text-[CanvasText] opacity-70">Loading activities...</div>
@@ -1007,33 +1045,36 @@ export default function Dashboard() {
                             </div>
                         ) : null}
                         
-                        <ActivityFeed 
-                            items={recentActivity.filter((it) => {
-                                if (activityFilter === "all") return true;
-                                if (activityFilter === "recognitions") return /stroke|recognition|praise/i.test(it.desc);
-                                if (activityFilter === "goals") return /goal|objective|milestone/i.test(it.desc);
-                                if (activityFilter === "tasks") return /task|todo|complete|moved/i.test(it.desc);
-                                return true;
-                            })} 
-                            onItemClick={(it) => setDrillItem(it)} 
-                        />
-                        
-                        {!dataLoading.activity && recentActivity.length === 0 && (
-                            <div className="text-[CanvasText] opacity-70 text-center py-4">
-                                No recent activity. Start working on your goals to see updates here!
-                            </div>
-                        )}
+                        <div className="flex-1 overflow-y-auto">
+                            <ActivityFeed 
+                                items={recentActivity.filter((it) => {
+                                    if (activityFilter === "all") return true;
+                                    if (activityFilter === "recognitions") return /stroke|recognition|praise/i.test(it.desc);
+                                    if (activityFilter === "goals") return /goal|objective|milestone/i.test(it.desc);
+                                    if (activityFilter === "tasks") return /task|todo|complete|moved/i.test(it.desc);
+                                    return true;
+                                })} 
+                                onItemClick={(it) => setDrillItem(it)} 
+                            />
+
+                            {!dataLoading.activity && recentActivity.length === 0 && (
+                                <div className="text-[CanvasText] opacity-70 text-center py-4">
+                                    No recent activity. Start working on your goals to see updates here!
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "suggestions") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <h2 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-2">Suggestions</h2>
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">Suggestions</h3>
                         <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
                             <li>Recommend goal: "Automate weekly reporting" (template)</li>
                             <li>Next best action: Finish API tests before lunch</li>
@@ -1041,15 +1082,16 @@ export default function Dashboard() {
                         </ul>
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
         if (key === "teamOverview") {
             return (
-                <div key={key} {...dragProps} className={`${dragClasses} ${gridClass}`}>
-                    <GripIcon />
-                    <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText] h-full">
-                        <h3 className="text-lg font-bold mb-3 text-blue-700 dark:text-blue-400">Team Performance Overview</h3>
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                        <h3 className="font-semibold text-blue-700 mb-3">Team Performance Overview</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div className="p-3 border rounded">Team goals completion: 68%</div>
                             <div className="p-3 border rounded">Avg workload: 32h/week</div>
@@ -1061,6 +1103,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+                </SortableWidget>
             );
         }
 
@@ -1099,84 +1142,82 @@ export default function Dashboard() {
         gridAutoRows: '1fr',
     };
 
-    const cardWrapper = {
-        minWidth: '120px',
-        minHeight: '100px',
-        display: 'flex',
-        flexDirection: 'column',
-    };
 
-    const cardWrapperLarge = {
-        minWidth: '160px',
-        minHeight: '120px',
-        display: 'flex',
-        flexDirection: 'column',
-    };
-
-    // Compute wrapper style dynamically based on how many top widgets are visible
-    function getWrapperStyle(key) {
-        // For grid layout we let CSS grid handle sizing. Provide a sensible minWidth
-        const isLarge = key === 'goals' || key === 'enps' || key === 'strokes';
-        const base = isLarge ? { ...cardWrapperLarge } : { ...cardWrapper };
-        return { ...base, position: 'relative', width: '100%' };
-    }
 
     return (
-        <div className="flex min-h-screen bg-[Canvas]">
-            <Sidebar 
-                user={{ name: "Hussein" }} 
-                mobileOpen={mobileSidebarOpen}
-                onMobileClose={() => setMobileSidebarOpen(false)}
-            />
-            {mobileSidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
-                    onClick={() => setMobileSidebarOpen(false)}
+        <div className="min-h-screen bg-[#EDEDED]">
+            <div className="flex w-full min-h-screen">
+                <Sidebar 
+                    user={{ name: "Hussein" }} 
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
                 />
-            )}
-        <main className="flex-1 p-2 md:p-4 text-[CanvasText] min-w-0">
-            <div className="w-full max-w-full" style={{ marginTop: '-0.75rem' }}>
-                <div className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <button
-                            className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
-                            onClick={() => setMobileSidebarOpen(true)}
-                            aria-label="Open sidebar"
-                        >
-                            <FaBars />
-                        </button>
-                    </div>
-                    {/* Widgets control moved to Navbar (keeps header slim) */}
-                </div>
+                {mobileSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                )}
+                <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto">
+                    <div className="max-w-full overflow-x-hidden pb-8 min-h-full">
+                        <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                                    onClick={() => setMobileSidebarOpen(true)}
+                                    aria-label="Open sidebar"
+                                >
+                                    <FaBars />
+                                </button>
+                                <h1 className="text-2xl font-semibold text-blue-700 dark:text-blue-300">Dashboard</h1>
+                            </div>
+                        </div>
+                        <div className="px-2 md:px-4">
 
-                {/* Quick Add fixed widget at top (non-draggable) */}
-                {prefs.widgets.quickAdd && (
-                    <div className="mb-3">
-                        <div className="bg-[Canvas] rounded-2xl shadow p-3 border text-[CanvasText]">
-                            <QuickAddBar
-                                onOpen={(t) => {
-                                    try {
-                                        // Map lightweight quick types to the modal manager's types
-                                        const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
-                                        window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
-                                    } catch (err) {
-                                        console.warn('quickAdd dispatch error', err);
-                                    }
-                                }}
-                                message={message}
-                            />
+                            {/* Quick Add fixed widget at top (non-draggable) */}
+                            {prefs.widgets.quickAdd && (
+                                <div className="mb-3">
+                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
+                                        <QuickAddBar
+                                            onOpen={(t) => {
+                                                try {
+                                                    // Map lightweight quick types to the modal manager's types
+                                                    const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
+                                                    window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
+                                                } catch (err) {
+                                                    console.warn('quickAdd dispatch error', err);
+                                                }
+                                            }}
+                                            message={message}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
+                            {visibleWidgetKeys.length > 0 && (
+                                <div className="w-full">
+                                    <DndContext 
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={handleDragEnd}
+                                    >
+                                        <SortableContext 
+                                            items={visibleWidgetKeys} 
+                                            strategy={rectSortingStrategy}
+                                        >
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+                                                {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
+                                            </div>
+                                        </SortableContext>
+                                    </DndContext>
+                                </div>
+                            )}
+
                         </div>
                     </div>
-                )}
-
-                {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
-                {visibleWidgetKeys.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-max">
-                        {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
-                    </div>
-                )}
-
-                {/* Footer note intentionally left blank */}
+                </main>
+            </div>
 
                 {/* Quick Add inline form area */}
                 {quickAddOpen && (
@@ -1245,8 +1286,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
-                </div>
-            </main>
         </div>
     );
 }

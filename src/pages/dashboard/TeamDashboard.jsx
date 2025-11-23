@@ -6,7 +6,7 @@ export default function TeamDashboard() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     return (
-        <div className="flex min-h-screen bg-[Canvas] text-[CanvasText]">
+        <div className="flex min-h-screen bg-[#EDEDED] text-[CanvasText]">
             <Sidebar 
                 user={{ name: "Hussein" }} 
                 mobileOpen={mobileSidebarOpen}
