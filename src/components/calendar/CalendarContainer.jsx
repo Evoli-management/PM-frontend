@@ -409,6 +409,37 @@ const CalendarContainer = () => {
             // No business-hours restriction; compute end as simple duration offset
             const end = new Date(start.getTime() + defaultMinutes * 60000);
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+
+            // If we dropped an existing task (id), update its start/end on the task service
+            if (taskId && todos.find((t) => String(t.id) === String(taskId))) {
+                try {
+                    const svc = await getTaskService();
+                    const existing = todos.find((t) => String(t.id) === String(taskId));
+                    // compute duration from existing task if present, otherwise defaultMinutes
+                    let durationMs = defaultMinutes * 60000;
+                    try {
+                        const s0 = new Date(existing.startDate || existing.start_date || existing.date || null);
+                        const e0 = new Date(existing.endDate || existing.end_date || existing.date || null);
+                        if (!isNaN(s0.getTime()) && !isNaN(e0.getTime())) {
+                            durationMs = Math.max(0, e0.getTime() - s0.getTime());
+                        }
+                    } catch (_) {}
+
+                    const newEnd = new Date(start.getTime() + durationMs);
+                    const toISO = (d) => d.toISOString();
+                    const patch = { startDate: toISO(start), endDate: toISO(newEnd) };
+                    const updated = await svc.update(taskId, patch);
+                    // Update local todos
+                    setTodos((prev) => prev.map((t) => (String(t.id) === String(taskId) ? updated : t)));
+                    addToast({ title: "Task updated", description: `Moved to ${start.toLocaleString()}`, variant: "success" });
+                } catch (err) {
+                    console.warn("Failed to update task from drop", err);
+                    addToast({ title: "Failed to update task", description: String(err?.message || err), variant: "error" });
+                }
+                return;
+            }
+
+            // Otherwise create a calendar appointment (existing behavior)
             // Try to find a title from todos if not provided
             let title =
                 (typeof taskOrId === "object" && taskOrId?.title) ||
@@ -457,6 +488,27 @@ const CalendarContainer = () => {
             let start = new Date(date);
             // No business-hours restriction; compute end as simple duration offset
             const end = new Date(start.getTime() + defaultMinutes * 60000);
+
+            // If an existing activity id was dropped, update its date
+            const activityId = typeof activityOrObj === "string" ? activityOrObj : activityOrObj?.id;
+            if (activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
+                try {
+                    const svc = await getActivityService();
+                    const toISO = (d) => d.toISOString();
+                    // activities may use `date` or `startDate` fields; prefer `date`
+                    const payload = { date: toISO(start) };
+                    const updated = await svc.update(activityId, payload);
+                    // update local weekActivities and unattachedActivities if present
+                    setWeekActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
+                    setUnattachedActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
+                    addToast({ title: "Activity updated", description: `Moved to ${start.toLocaleString()}`, variant: "success" });
+                } catch (err) {
+                    console.warn("Failed to update activity from drop", err);
+                    addToast({ title: "Failed to update activity", description: String(err?.message || err), variant: "error" });
+                }
+                return;
+            }
+
             const title =
                 (typeof activityOrObj === "object" && (activityOrObj.text || activityOrObj.title)) ||
                 "Activity";
@@ -811,7 +863,31 @@ const CalendarContainer = () => {
         try {
             // Determine end time: use provided newEndDate (resize) or default 30 minutes (move)
             const targetEnd = newEndDate ? newEndDate : new Date(newStartDate.getTime() + 30 * 60 * 1000);
-            const payload = { start: newStartDate.toISOString(), end: targetEnd.toISOString() };
+            // Include timezone for appointment updates to match create flow and
+            // ensure server-side business-hours checks use the correct zone.
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+            // Format datetimes using local-offset ISO formatter (same as create flow)
+            const toOffsetISO = (d) => {
+                try {
+                    const pad = (n) => String(n).padStart(2, "0");
+                    const y = d.getFullYear();
+                    const m = pad(d.getMonth() + 1);
+                    const day = pad(d.getDate());
+                    const hh = pad(d.getHours());
+                    const mm = pad(d.getMinutes());
+                    const ss = pad(d.getSeconds());
+                    const off = -d.getTimezoneOffset();
+                    const sign = off >= 0 ? "+" : "-";
+                    const oh = pad(Math.floor(Math.abs(off) / 60));
+                    const om = pad(Math.abs(off) % 60);
+                    return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
+                } catch (__) {
+                    return d.toISOString();
+                }
+            };
+
+            const payload = { start: toOffsetISO(newStartDate), end: toOffsetISO(targetEnd), timezone: tz };
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
             const isAppointment = current?.kind === "appointment";
@@ -825,8 +901,20 @@ const CalendarContainer = () => {
                 variant: "success",
             });
         } catch (err) {
+            // Try to extract meaningful server error details (validation messages)
             console.warn("Failed to move event", err);
-            addToast({ title: "Failed to update event", description: String(err?.message || err), variant: "error" });
+            let details = String(err?.message || err);
+            try {
+                const respData = err?.response?.data;
+                if (respData) {
+                    // backend usually returns { statusCode, message, error }
+                    if (typeof respData === 'string') details = respData;
+                    else if (Array.isArray(respData?.message)) details = respData.message.join('; ');
+                    else if (respData?.message) details = String(respData.message);
+                    else details = JSON.stringify(respData);
+                }
+            } catch (_) {}
+            addToast({ title: "Failed to update event", description: details, variant: "error" });
         }
     };
 

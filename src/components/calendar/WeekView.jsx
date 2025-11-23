@@ -4,6 +4,7 @@ import AvailabilityBlock from "./AvailabilityBlock";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
 function getWeekNumber(date) {
     const firstJan = new Date(date.getFullYear(), 0, 1);
@@ -12,8 +13,6 @@ function getWeekNumber(date) {
 }
 
 const defaultSlotSize = 30;
-
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
 const WeekView = ({
     currentDate,
@@ -28,6 +27,7 @@ const WeekView = ({
     onEventMove,
     onAddTaskOrActivity,
     onTaskClick,
+    onActivityDrop,
     view,
     onChangeView,
     filterType,
@@ -36,42 +36,51 @@ const WeekView = ({
     activities = [],
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
-    const { 
-        timeSlots, 
-        formattedTimeSlots, 
-        workingHours, 
+    const {
+        timeSlots,
+        formattedTimeSlots,
+        workingHours,
         formatTime,
         formatDate,
         loading: prefsLoading,
         updateSlotSize,
         isWorkingTime,
     } = useCalendarPreferences(slotSize);
+
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
+
     // Fixed time column width; day columns will flex to fill available space
     const TIME_COL_PX = 80; // matches w-20
+
     const containerRef = useRef(null);
     const tasksScrollRef = useRef(null);
     const [showTasksLeftCue, setShowTasksLeftCue] = useState(false);
     const [showTasksRightCue, setShowTasksRightCue] = useState(false);
     const weekScrollRef = useRef(null);
     const listOuterRef = useRef(null);
+    const [columnWidth, setColumnWidth] = useState(null);
+    const [keyAreaMap, setKeyAreaMap] = useState({});
+
     // Track current time as ms so we can compute fractional minutes (minutes + seconds/60)
     const [nowMs, setNowMs] = useState(() => Date.now());
-    // measured pixel height of a single slot row (read from DOM) — initialize to the same formula used for ITEM_SIZE
-    const [measuredSlotPx, setMeasuredSlotPx] = useState(() => Math.round((slotSize / 30) * 38));
+    // measured pixel height of a single slot row (read from DOM)
+    const [measuredSlotPx, setMeasuredSlotPx] = useState(() =>
+        Math.round((slotSize / 30) * 38)
+    );
     const [listScrollTop, setListScrollTop] = useState(0);
 
-    React.useEffect(() => {
-        // Keep nowMs updated every 5 seconds so the now-line can use fractional minutes
+    // keep "now" updated
+    useEffect(() => {
         const update = () => setNowMs(Date.now());
         update();
-        // align to next full second
         const msUntilNextSecond = 1000 - (Date.now() % 1000);
         const timeout = setTimeout(() => {
             update();
             const interval = setInterval(update, 5000);
-            weekScrollRef.current && (weekScrollRef.current._nowInterval = interval);
+            if (weekScrollRef.current) {
+                weekScrollRef.current._nowInterval = interval;
+            }
         }, msUntilNextSecond);
         return () => {
             clearTimeout(timeout);
@@ -82,18 +91,16 @@ const WeekView = ({
     }, []);
 
     // Track FixedSizeList outer scroll so the now-line can be positioned relative to visible scroll
-    React.useEffect(() => {
+    useEffect(() => {
         const el = listOuterRef.current;
         if (!el) return;
         const onScroll = () => setListScrollTop(el.scrollTop || 0);
-        el.addEventListener('scroll', onScroll, { passive: true });
-        // initialize
+        el.addEventListener("scroll", onScroll, { passive: true });
         setListScrollTop(el.scrollTop || 0);
 
-        // measure a rendered slot's height so px/min calculations match the DOM
         const measure = () => {
             try {
-                const item = el.querySelector('[data-slot-index]');
+                const item = el.querySelector("[data-slot-index]");
                 if (item) {
                     const h = item.getBoundingClientRect().height;
                     if (h && h > 0) setMeasuredSlotPx(h);
@@ -103,33 +110,82 @@ const WeekView = ({
         measure();
         const ro = new ResizeObserver(measure);
         ro.observe(el);
-        window.addEventListener('resize', measure);
-
+        window.addEventListener("resize", measure);
         return () => {
-            el.removeEventListener('scroll', onScroll);
+            el.removeEventListener("scroll", onScroll);
             ro.disconnect();
-            window.removeEventListener('resize', measure);
+            window.removeEventListener("resize", measure);
         };
     }, [listOuterRef.current]);
+
+    // Load key areas map for coloring tasks/activities (fallback when categories mapping not present)
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const mod = await import("../../services/keyAreaService");
+                const svc = mod?.default || mod;
+                const areas = await svc.list().catch(() => []);
+                const map = {};
+                (areas || []).forEach((a) => {
+                    if (a && a.id) map[String(a.id)] = a;
+                });
+                if (!ignore) setKeyAreaMap(map);
+            } catch (e) {
+                if (!ignore) setKeyAreaMap({});
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
+    // Measure column width so we can position event overlays exactly
+    useEffect(() => {
+        const el = weekScrollRef.current;
+        if (!el) return;
+        const measure = () => {
+            try {
+                const w = el.getBoundingClientRect().width || el.clientWidth || 0;
+                // days is always 7 in week view
+                const cw = Math.max(0, (w - TIME_COL_PX) / 7);
+                setColumnWidth(cw);
+            } catch (e) {}
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        window.addEventListener("resize", measure);
+        return () => {
+            ro.disconnect();
+            window.removeEventListener("resize", measure);
+        };
+    }, [weekScrollRef.current]);
 
     // Calculate week start (Monday)
     const weekStart = new Date(currentDate || new Date());
     weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
     const days = Array.from(
         { length: 7 },
-        (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
+        (_, i) =>
+            new Date(
+                weekStart.getFullYear(),
+                weekStart.getMonth(),
+                weekStart.getDate() + i
+            )
     );
-    
-    // Use dynamic time slots from preferences; fallback to full-day slots if not available
-    const slots = timeSlots.length > 0 ? timeSlots : generateTimeSlots("00:00", "24:00", slotSize);
-    
-    // Compute visual row height based on configured slotSize (minutes).
-    // Keep 30min -> 38px as the reference and scale proportionally.
-    const ITEM_SIZE = Math.round((slotSize / 30) * 38);
-    const LIST_HEIGHT_PX = 400; // fixed viewport height for grid scroll
-    const weekNum = getWeekNumber(weekStart);
 
-    // No explicit width calculations; columns will flex to fit container
+    // Use dynamic time slots from preferences; fallback to full-day slots if not available
+    const slots =
+        timeSlots.length > 0
+            ? timeSlots
+            : generateTimeSlots("00:00", "24:00", slotSize);
+
+    // Visual row height based on configured slotSize (minutes).
+    // 30min -> 38px as reference, scaled proportionally.
+    const ITEM_SIZE = Math.round((slotSize / 30) * 38);
+    const LIST_HEIGHT_PX = 400;
+    const weekNum = getWeekNumber(weekStart);
 
     // Update time slots when slot size changes
     useEffect(() => {
@@ -137,6 +193,8 @@ const WeekView = ({
             updateSlotSize(slotSize);
         }
     }, [slotSize, updateSlotSize]);
+
+    // horizontal scroll for tasks with mouse wheel
     useEffect(() => {
         const el = tasksScrollRef.current;
         if (!el) return;
@@ -172,16 +230,23 @@ const WeekView = ({
         };
     }, []);
 
-    // Navigation handlers
-    // Navigation is handled by container; keep internal handlers unused or remove if not needed
     // Drag-and-drop handler
     const handleDrop = (e, day, slot) => {
         try {
             const [h, m] = slot.split(":");
-            const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
+            const date = new Date(
+                day.getFullYear(),
+                day.getMonth(),
+                day.getDate(),
+                Number(h),
+                Number(m)
+            );
             const eventId = e.dataTransfer.getData("eventId");
             if (eventId) {
-                const dur = parseInt(e.dataTransfer.getData("durationMs") || "0", 10);
+                const dur = parseInt(
+                    e.dataTransfer.getData("durationMs") || "0",
+                    10
+                );
                 const newEnd = dur > 0 ? new Date(date.getTime() + dur) : null;
                 onEventMove && onEventMove(eventId, date, newEnd);
                 return;
@@ -189,17 +254,27 @@ const WeekView = ({
             const taskId = e.dataTransfer.getData("taskId");
             if (taskId) {
                 onTaskDrop && onTaskDrop(taskId, date);
+                return;
+            }
+            const activityId = e.dataTransfer.getData("activityId");
+            if (activityId) {
+                onActivityDrop && onActivityDrop(activityId, date);
             }
         } catch (err) {
             console.warn("Drop failed", err);
         }
     };
+
     // Range label for the week
     const endOfWeek = new Date(weekStart);
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     const weekLabel = `${formatDate(weekStart)} — ${formatDate(endOfWeek)}`;
 
-    // Helper: does event start match this slot (rounded to nearest slot size)?
+    // Helper: does event start fall within this slot minute range?
+    // Previously we rounded to nearest slot; that caused starts at :15 to be
+    // rounded up to :30. Instead, include any event whose start time is >=
+    // the slot start and < slot end so events at arbitrary minutes render in
+    // the correct slot and at the exact offset within that slot.
     const eventMatchesSlot = (startIso, day, slot, sizeMin) => {
         try {
             const ev = new Date(startIso);
@@ -209,482 +284,929 @@ const WeekView = ({
                 ev.getDate() !== day.getDate()
             )
                 return false;
+
             const [sh, smRaw] = slot.split(":");
-            const shNum = Number(sh);
-            const smNum = Number(smRaw);
-            let eh = ev.getHours();
-            let em = ev.getMinutes();
-            // round to nearest sizeMin (e.g., 30)
-            const rounded = Math.round(em / sizeMin) * sizeMin;
-            if (rounded === 60) {
-                eh = eh + 1;
-                em = 0;
-            } else {
-                em = rounded;
-            }
-            return eh === shNum && em === smNum;
+            const slotStart = new Date(
+                day.getFullYear(),
+                day.getMonth(),
+                day.getDate(),
+                Number(sh),
+                Number(smRaw || 0)
+            );
+            const slotStartMs = slotStart.getTime();
+            const slotEndMs = slotStartMs + sizeMin * 60000;
+            const evMs = ev.getTime();
+
+            return evMs >= slotStartMs && evMs < slotEndMs;
         } catch {
             return false;
         }
     };
 
+    // Helpers for color contrast (copied from DayView patterns)
+    function hexToRgb(hex) {
+        if (!hex) return null;
+        const h = hex.replace("#", "");
+        const bigint = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+        const r = (bigint >> 16) & 255;
+        const g = (bigint >> 8) & 255;
+        const b = bigint & 255;
+        return { r, g, b };
+    }
+    function getContrastTextColor(hex) {
+        try {
+            const c = hexToRgb(hex);
+            if (!c) return "#0B4A53";
+            const srgb = [c.r, c.g, c.b]
+                .map((v) => v / 255)
+                .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+            const lum = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+            return lum > 0.6 ? "#0B4A53" : "#ffffff";
+        } catch (e) {
+            return "#0B4A53";
+        }
+    }
+
     return (
         <>
-        <div className="p-0" style={{ overflow: "hidden" }}>
-            {/* Header with navigation inside the view */}
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                    {/* Back first, then View dropdown */}
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Previous week"
-                        onClick={() => onShiftDate && onShiftDate(-1)}
-                    >
-                        <FaChevronLeft />
-                    </button>
-                    <div className="relative">
+            <div className="p-0" style={{ overflow: "hidden" }}>
+                {/* Header with navigation inside the view */}
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
                         <button
-                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                            style={{ minWidth: 36, minHeight: 28 }}
-                            onClick={() => setShowViewMenu((s) => !s)}
-                            aria-haspopup="menu"
-                            aria-expanded={showViewMenu ? "true" : "false"}
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Previous week"
+                            onClick={() => onShiftDate && onShiftDate(-1)}
                         >
-                            <span>View</span>
-                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                {view?.charAt(0).toUpperCase() + view?.slice(1)}
-                            </span>
-                            <FaChevronDown
-                                className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
-                            />
+                            <FaChevronLeft />
                         </button>
-                        {showViewMenu && (
-                            <div
-                                role="menu"
-                                className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                        <div className="relative">
+                            <button
+                                className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                                style={{ minWidth: 36, minHeight: 28 }}
+                                onClick={() => setShowViewMenu((s) => !s)}
+                                aria-haspopup="menu"
+                                aria-expanded={showViewMenu ? "true" : "false"}
                             >
-                                {["day", "week", "month", "quarter", "list"].map((v) => (
-                                    <button
-                                        key={v}
-                                        role="menuitemradio"
-                                        aria-checked={view === v}
-                                        className={`w-full text-left px-3 py-2 text-sm ${view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
-                                        onClick={() => {
-                                            onChangeView && onChangeView(v);
-                                            setShowViewMenu(false);
-                                        }}
-                                    >
-                                        {v.charAt(0).toUpperCase() + v.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                    {weekLabel}
-                    {(loading || prefsLoading) && (
-                        <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
-                            Loading
-                        </span>
-                    )}
-                    {/* Working hours indicator removed — calendar now shows full day uniformly */}
-                </h2>
-                <div className="flex items-center gap-2">
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Today"
-                        onClick={() => onSetDate && onSetDate(new Date())}
-                    >
-                        Today
-                    </button>
-                    <select
-                        className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                        style={{ minHeight: 28 }}
-                        value={filterType}
-                        onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
-                        aria-label="Filter event types"
-                    >
-                        <option value="all">All</option>
-                        <option value="meeting">Meeting</option>
-                        <option value="focus">Focus</option>
-                        <option value="custom">Custom</option>
-                        <option value="green">Green</option>
-                        <option value="red">Red</option>
-                    </select>
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Next week"
-                        onClick={() => onShiftDate && onShiftDate(1)}
-                    >
-                        <FaChevronRight />
-                    </button>
-                </div>
-            </div>
-            {/* Calendar grid */}
-            <div ref={containerRef} className="no-scrollbar" style={{ overflowX: "hidden", overflowY: "hidden" }}>
-                <div style={{ width: "100%" }}>
-                    {/* Header stays fixed; only the grid below is vertically scrollable */}
-                    <div className="no-scrollbar">
-                        {/* Table for header and all-day row only */}
-                        <table
-                            className="min-w-full border border-gray-100 rounded-lg"
-                            style={{
-                                width: "100%",
-                                tableLayout: "fixed",
-                                borderCollapse: "separate",
-                                borderSpacing: 0,
-                            }}
-                        >
-                            <thead>
-                                <tr className="bg-blue-50">
-                                    <th
-                                        className="text-left px-2 py-2 text-blue-500 text-base font-semibold rounded-tl-lg"
-                                        style={{ width: TIME_COL_PX + "px" }}
-                                    >
-                                        all day
-                                    </th>
-                                    {days.map((date, dIdx) => (
-                                        <th
-                                            key={dIdx}
-                                            className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${dIdx === days.length - 1 ? "rounded-tr-lg" : ""}`}
-                                        >
-                                            {formatDate(date, { includeWeekday: true, shortWeekday: true })}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td
-                                            className="border-r border-gray-100 px-2 py-2 text-xs text-gray-500"
-                                        style={{ width: TIME_COL_PX + "px" }}
-                                    >
-                                        all day
-                                    </td>
-                                    {days.map((date, dIdx) => (
-                                        <td
-                                            key={dIdx}
-                                                className="border-r border-gray-100 px-2 py-2 text-center align-top"
-                                        >
-                                            <span className="text-gray-300">—</span>
-                                        </td>
-                                    ))}
-                                </tr>
-                            </tbody>
-                        </table>
-                        {/* Time slots - virtualized as flexbox grid below the table */}
-                        <div ref={weekScrollRef} className="w-full no-scrollbar" style={{ position: 'relative', width: "100%" }}>
-                            <FixedSizeList
-                                className="no-scrollbar"
-                                height={LIST_HEIGHT_PX}
-                                itemCount={slots.length}
-                                itemSize={ITEM_SIZE}
-                                width={undefined}
-                                outerRef={listOuterRef}
-                            >
-                                {({ index, style }) => {
-                                    const slot = slots[index];
-                                    return (
-                                        <div
-                                                    key={index}
-                                                    data-slot-index={index}
-                                                    style={{ ...style, overflow: "visible", boxSizing: 'border-box' }}
-                                                    className={`flex w-full bg-white`}
-                                                >
-                                            <div
-                                                className="border-r border-gray-100 px-2 py-1 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
-                                                style={{ width: TIME_COL_PX + "px" }}
+                                <span>View</span>
+                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                    {view?.charAt(0).toUpperCase() + view?.slice(1)}
+                                </span>
+                                <FaChevronDown
+                                    className={`${
+                                        showViewMenu ? "rotate-180" : "rotate-0"
+                                    } transition-transform`}
+                                />
+                            </button>
+                            {showViewMenu && (
+                                <div
+                                    role="menu"
+                                    className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                >
+                                    {["day", "week", "month", "quarter", "list"].map(
+                                        (v) => (
+                                            <button
+                                                key={v}
+                                                role="menuitemradio"
+                                                aria-checked={view === v}
+                                                className={`w-full text-left px-3 py-2 text-sm ${
+                                                    view === v
+                                                        ? "bg-blue-50 text-blue-700 font-semibold"
+                                                        : "text-slate-700 hover:bg-slate-50"
+                                                }`}
+                                                onClick={() => {
+                                                    onChangeView && onChangeView(v);
+                                                    setShowViewMenu(false);
+                                                }}
                                             >
-                                                {/* Left indicator for non-working hours */}
-                                                {isWorkingTime && !isWorkingTime(slot) && (
-                                                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300/40 rounded-r-md" aria-hidden="true"></span>
-                                                )}
-                                                <span className="pl-2">{formatTime(slot)}</span>
-                                            </div>
-                                            {days.map((date, dIdx) => {
-                                                const slotEvents = events.filter((ev) =>
-                                                    eventMatchesSlot(ev.start, date, slot, slotSize) && !ev.taskId
-                                                );
-                                                return (
-                                                        <div
-                                                        key={dIdx}
-                                                        className="border-r border-gray-100 px-2 py-1 align-top group flex items-center relative overflow-visible"
-                                                        style={{ flex: "1 1 0", minWidth: 0, height: ITEM_SIZE, boxSizing: 'border-box' }}
-                                                        onDragOver={(e) => e.preventDefault()}
-                                                        onDrop={(e) => handleDrop(e, date, slot)}
-                                                        onClick={(e) => {
-                                                            try { e.stopPropagation(); } catch {}
-                                                            const [h, m] = slot.split(":");
-                                                            const dt = new Date(
-                                                                date.getFullYear(),
-                                                                date.getMonth(),
-                                                                date.getDate(),
-                                                                Number(h),
-                                                                Number(m),
-                                                            );
-                                                            onQuickCreate && onQuickCreate(dt);
-                                                        }}
-                                                    >
-                                                        {slotEvents.length === 0
-                                                            ? null
-                                                            : slotEvents.map((ev, i) => {
-                                                                  const evStart = ev.start ? new Date(ev.start) : null;
-                                                                  const evEnd = ev.end ? new Date(ev.end) : null;
-                                                                  const startMs = evStart ? evStart.getTime() : 0;
-                                                                  const endMs = evEnd ? evEnd.getTime() : 0;
-                                                                  const durMs = endMs > startMs ? endMs - startMs : slotSize * 60000;
-                                                                  const effectiveRowPx = measuredSlotPx || ITEM_SIZE;
-                                                                  const heightPx = Math.max(effectiveRowPx * (durMs / (slotSize * 60000)) - 4, effectiveRowPx - 4);
-                                                                  const [sh, sm] = slot.split(":");
-                                                                  const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number(sh), Number(sm));
-                                                                  const withinSlotMin = evStart ? Math.max(0, Math.min(slotSize, (evStart.getTime() - slotStart.getTime()) / 60000)) : 0;
-                                                                  const withinSlotTop = (withinSlotMin / slotSize) * (measuredSlotPx || ITEM_SIZE);
-                                                                return (
-                                                                          <div
-                                                                              key={i}
-                                                                              className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${categories[ev.kind]?.color || "bg-gray-200"}`}
-                                                                              style={{
-                                                                                  position: "absolute",
-                                                                                  left: 2,
-                                                                                  right: 2,
-                                                                                  top: 2 + withinSlotTop,
-                                                                                  height: heightPx,
-                                                                                  zIndex: 5,
-                                                                              }}
-                                                                              draggable
-                                                                              onDragStart={(e) => {
-                                                                                  try {
-                                                                                      e.dataTransfer.setData(
-                                                                                          "eventId",
-                                                                                          String(ev.id),
-                                                                                      );
-                                                                                      const dur = ev.end
-                                                                                          ? new Date(ev.end).getTime() -
-                                                                                            new Date(ev.start).getTime()
-                                                                                          : 60 * 60 * 1000;
-                                                                                      e.dataTransfer.setData(
-                                                                                          "durationMs",
-                                                                                          String(Math.max(dur, 0)),
-                                                                                      );
-                                                                                      e.dataTransfer.effectAllowed = "move";
-                                                                                  } catch {}
-                                                                              }}
-                                                                              onClick={(e) => {
-                                                                                  try { e.stopPropagation(); } catch {}
-                                                                                  onEventClick && onEventClick(ev);
-                                                                              }}
-                                                                          >
-                                                                          <span className="shrink-0">
-                                                                              {categories[ev.kind]?.icon || ""}
-                                                                          </span>
-                                                                          <span
-                                                                              className="truncate whitespace-nowrap text-xs min-w-0 flex-1"
-                                                                              tabIndex={0}
-                                                                              aria-label={ev.title}
-                                                                          >
-                                                                              {ev.title}
-                                                                          </span>
-                                                                          
-                                                                          {/* Action Icons - shown on hover */}
-                                                                          <div className="hidden group-hover:flex items-center gap-1 ml-2">
-                                                                              <button
-                                                                                  className="p-1 rounded hover:bg-black/10 transition-colors"
-                                                                                  onClick={(e) => {
-                                                                                      e.stopPropagation();
-                                                                                      onEventClick && onEventClick(ev, 'edit');
-                                                                                  }}
-                                                                                  aria-label={`Edit ${ev.title}`}
-                                                                                  title="Edit appointment"
-                                                                              >
-                                                                                  <FaEdit className="w-3 h-3 text-blue-600" />
-                                                                              </button>
-                                                                              <button
-                                                                                  className="p-1 rounded hover:bg-black/10 transition-colors"
-                                                                                  onClick={(e) => {
-                                                                                      e.stopPropagation();
-                                                                                      onEventClick && onEventClick(ev, 'delete');
-                                                                                  }}
-                                                                                  aria-label={`Delete ${ev.title}`}
-                                                                                  title="Delete appointment"
-                                                                              >
-                                                                                  <FaTrash className="w-3 h-3 text-red-600" />
-                                                                              </button>
-                                                                          </div>
-                                                                      </div>
-                                                                  );
-                                                              })}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                }}
-                            </FixedSizeList>
-                            {/* Now line across week view: show only if the week contains today */}
-                            {(() => {
-                                const todayDate = new Date(nowMs);
-                                // only show now-line if today is in the rendered week
-                                const found = days.some(d => (
-                                    d.getFullYear() === todayDate.getFullYear() &&
-                                    d.getMonth() === todayDate.getMonth() &&
-                                    d.getDate() === todayDate.getDate()
-                                ));
-                                if (!found) return null;
-                                try {
-                                    const firstSlot = slots[0] || '00:00';
-                                    const lastSlot = slots[slots.length - 1] || '23:30';
-                                    const [fh, fm] = firstSlot.split(':').map(Number);
-                                    const [lh, lm] = lastSlot.split(':').map(Number);
-                                    const startMinutes = fh * 60 + (fm || 0);
-                                    const endMinutes = lh * 60 + (lm || 0) + slotSize;
-                                    // compute fractional minutes from nowMs
-                                    const nowDate = new Date(nowMs);
-                                    const nowMinutesFloat = nowDate.getHours() * 60 + nowDate.getMinutes() + nowDate.getSeconds() / 60;
-                                    if (nowMinutesFloat < startMinutes || nowMinutesFloat > endMinutes) return null;
-                                    const pxPerMinute = (measuredSlotPx || ITEM_SIZE) / slotSize;
-                                    const topPx = (nowMinutesFloat - startMinutes) * pxPerMinute;
-                                    // adjust by current scrollTop so the line appears at the correct visible position
-                                    const visibleTop = topPx - (listScrollTop || 0);
-                                    // only render if within visible list viewport
-                                    if (visibleTop < 0 || visibleTop > LIST_HEIGHT_PX - 2) return null;
-                                    return (
-                                        <div
-                                            aria-hidden="true"
-                                            style={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                right: 0,
-                                                top: 0,
-                                                transform: `translateY(${visibleTop}px)`,
-                                                height: 2,
-                                                background: '#ef4444',
-                                                zIndex: 40,
-                                                pointerEvents: 'none',
-                                                transition: 'transform 4.5s linear',
-                                                willChange: 'transform',
-                                            }}
-                                        />
-                                    );
-                                } catch (e) { return null; }
-                            })()}
+                                                {v.charAt(0).toUpperCase() +
+                                                    v.slice(1)}
+                                            </button>
+                                        )
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
-                    {/* Two rows: first for Add Task + task list, second for Add Activity + activity list */}
-                    <div className="flex flex-col w-full bg-white border border-gray-100 rounded-b-lg mt-2">
-                        {/* Row 1: Add Task + Task List */}
-                        <div className="flex w-full border-b border-blue-50">
-                            <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                        {weekLabel}
+                        {(loading || prefsLoading) && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                                Loading
+                            </span>
+                        )}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        <button
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Today"
+                            onClick={() => onSetDate && onSetDate(new Date())}
+                        >
+                            Today
+                        </button>
+                        <button
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Next week"
+                            onClick={() => onShiftDate && onShiftDate(1)}
+                        >
+                            <FaChevronRight />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Calendar grid */}
+                <div
+                    ref={containerRef}
+                    className="no-scrollbar"
+                    style={{ overflowX: "hidden", overflowY: "hidden" }}
+                >
+                    <div style={{ width: "100%" }}>
+                        {/* Header + all-day row */}
+                        <div className="no-scrollbar">
+                            <table
+                                className="min-w-full border border-gray-100 rounded-lg"
+                                style={{
+                                    width: "100%",
+                                    tableLayout: "fixed",
+                                    borderCollapse: "separate",
+                                    borderSpacing: 0,
+                                }}
+                            >
+                                <thead>
+                                    <tr className="bg-blue-50">
+                                        <th
+                                            className="text-left px-2 py-2 text-blue-500 text-base font-semibold rounded-tl-lg"
+                                            style={{ width: TIME_COL_PX + "px" }}
+                                        >
+                                            all day
+                                        </th>
+                                        {days.map((date, dIdx) => (
+                                            <th
+                                                key={dIdx}
+                                                className={`text-center px-2 py-2 text-blue-500 text-base font-semibold ${
+                                                    dIdx === days.length - 1
+                                                        ? "rounded-tr-lg"
+                                                        : ""
+                                                }`}
+                                            >
+                                                {formatDate(date, {
+                                                    includeWeekday: true,
+                                                    shortWeekday: true,
+                                                })}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td
+                                            className="border-r border-gray-100 px-2 py-2 text-xs text-gray-500"
+                                            style={{ width: TIME_COL_PX + "px" }}
+                                        >
+                                            all day
+                                        </td>
+                                        {/* single cell spanning the 7 day columns; we will render multi-day task bars inside */}
+                                        <td className="border-r border-gray-100 px-2 py-2 align-top" colSpan={7}>
+                                            <div style={{ position: 'relative', minHeight: 40 }}>
+                                                {(() => {
+                                                    try {
+                                                        // find todos that overlap this week AND span more than one day
+                                                        const dayMs = 24 * 60 * 60 * 1000;
+                                                        const weekTasks = (Array.isArray(todos) ? todos : []).filter((t) => {
+                                                            try {
+                                                                const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+                                                                const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
+                                                                const sDt = s ? new Date(s) : null;
+                                                                const eDt = e ? new Date(e) : null;
+                                                                if (!sDt || !eDt) return false;
+                                                                const sStart = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
+                                                                const eStartDay = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 0, 0, 0, 0);
+                                                                const eEnd = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 23, 59, 59, 999);
+                                                                // must overlap the week
+                                                                if (!(sStart <= endOfWeek && eEnd >= weekStart)) return false;
+                                                                // only include tasks that span more than one calendar day (end day strictly after start day)
+                                                                if (eStartDay.getTime() <= sStart.getTime()) return false;
+                                                                // also require they cover at least two day columns within this week
+                                                                const startIndex = Math.floor((sStart - weekStart) / dayMs);
+                                                                const endIndex = Math.floor((eEnd - weekStart) / dayMs);
+                                                                return endIndex > startIndex;
+                                                            } catch { return false; }
+                                                        });
+
+                                                        return weekTasks.map((t, i) => {
+                                                            try {
+                                                                const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+                                                                const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
+                                                                const sDt = s ? new Date(s) : null;
+                                                                const eDt = e ? new Date(e) : null;
+                                                                if (!sDt || !eDt) return null;
+
+                                                                const dayMs = 24 * 60 * 60 * 1000;
+                                                                const sStart = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
+                                                                const eEnd = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 23, 59, 59, 999);
+                                                                const rawStartIndex = Math.floor((sStart - weekStart) / dayMs);
+                                                                const rawEndIndex = Math.floor((eEnd - weekStart) / dayMs);
+                                                                const startIndex = Math.max(0, rawStartIndex);
+                                                                const endIndex = Math.min(6, rawEndIndex);
+                                                                const leftPct = (startIndex / 7) * 100;
+                                                                const widthPct = ((endIndex - startIndex + 1) / 7) * 100;
+                                                                const continuesLeft = rawStartIndex < 0;
+                                                                const continuesRight = rawEndIndex > 6;
+
+                                                                // resolve color same as below
+                                                                const kindKey = t.kind || t.type || t.kindName || null;
+                                                                const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                                                                const bgClass = cat?.color || null;
+                                                                const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
+                                                                const DEFAULT_BAR_COLOR = '#4DC3D8';
+                                                                const kaColor = (ka && ka.color) ? ka.color : null;
+                                                                const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                                                                const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                                                                const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                                                                const barStyle = { left: `${leftPct}%`, width: `${widthPct}%`, boxSizing: 'border-box', paddingRight: continuesRight ? '18px' : undefined, paddingLeft: continuesLeft ? '18px' : undefined, ...style };
+
+                                                                return (
+                                                                    <div
+                                                                        key={`allday-${t.id}-${i}`}
+                                                                        draggable
+                                                                        onDragStart={(e) => {
+                                                                            try {
+                                                                                e.dataTransfer.setData("taskId", String(t.id));
+                                                                                const durMs = eEnd.getTime() - sStart.getTime();
+                                                                                e.dataTransfer.setData("durationMs", String(Math.max(0, durMs)));
+                                                                                e.dataTransfer.effectAllowed = "move";
+                                                                            } catch (_) {}
+                                                                        }}
+                                                                        onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                                                        className={`absolute left-0 top-2 rounded px-2 py-1 text-xs overflow-hidden cursor-pointer ${bgClass || ''}`}
+                                                                        style={barStyle}
+                                                                        title={t.title || t.name}
+                                                                    >
+                                                                        {continuesLeft && (
+                                                                            <FaChevronLeft className="w-4 h-4 absolute left-1 top-1 font-semibold" style={{ color: textColor, zIndex: 6, fontWeight: 700 }} />
+                                                                        )}
+                                                                        <div className="truncate font-medium">{t.title || t.name}</div>
+                                                                        {continuesRight && (
+                                                                            <FaChevronRight className="w-4 h-4 absolute right-1 top-1 font-semibold" style={{ color: textColor, zIndex: 6, fontWeight: 700 }} />
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            } catch (__) { return null; }
+                                                        });
+                                                    } catch (e) {
+                                                        return null;
+                                                    }
+                                                })()}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            {/* Time slots – virtualized */}
+                            <div
+                                ref={weekScrollRef}
+                                className="w-full no-scrollbar"
+                                style={{ position: "relative", width: "100%" }}
+                            >
+                                <FixedSizeList
+                                    className="no-scrollbar"
+                                    height={LIST_HEIGHT_PX}
+                                    itemCount={slots.length}
+                                    itemSize={ITEM_SIZE}
+                                    width={undefined}
+                                    outerRef={listOuterRef}
+                                    innerElementType={React.forwardRef(function InnerWithOverlays({ children, style }, ref) {
+                                        // inner element for react-window; render children (rows) and place overlays inside
+                                        // We'll also provide resize handles for appointments so users can drag the top/bottom
+                                        // edges to extend/shrink an appointment. This component manages transient
+                                        // resize preview state and calls onEventMove when the pointer is released.
+                                        try {
+                                            const firstSlot = slots[0] || "00:00";
+                                            const [fh, fm] = firstSlot.split(":").map(Number);
+                                            const startMinutes = fh * 60 + (fm || 0);
+                                            const pxPerMinute = (measuredSlotPx || ITEM_SIZE) / slotSize;
+                                            const colW = columnWidth || Math.max(0, ((listOuterRef.current && listOuterRef.current.getBoundingClientRect().width) || 0 - TIME_COL_PX) / 7);
+
+                                            const [resizing, setResizing] = React.useState(null);
+
+                                            const cleanupPointerListeners = React.useRef(() => {});
+
+                                            const minDurationMinutes = 15;
+
+                                            const startResize = (ev, evObj, side) => {
+                                                try {
+                                                    ev.stopPropagation();
+                                                    ev.preventDefault();
+                                                    const pointerId = ev.pointerId;
+                                                    ev.target.setPointerCapture && ev.target.setPointerCapture(pointerId);
+
+                                                    const origStart = evObj.start ? new Date(evObj.start) : null;
+                                                    const origEnd = evObj.end ? new Date(evObj.end) : null;
+                                                    if (!origStart) return;
+                                                    const durationMs = origEnd ? Math.max(0, origEnd.getTime() - origStart.getTime()) : 60 * 60 * 1000;
+
+                                                    const state = {
+                                                        id: evObj.id,
+                                                        side, // 'top' or 'bottom'
+                                                        origStart,
+                                                        origEnd: origEnd || new Date(origStart.getTime() + durationMs),
+                                                        startY: ev.clientY,
+                                                        pxPerMinute,
+                                                        startMinutes,
+                                                        colIndex: days.findIndex((d) => d.getFullYear() === (new Date(evObj.start)).getFullYear() && d.getMonth() === (new Date(evObj.start)).getMonth() && d.getDate() === (new Date(evObj.start)).getDate()),
+                                                        lastPreview: null,
+                                                    };
+                                                    setResizing(state);
+
+                                                    const onPointerMove = (mv) => {
+                                                        try {
+                                                            setResizing((curr) => {
+                                                                if (!curr || curr.id !== state.id) return curr;
+                                                                const deltaY = mv.clientY - curr.startY;
+                                                                const deltaMinutes = deltaY / Math.max(0.0001, curr.pxPerMinute);
+
+                                                                let newStart = new Date(curr.origStart.getTime());
+                                                                let newEnd = new Date(curr.origEnd.getTime());
+                                                                if (curr.side === "top") {
+                                                                    newStart = new Date(curr.origStart.getTime() + Math.round(deltaMinutes * 60000));
+                                                                    // clamp so start is not after end - minDuration
+                                                                    const minStartTime = newEnd.getTime() - minDurationMinutes * 60000;
+                                                                    if (newStart.getTime() > minStartTime) newStart = new Date(minStartTime);
+                                                                } else {
+                                                                    newEnd = new Date(curr.origEnd.getTime() + Math.round(deltaMinutes * 60000));
+                                                                    const minEndTime = newStart.getTime() + minDurationMinutes * 60000;
+                                                                    if (newEnd.getTime() < minEndTime) newEnd = new Date(minEndTime);
+                                                                }
+
+                                                                const newStartMins = newStart.getHours() * 60 + newStart.getMinutes() + newStart.getSeconds() / 60;
+                                                                const newEndMins = newEnd.getHours() * 60 + newEnd.getMinutes() + newEnd.getSeconds() / 60;
+                                                                const topPx = (newStartMins - curr.startMinutes) * curr.pxPerMinute;
+                                                                const heightPx = Math.max(18, (newEndMins - newStartMins) * curr.pxPerMinute);
+
+                                                                return { ...curr, previewStart: newStart, previewEnd: newEnd, previewTop: topPx, previewHeight: heightPx };
+                                                            });
+                                                        } catch (__) {}
+                                                    };
+
+                                                    const onPointerUp = (up) => {
+                                                        try {
+                                                            cleanupPointerListeners.current();
+                                                            // finalize
+                                                            setResizing((curr) => {
+                                                                if (!curr || curr.id !== state.id) return null;
+                                                                const finalStart = curr.previewStart || curr.origStart;
+                                                                const finalEnd = curr.previewEnd || curr.origEnd;
+                                                                // call parent handler to persist
+                                                                try {
+                                                                    if (typeof onEventMove === "function") {
+                                                                        onEventMove && onEventMove(curr.id, finalStart, finalEnd);
+                                                                    }
+                                                                } catch (__) {}
+                                                                return null;
+                                                            });
+                                                        } catch (__) {}
+                                                    };
+
+                                                    // register global listeners
+                                                    window.addEventListener("pointermove", onPointerMove);
+                                                    window.addEventListener("pointerup", onPointerUp, { once: true });
+                                                    cleanupPointerListeners.current = () => {
+                                                        try { window.removeEventListener("pointermove", onPointerMove); } catch (__) {}
+                                                        try { window.removeEventListener("pointerup", onPointerUp); } catch (__) {}
+                                                    };
+                                                } catch (__) {}
+                                            };
+
+                                            const cancelResize = () => {
+                                                try { cleanupPointerListeners.current(); } catch (__) {}
+                                                setResizing(null);
+                                            };
+
+                                            return (
+                                                <div ref={ref} style={{ ...style, position: "relative" }}>
+                                                    {children}
+                                                    {/* now line placed inside inner element so it scrolls naturally */}
+                                                    {(() => {
+                                                        try {
+                                                            const lastSlot = slots[slots.length - 1] || "23:30";
+                                                            const [lh, lm] = lastSlot.split(":").map(Number);
+                                                            const endMinutes = lh * 60 + (lm || 0) + slotSize;
+                                                            const todayDate = new Date(nowMs);
+                                                            const found = days.some(
+                                                                (d) =>
+                                                                    d.getFullYear() === todayDate.getFullYear() &&
+                                                                    d.getMonth() === todayDate.getMonth() &&
+                                                                    d.getDate() === todayDate.getDate()
+                                                            );
+                                                            if (!found) return null;
+                                                            const nowDate = new Date(nowMs);
+                                                            const nowMinutesFloat = nowDate.getHours() * 60 + nowDate.getMinutes() + nowDate.getSeconds() / 60;
+                                                            if (nowMinutesFloat < (startMinutes) || nowMinutesFloat > endMinutes) return null;
+                                                            const nowTop = (nowMinutesFloat - startMinutes) * pxPerMinute;
+
+                                                            return (
+                                                                <div
+                                                                    className="absolute flex items-center pointer-events-none"
+                                                                    style={{ left: TIME_COL_PX + "px", right: 0, top: nowTop + "px" }}
+                                                                >
+                                                                    <span className="ml-[-32px] bg-red-500 text-white text-[10px] px-1 rounded-full">
+                                                                        {formatTime ? formatTime(`${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`) : `${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`}
+                                                                    </span>
+                                                                    <div className="flex-1 border-t border-red-400" />
+                                                                </div>
+                                                            );
+                                                        } catch (e) {
+                                                            return null;
+                                                        }
+                                                    })()}
+
+                                                    {/* overlays */}
+                                                    {days.map((date, dIdx) => {
+                                                        return (events || [])
+                                                            .filter((ev) => {
+                                                                try {
+                                                                    const s = ev.start ? new Date(ev.start) : null;
+                                                                    if (!s) return false;
+                                                                    return (
+                                                                        s.getFullYear() === date.getFullYear() &&
+                                                                        s.getMonth() === date.getMonth() &&
+                                                                        s.getDate() === date.getDate() &&
+                                                                        !ev.taskId
+                                                                    );
+                                                                } catch (__) {
+                                                                    return false;
+                                                                }
+                                                            })
+                                                            .map((ev, i) => {
+                                                                try {
+                                                                    const evStart = ev.start ? new Date(ev.start) : null;
+                                                                    const evEnd = ev.end ? new Date(ev.end) : null;
+                                                                    if (!evStart) return null;
+
+                                                                    const evStartMins = evStart.getHours() * 60 + evStart.getMinutes() + evStart.getSeconds() / 60;
+                                                                    const evEndMins = evEnd ? evEnd.getHours() * 60 + evEnd.getMinutes() + evEnd.getSeconds() / 60 : evStartMins + slotSize / 60;
+
+                                                                    const topPx = (evStartMins - startMinutes) * pxPerMinute;
+                                                                    const durationMins = Math.max(15, evEndMins - evStartMins);
+                                                                    const heightPx = Math.max(18, durationMins * pxPerMinute);
+
+                                                                    const leftPx = TIME_COL_PX + dIdx * colW + 6;
+                                                                    const widthPx = Math.max(40, colW - 12);
+
+                                                                    const kindClass = categories[ev.kind]?.color || null;
+
+                                                                    const isResizingThis = resizing && String(resizing.id) === String(ev.id);
+
+                                                                    return (
+                                                                        <div
+                                                                            key={`ov-${dIdx}-${i}-${ev.id || i}`}
+                                                                            style={{
+                                                                                position: "absolute",
+                                                                                top: topPx + "px",
+                                                                                left: leftPx + "px",
+                                                                                width: widthPx + "px",
+                                                                                height: Math.max(18, heightPx) + "px",
+                                                                                zIndex: 20,
+                                                                                pointerEvents: "auto",
+                                                                            }}
+                                                                        >
+                                                                            {/* main appointment bar */}
+                                                                            <div
+                                                                                className={`rounded px-2 py-1 text-xs overflow-hidden flex items-center gap-2 group ${kindClass || "bg-gray-200"}`}
+                                                                                style={{ height: "100%", cursor: "pointer" }}
+                                                                                draggable
+                                                                                onDragStart={(e) => {
+                                                                                    try {
+                                                                                        e.dataTransfer.setData("eventId", String(ev.id));
+                                                                                        const dur = ev.end ? new Date(ev.end).getTime() - new Date(ev.start).getTime() : 60 * 60 * 1000;
+                                                                                        e.dataTransfer.setData("durationMs", String(Math.max(dur, 0)));
+                                                                                        e.dataTransfer.effectAllowed = "move";
+                                                                                    } catch (_) {}
+                                                                                }}
+                                                                                onClick={(e) => {
+                                                                                    try { e.stopPropagation(); } catch (_) {}
+                                                                                    onEventClick && onEventClick(ev);
+                                                                                }}
+                                                                            >
+                                                                                <span className="shrink-0">{categories[ev.kind]?.icon || ""}</span>
+                                                                                <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1" tabIndex={0} aria-label={ev.title}>{ev.title}</span>
+                                                                                <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                                                                                    <button
+                                                                                        className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                                        onClick={(e) => {
+                                                                                            try { e.stopPropagation(); } catch (_) {}
+                                                                                            onEventClick && onEventClick(ev, 'edit');
+                                                                                        }}
+                                                                                        aria-label={`Edit ${ev.title}`}
+                                                                                        title="Edit appointment"
+                                                                                    >
+                                                                                        <FaEdit className="w-3 h-3 text-blue-600" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        className="p-1 rounded hover:bg-black/10 transition-colors"
+                                                                                        onClick={(e) => {
+                                                                                            try { e.stopPropagation(); } catch (_) {}
+                                                                                            onEventClick && onEventClick(ev, 'delete');
+                                                                                        }}
+                                                                                        aria-label={`Delete ${ev.title}`}
+                                                                                        title="Delete appointment"
+                                                                                    >
+                                                                                        <FaTrash className="w-3 h-3 text-red-600" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* top resize handle */}
+                                                                            <div
+                                                                                role="separator"
+                                                                                aria-orientation="horizontal"
+                                                                                onPointerDown={(e) => startResize(e, ev, 'top')}
+                                                                                className="absolute left-0 right-0 h-2 -top-1 cursor-ns-resize"
+                                                                                style={{ zIndex: 30 }}
+                                                                            />
+
+                                                                            {/* bottom resize handle */}
+                                                                            <div
+                                                                                role="separator"
+                                                                                aria-orientation="horizontal"
+                                                                                onPointerDown={(e) => startResize(e, ev, 'bottom')}
+                                                                                className="absolute left-0 right-0 h-2 -bottom-1 cursor-ns-resize"
+                                                                                style={{ zIndex: 30 }}
+                                                                            />
+
+                                                                            {/* live preview while resizing */}
+                                                                            {isResizingThis && resizing.previewTop != null && (
+                                                                                <div
+                                                                                    className="absolute rounded pointer-events-none border-2 border-dashed border-slate-400 bg-slate-200/30"
+                                                                                    style={{ top: resizing.previewTop + 'px', left: 0, width: '100%', height: resizing.previewHeight + 'px', zIndex: 40 }}
+                                                                                >
+                                                                                    <div className="absolute -top-6 left-2 bg-black text-white text-[11px] px-2 py-0.5 rounded">
+                                                                                        {resizing.previewStart ? (formatTime ? formatTime(`${String(resizing.previewStart.getHours()).padStart(2,'0')}:${String(resizing.previewStart.getMinutes()).padStart(2,'0')}`) : `${String(resizing.previewStart.getHours()).padStart(2,'0')}:${String(resizing.previewStart.getMinutes()).padStart(2,'0')}`) : ''}
+                                                                                        {' — '}
+                                                                                        {resizing.previewEnd ? (formatTime ? formatTime(`${String(resizing.previewEnd.getHours()).padStart(2,'0')}:${String(resizing.previewEnd.getMinutes()).padStart(2,'0')}`) : `${String(resizing.previewEnd.getHours()).padStart(2,'0')}:${String(resizing.previewEnd.getMinutes()).padStart(2,'0')}`) : ''}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                } catch (__) {
+                                                                    return null;
+                                                                }
+                                                            });
+                                                    })}
+                                                    {/* cancel preview if component unmounts */}
+                                                    {resizing && <div style={{ display: 'none' }} onMouseDown={() => { }} />}
+                                                </div>
+                                            );
+                                        } catch (e) {
+                                            return <div ref={ref} style={{ ...style, position: "relative" }}>{children}</div>;
+                                        }
+                                    })}
+                                >
+                                    {({ index, style }) => {
+                                        const slot = slots[index];
+                                        const [slotHour, slotMinute] = slot
+                                            .split(":")
+                                            .map((n) => parseInt(n, 10) || 0);
+
+                                        const isHourBoundary = slotMinute === 0;
+                                        const isHalfHourBoundary = slotMinute === 30;
+                                        const isQuarterHourBoundary =
+                                            slotMinute % 15 === 0 && slotMinute % 30 !== 0;
+
+                                        // Hour boundary: full-width prominent line.
+                                        // Half-hour boundary: we will NOT draw the top border on the full row
+                                        // so it doesn't extend into the hour label column; instead we draw
+                                        // a subtle solid top-border on each day cell below.
+                                        const rowBorderClass = isHourBoundary
+                                            ? "border-t border-slate-300"
+                                            : isHalfHourBoundary
+                                            ? ""
+                                            : "border-t border-slate-100";
+
+                                                        // Determine if this slot is working time (used to gray out non-working areas)
+                                                        const slotIsWorking = isWorkingTime ? isWorkingTime(slot) : true;
+
+                                                        // Subtle top-border for half-hour and dotted for quarter-hour cells.
+                                                        const cellTopBorderStyle = isHalfHourBoundary
+                                                                ? {
+                                                                            borderTopStyle: "solid",
+                                                                            borderTopWidth: "1px",
+                                                                            // subtle color for half-hour
+                                                                            borderTopColor: "rgba(148,163,184,0.15)",
+                                                                    }
+                                                                : isQuarterHourBoundary
+                                                                                    ? {
+                                                                                                borderTopStyle: "dotted",
+                                                                                                borderTopWidth: "1px",
+                                                                                                // match opacity/color with half-hour so visibility is the same
+                                                                                                borderTopColor: "rgba(148,163,184,0.15)",
+                                                                                        }
+                                                                : {};
+
+                                        return (
+                                            <div
+                                                key={index}
+                                                data-slot-index={index}
+                                                style={{
+                                                    ...style,
+                                                    overflow: "visible",
+                                                    boxSizing: "border-box",
+                                                }}
+                                                className={`flex w-full bg-white ${rowBorderClass}`}
+                                            >
+                                                {/* LEFT: hour labels (only on :00) */}
+                                                <div
+                                                    className="border-r border-gray-100 px-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
+                                                    style={{
+                                                        width: TIME_COL_PX + "px",
+                                                        height: ITEM_SIZE,
+                                                        backgroundColor: slotIsWorking ? undefined : "#f8fafc",
+                                                    }}
+                                                >
+                                                    {isWorkingTime &&
+                                                        !isWorkingTime(slot) && (
+                                                            <span
+                                                                className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300/40 rounded-r-md"
+                                                                aria-hidden="true"
+                                                            ></span>
+                                                        )}
+
+                                                    <span className="pl-2">
+                                                        {isHourBoundary
+                                                            ? formatTime(slot)
+                                                            : ""}
+                                                    </span>
+                                                </div>
+
+                                                {/* RIGHT: grid cells for each day */}
+                                                {days.map((date, dIdx) => {
+                                                     const slotEvents =
+                                                        events.filter(
+                                                            (ev) =>
+                                                                eventMatchesSlot(
+                                                                    ev.start,
+                                                                    date,
+                                                                    slot,
+                                                                    slotSize
+                                                                ) && !ev.taskId
+                                                        );
+
+                                                    return (
+                                                        <div
+                                                            key={dIdx}
+                                                            className="border-r border-gray-100 px-2 align-top group flex items-center relative overflow-visible"
+                                                            style={{
+                                                                flex: "1 1 0",
+                                                                minWidth: 0,
+                                                                height: ITEM_SIZE,
+                                                                boxSizing:
+                                                                    "border-box",
+                                                                cursor: "pointer",
+                                                                backgroundColor: slotIsWorking ? undefined : "#f8fafc",
+                                                                ...cellTopBorderStyle,
+                                                            }}
+                                                            onDragOver={(e) =>
+                                                                e.preventDefault()
+                                                            }
+                                                            onDrop={(e) =>
+                                                                handleDrop(
+                                                                    e,
+                                                                    date,
+                                                                    slot
+                                                                )
+                                                            }
+                                                            onClick={(e) => {
+                                                                try {
+                                                                    e.stopPropagation();
+                                                                } catch {}
+                                                                const [h, m] =
+                                                                    slot.split(
+                                                                        ":"
+                                                                    );
+                                                                const dt =
+                                                                    new Date(
+                                                                        date.getFullYear(),
+                                                                        date.getMonth(),
+                                                                        date.getDate(),
+                                                                        Number(h),
+                                                                        Number(m)
+                                                                    );
+                                                                onQuickCreate &&
+                                                                    onQuickCreate(
+                                                                        dt
+                                                                    );
+                                                            }}
+                                                        >
+                                                            {/* 15-minute midpoint line for 30-minute slot granularity */}
+                                                            {slotSize === 30 && (
+                                                                <div
+                                                                    aria-hidden="true"
+                                                                    style={{
+                                                                        position:
+                                                                            "absolute",
+                                                                        left: 2,
+                                                                        right: 2,
+                                                                        // place at midpoint of the row
+                                                                        top:
+                                                                            (measuredSlotPx || ITEM_SIZE) / 2 +
+                                                                            "px",
+                                                                        height: 1,
+                                                                        borderTopStyle:
+                                                                            "dotted",
+                                                                        borderTopWidth:
+                                                                            "1px",
+                                                                        borderTopColor:
+                                                                            "rgba(148,163,184,0.15)",
+                                                                        pointerEvents:
+                                                                            "none",
+                                                                        zIndex: 1,
+                                                                    }}
+                                                                />
+                                                            )}
+
+                                                            {null}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    }}
+                                </FixedSizeList>
+
+                                
+                                
+                            </div>
+                        </div>
+
+                        {/* Combined Tasks + Activities row: render per-day vertical columns under each date (no separation) */}
+                        <div className="flex w-full bg-white border border-gray-100 rounded-b-lg mt-2">
+                            {/* LEFT: sticky column with both Add buttons stacked */}
+                            <div className="flex flex-col items-start pr-2 pl-1 py-2" style={{ width: TIME_COL_PX + "px", position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white', minHeight: 56 }}>
                                 <button
                                     type="button"
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
-                                    style={{ minWidth: 110, minHeight: 36 }}
-                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })}
+                                    className="inline-flex items-center justify-center px-2 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap mb-2"
+                                    style={{ minHeight: 36, width: TIME_COL_PX + "px", alignSelf: 'flex-start' }}
+                                    onClick={() =>
+                                        onAddTaskOrActivity &&
+                                        onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })
+                                    }
                                 >
-                                    <span style={{ fontWeight: "bold" }}>+</span>
                                     <span>Add task</span>
                                 </button>
-                            </div>
-                            {/* Align task list start with activity list (use same ml-8 offset) */}
-                            <div className="p-2 min-w-0 relative flex-1 flex items-center ml-8">
-                                <div ref={tasksScrollRef} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
-                                    {(Array.isArray(todos) ? todos : []).map((t) => (
-                                        <div
-                                            key={t.id}
-                                            draggable
-                                            onDragStart={(e) => {
-                                                try {
-                                                    e.dataTransfer.setData("taskId", String(t.id));
-                                                    e.dataTransfer.effectAllowed = "copy";
-                                                } catch {}
-                                            }}
-                                            className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
-                                            style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
-                                            title={t.title}
-                                            onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                        >
-                                            <div className="truncate font-medium">{t.title}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                                {/* Scroll cues and buttons */}
-                                {showTasksLeftCue && (
-                                    <>
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
-                                        <button
-                                            type="button"
-                                            className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
-                                            aria-label="Scroll left"
-                                            onClick={() =>
-                                                tasksScrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })
-                                            }
-                                        >
-                                            <FaChevronLeft />
-                                        </button>
-                                    </>
-                                )}
-                                {showTasksRightCue && (
-                                    <>
-                                        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
-                                        <button
-                                            type="button"
-                                            className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-slate-700 border border-slate-200 rounded-full p-1 shadow pointer-events-auto"
-                                            aria-label="Scroll right"
-                                            onClick={() =>
-                                                tasksScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
-                                            }
-                                        >
-                                            <FaChevronRight />
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                        {/* Row 2: Add Activity + Activity List */}
-                        <div className="flex w-full">
-                            <div className="flex items-center p-2" style={{ width: TIME_COL_PX + "px" }}>
+
                                 <button
                                     type="button"
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
-                                    style={{ minWidth: 110, minHeight: 36 }}
-                                    onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })}
+                                    className="inline-flex items-center justify-center px-2 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
+                                    style={{ minHeight: 36, width: TIME_COL_PX + "px", alignSelf: 'flex-start' }}
+                                    onClick={() =>
+                                        onAddTaskOrActivity &&
+                                        onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })
+                                    }
                                 >
-                                    <span style={{ fontWeight: "bold" }}>+</span>
                                     <span>Add activity</span>
                                 </button>
                             </div>
-                            <div className="p-2 min-w-0 flex-1 flex items-center ml-8">
-                                <div className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
-                                    {(Array.isArray(activities) ? activities : []).map((a) => (
-                                        <div
-                                            key={a.id}
-                                            draggable
-                                            onDragStart={(e) => {
-                                                try {
-                                                    e.dataTransfer.setData("activityId", String(a.id || ""));
-                                                    e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
-                                                    e.dataTransfer.effectAllowed = "copyMove";
-                                                } catch {}
-                                            }}
-                                            className="px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-[160px] flex items-center gap-2 hover:opacity-90"
-                                            style={{ backgroundColor: "#7ED4E3", borderColor: "#7ED4E3", color: "#0B4A53" }}
-                                            title={a.text || a.title}
-                                        >
-                                            <FaBars aria-hidden="true" />
-                                            <div className="truncate font-medium">{a.text || a.title}</div>
+
+                            {/* RIGHT: seven day columns, each stacking tasks+activities */}
+                            <div className="flex-1 grid grid-cols-7 gap-0">
+                                {days.map((date, dIdx) => {
+                                    const startDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+                                    const endDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+                                    const dayTodos = (Array.isArray(todos) ? todos : []).filter((t) => {
+                                        try {
+                                            const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+                                            const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
+                                            const sDt = s ? new Date(s) : null;
+                                            const eDt = e ? new Date(e) : null;
+                                            const rs = sDt || eDt;
+                                            const re = eDt || sDt;
+                                            if (!rs || !re) return false;
+                                            return rs <= endDay && re >= startDay;
+                                        } catch (__) {
+                                            return false;
+                                        }
+                                    }).map((t) => ({...t, __type: 'task'}));
+
+                                    const dayActivities = (Array.isArray(activities) ? activities : []).filter((a) => {
+                                        try {
+                                            const cand = new Date(a.date || a.startDate || a.start_date || a.dueDate || a.due_date || a.createdAt || a.created_at || null);
+                                            if (isNaN(cand.getTime())) return false;
+                                            return (
+                                                cand.getFullYear() === date.getFullYear() &&
+                                                cand.getMonth() === date.getMonth() &&
+                                                cand.getDate() === date.getDate()
+                                            );
+                                        } catch (_) {
+                                            return false;
+                                        }
+                                    }).map((a) => ({...a, __type: 'activity'}));
+
+                                    // combine and optionally sort (by startDate/date/createdAt if present)
+                                    const combined = [...dayTodos, ...dayActivities].sort((x, y) => {
+                                        const getTime = (it) => {
+                                            try {
+                                                if (it.__type === 'task') {
+                                                    const s = it.startDate || it.start_date || it.date || it.dueDate || it.due_date || null;
+                                                    return s ? new Date(s).getTime() : 0;
+                                                }
+                                                const s2 = it.date || it.startDate || it.start_date || it.dueDate || it.due_date || it.createdAt || it.created_at || null;
+                                                return s2 ? new Date(s2).getTime() : 0;
+                                            } catch { return 0; }
+                                        };
+                                        return (getTime(x) || 0) - (getTime(y) || 0);
+                                    });
+
+                                    return (
+                                        <div key={`col-${dIdx}`} className="border-r border-gray-100 p-2 min-h-[56px] overflow-hidden">
+                                            <div className="flex flex-col gap-2">
+                                                {combined.map((item) => {
+                                                    if (item.__type === 'task') {
+                                                        const t = item;
+                                                        const kindKey = t.kind || t.type || t.kindName || null;
+                                                        const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                                                        const bgClass = cat?.color || null;
+                                                        const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
+                                                        const DEFAULT_BAR_COLOR = '#4DC3D8';
+                                                        const kaColor = (ka && ka.color) ? ka.color : null;
+                                                        const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                                                        const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                                                        const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                                                        return (
+                                                            <div
+                                                                key={`task-${t.id}`}
+                                                                draggable
+                                                                onDragStart={(e) => {
+                                                                    try {
+                                                                        e.dataTransfer.setData("taskId", String(t.id));
+                                                                        e.dataTransfer.effectAllowed = "copy";
+                                                                    } catch {}
+                                                                }}
+                                                                onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                                                className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 ${bgClass || ''}`}
+                                                                style={style}
+                                                                title={t.title || t.name}
+                                                            >
+                                                                <div className="truncate font-medium">{t.title || t.name}</div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // activity
+                                                    const a = item;
+                                                    const kindKey = a.kind || a.type || null;
+                                                    const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                                                    let ka = null;
+                                                    if (a.keyAreaId || a.key_area_id) ka = keyAreaMap[String(a.keyAreaId || a.key_area_id)];
+                                                    else if (a.taskId || a.task_id) {
+                                                        const parent = (Array.isArray(todos) ? todos : []).find((t) => String(t.id) === String(a.taskId || a.task_id));
+                                                        if (parent) ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
+                                                    }
+                                                    const bgClass = cat?.color || null;
+                                                    const DEFAULT_BAR_COLOR = '#4DC3D8';
+                                                    const kaColor = (ka && ka.color) ? ka.color : null;
+                                                    const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                                                    const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                                                    const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                                                    return (
+                                                        <div
+                                                            key={`act-${a.id}`}
+                                                            draggable
+                                                            onDragStart={(e) => {
+                                                                try {
+                                                                    e.dataTransfer.setData("activityId", String(a.id || ""));
+                                                                    e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
+                                                                    e.dataTransfer.effectAllowed = "copyMove";
+                                                                } catch {}
+                                                            }}
+                                                            className={`px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 ${bgClass || ''}`}
+                                                            style={style}
+                                                            title={a.text || a.title}
+                                                        >
+                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                                            </svg>
+                                                            <div className="truncate font-medium">{a.text || a.title}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            {/* Removed To-Do List Panel per request */}
-        </div>
         </>
     );
 };

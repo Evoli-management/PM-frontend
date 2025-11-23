@@ -1,746 +1,1106 @@
-import React from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
-import { FixedSizeList } from "react-window";
-import AvailabilityBlock from "./AvailabilityBlock";
+import React, { useState, useEffect, useRef } from "react";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import calendarService from "../../services/calendarService";
 
+// Load activityService on demand to keep it out of the main chunk
+let _activityService = null;
+const getActivityService = async () => {
+  if (_activityService) return _activityService;
+  const mod = await import("../../services/activityService");
+  _activityService = mod?.default || mod;
+  return _activityService;
+};
+// Helper: compute text color (dark or white) for a hex background
+function hexToRgb(hex) {
+  if (!hex) return null;
+  const h = hex.replace('#', '');
+  const bigint = parseInt(h.length === 3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return { r, g, b };
+}
+function getContrastTextColor(hex) {
+  try {
+    const c = hexToRgb(hex);
+    if (!c) return '#0B4A53';
+    const srgb = [c.r, c.g, c.b]
+      .map((v) => v / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+    const lum = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+    return lum > 0.6 ? '#0B4A53' : '#ffffff';
+  } catch (e) {
+    return '#0B4A53';
+  }
+}
+
+// Treat an end timestamp of exactly midnight as the inclusive end of that day
+// so an end of 2025-10-23T00:00:00 will cover 2025-10-23 as expected.
+function adjustEndInclusive(ed) {
+  try {
+    if (!ed) return ed;
+    const d = new Date(ed);
+    if (isNaN(d.getTime())) return d;
+    if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0) {
+      // move to 23:59:59.999 of the same date
+      return new Date(d.getTime() + 24 * 60 * 60 * 1000 - 1);
+    }
+    return d;
+  } catch (e) {
+    return ed;
+  }
+}
+import { FaChevronDown, FaEdit, FaTrash } from "react-icons/fa";
+
+// DayView props: startHour, endHour, slotMinutes, hourHeight
 export default function DayView({
-    currentDate,
-    view,
-    onChangeView,
-    filterType,
-    onChangeFilter,
-    events,
-    todos,
-    activitiesByTask = {},
-    unattachedActivities = [],
-    categories,
-    onTaskDrop,
-    onEventMove,
-    onActivityDrop,
-    onEventClick,
-    onTaskClick,
-    onActivityClick,
-    onPlanTomorrow,
-    onShiftDate,
-    onSetDate,
-    onQuickCreate,
-    onAddTaskOrActivity,
-    loading = false,
+  startHour = 0,
+  endHour = 24,
+  slotMinutes = 15,
+  hourHeight = 64,
+  currentDate: propDate,
+  onSetDate,
+  onShiftDate,
+  view: propView,
+  onChangeView,
+  onQuickCreate,
+  onAddTaskOrActivity,
+  categories = {},
+  events = [],
+  todos = [],
+  activitiesByTask = {},
+  unattachedActivities = [],
+  loading = false,
+  onEventClick,
+  onEventMove,
+  onTaskDrop,
+  onActivityDrop,
+  onTaskClick,
+  onActivityClick,
 }) {
-    const slotSizeMin = 30;
-    const { 
-        timeSlots, 
-        formattedTimeSlots, 
-        workingHours, 
-        formatTime,
-        formatDate,
-        loading: prefsLoading,
-        isWorkingTime,
-    } = useCalendarPreferences(slotSizeMin);
-    const [showViewMenu, setShowViewMenu] = React.useState(false);
 
-    // Derive visual row height from slot size so slot sizes scale consistently
-    // Base reference: 30 minutes -> 38px (used historically). Compute proportionally.
-    const SLOT_ROW_PX = Math.round((slotSizeMin / 30) * 38);
+  // Always render the full 24-hour grid; non-working slots will be greyed
+  // Always render the full 24-hour grid; non-working slots will be greyed
+  const {
+    timeSlots,
+    formattedTimeSlots,
+    workingHours,
+    formatTime,
+    formatDate,
+    loading: prefsLoading,
+    updateSlotSize,
+    isWorkingTime,
+  } = useCalendarPreferences(slotMinutes);
 
-    // Use dynamic hours from preferences, fallback to full-day if still loading
-    const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
-        const h = Math.floor(i / 2);
-        const m = i % 2 === 0 ? "00" : "30";
-        return `${h.toString().padStart(2, '0')}:${m}`;
-    });
-    const hours = timeSlots.length > 0 ? timeSlots : ALL_HOURS;
+  const hours = Array.from({ length: 24 }, (_, i) => i);
 
-    // Create a formatted hours array for display
-    const formattedHours = hours.map(hour => ({
-        value: hour,
-        display: formatTime(hour)
-    }));
-    
-    const today = currentDate || new Date();
+  const HOUR_HEIGHT = hourHeight;
 
-    const scrollRef = React.useRef(null);
-    const tableRef = React.useRef(null);
-    const [headerHeight, setHeaderHeight] = React.useState(0);
-    // track current time in ms so we can compute fractional minutes (minutes + seconds/60)
-    const [nowMs, setNowMs] = React.useState(() => Date.now());
-    // measured pixel height of a single slot row in the DOM; fallback to SLOT_ROW_PX
-    const [measuredSlotPx, setMeasuredSlotPx] = React.useState(SLOT_ROW_PX);
+  // current time position
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  // For full-day display, start at 00:00 and show 24 hours
+  const startMinutes = 0;
+  const totalMinutes = 24 * 60;
+  const minutesFromStart = Math.max(0, Math.min(nowMinutes - startMinutes, totalMinutes));
+  const nowTop = (minutesFromStart / 60) * HOUR_HEIGHT;
 
-    // Update nowMinutes every minute, align to the start of the next minute
-    React.useEffect(() => {
-        // update nowMs every 1 second for smooth per-second tracking in Day view
-        const update = () => setNowMs(Date.now());
-        update();
-        const msUntilNextSecond = 1000 - (Date.now() % 1000);
-        const timeout = setTimeout(() => {
-            update();
-            const interval = setInterval(update, 1000);
-            scrollRef.current && (scrollRef.current._nowInterval = interval);
-        }, msUntilNextSecond);
-        return () => {
-            clearTimeout(timeout);
-            if (scrollRef.current && scrollRef.current._nowInterval) {
-                clearInterval(scrollRef.current._nowInterval);
-            }
-        };
-    }, []);
+  // header + view state
+  const [currentDate, setCurrentDate] = useState(propDate || new Date());
+  const [view, setView] = useState(propView || "day");
+  const [showViewMenu, setShowViewMenu] = useState(false);
+  const viewMenuRef = useRef(null);
 
-    // Measure header height so we can offset the now-line below the header
-    React.useEffect(() => {
-        const setHeight = () => {
-            try {
-                const th = tableRef.current?.querySelector('thead');
-                setHeaderHeight(th ? th.offsetHeight : 0);
-            } catch (e) { setHeaderHeight(0); }
-        };
-        setHeight();
-        const ro = new ResizeObserver(setHeight);
-        if (tableRef.current) ro.observe(tableRef.current);
-        window.addEventListener('resize', setHeight);
-        return () => {
-            ro.disconnect();
-            window.removeEventListener('resize', setHeight);
-        };
-    }, []);
+  // Sidebar data: todos, appointments and activities for selected day
+  const [sideTodos, setSideTodos] = useState([]);
+  const [sideAppointments, setSideAppointments] = useState([]);
+  const [sideActivities, setSideActivities] = useState([]);
+  const [loadingSidebar, setLoadingSidebar] = useState(false);
+  const [keyAreaMap, setKeyAreaMap] = useState({});
 
-    // Measure an actual slot row height from the DOM so px/min calculations use the real size
-    React.useEffect(() => {
-        const el = tableRef.current || scrollRef.current;
-        if (!el) return;
-        const measure = () => {
-            try {
-                const item = el.querySelector('[data-slot-index]');
-                if (item) {
-                    const h = item.getBoundingClientRect().height;
-                    if (h && h > 0) setMeasuredSlotPx(h);
-                }
-            } catch (e) {}
-        };
-        measure();
-        const ro = new ResizeObserver(measure);
-        ro.observe(el);
-        window.addEventListener('resize', measure);
-        return () => {
-            ro.disconnect();
-            window.removeEventListener('resize', measure);
-        };
-    }, [tableRef.current, scrollRef.current, hours.length]);
-    
-    const overlapsSlot = (ev, refDate, slot) => {
-        try {
-            if (!ev?.start || !ev?.end) return matchesSlot(ev?.start, refDate, slot); // fallback to start-only
-            const [sh, sm] = slot.split(":");
-            const slotStart = new Date(
-                refDate.getFullYear(),
-                refDate.getMonth(),
-                refDate.getDate(),
-                Number(sh),
-                Number(sm),
-            );
-            const slotEnd = new Date(slotStart.getTime() + slotSizeMin * 60000);
-            const start = new Date(ev.start);
-            const end = new Date(ev.end);
-            if (
-                start.getFullYear() !== refDate.getFullYear() ||
-                start.getMonth() !== refDate.getMonth() ||
-                start.getDate() !== refDate.getDate()
-            )
-                return false;
-            return start < slotEnd && end > slotStart; // overlap
-        } catch {
-            return false;
-        }
-    };
-    // Build date-only value for comparisons and filter todos to those spanning today
-    const toDateOnly = (iso) => {
-        if (!iso) return null;
-        const d = new Date(iso);
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    };
-    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const isInRangeToday = (t) => {
-        let start = toDateOnly(t.startDate) || toDateOnly(t.dueDate) || toDateOnly(t.endDate);
-        let end = toDateOnly(t.endDate) || toDateOnly(t.dueDate) || toDateOnly(t.startDate);
-        if (!start && !end) return false;
-        if (start && end && start > end) {
-            const tmp = start;
-            start = end;
-            end = tmp;
-        }
-        if (!start) start = end;
-        if (!end) end = start;
-        return start <= todayOnly && todayOnly <= end;
-    };
-    const dayTodos = Array.isArray(todos) ? todos.filter(isInRangeToday) : [];
-    const dayActivities = React.useMemo(() => {
-        const flatten = (arr) => (Array.isArray(arr) ? arr : []);
+  // transient resizing state for pointer-based resize (top/bottom handles)
+  const [resizing, setResizing] = useState(null);
+  // flag to suppress click immediately after a resize operation
+  const justResizedRef = useRef(false);
 
-        const activityInDay = (a) => {
-            try {
-                const toDateOnlyLocal = (iso) => {
-                    if (!iso && iso !== 0) return null;
-                    try {
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return String(iso);
-                        const d = new Date(iso);
-                        if (isNaN(d.getTime())) return null;
-                        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                    } catch {
-                        return null;
-                    }
-                };
-
-                const start = toDateOnlyLocal(a?.date_start || a?.startDate || a?.date || null);
-                const end = toDateOnlyLocal(a?.date_end || a?.endDate || a?.date_end || null);
-                if (!start && !end) return false;
-                let s = start || end;
-                let e = end || start;
-                if (s && e && s.getTime && e.getTime && s.getTime() > e.getTime()) {
-                    const tmp = s;
-                    s = e;
-                    e = tmp;
-                }
-                if (!s) s = e;
-                if (!e) e = s;
-                const todayStart = new Date(todayOnly.getFullYear(), todayOnly.getMonth(), todayOnly.getDate());
-                return s <= todayStart && todayStart <= e;
-            } catch (err) {
-                return false;
-            }
-        };
-
-        // Gather activities attached to today's todos, then filter by date overlap with today
-        const fromTasks = (dayTodos || []).flatMap((t) => flatten(activitiesByTask?.[String(t.id)])).filter(activityInDay);
-
-        // Include unattached activities only if they overlap today
-        const fromUnattached = flatten(unattachedActivities).filter(activityInDay);
-
-        return [...fromUnattached, ...fromTasks];
-    }, [dayTodos, activitiesByTask, unattachedActivities]);
-    const matchesSlot = (startIso, refDate, slot) => {
-        try {
-            const ev = new Date(startIso);
-            if (
-                ev.getFullYear() !== refDate.getFullYear() ||
-                ev.getMonth() !== refDate.getMonth() ||
-                ev.getDate() !== refDate.getDate()
-            )
-                return false;
-            const [sh, smRaw] = slot.split(":");
-            const shNum = Number(sh);
-            const smNum = Number(smRaw);
-            let eh = ev.getHours();
-            let em = ev.getMinutes();
-            const rounded = Math.round(em / slotSizeMin) * slotSizeMin;
-            if (rounded === 60) {
-                eh = eh + 1;
-                em = 0;
-            } else {
-                em = rounded;
-            }
-            return eh === shNum && em === smNum;
-        } catch {
-            return false;
-        }
-    };
-    // Drag-and-drop handler
-    const handleDrop = (e, hour) => {
-        try {
-            const [hh, mm] = hour.split(":");
-            const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm));
-            const eventId = e.dataTransfer.getData("eventId");
-            if (eventId) {
-                const dur = parseInt(e.dataTransfer.getData("durationMs") || "0", 10);
-                const newEnd = dur > 0 ? new Date(date.getTime() + dur) : null;
-                onEventMove && onEventMove(eventId, date, newEnd);
-                return;
-            }
-            const taskId = e.dataTransfer.getData("taskId");
-            if (taskId) {
-                const task = todos.find((t) => String(t.id) === String(taskId));
-                if (task) onTaskDrop && onTaskDrop(task, date);
-                return;
-            }
-            const activityText = e.dataTransfer.getData("activityText");
-            const activityId = e.dataTransfer.getData("activityId");
-            if (activityText || activityId) {
-                const a = activityId
-                    ? dayActivities.find((x) => String(x.id) === String(activityId)) || { id: activityId, text: activityText }
-                    : { text: activityText };
-                onActivityDrop && onActivityDrop(a, date);
-            }
-        } catch {}
-    };
+  const isToday = (() => {
+    const d = currentDate || new Date();
+    const t = new Date();
     return (
-        <div className="p-0 flex gap-4 w-full max-w-none">
-            
-            {/* Left: Calendar day view */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                        {/* Back first, then View dropdown */}
-                        <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
-                            aria-label="Previous day"
-                            onClick={() => onShiftDate && onShiftDate(-1)}
-                        >
-                            <FaChevronLeft />
-                        </button>
-                        <div className="relative">
-                            <button
-                                className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                                style={{ minWidth: 36, minHeight: 28 }}
-                                onClick={() => setShowViewMenu((s) => !s)}
-                                aria-haspopup="menu"
-                                aria-expanded={showViewMenu ? "true" : "false"}
-                            >
-                                <span>View</span>
-                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                    {view?.charAt(0).toUpperCase() + view?.slice(1)}
-                                </span>
-                                <FaChevronDown
-                                    className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
-                                />
-                            </button>
-                            {showViewMenu && (
-                                <div
-                                    role="menu"
-                                    className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
-                                >
-                                    {["day", "week", "month", "quarter", "list"].map((v) => (
-                                        <button
-                                            key={v}
-                                            role="menuitemradio"
-                                            aria-checked={view === v}
-                                            className={`w-full text-left px-3 py-2 text-sm ${view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
-                                            onClick={() => {
-                                                onChangeView && onChangeView(v);
-                                                setShowViewMenu(false);
-                                            }}
-                                        >
-                                            {v.charAt(0).toUpperCase() + v.slice(1)}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        {formatDate(today, { includeWeekday: true, longMonth: true })}
-                        {(loading || prefsLoading) && (
-                            <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
-                                Loading
-                            </span>
-                        )}
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
-                            aria-label="Today"
-                            onClick={() => onSetDate && onSetDate(new Date())}
-                        >
-                            Today
-                        </button>
-                        <select
-                            className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                            style={{ minHeight: 28 }}
-                            value={filterType}
-                            onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
-                            aria-label="Filter event types"
-                        >
-                            <option value="all">All</option>
-                            <option value="meeting">Meeting</option>
-                            <option value="focus">Focus</option>
-                            <option value="custom">Custom</option>
-                            <option value="green">Green</option>
-                            <option value="red">Red</option>
-                        </select>
-                        <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
-                            aria-label="Next day"
-                            onClick={() => onShiftDate && onShiftDate(1)}
-                        >
-                            <FaChevronRight />
-                        </button>
-                    </div>
-                </div>
-                <div
-                    className="flex flex-col gap-1"
-                    ref={scrollRef}
-                    style={{ position: 'relative', maxWidth: "100%", maxHeight: "60vh", overflowX: "auto", overflowY: "auto" }}
-                >
-                    {/* Keep clean: no empty-state banner when there are no events */}
-                        <table
-                        ref={tableRef}
-                        className="min-w-full border border-gray-100 rounded-lg"
-                        style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}
-                    >
-                        <thead>
-                            <tr className="bg-sky-50">
-                                <th className="text-left px-2 py-2 text-xs font-semibold text-gray-400 w-24">Time</th>
-                                <th className="text-left px-2 py-2 text-xs font-semibold text-gray-400">Events</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {hours.map((h, idx) => {
-                                // Calculate slot start/end
-                                const [hh, mm] = h.split(":");
-                                const slotStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm));
-                                const nextSlot = hours[idx + 1];
-                                const slotEnd = nextSlot
-                                    ? new Date(today.getFullYear(), today.getMonth(), today.getDate(), ...nextSlot.split(":").map(Number))
-                                    : new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(hh), Number(mm) + 30);
-                                // Only render bars in the slot where the event starts
-                                const renderEvents = events.filter((ev) => {
-                                    const evStart = new Date(ev.start);
-                                    return evStart.getHours() === slotStart.getHours() && evStart.getMinutes() === slotStart.getMinutes();
-                                });
-                                const isBoundary = h === workingHours.endTime; // non-interactive row
-                                const formattedHour = formattedHours.find(fh => fh.value === h);
-                                const isWorking = isWorkingTime ? isWorkingTime(h) : (workingHours.startTime && workingHours.endTime && (() => {
-                                    try {
-                                        const sm = h;
-                                        const [sh, smm] = sm.split(":");
-                                        const startMinutes = parseInt(workingHours.startTime.split(":" )[0]) * 60 + parseInt(workingHours.startTime.split(":" )[1]);
-                                        const endMinutes = parseInt(workingHours.endTime.split(":" )[0]) * 60 + parseInt(workingHours.endTime.split(":" )[1]);
-                                        const slotMinutes = Number(sh) * 60 + Number(smm);
-                                        return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-                                    } catch { return false; }
-                                })());
-                                return (
-                                        <tr key={idx} className="bg-white">
-                                            <td className="border-t border-r border-gray-100 px-2 py-1 text-xs w-24 align-top relative">
-                                                {!isWorking && <span className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300/40 rounded-r-md" aria-hidden="true"></span>}
-                                                <span className="pl-2">{formattedHour ? formattedHour.display : h}</span>
-                                            </td>
-                                        <td
-                                            className={`border-t border-gray-100 px-2 py-1 align-top relative ${isBoundary ? "pointer-events-none opacity-60" : ""}`}
-                                            style={{ width: "100%", minHeight: SLOT_ROW_PX, boxSizing: 'border-box' }}
-                                            {...(!isBoundary && {
-                                                // Single click on an empty timeslot should open the appointment modal
-                                                onClick: (e) => {
-                                                    try { e.stopPropagation(); } catch {}
-                                                    const [hh, mm] = h.split(":");
-                                                    const date = new Date(
-                                                        today.getFullYear(),
-                                                        today.getMonth(),
-                                                        today.getDate(),
-                                                        Number(hh),
-                                                        Number(mm),
-                                                    );
-                                                    onQuickCreate && onQuickCreate(date);
-                                                },
-                                                onDragOver: (e) => {
-                                                    try {
-                                                        e.preventDefault();
-                                                        e.dataTransfer.dropEffect = "copy";
-                                                    } catch {}
-                                                },
-                                                onDrop: (e) => handleDrop(e, h),
-                                            })}
-                                        >
-                                            <div data-slot-index={idx} style={{ position: "relative", minHeight: SLOT_ROW_PX, boxSizing: 'border-box' }}>
-                                                {renderEvents.map((ev, i) => {
-                                                    const isTaskBox = !!ev.taskId;
-                                                    // Calculate bar height to span all overlapping slots
-                                                    const evStart = new Date(ev.start);
-                                                    const evEnd = ev.end ? new Date(ev.end) : new Date(evStart.getTime() + 30 * 60000);
-                                                    const slotIdx = idx;
-                                                    // Find which slot index the event ends in
-                                                    let endIdx = slotIdx;
-                                                    for (let j = slotIdx + 1; j < hours.length; j++) {
-                                                        const [ehh, emm] = hours[j].split(":");
-                                                        const slotEndTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), Number(ehh), Number(emm));
-                                                        if (slotEndTime > evEnd) break;
-                                                        endIdx = j;
-                                                    }
-                                                    const effectiveRowPx = measuredSlotPx || SLOT_ROW_PX;
-                                                    const barHeightUncapped = (endIdx - slotIdx + 1) * effectiveRowPx - 4; // per-slot px, minus small gap
-                                                    // Cap the visual height to a single slot so appointment bars match the slot size
-                                                    const barHeight = Math.min(barHeightUncapped, effectiveRowPx - 4);
-                                                    // Stack multiple events that start in the same slot vertically so they don't fully overlap.
-                                                    // Each subsequent event is shifted down slightly (top) but keeps the same slot-sized height.
-                                                    const verticalOffset = i * 6; // px between stacked events
-                                                    const adjustedBarHeight = barHeight;
-                                                    // Check if next event starts at the end of this event
-                                                    let showBoundary = false;
-                                                    if (i < renderEvents.length - 1) {
-                                                        const nextEv = renderEvents[i + 1];
-                                                        const evEndTime = ev.end ? new Date(ev.end) : new Date(evStart.getTime() + 30 * 60000);
-                                                        const nextEvStartTime = new Date(nextEv.start);
-                                                        if (evEndTime.getTime() === nextEvStartTime.getTime()) {
-                                                            showBoundary = true;
-                                                        }
-                                                    }
-                                                    // Use a composite key (id + start + index) to avoid duplicates when
-                                                    // multiple items share the same id across different data sources.
-                                                    const compositeKey = `${ev.id ?? 'noid'}-${ev.start ?? 'nostart'}-${i}`;
-                                                    return (
-                                                        <React.Fragment key={compositeKey}>
-                                                            <div
-                                                                tabIndex={-1}
-                                                                className={`px-2 py-1 rounded cursor-pointer flex items-center gap-1 w-full max-w-full overflow-hidden group focus:outline-none focus:ring-0 ${isTaskBox ? "" : "bg-indigo-400"}`}
-                                                                draggable
-                                                                onPointerDown={(e) => { try { e.preventDefault(); } catch {} }}
-                                                                onMouseDown={(e) => { try { e.preventDefault(); } catch {} }}
-                                                                onFocus={(e) => { try { e.currentTarget.blur(); } catch {} }}
-                                                                onDragStart={(e) => {
-                                                                    try {
-                                                                        e.dataTransfer.setData("eventId", String(ev.id));
-                                                                        const dur = ev.end
-                                                                            ? new Date(ev.end).getTime() - new Date(ev.start).getTime()
-                                                                            : 60 * 60 * 1000;
-                                                                        e.dataTransfer.setData("durationMs", String(Math.max(dur, 0)));
-                                                                        e.dataTransfer.effectAllowed = "move";
-                                                                    } catch {}
-                                                                }}
-                                                                onClick={(e) => {
-                                                                    try { e.stopPropagation(); } catch {}
-                                                                    onEventClick && onEventClick(ev);
-                                                                }}
-                                                                style={{
-                                                                    outline: "none",
-                                                                    position: "absolute",
-                                                                    left: 0,
-                                                                    right: 0,
-                                                                    top: verticalOffset,
-                                                                    height: adjustedBarHeight,
-                                                                    backgroundColor: isTaskBox ? "#7ED4E3" : undefined,
-                                                                    zIndex: 2,
-                                                                    boxShadow: "0 2px 10px -4px rgba(2,6,23,0.06)",
-                                                                    border: "1.5px solid rgba(15,23,42,0.12)",
-                                                                }}
-                                                            >
-                                                                {!isTaskBox && (
-                                                                    <span className="shrink-0">
-                                                                        {categories[ev.kind]?.icon || ""}
-                                                                    </span>
-                                                                )}
-                                                                <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1">
-                                                                    {ev.title}
-                                                                </span>
-                                                                {!isTaskBox && (
-                                                                    <div className="hidden group-hover:flex items-center gap-1 ml-2">
-                                                                        <button
-                                                                            className="p-1 rounded hover:bg-black/10 transition-colors"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                onEventClick && onEventClick(ev, 'edit');
-                                                                            }}
-                                                                            aria-label={`Edit ${ev.title}`}
-                                                                            title="Edit appointment"
-                                                                        >
-                                                                            <FaEdit className="w-3 h-3 text-blue-600" />
-                                                                        </button>
-                                                                        <button
-                                                                            className="p-1 rounded hover:bg-black/10 transition-colors"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                onEventClick && onEventClick(ev, 'delete');
-                                                                            }}
-                                                                            aria-label={`Delete ${ev.title}`}
-                                                                            title="Delete appointment"
-                                                                        >
-                                                                            <FaTrash className="w-3 h-3 text-red-600" />
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {/* intentionally keep a single event bar element per event; boundary marker removed */}
-                                                        </React.Fragment>
-                                                    );
-                                                })}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                    {/* Now line: show only when viewing today's date */}
-                    {(() => {
-                        // Only show when today is the same day displayed
-                        if (new Date().toDateString() !== (today || new Date()).toDateString()) return null;
-                        try {
-                            const firstSlot = hours[0] || '00:00';
-                            const lastSlot = hours[hours.length - 1] || '23:30';
-                            const [fh, fm] = firstSlot.split(':').map(Number);
-                            const [lh, lm] = lastSlot.split(':').map(Number);
-                            const startMinutes = fh * 60 + (fm || 0);
-                            const endMinutes = lh * 60 + (lm || 0) + slotSizeMin; // include last slot
-                            const nowDate = new Date(nowMs);
-                            const nowMinutesFloat = nowDate.getHours() * 60 + nowDate.getMinutes() + nowDate.getSeconds() / 60;
-                            if (nowMinutesFloat < startMinutes || nowMinutesFloat > endMinutes) return null;
-                            const pxPerMinute = (measuredSlotPx || SLOT_ROW_PX) / slotSizeMin;
-                            const topPx = headerHeight + (nowMinutesFloat - startMinutes) * pxPerMinute;
-                                return (
-                                <div
-                                    aria-hidden="true"
-                                    className="pointer-events-none"
-                                    style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        right: 0,
-                                        top: 0,
-                                        transform: `translateY(${topPx}px)`,
-                                        height: 2,
-                                        background: '#ef4444', // red
-                                        zIndex: 40,
-                                        transition: 'transform 0.9s linear',
-                                        willChange: 'transform',
-                                    }}
-                                />
-                            );
-                        } catch (e) { return null; }
-                    })()}
-                </div>
-                {/* Removed 'Plan tomorrow' button as requested */}
-            </div>
-
-            {/* Right: Actions column */}
-            <div className="w-[26rem] md:w-[30rem] shrink-0">
-                <div className="sticky top-2">
-                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3 mb-3">
-                        <h3 className="text-sm font-semibold text-slate-700 mb-3">Quick actions</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            {/* Row 1: Category buttons (Tasks left, Activities right) */}
-                            <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium">
-                                <svg
-                                    stroke="currentColor"
-                                    fill="currentColor"
-                                    strokeWidth="0"
-                                    viewBox="0 0 448 512"
-                                    className="w-4 h-4 text-[#4DC3D8] shrink-0"
-                                    aria-hidden="true"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                >
-                                    <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
-                                </svg>
-                                <span>Tasks</span>
-                            </button>
-                            <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium">
-                                <svg
-                                    stroke="currentColor"
-                                    fill="currentColor"
-                                    strokeWidth="0"
-                                    viewBox="0 0 448 512"
-                                    className="w-4 h-4 text-[#4DC3D8] shrink-0"
-                                    aria-hidden="true"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                >
-                                    <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                                </svg>
-                                <span>Activities</span>
-                            </button>
-                            {/* Row 2: Lists (Tasks list left, Activities list right) */}
-                            <div className="w-full max-h-32 overflow-auto rounded border border-slate-200 bg-slate-50 p-2">
-                                {dayTodos.length === 0 ? (
-                                    <div className="text-[11px] text-slate-500 text-center">No tasks</div>
-                                ) : (
-                                    <div className="flex flex-col gap-1">
-                                        {dayTodos.map((t) => (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                className="w-full px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center gap-2 text-left"
-                                                title={t.title}
-                                                onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                                draggable
-                                                onDragStart={(e) => {
-                                                    try {
-                                                        e.dataTransfer.setData("taskId", String(t.id));
-                                                        e.dataTransfer.setData("title", t.title || "");
-                                                        e.dataTransfer.setData("description", t.description || "");
-                                                        e.dataTransfer.effectAllowed = "copyMove";
-                                                    } catch {}
-                                                }}
-                                            >
-                                                <svg
-                                                    stroke="currentColor"
-                                                    fill="currentColor"
-                                                    strokeWidth="0"
-                                                    viewBox="0 0 448 512"
-                                                    className="w-3.5 h-3.5 text-[#4DC3D8] shrink-0"
-                                                    aria-hidden="true"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                >
-                                                    <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
-                                                </svg>
-                                                <span className="truncate">{t.title}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="w-full max-h-32 overflow-auto rounded border border-slate-200 bg-slate-50 p-2">
-                                {dayActivities.length === 0 ? (
-                                    <div className="text-[11px] text-slate-500 text-center">No activities</div>
-                                ) : (
-                                    <div className="flex flex-col gap-1">
-                                        {dayActivities.map((a) => (
-                                            <button
-                                                key={a.id}
-                                                type="button"
-                                                className="w-full px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center gap-2 text-left cursor-pointer transition-colors"
-                                                title={a.text || a.title}
-                                                onClick={() => onActivityClick && onActivityClick(a)}
-                                                draggable
-                                                onDragStart={(e) => {
-                                                    try {
-                                                        e.dataTransfer.setData("activityId", String(a.id || ""));
-                                                        e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
-                                                        e.dataTransfer.effectAllowed = "copyMove";
-                                                    } catch {}
-                                                }}
-                                            >
-                                                <svg
-                                                    stroke="currentColor"
-                                                    fill="currentColor"
-                                                    strokeWidth="0"
-                                                    viewBox="0 0 448 512"
-                                                    className="w-3.5 h-3.5 text-[#4DC3D8] shrink-0"
-                                                    aria-hidden="true"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                >
-                                                    <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
-                                                </svg>
-                                                <span className="truncate">{a.text || a.title}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            {/* Row 2: Add buttons (Add task left, Add activity right) */}
-                            <button
-                                type="button"
-                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
-                                onClick={() =>
-                                    onAddTaskOrActivity &&
-                                    onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "task" })
-                                }
-                            >
-                                <FaPlus />
-                                <span>Add task</span>
-                            </button>
-                            <button
-                                type="button"
-                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm whitespace-nowrap"
-                                onClick={() =>
-                                    onAddTaskOrActivity &&
-                                    onAddTaskOrActivity(currentDate || new Date(), { defaultTab: "activity" })
-                                }
-                            >
-                                <FaPlus />
-                                <span>Add activity</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      d.getFullYear() === t.getFullYear() &&
+      d.getMonth() === t.getMonth() &&
+      d.getDate() === t.getDate()
     );
+  })();
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!viewMenuRef.current) return;
+      if (!viewMenuRef.current.contains(e.target)) setShowViewMenu(false);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") setShowViewMenu(false);
+    }
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof onChangeView === "function") onChangeView(view);
+  }, [view, onChangeView]);
+
+  useEffect(() => {
+    if (propDate && propDate.getTime && propDate.getTime() !== currentDate.getTime()) {
+      setCurrentDate(propDate);
+    }
+  }, [propDate]);
+
+  useEffect(() => {
+    if (propView && propView !== view) {
+      setView(propView);
+    }
+  }, [propView]);
+
+  // Pointer-based resize helper (top/bottom handles) — mirrors WeekView behavior in a simpler form.
+  const startResize = (ev, apptObj, side) => {
+    try {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const pointerId = ev.pointerId;
+      ev.target.setPointerCapture && ev.target.setPointerCapture(pointerId);
+
+      const parseDate = (s) => {
+        try {
+          const d = new Date(s);
+          return isNaN(d.getTime()) ? null : d;
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const origStart = parseDate(apptObj.startDate || apptObj.start || apptObj.from || apptObj.begin || apptObj.date) || new Date();
+      const origEnd = parseDate(apptObj.endDate || apptObj.end || apptObj.to || apptObj.finish || apptObj.date) || new Date(origStart.getTime() + 60 * 60 * 1000);
+
+      const state = {
+        id: apptObj.id || apptObj._id || apptObj.eventId || apptObj.uid || String(Math.random()),
+        side, // 'top' or 'bottom'
+        origStart,
+        origEnd,
+        startY: ev.clientY,
+        pxPerMinute: HOUR_HEIGHT / 60,
+        previewStart: null,
+        previewEnd: null,
+        previewTop: null,
+        previewHeight: null,
+      };
+      setResizing(state);
+
+      const minDurationMinutes = 15;
+
+      const onPointerMove = (mv) => {
+        try {
+          setResizing((curr) => {
+            if (!curr || curr.id !== state.id) return curr;
+            const deltaY = mv.clientY - curr.startY;
+            const deltaMinutes = deltaY / Math.max(0.0001, curr.pxPerMinute);
+
+            let newStart = new Date(curr.origStart.getTime());
+            let newEnd = new Date(curr.origEnd.getTime());
+            if (curr.side === "top") {
+              newStart = new Date(curr.origStart.getTime() + Math.round(deltaMinutes * 60000));
+              const minStartTime = newEnd.getTime() - minDurationMinutes * 60000;
+              if (newStart.getTime() > minStartTime) newStart = new Date(minStartTime);
+            } else {
+              newEnd = new Date(curr.origEnd.getTime() + Math.round(deltaMinutes * 60000));
+              const minEndTime = newStart.getTime() + minDurationMinutes * 60000;
+              if (newEnd.getTime() < minEndTime) newEnd = new Date(minEndTime);
+            }
+
+            const newStartMins = newStart.getHours() * 60 + newStart.getMinutes() + newStart.getSeconds() / 60;
+            const newEndMins = newEnd.getHours() * 60 + newEnd.getMinutes() + newEnd.getSeconds() / 60;
+            const topPx = (newStartMins - startMinutes) / 60 * HOUR_HEIGHT;
+            const heightPx = Math.max(18, (newEndMins - newStartMins) / 60 * HOUR_HEIGHT);
+
+            return { ...curr, previewStart: newStart, previewEnd: newEnd, previewTop: topPx, previewHeight: heightPx };
+          });
+        } catch (__) {}
+      };
+
+      const onPointerUp = (up) => {
+        try {
+          window.removeEventListener("pointermove", onPointerMove);
+          window.removeEventListener("pointerup", onPointerUp);
+          setResizing((curr) => {
+            if (!curr || curr.id !== state.id) return null;
+            const finalStart = curr.previewStart || curr.origStart;
+            const finalEnd = curr.previewEnd || curr.origEnd;
+            try {
+              if (typeof onEventMove === "function") {
+                onEventMove && onEventMove(curr.id, finalStart, finalEnd);
+              }
+            } catch (__) {}
+            // mark that a resize just happened to suppress the following click event
+            try {
+              justResizedRef.current = true;
+              setTimeout(() => { justResizedRef.current = false; }, 300);
+            } catch (__){ }
+            return null;
+          });
+        } catch (__) {}
+      };
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp, { once: true });
+    } catch (__) {}
+  };
+
+  // navigation
+  const goPrevDay = () => {
+    if (typeof onShiftDate === "function") return onShiftDate(-1);
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 1);
+    onSetDate?.(d);
+    setCurrentDate(d);
+  };
+  const goNextDay = () => {
+    if (typeof onShiftDate === "function") return onShiftDate(1);
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + 1);
+    onSetDate?.(d);
+    setCurrentDate(d);
+  };
+  const goToday = () => {
+    const d = new Date();
+    onSetDate?.(d);
+    setCurrentDate(d);
+  };
+
+  const headerWeekday =
+    currentDate && currentDate.toLocaleDateString
+      ? currentDate.toLocaleDateString(undefined, { weekday: "long" })
+      : "";
+  const headerDate =
+    currentDate && currentDate.toLocaleDateString
+      ? currentDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+      : "";
+
+  // Load sidebar items (todos/appointments/activities) for the selected day
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      try {
+        setLoadingSidebar(true);
+        const start = new Date(currentDate);
+        const end = new Date(currentDate);
+        // day range: 00:00 -> 23:59:59 for the selected day
+        const dayStart = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0);
+        const dayEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59);
+
+        // To ensure multi-day tasks (tasks that started earlier or end later) are
+        // visible on every day in their range, ask for a slightly wider window
+        // and then filter client-side for items that overlap the selected day.
+        // This avoids depending on backend semantics about whether `listTodos`
+        // returns items that merely overlap vs. those that start inside the range.
+        const padDays = 7; // fetch +/- 7 days to give a reasonable buffer
+        const fetchFrom = new Date(dayStart.getTime() - padDays * 24 * 60 * 60 * 1000).toISOString();
+        const fetchTo = new Date(dayEnd.getTime() + padDays * 24 * 60 * 60 * 1000).toISOString();
+
+        const [rawTodos, apps] = await Promise.all([
+          calendarService.listTodos({ from: fetchFrom, to: fetchTo }).catch(() => []),
+          calendarService.listAppointments({ from: dayStart.toISOString(), to: dayEnd.toISOString() }).catch(() => []),
+        ]);
+
+        // client-side filter to only keep todos that overlap the selected day
+        const tds = (Array.isArray(rawTodos) ? rawTodos : []).filter((t) => {
+          try {
+            const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+            const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || null;
+            if (!s || !e) return false;
+            const sd = new Date(s);
+            const ed = new Date(e);
+            if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return false;
+            const edAdjusted = adjustEndInclusive(ed);
+            // overlap test: task overlaps the selected day
+            return sd <= dayEnd && edAdjusted >= dayStart;
+          } catch (_) {
+            return false;
+          }
+        });
+
+        if (ignore) return;
+        setSideTodos(Array.isArray(tds) ? tds : []);
+        setSideAppointments(Array.isArray(apps) ? apps : []);
+
+        // Load key areas to map colors for tasks when categories mapping is not present
+        try {
+          const kaMod = await import("../../services/keyAreaService");
+          const kaSvc = kaMod?.default || kaMod;
+          const areas = await kaSvc.list().catch(() => []);
+          const map = {};
+          (areas || []).forEach((a) => {
+            if (a && a.id) map[String(a.id)] = a;
+          });
+          if (!ignore) setKeyAreaMap(map);
+        } catch (__) {
+          if (!ignore) setKeyAreaMap({});
+        }
+
+        // Fetch activities for todos on this day
+        try {
+          const todosForDay = (Array.isArray(tds) ? tds : []).filter((t) => {
+            try {
+              const todayOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+              let start = new Date(t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null);
+              let end = new Date(t.endDate || t.end_date || t.date || t.dueDate || t.due_date || null);
+              if (isNaN(start.getTime())) start = todayOnly;
+              if (isNaN(end.getTime())) end = todayOnly;
+              return start <= todayOnly && todayOnly <= end;
+            } catch (_) {
+              return false;
+            }
+          });
+          const uniqueIds = Array.from(new Set(todosForDay.map((t) => String(t.id))));
+          const pairs = await Promise.all(
+            uniqueIds.map(async (id) => {
+              try {
+                const svc = await getActivityService();
+                const list = await svc.list({ taskId: id }).catch(() => []);
+                return Array.isArray(list) ? list : [];
+              } catch (_) {
+                return [];
+              }
+            }),
+          );
+          const flat = ([]).concat(...pairs).filter(Boolean);
+          if (!ignore) setSideActivities(flat);
+        } catch (e) {
+          if (!ignore) setSideActivities([]);
+        }
+      } catch (e) {
+        if (!ignore) {
+          setSideTodos([]);
+          setSideAppointments([]);
+          setSideActivities([]);
+        }
+      } finally {
+        if (!ignore) setLoadingSidebar(false);
+      }
+    };
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [currentDate]);
+  // Sidebar subcomponents to simplify JSX and avoid nested ternary/fragment parsing issues
+  const TasksBox = () => (
+    <div className="flex flex-col h-full">
+      <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-2">
+        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+        </svg>
+        <span>Tasks</span>
+      </div>
+
+  <div className="w-full rounded border border-slate-200 bg-slate-50 p-2 overflow-visible flex-1">
+        {loadingSidebar ? (
+          <div className="text-[11px] text-slate-500 text-center">Loading…</div>
+        ) : (((Array.isArray(todos) && todos.length) || (sideTodos && sideTodos.length)) ? (
+          <div className="flex flex-col gap-2">
+            {(Array.isArray(todos) && todos.length ? todos : sideTodos).slice(0,12).map((t) => {
+              const kindKey = t.kind || t.type || t.kindName || null;
+              const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+              const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
+              const DEFAULT_BAR_COLOR = '#4DC3D8';
+              const bgClass = cat?.color || null; // tailwind class e.g. 'bg-blue-500'
+              const kaColor = (ka && ka.color) ? ka.color : null;
+              const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+              const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+              const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+              return (
+                <div
+                  key={t.id}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    try {
+                      e.dataTransfer.setData("taskId", String(t.id));
+                      e.dataTransfer.effectAllowed = "copy";
+                    } catch (_) {}
+                  }}
+                  className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 ${bgClass || ''}`}
+                  style={style}
+                  title={t.title || t.name || 'Untitled'}
+                >
+                  <div className="truncate font-medium">{t.title || t.name || 'Untitled'}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-500 text-center">No tasks</div>
+        ))}
+      </div>
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'task' })}
+          className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm"
+        >
+          Add task
+        </button>
+      </div>
+    </div>
+  );
+
+  const ActivitiesBox = () => (
+    <>
+    <div className="flex flex-col h-full">
+      <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-800 font-medium mb-2">
+        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8] shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
+        </svg>
+        <span>Activities</span>
+      </div>
+
+      <div className="w-full rounded border border-slate-200 bg-slate-50 p-2 overflow-visible flex-1">
+      {loadingSidebar ? (
+        <div className="text-[11px] text-slate-500 text-center">Loading…</div>
+      ) : (
+        <>
+          {((Array.isArray(unattachedActivities) && unattachedActivities.length) || (sideActivities && sideActivities.length)) ? (
+            <div className="flex flex-col gap-2">
+                {(Array.isArray(unattachedActivities) && unattachedActivities.length ? unattachedActivities : sideActivities).slice(0,12).map((a, i) => {
+                const kindKey = a.kind || a.type || null;
+                const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                let ka = null;
+                if (a.keyAreaId || a.key_area_id) {
+                  ka = keyAreaMap[String(a.keyAreaId || a.key_area_id)];
+                } else if (a.taskId || a.task_id) {
+                  const parent = sideTodos.find((t) => String(t.id) === String(a.taskId || a.task_id));
+                  if (parent) {
+                    ka = keyAreaMap[String(parent.keyAreaId || parent.key_area_id)];
+                  }
+                }
+                const DEFAULT_BAR_COLOR = '#4DC3D8';
+                const bgClass = cat?.color || null;
+                const kaColor = (ka && ka.color) ? ka.color : null;
+                const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+                const svgColor = textColor || '#ffffff';
+                return (
+                  <div
+                    key={a.id || i}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      try {
+                        e.dataTransfer.setData("activityId", String(a.id || ""));
+                        e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
+                        e.dataTransfer.effectAllowed = "copyMove";
+                      } catch (_) {}
+                    }}
+                    className={`px-2 py-1 rounded border text-xs w-full flex items-center gap-2 ${bgClass || ''}`}
+                    style={style}
+                    title={a.text || a.desc || a.note || 'Activity'}
+                  >
+                    <svg
+                      stroke="currentColor"
+                      fill="currentColor"
+                      strokeWidth="0"
+                      viewBox="0 0 448 512"
+                      className="w-4 h-4 shrink-0"
+                      aria-hidden="true"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{ color: svgColor }}
+                    >
+                      <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
+                    </svg>
+
+                    <div className="truncate">{a.text || a.desc || a.note || 'Activity'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-[11px] text-slate-500 text-center">No activities</div>
+          )}
+        </>
+      )}
+    </div>
+
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => onAddTaskOrActivity && onAddTaskOrActivity(currentDate || new Date(), { defaultTab: 'activity' })}
+        className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm"
+      >
+        Add activity
+      </button>
+    </div>
+    </div>
+    </>
+  );
+
+  return (
+    <div className="px-4 md:px-8">
+  <div className="flex items-start gap-1">
+        <div className="flex-1">
+          {/* compact header */}
+          <div className="w-full mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={goPrevDay}
+                  className="px-2 py-2 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                  aria-label="Previous day"
+                  style={{ minWidth: 36, minHeight: 36 }}
+                >
+                  {/* left chevron */}
+                  <svg
+                    stroke="currentColor"
+                    fill="currentColor"
+                    strokeWidth="0"
+                    viewBox="0 0 320 512"
+                    height="1em"
+                    width="1em"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
+                  </svg>
+                </button>
+
+                <div className="relative" ref={viewMenuRef}>
+                  <button
+                    onClick={() => setShowViewMenu((s) => !s)}
+                    className="px-2 py-1 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                    aria-haspopup="menu"
+                    aria-expanded={showViewMenu ? "true" : "false"}
+                    style={{ minWidth: 36, minHeight: 28 }}
+                  >
+                    <span>View</span>
+                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                      {view?.charAt(0).toUpperCase() + view?.slice(1)}
+                    </span>
+                    <FaChevronDown
+                      className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
+                    />
+                  </button>
+
+                  {showViewMenu && (
+                    <div
+                      role="menu"
+                      className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                    >
+                      {["day", "week", "month", "quarter", "list"].map((v) => (
+                        <button
+                          key={v}
+                          role="menuitemradio"
+                          aria-checked={view === v}
+                          className={`w-full text-left px-3 py-2 text-sm ${
+                            view === v
+                              ? "bg-blue-50 text-blue-700 font-semibold"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                          onClick={() => {
+                            onChangeView?.(v);
+                            setView(v);
+                            setShowViewMenu(false);
+                          }}
+                        >
+                          {v.charAt(0).toUpperCase() + v.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                {headerWeekday}, {headerDate}
+              </h2>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={goToday}
+                  className="px-2 py-2 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                  aria-label="Today"
+                  style={{ minWidth: 36, minHeight: 36 }}
+                >
+                  Today
+                </button>
+
+                <button
+                  onClick={goNextDay}
+                  className="px-2 py-2 rounded-md text-sm font-semibold bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                  aria-label="Next day"
+                  style={{ minWidth: 36, minHeight: 36 }}
+                >
+                  {/* right chevron */}
+                  <svg
+                    stroke="currentColor"
+                    fill="currentColor"
+                    strokeWidth="0"
+                    viewBox="0 0 320 512"
+                    height="1em"
+                    width="1em"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* CALENDAR CARD */}
+          <div
+            className="bg-white border border-blue-50 rounded-lg shadow-sm p-3 pr-2 overflow-hidden"
+            style={{ height: 500 }}
+          >
+            <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
+              {/* all-day strip: show tasks that span multiple days with continuation indicators */}
+              <div className="flex">
+                <div className="w-20 bg-white text-xs text-gray-500">
+                  <div className="h-10 flex items-center">
+                    <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">
+                      All-Day
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  {/* make all-day area able to stack full-width bars for multi-day tasks */}
+                  <div className="border-b border-gray-200 px-2 py-1">
+                    <div className="flex flex-col gap-1 max-h-28 overflow-y-auto">
+                      {(() => {
+                        try {
+                          const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 0);
+                          const dayEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999);
+                          // combine side-loaded todos and events passed from container so multi-day tasks/events
+                          // (appointments) show in the all-day strip as they do in WeekView
+                          const combinedSource = [];
+                          // Prefer parent `todos` for up-to-date edits, but also include
+                          // `sideTodos` fetched locally (overlapping multi-day tasks).
+                          // Merge them and de-duplicate by id so tasks found by the
+                          // local overlap query are still visible even if the parent
+                          // passed a narrower set.
+                          const parentTodos = Array.isArray(todos) ? todos : [];
+                          const localTodos = Array.isArray(sideTodos) ? sideTodos : [];
+                          const mergedTodos = [
+                            ...parentTodos,
+                            ...localTodos.filter((lt) => !parentTodos.some((pt) => String(pt.id || pt._id) === String(lt.id || lt._id)))
+                          ];
+                          mergedTodos.forEach((t) => combinedSource.push({ ...t, __src: 'todo' }));
+                          const todoIds = new Set(mergedTodos.map((t) => String(t.id || t._id || t.taskId || t.task_id || "")));
+                          (Array.isArray(events) ? events : []).forEach((e) => {
+                            try {
+                              const linkedTaskId = String(e.taskId || e.task_id || "");
+                              if (linkedTaskId && todoIds.has(linkedTaskId)) return; // skip event; todo covers it
+                            } catch (_) {}
+                            combinedSource.push({ ...e, __src: 'event' });
+                          });
+                          // de-duplicate by id/title when both sources overlap
+                          const seen = new Set();
+                          const multiDay = combinedSource.filter((t) => {
+                            try {
+                              // simple dedupe key
+                              const dedupeId = String(t.id || t._id || t.eventId || (t.title || t.name || t.summary) || JSON.stringify(t)).slice(0, 128);
+                              if (seen.has(dedupeId)) return false;
+                              seen.add(dedupeId);
+
+                              const s = t.startDate || t.start || t.start_date || t.from || t.begin || t.date || t.dueDate || t.due_date || null;
+                              const e = t.endDate || t.end || t.end_date || t.to || t.finish || t.date || t.dueDate || t.due_date || null;
+                              if (!s || !e) return false;
+                              const sd = new Date(s);
+                              const ed = new Date(e);
+                              if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return false;
+                              // Normalize end dates: treat a midnight end as the inclusive end-of-day so
+                              // an End Date of 2025-10-23 covers 2025-10-23 as expected.
+                              const edAdjusted = adjustEndInclusive(ed);
+                              // include items that span more than a single calendar day (compare date-only using adjusted end)
+                              const sameDay = (sd.getFullYear() === edAdjusted.getFullYear() && sd.getMonth() === edAdjusted.getMonth() && sd.getDate() === edAdjusted.getDate());
+                              if (sameDay) return false;
+                              // include only those that overlap this day using the adjusted end
+                              return sd <= dayEnd && edAdjusted >= dayStart;
+                            } catch (_) { return false; }
+                          });
+
+                          if (!multiDay || multiDay.length === 0) return null;
+
+                          return multiDay.map((t) => {
+                            try {
+                              const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+                              const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || null;
+                              const sd = new Date(s);
+                              const ed = new Date(e);
+                              const edAdjusted = adjustEndInclusive(ed);
+                              const startedBefore = sd < dayStart;
+                              const endsAfter = edAdjusted > dayEnd;
+                              const title = t.title || t.name || t.summary || 'Task';
+                              // color resolution for all-day multi-day task bar (match WeekView/Day appointments)
+                              const kindKey = t.kind || t.type || t.kindName || null;
+                              const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                              const bgClass = cat?.color || null;
+                              let ka = null;
+                              if (t.keyAreaId || t.key_area_id) ka = keyAreaMap[String(t.keyAreaId || t.key_area_id)];
+                              else if (t.taskId || t.task_id) ka = keyAreaMap[String(t.taskId || t.task_id)];
+                              const kaColor = ka && ka.color ? ka.color : null;
+                              const DEFAULT_BAR_COLOR = '#4DC3D8';
+                              const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                              const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                              const styleBar = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                              return (
+                                <div key={`allday-${t.id || title}`} className="w-full">
+                                  <button
+                                    type="button"
+                                    onClick={() => onTaskClick && onTaskClick(t)}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
+                                    style={{ ...(styleBar || {}), width: '100%' }}
+                                    title={title}
+                                  >
+                                    <span className="shrink-0 text-sm" style={{ color: (styleBar && styleBar.color) || undefined }}>
+                                      {startedBefore ? '<' : ''}
+                                    </span>
+                                    <span className="flex-1 truncate">{title}</span>
+                                    <span className="shrink-0 text-sm" style={{ color: (styleBar && styleBar.color) || undefined }}>
+                                      {endsAfter ? '>' : ''}
+                                    </span>
+                                  </button>
+                                </div>
+                              );
+                            } catch (_) { return null; }
+                          });
+                        } catch (e) { return null; }
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* MAIN SCROLL AREA */}
+              <div className="flex-1 flex min-h-0" style={{ overflowX: "hidden", overflowY: "auto" }}>
+                {/* LEFT TIME COLUMN – clearer hourly rows */}
+                <div className="w-20 bg-white text-xs text-gray-500 min-h-0">
+                  <div
+                    className="relative border-r border-gray-200"
+                    style={{ height: HOUR_HEIGHT * hours.length }}
+                  >
+                    {hours.map((h) => {
+                      const hourIso = `${String(h).padStart(2,'0')}:00`;
+                      const hourLabel = formatTime ? formatTime(hourIso) : hourIso;
+                      const hourIsWorking = isWorkingTime ? isWorkingTime(hourIso) : (h >= sH && h < eH);
+                      return (
+                        <div
+                          key={h}
+                          className="relative flex items-start border-b border-gray-100"
+                          style={{ height: HOUR_HEIGHT, backgroundColor: hourIsWorking ? undefined : '#f8fafc' }}
+                        >
+                          <span className={`absolute top-1 right-1 text-[11px] ${hourIsWorking ? 'text-gray-500' : 'text-gray-400'}`}>
+                            {hourLabel}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* RIGHT GRID */}
+                <div className="flex-1 bg-white min-h-0">
+                  <div
+                    className="relative"
+                    style={{ height: HOUR_HEIGHT * hours.length }}
+                  >
+                    {/* clearer grid slots */}
+                    {(() => {
+                      const segmentsPerHour = Math.floor(60 / slotMinutes);
+                      const segmentHeight = (HOUR_HEIGHT * slotMinutes) / 60;
+
+                      const rows = [];
+
+                      hours.forEach((h) => {
+                        for (let i = 0; i < segmentsPerHour; i++) {
+                          const minute = i * slotMinutes;
+                          // solid at 0 and 30 minutes, dotted at 15 and 45 (when slotMinutes is 15)
+                          const isSolid = minute % 30 === 0;
+                          const isDotted = !isSolid && minute % 15 === 0;
+
+                          let borderClasses = "";
+                          if (isSolid) {
+                            borderClasses = "border-t border-slate-300"; // solid at 0 and 30
+                          } else if (isDotted) {
+                            borderClasses = "border-t border-dotted border-slate-200"; // dotted at 15 and 45
+                          }
+
+                          const slotTimeStr = `${String(h).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+                          const slotIsWorking = isWorkingTime ? isWorkingTime(slotTimeStr) : true;
+
+                          rows.push(
+                            <div
+                              key={`${h}-${minute}`}
+                              role="button"
+                              tabIndex={0}
+                              className={`w-full ${borderClasses}`}
+                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: slotIsWorking ? undefined : '#f8fafc' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (typeof onQuickCreate === "function") {
+                                  const base = currentDate || new Date();
+                                  const dt = new Date(
+                                    base.getFullYear(),
+                                    base.getMonth(),
+                                    base.getDate(),
+                                    h,
+                                    minute,
+                                    0,
+                                    0
+                                  );
+                                  onQuickCreate(dt);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (typeof onQuickCreate === "function") {
+                                    const base = currentDate || new Date();
+                                    const dt = new Date(
+                                      base.getFullYear(),
+                                      base.getMonth(),
+                                      base.getDate(),
+                                      h,
+                                      minute,
+                                      0,
+                                      0
+                                    );
+                                    onQuickCreate(dt);
+                                  }
+                                }
+                              }}
+                              onDragOver={(e) => {
+                                try { e.preventDefault(); } catch (_) {}
+                              }}
+                              onDrop={(e) => {
+                                try {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const data = e.dataTransfer;
+                                  const eventId = data.getData("eventId");
+                                  const taskId = data.getData("taskId");
+                                  const activityId = data.getData("activityId");
+                                  const durationMs = parseInt(data.getData("durationMs") || "0", 10);
+                                  const base = currentDate || new Date();
+                                  const dt = new Date(
+                                    base.getFullYear(),
+                                    base.getMonth(),
+                                    base.getDate(),
+                                    h,
+                                    minute,
+                                    0,
+                                    0
+                                  );
+                                  if (eventId && typeof onEventMove === "function") {
+                                    const newEnd = durationMs > 0 ? new Date(dt.getTime() + durationMs) : null;
+                                    onEventMove(eventId, dt, newEnd);
+                                    return;
+                                  }
+                                  if (taskId && typeof onTaskDrop === "function") {
+                                    onTaskDrop(taskId, dt);
+                                    return;
+                                  }
+                                  if (activityId && typeof onActivityDrop === "function") {
+                                    onActivityDrop(activityId, dt);
+                                    return;
+                                  }
+                                } catch (__) {}
+                              }}
+                            />
+                          );
+                        }
+                      });
+
+                      return rows;
+                      })()}
+
+                      {/* appointments positioned in the grid */}
+                      {/* prefer events passed in from parent (CalendarContainer) when available
+                          so moves performed in the parent immediately reflect in Day view
+                          (CalendarContainer updates `events` after calling the backend). */}
+                      {(() => {
+                        // Use events prop (merged events+appointments from container) when present,
+                        // otherwise fall back to locally loaded `sideAppointments`.
+                        const source = (Array.isArray(events) && events.length) ? events : sideAppointments;
+                        return (Array.isArray(source) ? source : []).map((appt, idx) => {
+                        // robust date parsing
+                        const parseDate = (s) => {
+                          if (!s) return null;
+                          try {
+                            const d = new Date(s);
+                            return isNaN(d.getTime()) ? null : d;
+                          } catch (_) {
+                            return null;
+                          }
+                        };
+
+                        const start = parseDate(appt.startDate || appt.start_date || appt.start || appt.from || appt.begin || appt.date);
+                        const end = parseDate(appt.endDate || appt.end_date || appt.end || appt.to || appt.finish || appt.date);
+                        if (!start || !end) return null;
+
+                        // skip appointments outside visible hours
+                        const apptStartMins = start.getHours() * 60 + start.getMinutes() + start.getSeconds() / 60;
+                        const apptEndMins = end.getHours() * 60 + end.getMinutes() + end.getSeconds() / 60;
+                        if (apptEndMins <= startMinutes || apptStartMins >= startMinutes + totalMinutes) return null;
+
+                        const topPx = Math.max(0, ((apptStartMins - startMinutes) / 60) * HOUR_HEIGHT);
+                        const durationMins = Math.max(15, (apptEndMins - apptStartMins));
+                        const heightPx = Math.max(18, (durationMins / 60) * HOUR_HEIGHT);
+
+                        // color resolution: category -> keyArea -> default
+                        const kindKey = appt.kind || appt.type || appt.kindName || null;
+                        const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                        const bgClass = cat?.color || null;
+                        // try key area from appointment or (if present) parent task
+                        let ka = null;
+                        if (appt.keyAreaId || appt.key_area_id) ka = keyAreaMap[String(appt.keyAreaId || appt.key_area_id)];
+                        else if (appt.taskId || appt.task_id) ka = keyAreaMap[String(appt.taskId || appt.task_id)];
+                        const kaColor = ka && ka.color ? ka.color : null;
+                        const DEFAULT_BAR_COLOR = '#4DC3D8';
+                        const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                        const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                        const style = bgClass ? undefined : { top: topPx + 'px', height: heightPx + 'px', left: '6px', right: '8px', backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                        const title = appt.title || appt.name || appt.summary || appt.text || 'Appointment';
+
+                        return (
+                          <div
+                            key={`appt-${idx}-${title}`}
+                            className={`absolute rounded px-2 py-1 text-xs overflow-hidden flex items-center gap-2 group ${bgClass || ''}`}
+                            style={bgClass ? { top: topPx + 'px', height: heightPx + 'px', left: '6px', right: '8px', zIndex: 5 } : { ...style, zIndex: 5 }}
+                            draggable
+                            onDragStart={(e) => {
+                              try {
+                                e.dataTransfer.setData("eventId", String(appt.id || appt._id || appt.eventId || appt.uid || title));
+                                const dur = end.getTime() - start.getTime();
+                                e.dataTransfer.setData("durationMs", String(Math.max(dur, 0)));
+                                e.dataTransfer.effectAllowed = "move";
+                              } catch (__) {}
+                            }}
+                            onClick={(e) => {
+                              try {
+                                e.stopPropagation();
+                                // suppress click immediately after a pointer resize to avoid opening the edit modal
+                                if (justResizedRef && justResizedRef.current) return;
+                              } catch (__) {}
+                              onEventClick && onEventClick(appt);
+                            }}
+                            title={title}
+                          >
+                            <span className="shrink-0">{categories[appt.kind]?.icon || ""}</span>
+                            <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1 cursor-grab active:cursor-grabbing" tabIndex={0} aria-label={title}>{title}</span>
+
+                            {/* top resize handle */}
+                            <div
+                              role="separator"
+                              aria-orientation="horizontal"
+                              onPointerDown={(e) => startResize(e, appt, 'top')}
+                              className="absolute left-0 right-0 h-2 -top-1 cursor-ns-resize"
+                              style={{ zIndex: 10 }}
+                            />
+
+                            {/* bottom resize handle */}
+                            <div
+                              role="separator"
+                              aria-orientation="horizontal"
+                              onPointerDown={(e) => startResize(e, appt, 'bottom')}
+                              className="absolute left-0 right-0 h-2 -bottom-1 cursor-ns-resize"
+                              style={{ zIndex: 10 }}
+                            />
+
+                            {/* Action Icons - shown on hover */}
+                            <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                              <button
+                                className="p-1 rounded hover:bg-black/10 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEventClick && onEventClick(appt, 'edit');
+                                }}
+                                aria-label={`Edit ${title}`}
+                                title="Edit appointment"
+                              >
+                                <FaEdit className="w-3 h-3 text-blue-600" />
+                              </button>
+                              <button
+                                className="p-1 rounded hover:bg-black/10 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEventClick && onEventClick(appt, 'delete');
+                                }}
+                                aria-label={`Delete ${title}`}
+                                title="Delete appointment"
+                              >
+                                <FaTrash className="w-3 h-3 text-red-600" />
+                              </button>
+                            </div>
+
+                            {/* live preview will be rendered after the mapping (global) */}
+                          </div>
+                        );
+                        });
+                      })()}
+
+                      {/* live preview while resizing */}
+                      {resizing && resizing.previewTop != null && (
+                        <div
+                          className="absolute rounded pointer-events-none border-2 border-dashed border-slate-400 bg-slate-200/30"
+                          style={{ top: resizing.previewTop + 'px', left: '6px', right: '8px', height: resizing.previewHeight + 'px', zIndex: 20 }}
+                        >
+                          <div className="absolute -top-6 left-2 bg-black text-white text-[11px] px-2 py-0.5 rounded">
+                            {resizing.previewStart ? (formatTime ? formatTime(`${String(resizing.previewStart.getHours()).padStart(2,'0')}:${String(resizing.previewStart.getMinutes()).padStart(2,'0')}`) : `${String(resizing.previewStart.getHours()).padStart(2,'0')}:${String(resizing.previewStart.getMinutes()).padStart(2,'0')}`) : ''}
+                            {' — '}
+                            {resizing.previewEnd ? (formatTime ? formatTime(`${String(resizing.previewEnd.getHours()).padStart(2,'0')}:${String(resizing.previewEnd.getMinutes()).padStart(2,'0')}`) : `${String(resizing.previewEnd.getHours()).padStart(2,'0')}:${String(resizing.previewEnd.getMinutes()).padStart(2,'0')}`) : ''}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* current time line */}
+                    {isToday && (
+                      <div
+                        className="absolute left-0 right-0 flex items-center pointer-events-none"
+                        style={{ top: nowTop }}
+                      >
+                        <span className="ml-[-32px] bg-red-500 text-white text-[10px] px-1 rounded-full">
+                          {formatTime ? formatTime(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`) : `${String(now.getHours()).padStart(2, "0")}:
+                          ${String(now.getMinutes()).padStart(2, "0")}`}
+                        </span>
+                        <div className="flex-1 border-t border-red-400" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* END SCROLL AREA */}
+            </div>
+          </div>
+        </div>
+
+  {/* Sidebar: Quick actions panel */}
+  <div className="w-80 md:w-96 flex-shrink-0 -mr-4 md:-mr-8">
+          <div className="sticky top-2">
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-stretch">
+                <div className="h-full">
+                  <TasksBox />
+                </div>
+                <div className="h-full">
+                  <ActivitiesBox />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

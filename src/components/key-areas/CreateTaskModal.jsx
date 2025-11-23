@@ -39,6 +39,34 @@ export default function CreateTaskModal({
   // parentListNames: optional mapping passed by parent when no key area is selected
   parentListNames = null,
 }) {
+  const firstRowRef = useRef(null);
+  const [firstRowHeight, setFirstRowHeight] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let ro = null;
+    const measure = () => {
+      try {
+        if (firstRowRef.current) {
+          const h = firstRowRef.current.getBoundingClientRect().height;
+          setFirstRowHeight(h);
+        }
+      } catch (_) {}
+    };
+    // measure once and observe size changes
+    measure();
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure);
+      if (firstRowRef.current) ro.observe(firstRowRef.current);
+    }
+    window.addEventListener('resize', measure);
+    return () => {
+      try {
+        if (ro && ro.disconnect) ro.disconnect();
+      } catch (_) {}
+      window.removeEventListener('resize', measure);
+    };
+  }, [isOpen]);
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
   const [assignee, setAssignee] = useState(initialData.assignee || '');
@@ -381,29 +409,20 @@ export default function CreateTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700">Description</label>
-              <input
-                name="description"
-                className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
-                placeholder="Brief description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-
-              <div className="mt-2">
-                <label className="text-sm font-medium text-slate-700">Start time</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-rows-5 gap-0">
+              <div ref={firstRowRef} style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+                <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
-                  type="time"
-                  required
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none mt-0.5"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  name="description"
+                  className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
+                  placeholder="Brief description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
 
-              <div className="mt-2">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
                 <div className="relative mt-0">
                   <input
@@ -425,18 +444,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div className="mt-2">
-                <label className="text-sm font-medium text-slate-700">End time</label>
-                <input
-                  type="time"
-                  required
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none mt-0.5"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-
-              <div className="mt-2">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
                   <input
@@ -453,10 +461,39 @@ export default function CreateTaskModal({
                   </button>
                 </div>
               </div>
+
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                <div className="relative mt-0.5">
+                  <input
+                    name="deadline"
+                    type="date"
+                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    ref={deadlineRef}
+                  />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}>
+                    📅
+                  </button>
+                </div>
+                <p className="mt-0 text-xs text-slate-500">No later than</p>
+              </div>
+
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
+                <label className="text-sm font-medium text-slate-700">Duration</label>
+                <input
+                  name="duration"
+                  className={`${inputCls} mt-0`}
+                  placeholder="e.g., 1h, 1d"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div>
-              <div>
+            <div className="grid grid-rows-5 gap-0">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
                   <select
@@ -474,7 +511,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div className="mt-2">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
                   <select
@@ -504,17 +541,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div className="mt-2">
-                <label className="text-sm font-medium text-slate-700">Task</label>
-                <div className="relative mt-0">
-                  <select name="task_id" className={`${selectCls} mt-0 h-9`} value={''} disabled>
-                    <option value="">— Select Task —</option>
-                  </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-              </div>
-
-              <div className="mt-2">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Assignee</label>
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
@@ -525,7 +552,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div className="mt-2">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
                   <select name="priority" className={selectCls} value={String(priority)} onChange={(e) => setPriority(Number(e.target.value))}>
@@ -537,7 +564,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div className="mt-2">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
                 <div className="relative mt-0">
                   <select name="goal" className={selectCls} value={goal} onChange={(e) => setGoal(e.target.value)}>
