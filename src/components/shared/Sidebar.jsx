@@ -275,15 +275,13 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-0 md:translate-x-0 md:ml-4 md:mr-2 hidden-mobile`}
+            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} h-screen shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-0 md:translate-x-0 md:ml-4 md:mr-2 hidden-mobile`}
             aria-label="Sidebar"
+            style={{ scrollbarGutter: 'stable' }}
         >
             <div className="flex-1 overflow-y-auto no-scrollbar pb-2">
                 <div className="mb-6 flex items-center gap-2 px-2">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
-                    {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
-
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ml-auto flex items-center gap-2 w-full justify-end">
                         {mobileOpen && (
                             <button
                                 className="md:hidden text-blue-700 hover:text-blue-900 focus:outline-none"

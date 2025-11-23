@@ -112,9 +112,8 @@ export default function Navbar() {
         return () => document.removeEventListener('keydown', onKey);
     }, [openQuick]);
 
-    // Widget keys shown in Navbar control (keeps labels simple)
+    // Widget keys shown in Navbar control (keeps labels simple) - QuickAdd removed to avoid duplication with navbar quick actions
     const widgetKeys = [
-        { key: 'quickAdd', label: 'Quick Add' },
         { key: 'myDay', label: 'My Day' },
         { key: 'goals', label: 'Goals' },
         { key: 'enps', label: 'eNPS' },

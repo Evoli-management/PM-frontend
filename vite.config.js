@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-    base: "/PM-frontend/", // ✅ This is required for GitHub Pages
+    base: "/", // ✅ Use root path for local development
     plugins: [react(), tailwindcss()],
     server: {
         proxy: {
