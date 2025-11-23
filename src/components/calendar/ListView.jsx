@@ -105,19 +105,6 @@ const ListView = ({
                     </div>
                     <h2 className="text-xl font-bold">{label}</h2>
                     <div className="flex items-center gap-2">
-                        <select
-                            className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                            style={{ minHeight: 28 }}
-                            value={filterType}
-                            onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
-                            aria-label="Filter event types"
-                        >
-                            <option value="all">All Types</option>
-                            <option value="task">Tasks</option>
-                            <option value="reminder">Reminders</option>
-                            <option value="meeting">Meetings</option>
-                            <option value="custom">Custom</option>
-                        </select>
                         <button
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 36, minHeight: 36 }}
@@ -186,19 +173,6 @@ const ListView = ({
                 </div>
                 <h2 className="text-xl font-bold">{label}</h2>
                 <div className="flex items-center gap-2">
-                    <select
-                        className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                        style={{ minHeight: 28 }}
-                        value={filterType}
-                        onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
-                        aria-label="Filter event types"
-                    >
-                        <option value="all">All Types</option>
-                        <option value="task">Tasks</option>
-                        <option value="reminder">Reminders</option>
-                        <option value="meeting">Meetings</option>
-                        <option value="custom">Custom</option>
-                    </select>
                     <button
                         className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                         style={{ minWidth: 36, minHeight: 36 }}

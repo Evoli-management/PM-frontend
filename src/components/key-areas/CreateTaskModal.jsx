@@ -39,11 +39,52 @@ export default function CreateTaskModal({
   // parentListNames: optional mapping passed by parent when no key area is selected
   parentListNames = null,
 }) {
+  const firstRowRef = useRef(null);
+  const [firstRowHeight, setFirstRowHeight] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let ro = null;
+    const measure = () => {
+      try {
+        if (firstRowRef.current) {
+          const h = firstRowRef.current.getBoundingClientRect().height;
+          setFirstRowHeight(h);
+        }
+      } catch (_) {}
+    };
+    // measure once and observe size changes
+    measure();
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure);
+      if (firstRowRef.current) ro.observe(firstRowRef.current);
+    }
+    window.addEventListener('resize', measure);
+    return () => {
+      try {
+        if (ro && ro.disconnect) ro.disconnect();
+      } catch (_) {}
+      window.removeEventListener('resize', measure);
+    };
+  }, [isOpen]);
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
   const [assignee, setAssignee] = useState(initialData.assignee || '');
-  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate));
-  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate));
+  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate || initialData.date));
+  const [startTime, setStartTime] = useState(() => {
+    try {
+      // Prefer explicit start_time/startTime, then a generic `time` passed by calendar slot.
+      // If none provided, start empty (no default time).
+      return initialData.start_time || initialData.startTime || initialData.time || '';
+    } catch { return ''; }
+  });
+  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate || initialData.date));
+  const [endTime, setEndTime] = useState(() => {
+    try {
+      // Keep end time empty by default when not provided.
+      return initialData.end_time || initialData.endTime || '';
+    } catch { return ''; }
+  });
   // When creating, we keep end date in-sync with start date until the user edits end date.
   const [endAuto, setEndAuto] = useState(!(initialData.end_date || initialData.endDate));
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
@@ -76,10 +117,14 @@ export default function CreateTaskModal({
     if (description !== nextDescription) setDescription(nextDescription);
     const nextAssignee = initialData.assignee || '';
     if (assignee !== nextAssignee) setAssignee(nextAssignee);
-    const nextStart = safeDate(initialData.start_date || initialData.startDate);
+  const nextStart = safeDate(initialData.start_date || initialData.startDate || initialData.date);
     if (startDate !== nextStart) setStartDate(nextStart);
+    const nextStartTime = initialData.start_time || initialData.startTime || initialData.time || '';
+    if (nextStartTime && startTime !== nextStartTime) setStartTime(nextStartTime);
   const nextEnd = safeDate(initialData.end_date || initialData.endDate);
   if (endDate !== nextEnd) setEndDate(nextEnd);
+  const nextEndTime = initialData.end_time || initialData.endTime || initialData.endTime || '';
+  if (nextEndTime && endTime !== nextEndTime) setEndTime(nextEndTime);
   // If the initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
   const nextEndAuto = !Boolean(initialData.end_date || initialData.endDate);
   if (endAuto !== nextEndAuto) setEndAuto(nextEndAuto);
@@ -293,7 +338,11 @@ export default function CreateTaskModal({
       description: (description || '').trim(),
       assignee: assignee || null,
       start_date: startDate || null,
+      time: startTime || null,
+      start_time: startTime || null,
+      date: startDate || null,
       end_date: endDate || null,
+      end_time: endTime || null,
       deadline: deadline || null,
       duration: duration || null,
       priority,
@@ -362,149 +411,89 @@ export default function CreateTaskModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="grid grid-rows-5 gap-0">
-              <div>
+              <div ref={firstRowRef} style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
                   name="description"
-                  className={`${inputCls} mt-0`}
+                  className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
+                  placeholder="Brief description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Brief description"
                 />
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
                 <div className="relative mt-0">
                   <input
-                    ref={startRef}
                     name="start_date"
                     type="date"
-                    className={dateCls}
+                    required
+                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={startDate}
                     onChange={(e) => {
                       const v = e.target.value;
                       setStartDate(v);
-                      // Auto-propagate to end date while endAuto is true
                       if (endAuto) setEndDate(v);
                     }}
-                    onInput={(e) => {
-                      const v = e.target.value;
-                      setStartDate(v);
-                      if (endAuto) setEndDate(v);
-                    }}
+                    ref={startRef}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!startRef.current?.value) {
-                          setStartDate(todayStr);
-                        }
-                        startRef.current?.showPicker?.();
-                        startRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) {} }}>
                     📅
                   </button>
                 </div>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
                 <div className="relative mt-0">
                   <input
-                    ref={endRef}
                     name="end_date"
                     type="date"
-                    className={dateCls}
+                    required
+                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={endDate}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setEndDate(v);
-                      // User edited end date explicitly — stop auto-syncing
-                      setEndAuto(false);
-                    }}
-                    onInput={(e) => {
-                      const v = e.target.value;
-                      setEndDate(v);
-                      setEndAuto(false);
-                    }}
+                    onChange={(e) => { setEndDate(e.target.value); setEndAuto(false); }}
+                    ref={endRef}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!endRef.current?.value) {
-                          setEndDate(todayStr);
-                        }
-                        endRef.current?.showPicker?.();
-                        endRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { endRef.current?.showPicker?.(); endRef.current?.focus(); } catch (__) {} }}>
                     📅
                   </button>
                 </div>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Deadline</label>
                 <div className="relative mt-0.5">
                   <input
-                    ref={deadlineRef}
                     name="deadline"
                     type="date"
-                    className={dateCls}
+                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                     value={deadline}
-                    onChange={(e) => { setDeadline(e.target.value); }}
-                    onInput={(e) => { setDeadline(e.target.value); }}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    ref={deadlineRef}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!deadlineRef.current?.value) {
-                          setDeadline(todayStr);
-                        }
-                        deadlineRef.current?.showPicker?.();
-                        deadlineRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}>
                     📅
                   </button>
                 </div>
                 <p className="mt-0 text-xs text-slate-500">No later than</p>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Duration</label>
                 <input
                   name="duration"
-                  className={`${inputCls} mt-0.5`}
+                  className={`${inputCls} mt-0`}
+                  placeholder="e.g., 1h, 1d"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
-                  placeholder="e.g., 1h, 1d"
                 />
               </div>
             </div>
 
-              <div className="grid grid-rows-5 gap-0">
-              <div>
+            <div className="grid grid-rows-5 gap-0">
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
                   <select
@@ -522,7 +511,7 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
                   <select
@@ -533,30 +522,18 @@ export default function CreateTaskModal({
                   >
                     {
                       (() => {
-                        // If no key area is selected (DontForget flow), prefer the
-                        // `availableLists` prop (computed by the parent) so DF list
-                        // numbers are respected. Otherwise, compute from key area
-                        // listNames and tasks in that area.
                         if (!keyAreaId) {
                           const useLists = (availableLists && availableLists.length) ? availableLists : [1];
                           return useLists.map((n) => (
                             <option key={n} value={n}>{(parentListNames && parentListNames[n]) || (listNames && listNames[n]) || `List ${n}`}</option>
                           ));
                         }
-
-                        const named = Object.keys(listNames || {})
-                          .map(Number)
-                          .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
-                        const listsWithTasks = (allTasks || [])
-                          .filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index)
-                          .map((t) => t.list_index)
-                          .filter((v, i, arr) => arr.indexOf(v) === i);
+                        const named = Object.keys(listNames || {}).map(Number).filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
+                        const listsWithTasks = (allTasks || []).filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index).map((t) => t.list_index).filter((v, i, arr) => arr.indexOf(v) === i);
                         const combined = [1, ...named, ...listsWithTasks];
                         const uniq = [...new Set(combined)].sort((a, b) => a - b);
                         const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
-                        return toUse.map((n) => (
-                          <option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>
-                        ));
+                        return toUse.map((n) => (<option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>));
                       })()
                     }
                   </select>
@@ -564,15 +541,10 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Assignee</label>
                 <div className="relative mt-0">
-                  <select
-                    name="assignee"
-                    className={selectCls}
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                  >
+                  <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
                     {(usersList || []).map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
                   </select>
@@ -580,15 +552,10 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
-                  <select
-                    name="priority"
-                    className={selectCls}
-                    value={String(priority)}
-                    onChange={(e) => setPriority(Number(e.target.value))}
-                  >
+                  <select name="priority" className={selectCls} value={String(priority)} onChange={(e) => setPriority(Number(e.target.value))}>
                     <option value={1}>Low</option>
                     <option value={2}>Normal</option>
                     <option value={3}>High</option>
@@ -597,19 +564,12 @@ export default function CreateTaskModal({
                 </div>
               </div>
 
-              <div>
+              <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
                 <div className="relative mt-0">
-                  <select
-                    name="goal"
-                    className={selectCls}
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                  >
+                  <select name="goal" className={selectCls} value={goal} onChange={(e) => setGoal(e.target.value)}>
                     <option value="">— Select Goal —</option>
-                    {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
-                      <option key={g.id} value={g.id}>{g.title}</option>
-                    ))}
+                    {(localGoals && localGoals.length ? localGoals : goals).map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>

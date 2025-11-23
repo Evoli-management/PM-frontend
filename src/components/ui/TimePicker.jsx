@@ -14,7 +14,10 @@ const TimePicker = ({
     value = '09:00', 
     onChange, 
     use24Hour = false, 
-    className = '',
+    // outerClassName is applied to the visible button/control
+    outerClassName = '',
+    // innerClassName is applied to the dropdown selects only; keep minimal to avoid overriding external fields
+    innerClassName = 'w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500',
     label = 'Time'
 }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -92,10 +95,11 @@ const TimePicker = ({
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-left bg-white hover:bg-gray-50 ${className}`}
+                // Use the exact classes provided by the parent for outer appearance
+                className={`${outerClassName} text-left appointment-time-control`}
                 aria-label={label}
             >
-                <span className="text-gray-900">{displayValue}</span>
+                <span className="text-slate-900">{displayValue}</span>
                 <svg
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
                     fill="none"
@@ -121,7 +125,7 @@ const TimePicker = ({
                                         const newHour = parseInt(e.target.value);
                                         handleTimeChange(newHour, minutes, period);
                                     }}
-                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className={`${innerClassName}`}
                                 >
                                     {generateHourOptions().map(hour => (
                                         <option key={hour} value={hour}>
@@ -140,7 +144,7 @@ const TimePicker = ({
                                         const newMinutes = parseInt(e.target.value);
                                         handleTimeChange(getDisplayHour(), newMinutes, period);
                                     }}
-                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className={`${innerClassName}`}
                                 >
                                     {generateMinuteOptions().map(minute => (
                                         <option key={minute} value={minute}>
@@ -155,13 +159,13 @@ const TimePicker = ({
                                 <div>
                                     <div className="text-xs font-medium text-gray-500 mb-1">Period</div>
                                     <select
-                                        value={period}
-                                        onChange={(e) => {
-                                            const newPeriod = e.target.value;
-                                            handleTimeChange(getDisplayHour(), minutes, newPeriod);
-                                        }}
-                                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    >
+                                            value={period}
+                                            onChange={(e) => {
+                                                const newPeriod = e.target.value;
+                                                handleTimeChange(getDisplayHour(), minutes, newPeriod);
+                                            }}
+                                            className={`${innerClassName}`}
+                                        >
                                         <option value="AM">AM</option>
                                         <option value="PM">PM</option>
                                     </select>

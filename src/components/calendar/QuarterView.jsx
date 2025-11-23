@@ -103,7 +103,7 @@ export default function QuarterView({
     return (
         <div className="p-0" style={{ boxShadow: "none" }}>
             {/* Quarter navigation inside view */}
-            <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-blue-100">
+            <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
                 <div className="flex items-center gap-2">
                     {/* Back first, then View dropdown */}
                     <button
@@ -155,19 +155,6 @@ export default function QuarterView({
                 </div>
                 <span className="text-lg font-semibold text-blue-700">{monthNames.join(" / ")}</span>
                 <div className="flex items-center gap-2">
-                    <select
-                        className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                        style={{ minHeight: 28 }}
-                        value={filterType}
-                        onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
-                        aria-label="Filter event types"
-                    >
-                        <option value="all">All Types</option>
-                        <option value="task">Tasks</option>
-                        <option value="reminder">Reminders</option>
-                        <option value="meeting">Meetings</option>
-                        <option value="custom">Custom</option>
-                    </select>
                     <button
                         className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                         style={{ minWidth: 36, minHeight: 36 }}
@@ -183,9 +170,9 @@ export default function QuarterView({
                 className="overflow-x-auto px-6 pb-6"
                 style={{ maxWidth: "100vw", maxHeight: "60vh", overflowY: "auto" }}
             >
-                <table className="w-full border border-blue-100 rounded" style={{ tableLayout: "auto", width: "100%" }}>
+                <table className="w-full border border-gray-200 rounded" style={{ tableLayout: "auto", width: "100%" }}>
                     <thead>
-                        <tr className="bg-blue-50">
+                        <tr className="bg-white">
                             {months.map((m, mIdx) => (
                                 <th key={mIdx} className="text-center px-2 py-2 text-blue-500 text-base font-semibold">
                                     {m.toLocaleString("default", { month: "long", year: "numeric" })}
@@ -196,7 +183,7 @@ export default function QuarterView({
                     <tbody>
                         {rows.map((row, rIdx) => (
                             <React.Fragment key={rIdx}>
-                                <tr className={rIdx % 2 === 0 ? "bg-blue-50" : "bg-white"}>
+                                <tr className="bg-white">
                                     {row.map((date, mIdx) => {
                                         if (!date)
                                             return (
@@ -223,7 +210,7 @@ export default function QuarterView({
                                         return (
                                             <td
                                                 key={mIdx}
-                                                className={`px-3 py-3 text-center align-top cursor-pointer border border-blue-100 hover:bg-blue-100`}
+                                                className={`px-3 py-3 text-center align-top cursor-pointer border border-gray-200 hover:bg-gray-50`}
                                                 style={{ minWidth: 80 }}
                                                 onClick={() => onDayClick && onDayClick(date)}
                                             >
