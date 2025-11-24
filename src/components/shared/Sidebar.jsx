@@ -11,7 +11,7 @@ import { isFeatureEnabled } from "../../utils/flags.js";
 
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
-    { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
+    { label: "Calendar", icon: <FaCalendarAlt className="text-green-600" />, to: "/calendar", section: "Main" },
     {
         label: "Don't Forget",
         icon: (
