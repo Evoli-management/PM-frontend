@@ -190,12 +190,8 @@ export default function Navbar() {
         { key: 'myDay', label: 'My Day' },
         { key: 'goals', label: 'Goals' },
         { key: 'enps', label: 'eNPS' },
-        { key: 'strokes', label: 'Strokes' },
-        { key: 'productivity', label: 'Productivity' },
         { key: 'calendarPreview', label: 'Calendar Preview' },
         { key: 'activity', label: "What's New" },
-        { key: 'suggestions', label: 'Suggestions' },
-        { key: 'teamOverview', label: 'Team Overview' },
     ];
 
     // Toggle a widget on/off and persist to dashboard prefs in localStorage
