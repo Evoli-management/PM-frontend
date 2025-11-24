@@ -49,6 +49,7 @@ const WeekView = ({
 
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
+    const [colOverlay, setColOverlay] = useState(null);
 
     // Fixed time column width; day columns will flex to fill available space
     const TIME_COL_PX = 80; // matches w-20
@@ -329,7 +330,17 @@ const WeekView = ({
 
     return (
         <>
-            <div className="p-0" style={{ overflow: "hidden" }}>
+                <style>{`
+                    @keyframes blinkRow {
+                        0% { background-color: rgba(59,130,246,0.12) !important; box-shadow: none !important; }
+                        25% { background-color: rgba(59,130,246,0.6) !important; box-shadow: 0 0 0 10px rgba(59,130,246,0.18) !important; }
+                        50% { background-color: rgba(59,130,246,0.12) !important; box-shadow: none !important; }
+                        75% { background-color: rgba(59,130,246,0.6) !important; box-shadow: 0 0 0 10px rgba(59,130,246,0.18) !important; }
+                        100% { background-color: rgba(59,130,246,0.12) !important; box-shadow: none !important; }
+                    }
+                    .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
+                `}</style>
+                <div className="p-0" style={{ overflow: "hidden", position: 'relative' }}>
                 {/* Header with navigation inside the view */}
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -402,7 +413,64 @@ const WeekView = ({
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 36, minHeight: 36 }}
                             aria-label="Today"
-                            onClick={() => onSetDate && onSetDate(new Date())}
+                            onClick={() => {
+                                try {
+                                    if (typeof onSetDate === 'function') onSetDate(new Date());
+                                } catch (_) {}
+                                // trigger blink overlay for today's column
+                                try {
+                                    const today = new Date();
+                                    const dIdx = days.findIndex(d => d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate());
+                                    if (dIdx === -1) return;
+                                    const container = containerRef.current;
+                                    if (!container) return;
+                                    // find the header th for the day column
+                                    const table = container.querySelector('table');
+                                    let th = null;
+                                    if (table) {
+                                        const ths = table.querySelectorAll('thead th');
+                                        // header has one leading 'all day' th, so day ths start at index 1
+                                        th = ths[1 + dIdx];
+                                    }
+                                    let left = TIME_COL_PX + (columnWidth || 0) * dIdx;
+                                    let width = columnWidth || (container.getBoundingClientRect().width - TIME_COL_PX) / 7;
+                                    let top = 0;
+                                    let height = container.scrollHeight || container.getBoundingClientRect().height;
+                                    if (th) {
+                                        const crect = container.getBoundingClientRect();
+                                        const r = th.getBoundingClientRect();
+                                        left = r.left - crect.left + container.scrollLeft;
+                                        width = r.width;
+                                        // Start the overlay at the header row (<thead><tr>) so it aligns with
+                                        // the column name row exactly (matches the user's requested HTML row).
+                                        try {
+                                            const theadTr = table.querySelector('thead tr');
+                                            if (theadTr) {
+                                                    const trRect = theadTr.getBoundingClientRect();
+                                                    // start the overlay just below the header row (use its bottom)
+                                                    top = trRect.bottom - crect.top + container.scrollTop;
+                                                } else {
+                                                    top = r.top - crect.top + container.scrollTop;
+                                                }
+                                        } catch (__) {
+                                            top = r.top - crect.top + container.scrollTop;
+                                        }
+                                        // compute bottom from the last child element of container
+                                        const last = container.querySelector('.flex-1.grid');
+                                        if (last) {
+                                            const lr = last.getBoundingClientRect();
+                                            const lastBottom = lr.bottom - crect.top + container.scrollTop;
+                                            // height should be measured from chosen top down to lastBottom
+                                            height = Math.max(0, lastBottom - top);
+                                        } else {
+                                            height = Math.max(0, container.scrollHeight - top);
+                                        }
+                                    }
+                                    setColOverlay({ left, top, width, height, visible: true });
+                                    const totalMs = 450 * 4 + 100;
+                                    setTimeout(() => setColOverlay(null), totalMs);
+                                } catch (e) { /* swallow */ }
+                            }}
                         >
                             Today
                         </button>
@@ -441,7 +509,7 @@ const WeekView = ({
                                             className="text-left px-2 py-2 text-blue-500 text-base font-semibold rounded-tl-lg"
                                             style={{ width: TIME_COL_PX + "px" }}
                                         >
-                                            all day
+                                            <span className="sr-only">all day</span>
                                         </th>
                                         {days.map((date, dIdx) => (
                                             <th
@@ -466,7 +534,7 @@ const WeekView = ({
                                             className="border-r border-gray-100 px-2 py-2 text-xs text-gray-500"
                                             style={{ width: TIME_COL_PX + "px" }}
                                         >
-                                            all day
+                                            <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">All-Day</span>
                                         </td>
                                         {/* single cell spanning the 7 day columns; we will render multi-day task bars inside */}
                                         <td className="border-r border-gray-100 px-2 py-2 align-top" colSpan={7}>
@@ -1043,6 +1111,22 @@ const WeekView = ({
                                 
                             </div>
                         </div>
+                        {/* Column overlay for Today blink */}
+                        {colOverlay && colOverlay.visible && (
+                            <div
+                                className="today-row-overlay"
+                                style={{
+                                    position: 'absolute',
+                                    left: colOverlay.left,
+                                    top: colOverlay.top,
+                                    width: colOverlay.width,
+                                    height: colOverlay.height,
+                                    zIndex: 80,
+                                    pointerEvents: 'none',
+                                    backgroundColor: 'rgba(59,130,246,0.32)'
+                                }}
+                            />
+                        )}
 
                         {/* Combined Tasks + Activities row: render per-day vertical columns under each date (no separation) */}
                         <div className="flex w-full bg-white border border-gray-100 rounded-b-lg mt-2">
@@ -1079,15 +1163,26 @@ const WeekView = ({
                                     const startDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
                                     const endDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 
+                                    // Only include single-day tasks in the per-day columns.
+                                    // Multi-day tasks are rendered in the all-day row above.
                                     const dayTodos = (Array.isArray(todos) ? todos : []).filter((t) => {
                                         try {
                                             const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
                                             const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
                                             const sDt = s ? new Date(s) : null;
                                             const eDt = e ? new Date(e) : null;
-                                            const rs = sDt || eDt;
-                                            const re = eDt || sDt;
-                                            if (!rs || !re) return false;
+                                            if (!sDt || !eDt) return false;
+
+                                            // Determine start-of-day for both dates
+                                            const sStartDay = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
+                                            const eStartDay = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 0, 0, 0, 0);
+
+                                            // If the task spans more than one calendar day, exclude it from per-day columns
+                                            if (eStartDay.getTime() > sStartDay.getTime()) return false;
+
+                                            // Finally, include if it overlaps this specific day
+                                            const rs = sDt;
+                                            const re = eDt;
                                             return rs <= endDay && re >= startDay;
                                         } catch (__) {
                                             return false;
@@ -1129,6 +1224,22 @@ const WeekView = ({
                                                 {combined.map((item) => {
                                                     if (item.__type === 'task') {
                                                         const t = item;
+                                                        // Defensive: if a multi-day task somehow made it into the per-day list,
+                                                        // skip rendering here so it only appears in the all-day row above.
+                                                        try {
+                                                            const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+                                                            const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
+                                                            const sDt = s ? new Date(s) : null;
+                                                            const eDt = e ? new Date(e) : null;
+                                                            if (sDt && eDt) {
+                                                                const sStartDay = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0,0,0,0);
+                                                                const eStartDay = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 0,0,0,0);
+                                                                if (eStartDay.getTime() > sStartDay.getTime()) {
+                                                                    // multi-day => don't render in day column
+                                                                    return null;
+                                                                }
+                                                            }
+                                                        } catch (__) {}
                                                         const kindKey = t.kind || t.type || t.kindName || null;
                                                         const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
                                                         const bgClass = cat?.color || null;
