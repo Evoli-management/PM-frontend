@@ -26,7 +26,7 @@ import { CSS } from '@dnd-kit/utilities';
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
 import ActivityFeed from "../../components/dashboard/widgets/ActivityFeed.jsx";
-import StrokesPanel from "../../components/dashboard/widgets/StrokesPanel.jsx";
+
 import StatsCard from "../../components/dashboard/widgets/StatsCard.jsx";
 import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
 import WeeklyTrendBars from "../../components/dashboard/widgets/WeeklyTrendBars.jsx";
@@ -61,10 +61,7 @@ const fallbackCalendar = [
     { id: 3, title: "Focus: API integration", start: "14:00", end: "16:00" },
 ];
 
-const fallbackStrokes = {
-    received: [{ id: 1, from: "Dana", msg: "Great work on the release!", time: "1d" }],
-    given: [{ id: 2, to: "Bob", msg: "Thanks for jumping on the bug fix.", time: "3d" }],
-};
+
 
 function EChart({ data = [], labels = [] }) {
     // responsive SVG chart with axes, grid and tooltip
@@ -257,15 +254,11 @@ export default function Dashboard() {
             myDay: true,
             goals: true,
             enps: true,
-            strokes: true,
-            productivity: true,
             calendarPreview: true,
             activity: true,
-            suggestions: false,
-            teamOverview: false,
         },
         // explicit order for all widgets — will be kept in localStorage (quickAdd removed to avoid duplication with navbar)
-        widgetOrder: ["myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview"],
+        widgetOrder: ["myDay", "goals", "enps", "calendarPreview", "activity"],
         theme: "light", // or 'dark'
     };
 
@@ -377,14 +370,12 @@ export default function Dashboard() {
     const [activeGoals, setActiveGoals] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
     const [calendarToday, setCalendarToday] = useState([]);
-    const [strokes, setStrokes] = useState({ received: [], given: [] });
     
     // Loading and error states
     const [dataLoading, setDataLoading] = useState({
         goals: true,
         activity: true,
         calendar: true,
-        strokes: true,
     });
     const [dataErrors, setDataErrors] = useState({});
 
@@ -479,17 +470,7 @@ export default function Dashboard() {
                 setDataLoading(prev => ({ ...prev, calendar: false }));
             }
 
-            // Load Strokes (if service becomes available)
-            try {
-                // For now, use fallback data since strokes service might not be implemented yet
-                setStrokes(fallbackStrokes);
-                setDataLoading(prev => ({ ...prev, strokes: false }));
-            } catch (error) {
-                console.error("Failed to load strokes:", error);
-                setStrokes(fallbackStrokes);
-                setDataErrors(prev => ({ ...prev, strokes: error.message }));
-                setDataLoading(prev => ({ ...prev, strokes: false }));
-            }
+
         };
 
         loadDashboardData();
@@ -613,8 +594,8 @@ export default function Dashboard() {
         appointments: calendarToday.length
     };
     
-    const productivity = { productive: 24, trap: 6 }; // TODO: Replace with real productivity tracking
-    const [prodTrend, setProdTrend] = useState([6, 7, 6, 8, 7, 9, 8]);
+
+
 
     // Activity filter + drill modal
     const [activityFilter, setActivityFilter] = useState("all"); // all|tasks|goals|recognitions
@@ -832,42 +813,9 @@ export default function Dashboard() {
             );
         }
 
-        if (key === "strokes") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Strokes</h3>
-                        <StrokesPanel strokes={strokes} />
-                    </div>
-                </div>
-                </SortableWidget>
-            );
-        }
 
-        if (key === "productivity") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-blue-700">Productivity</h3>
-                                <span className="text-xs text-[CanvasText] opacity-60" title="Hours logged this week: productive vs trap">ℹ️</span>
-                            </div>
-                            <div className="flex-1 flex flex-col justify-center items-center">
-                                <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
-                                <div className="text-xs font-medium opacity-80">productive</div>
-                                <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
-                                <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
-                                    <div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} />
-                                    <div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </SortableWidget>
-            );
-        }
+
+
 
         if (key === "calendarPreview") {
             return (
@@ -965,43 +913,9 @@ export default function Dashboard() {
             );
         }
 
-        if (key === "suggestions") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Suggestions</h3>
-                        <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
-                            <li>Recommend goal: "Automate weekly reporting" (template)</li>
-                            <li>Next best action: Finish API tests before lunch</li>
-                            <li>Insight: You're most productive in the morning (9–12)</li>
-                        </ul>
-                    </div>
-                </div>
-                </SortableWidget>
-            );
-        }
 
-        if (key === "teamOverview") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Team Performance Overview</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                            <div className="p-3 border rounded">Team goals completion: 68%</div>
-                            <div className="p-3 border rounded">Avg workload: 32h/week</div>
-                            <div className="p-3 border rounded">eNPS trend: steady ↑</div>
-                            <div className="p-3 border rounded">Strokes leaderboard: Dana (5)</div>
-                        </div>
-                        <div className="mt-3 flex justify-end">
-                            <button className="px-3 py-1 border rounded text-sm" title="Export team report">Export report</button>
-                        </div>
-                    </div>
-                </div>
-                </SortableWidget>
-            );
-        }
+
+
 
         return null;
     };
