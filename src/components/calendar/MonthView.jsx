@@ -27,7 +27,8 @@ export default function MonthView({
         timeSlots, 
         workingHours, 
         formatTime,
-        loading: prefsLoading 
+        loading: prefsLoading,
+        isWorkingTime,
     } = useCalendarPreferences(30);
     
     // Generate all possible hours (24-hour format)
@@ -37,27 +38,15 @@ export default function MonthView({
         return `${h.toString().padStart(2, '0')}:${m}`;
     });
 
-    // Dynamic working hours based on user preferences
-    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS.filter((h) => {
-        const hour = Number(h.split(":")[0]);
-        return hour >= 8 && hour <= 18;
-    });
+    // Use full-day hours (no working-hours restriction)
+    const WORKING_HOURS = timeSlots.length > 0 ? timeSlots.slice(0, -1) : ALL_HOURS;
 
-    // Use workingHours for start/end hour
-    const WORK_START = workingHours?.startTime ? Number(workingHours.startTime.split(":")[0]) : 8;
-    const WORK_END = workingHours?.endTime ? Number(workingHours.endTime.split(":")[0]) : 17;
+    // Use full-day bounds
+    const WORK_START = 0;
+    const WORK_END = 24;
 
-    // Debug: Log working hours to verify they're being used
-    console.log('MonthView working hours:', { 
-        startTime: workingHours?.startTime, 
-        endTime: workingHours?.endTime, 
-        WORK_START, 
-        WORK_END,
-        timeSlotsLength: timeSlots.length 
-    });
-
-    const [showAllHours, setShowAllHours] = useState(false);
-    const HOURS = showAllHours ? ALL_HOURS : WORKING_HOURS;
+    // Always show full 24 hours
+    const HOURS = ALL_HOURS;
     // Weekday headers are not rendered in this table layout
 
     const today = new Date();
@@ -266,22 +255,7 @@ export default function MonthView({
         return () => clearInterval(interval);
     }, [month]);
 
-    // Auto-scroll to first working hour slot when component loads or working hours change
-    useEffect(() => {
-        if (gridRef.current && !showAllHours && HOURS.length > 0) {
-            // Calculate offset to first working hour slot
-            // Scroll to show the first vertical line (left border) of the first working hour
-            const stickyColumnsWidth = 96 + 80; // Date column (96px) + All day column (80px)
-            const scrollToPosition = stickyColumnsWidth; // Position at the first vertical line of first working hour
-            
-            // Small delay to ensure table is rendered
-            setTimeout(() => {
-                if (gridRef.current) {
-                    gridRef.current.scrollLeft = scrollToPosition;
-                }
-            }, 100);
-        }
-    }, [workingHours.startTime, workingHours.endTime, showAllHours, HOURS.length]);
+    // Auto-scroll behavior removed — calendar shows full day without auto-scrolling to working hours
 
     // Build grid rows: one per day
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -346,57 +320,20 @@ export default function MonthView({
                                 Loading
                             </span>
                         )}
-                        {workingHours.startTime && workingHours.endTime && !showAllHours && (
-                            <span className="text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
-                                {formatTime(workingHours.startTime)} - {formatTime(workingHours.endTime)}
-                            </span>
-                        )}
+                        {/* working-hours indicator removed */}
                     </h2>
                     <div className="flex items-center gap-2">
-                        <select
-                            className="px-2 py-1 rounded border text-sm font-semibold text-blue-900 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-                            style={{ minHeight: 28 }}
-                            value={filterType}
-                            onChange={(e) => onChangeFilter && onChangeFilter(e.target.value)}
-                            aria-label="Filter event types"
-                        >
-                            <option value="all">All Types</option>
-                            <option value="task">Tasks</option>
-                            <option value="reminder">Reminders</option>
-                            <option value="meeting">Meetings</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                        <button
-                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                            style={{ minWidth: 36, minHeight: 36 }}
-                            aria-label="Next month"
-                            onClick={() => onShiftDate && onShiftDate(1)}
-                        >
-                            <FaChevronRight />
-                        </button>
+                            <button
+                                className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                style={{ minWidth: 36, minHeight: 36 }}
+                                aria-label="Next month"
+                                onClick={() => onShiftDate && onShiftDate(1)}
+                            >
+                                <FaChevronRight />
+                            </button>
                     </div>
                 </div>
-                <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-600">
-                        {!showAllHours && (
-                            <span>
-                                Showing working hours ({formatTime(workingHours.startTime) || '8:00 AM'} - {formatTime(workingHours.endTime) || '6:00 PM'})
-                            </span>
-                        )}
-                        {showAllHours && (
-                            <span>Showing all 24 hours</span>
-                        )}
-                    </div>
-                    <label className="text-sm text-gray-600 cursor-pointer flex items-center">
-                        <input
-                            type="checkbox"
-                            checked={showAllHours}
-                            onChange={(e) => setShowAllHours(e.target.checked)}
-                            className="mr-2"
-                        />
-                        Show all hours (24h)
-                    </label>
-                </div>
+                {/* Working-hours indicator and toggle removed — calendar displays full day uniformly */}
                 <div
                     ref={gridRef}
                     className="relative pb-6"
@@ -411,7 +348,7 @@ export default function MonthView({
                     }}
                 >
                     <table
-                        className="min-w-full border border-sky-100 rounded-lg"
+                        className="min-w-full border border-gray-200 rounded-lg"
                         style={{
                             minWidth: `${(HOURS.length + 2) * 110}px`,
                             maxWidth: `${(HOURS.length + 2) * 110}px`, // restrict horizontal scroll to working hours
@@ -420,14 +357,14 @@ export default function MonthView({
                         }}
                     >
                         <thead>
-                            <tr className="bg-sky-50">
+                            <tr className="bg-white">
                                 <th 
-                                    className="sticky left-0 bg-sky-50 text-left px-2 py-2 text-xs font-semibold text-gray-400 z-30"
+                                    className="sticky left-0 bg-white text-left px-2 py-2 text-xs font-semibold text-gray-400 z-30"
                                     style={{ 
                                         width: '96px', 
                                         minWidth: '96px', 
                                         maxWidth: '96px',
-                                        borderRight: '2px solid rgba(56,189,248,0.4)',
+                                        borderRight: '2px solid rgba(226,232,240,1)',
                                         boxSizing: 'border-box',
                                         transform: 'translateZ(0)',
                                         willChange: 'transform'
@@ -436,7 +373,7 @@ export default function MonthView({
                                     &nbsp;
                                 </th>
                                 <th 
-                                    className="sticky bg-sky-50 text-center px-2 py-2 text-xs font-semibold text-gray-400 z-30"
+                                    className="sticky bg-white text-center px-2 py-2 text-xs font-semibold text-gray-400 z-30"
                                     style={{ 
                                         left: 96, 
                                         width: '80px', 
@@ -445,9 +382,9 @@ export default function MonthView({
                                         boxSizing: 'border-box', 
                                         transform: 'translateZ(0)', 
                                         willChange: 'transform',
-                                        borderLeft: '2px solid rgba(56,189,248,0.4)',
+                                        borderLeft: '2px solid rgba(226,232,240,1)',
                                         // Persistent separator to indicate margin with working hours
-                                        borderRight: '2px solid rgba(56,189,248,0.4)'
+                                        borderRight: '2px solid rgba(226,232,240,1)'
                                     }}
                                 >
                                     all day
@@ -497,15 +434,15 @@ export default function MonthView({
                                         evDate.getDate() === date.getDate();
                                 });
                                 return (
-                                    <tr key={idx} className={idx % 2 === 0 ? "bg-blue-50" : "bg-white"} style={{ position: "relative" }}>
+                                    <tr key={idx} className="bg-white" style={{ position: "relative" }}>
                                         <td
-                                            className={`sticky ${idx % 2 === 0 ? "bg-blue-50" : "bg-white"} px-2 py-2 text-sm font-semibold z-30 ${isWeekend ? "text-red-500" : "text-gray-700"} ${isToday ? "text-blue-600" : ""}`}
+                                            className={`sticky bg-white px-2 py-2 text-sm font-semibold z-30 ${isWeekend ? "text-red-500" : "text-gray-700"} ${isToday ? "text-blue-600" : ""}`}
                                             style={{ 
                                                 left: 0,
                                                 width: '96px', 
                                                 minWidth: '96px', 
-                                                maxWidth: '96px',
-                                                borderRight: '2px solid rgba(56,189,248,0.4)',
+                                                maxWidth: '96px', 
+                                                borderRight: '2px solid rgba(226,232,240,1)',
                                                 boxSizing: 'border-box',
                                                 transform: 'translateZ(0)',
                                                 willChange: 'transform'
@@ -515,7 +452,7 @@ export default function MonthView({
                                         </td>
                                         <td
                                             ref={(el) => (allDayRefs.current[idx] = el)}
-                                            className={`sticky ${idx % 2 === 0 ? "bg-blue-50" : "bg-white"} px-1 py-0 text-left align-top z-30`}
+                                            className={`sticky bg-white px-1 py-0 text-left align-top z-30`}
                                             style={{ 
                                                 left: 96, 
                                                 width: '80px', 
@@ -524,9 +461,9 @@ export default function MonthView({
                                                 boxSizing: 'border-box', 
                                                 transform: 'translateZ(0)', 
                                                 willChange: 'transform',
-                                                borderLeft: '2px solid rgba(56,189,248,0.4)',
+                                                borderLeft: '2px solid rgba(226,232,240,1)',
                                                 // Persistent separator to indicate margin with working hours
-                                                borderRight: '2px solid rgba(56,189,248,0.4)'
+                                                borderRight: '2px solid rgba(226,232,240,1)'
                                             }}
                                         >
                                             {/* overlay draws continuous poles; cell content intentionally minimal */}
@@ -539,23 +476,38 @@ export default function MonthView({
                                             // Use a thin left border on the first time slot; the sticky all-day cell provides
                                             // the prominent separator via its right border, visible during horizontal scroll.
                                             const leftBorder = isFirstColumn 
-                                                ? "1px solid rgba(56,189,248,0.08)" 
-                                                : "1px solid rgba(56,189,248,0.08)";
-                                            
+                                                ? "1px solid rgba(226,232,240,0.08)" 
+                                                : "1px solid rgba(226,232,240,0.08)";
+                                            // Determine working vs non-working for this hour slot
+                                            let isWorking = true;
+                                            try {
+                                                if (isWorkingTime) {
+                                                    isWorking = isWorkingTime(h);
+                                                } else if (workingHours && workingHours.startTime && workingHours.endTime) {
+                                                    const [sh, sm] = workingHours.startTime.split(":");
+                                                    const [eh, em] = workingHours.endTime.split(":");
+                                                    const startMinutes = Number(sh) * 60 + Number(sm);
+                                                    const endMinutes = Number(eh) * 60 + Number(em);
+                                                    const [hh, mm] = h.split(":");
+                                                    const slotMinutes = Number(hh) * 60 + Number(mm);
+                                                    isWorking = slotMinutes >= startMinutes && slotMinutes < endMinutes;
+                                                }
+                                            } catch { isWorking = true; }
+
                                             return (
                                                 <td
                                                     key={hIdx}
-                                                    className="relative px-1 py-2 text-center align-top w-16 cursor-pointer hover:bg-blue-100"
+                                                    className={`relative px-1 py-2 text-center align-top w-16 cursor-pointer ${isWorking ? '' : 'bg-slate-50'}`}
                                                     style={{ 
                                                         minWidth: 40, 
                                                         borderLeft: leftBorder,
-                                                        borderRight: "1px solid rgba(56,189,248,0.08)",
-                                                        borderTop: "1px solid rgba(56,189,248,0.1)",
-                                                        borderBottom: "1px solid rgba(56,189,248,0.1)"
+                                                        borderRight: "1px solid rgba(226,232,240,0.08)",
+                                                        borderTop: "1px solid rgba(226,232,240,0.1)",
+                                                        borderBottom: "1px solid rgba(226,232,240,0.1)"
                                                     }}
-                                                onClick={() => onEventClick && onEventClick({ day: date, hour: h })}
-                                                onDoubleClick={(e) => {
-                                                    e.stopPropagation();
+                                                onClick={(e) => {
+                                                    try { e.stopPropagation(); } catch {}
+                                                    if (onEventClick) onEventClick({ day: date, hour: h });
                                                     if (typeof onQuickCreate === "function") {
                                                         const [hr, min] = h.split(":");
                                                         const dt = new Date(
@@ -567,9 +519,8 @@ export default function MonthView({
                                                             0,
                                                             0,
                                                         );
-                                                        // Default appointment duration: 30 minutes
-                                                        const endDt = new Date(dt.getTime() + 30 * 60000);
-                                                        onQuickCreate({ start: dt, end: endDt });
+                                                        // Default appointment duration handled by AppointmentModal via defaultDurationMinutes
+                                                        onQuickCreate(dt);
                                                     }
                                                 }}
                                                 onDragOver={(e) => {
@@ -598,7 +549,7 @@ export default function MonthView({
                                                         if (task) onTaskDrop(task, dt);
                                                     } catch {}
                                                 }}
-                                                title="Double-click to add appointment"
+                                                title="Click to add appointment"
                                             >
                                                 {/* Display appointment bar if exists for this day/slot */}
                                                 {appointmentsByDaySlot[dayKey]?.[h] && appointmentsByDaySlot[dayKey][h].map((ev, appIdx) => {

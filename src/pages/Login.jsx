@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
-import authService from "../services/authService";
+// authService is imported dynamically at call sites to allow code-splitting
 
 const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +34,7 @@ const LoginPage = () => {
         setLoading(true);
         try {
             const { email, password } = formData;
+            const authService = await import("../services/authService").then((m) => m.default);
             const res = await authService.login({ email, password });
 
             // Try to get token from response
@@ -68,7 +69,8 @@ const LoginPage = () => {
                             className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer"
                             onClick={async () => {
                                 try {
-                                    await authService.resendVerification(email);
+                                    const authService = await import("../services/authService").then((m) => m.default);
+                                    await authService.resendVerification(formData.email);
                                     alert("Verification email resent! Please check your inbox.");
                                 } catch {
                                     alert("Failed to resend verification email. Try again later.");

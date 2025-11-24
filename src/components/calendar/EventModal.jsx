@@ -1,15 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
-import keyAreaService from "../../services/keyAreaService";
-import { getGoals } from "../../services/goalService";
-import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
+import TimePicker from "../ui/TimePicker.jsx";
+// Load keyAreaService on demand so it can be code-split
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
+// Business hours checks removed — full-day calendar now supported
 
 const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEventDeleted }) => {
     if (!event) return null;
     const { addToast } = useToast();
-    const startStr = event.start ? new Date(event.start).toLocaleString() : "";
-    const endStr = event.end ? new Date(event.end).toLocaleString() : "";
+    const { formatTime, formatDate, use24Hour } = useCalendarPreferences();
+    const startStr = event.start ? `${formatDate(new Date(event.start))} ${formatTime(`${String(new Date(event.start).getHours()).padStart(2,'0')}:${String(new Date(event.start).getMinutes()).padStart(2,'0')}`)}` : "";
+    const endStr = event.end ? `${formatDate(new Date(event.end))} ${formatTime(`${String(new Date(event.end).getHours()).padStart(2,'0')}:${String(new Date(event.end).getMinutes()).padStart(2,'0')}`)}` : "";
 
     // Edit mode state
     const [isEditing, setIsEditing] = useState(false);
@@ -42,9 +51,13 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
     useEffect(() => {
         (async () => {
             try {
+                const kaSvc = await getKeyAreaService();
                 const [kas, gs] = await Promise.all([
-                    keyAreaService.list({ includeTaskCount: false }).catch(() => []),
-                    getGoals().catch(() => []),
+                    kaSvc.list({ includeTaskCount: false }).catch(() => []),
+                    // Dynamically import goalService so it can be code-split away
+                    // from the initial bundle. Some consumers already use
+                    // dynamic import; doing it here avoids keeping goals in main.
+                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
                 ]);
                 setKeyAreas(Array.isArray(kas) ? kas : []);
                 setGoals(Array.isArray(gs) ? gs : []);
@@ -88,10 +101,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                 return;
             }
             setSaving(true);
-            if (!withinBusinessHours(s) || !withinBusinessHours(e)) {
-                addToast({ title: "Outside business hours", description: "Allowed 08:00–17:00", variant: "error" });
-                return;
-            }
+            // No business-hours restriction: allow events at any time
             const payload = {
                 title: title.trim(),
                 description: notes || null,
@@ -120,10 +130,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
             const end = event.end ? new Date(event.end) : null;
             const newStart = new Date(start.getTime() + minutes * 60 * 1000);
             const newEnd = end ? new Date(end.getTime() + minutes * 60 * 1000) : null;
-            if (!withinBusinessHours(newStart) || (newEnd && !withinBusinessHours(newEnd))) {
-                addToast({ title: "Outside business hours", description: "Use 08:00–17:00", variant: "warning" });
-                return;
-            }
+            // No business-hours restriction when shifting events
             const updated = await calendarService.updateEvent(event.id, {
                 start: newStart.toISOString(),
                 end: newEnd ? newEnd.toISOString() : null,
@@ -143,10 +150,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
             // Snap to 30-minute increments
             const snappedDelta = Math.round(deltaMinutes / 30) * 30;
             const newEnd = new Date(end.getTime() + snappedDelta * 60 * 1000);
-            if (!withinBusinessHours(newEnd)) {
-                addToast({ title: "Outside business hours", description: "Use 08:00–17:00", variant: "warning" });
-                return;
-            }
+            // No business-hours restriction when resizing events
             const updated = await calendarService.updateEvent(event.id, {
                 end: newEnd.toISOString(),
             });
@@ -250,7 +254,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                         />
 
                         {/* Start/Key area Row */}
-                        <div className="grid grid-cols-3 gap-2 mb-3">
+                                <div className="grid grid-cols-3 gap-2 mb-3">
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date*</label>
                                 <input
@@ -262,12 +266,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Start Time*</label>
-                                <input
-                                    type="time"
-                                    className="w-full border rounded px-2 py-1"
-                                    value={startTime}
-                                    onChange={(e) => setStartTime(e.target.value)}
-                                />
+                                <TimePicker value={startTime} onChange={(v)=>setStartTime(v)} use24Hour={use24Hour} className="w-full" />
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Key area</label>
@@ -299,12 +298,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">End Time*</label>
-                                <input
-                                    type="time"
-                                    className="w-full border rounded px-2 py-1"
-                                    value={endTime}
-                                    onChange={(e) => setEndTime(e.target.value)}
-                                />
+                                <TimePicker value={endTime} onChange={(v)=>setEndTime(v)} use24Hour={use24Hour} className="w-full" />
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Goal</label>

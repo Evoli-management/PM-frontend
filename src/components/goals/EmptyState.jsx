@@ -1,25 +1,22 @@
 // src/components/goals/EmptyState.jsx
 import React from "react";
-import { FaBullseye, FaPlus } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 
-const EmptyState = ({ searchTerm, statusFilter, onCreateClick }) => {
+const EmptyState = ({ searchTerm, statusFilter, onCreateClick, title, hint }) => {
+    // If a caller provides a `title` or `hint`, prefer those values so this
+    // component can be reused outside of the "goals" context (e.g. tasks).
     const hasFilters = searchTerm || statusFilter !== "all";
+    const header = typeof title !== 'undefined' && title !== null ? title : (hasFilters ? "No goals found" : "No goals yet");
+    const paragraph = typeof hint !== 'undefined' && hint !== null ? hint : (hasFilters ? "Try adjusting your search or filter criteria." : "Create your first goal to get started with tracking your objectives.");
 
     return (
         <div className="text-center py-16">
-            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FaBullseye className="w-12 h-12 text-slate-400" />
-            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">{header}</h3>
 
-            <h3 className="text-xl font-bold text-slate-900 mb-2">{hasFilters ? "No goals found" : "No goals yet"}</h3>
+            <p className="text-slate-600 mb-8">{paragraph}</p>
 
-            <p className="text-slate-600 mb-8">
-                {hasFilters
-                    ? "Try adjusting your search or filter criteria."
-                    : "Create your first goal to get started with tracking your objectives."}
-            </p>
-
-            {!hasFilters && (
+            {/* Only show the default create button when there are no filters and a create handler is provided */}
+            {!hasFilters && onCreateClick && (
                 <button
                     onClick={onCreateClick}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"

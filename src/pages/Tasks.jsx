@@ -1,11 +1,27 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+export { default } from "./DontForget.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
+import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
-import DontForgetComposer from "../components/tasks/DontForgetComposer.jsx";
-import taskService from "../services/taskService";
-import keyAreaService from "../services/keyAreaService";
+const DontForgetComposer = React.lazy(() => import("../components/tasks/DontForgetComposer.jsx"));
+
+// Lazy getters for services to allow code-splitting
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import("../services/taskService");
+    _taskService = mod.default || mod;
+    return _taskService;
+};
+
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../services/keyAreaService");
+    _keyAreaService = mod.default || mod;
+    return _keyAreaService;
+};
 
 export default function Tasks() {
     const location = useLocation();
@@ -37,11 +53,12 @@ export default function Tasks() {
 
     // Key Areas for assignment dialog
     const [dfKeyAreas, setDfKeyAreas] = useState([]);
+    const { addToast } = useToast ? useToast() : { addToast: () => {} };
     useEffect(() => {
         if (viewMode !== "dont-forget") return;
         (async () => {
             try {
-                const list = await keyAreaService.list({ includeTaskCount: false });
+                const list = await (await getKeyAreaService()).list({ includeTaskCount: false });
                 // Exclude Ideas/default area from choices
                 setDfKeyAreas(list.filter((k) => !k.is_default && (k.title || "").toLowerCase() !== "ideas"));
             } catch (e) {
@@ -59,7 +76,7 @@ export default function Tasks() {
         let cancelled = false;
         (async () => {
             try {
-                const data = await taskService.list({ unassigned: true });
+                const data = await (await getTaskService()).list({ unassigned: true });
                 if (!cancelled) {
                     // Map API fields to this view’s expected shape
                     const mapped = data.map((t) => ({
@@ -75,6 +92,8 @@ export default function Tasks() {
                         dueDate: t.dueDate ? t.dueDate.slice(0, 10) : "",
                         end_date: t.endDate ? t.endDate.slice(0, 10) : "",
                         duration: t.duration || "",
+                        // preserve raw ISO for completionDate so we can format locally
+                        completionDate: t.completionDate || null,
                         time: "",
                         notes: t.description || "",
                         keyArea: "", // DF has no key area
@@ -231,7 +250,7 @@ export default function Tasks() {
                 ...(mappedPriority ? { priority: mappedPriority } : {}),
             };
             if (payload?.keyAreaId) body.keyAreaId = payload.keyAreaId;
-            const created = await taskService.create(body);
+            const created = await (await getTaskService()).create(body);
             // Push to local list
             if (!payload?.keyAreaId) {
                 setTasks((prev) => [
@@ -306,7 +325,7 @@ export default function Tasks() {
             await Promise.all(
                 Array.from(selectedIds).map(async (id) => {
                     try {
-                        await taskService.remove(id);
+                        await (await getTaskService()).remove(id);
                     } catch (e) {
                         console.warn("Failed to delete task", id, e);
                     }
@@ -329,27 +348,54 @@ export default function Tasks() {
         const newCompleted = !t.completed;
         const newStatus = newCompleted ? "done" : "open";
         try {
-            await taskService.update(id, { status: newStatus });
+            await (await getTaskService()).update(id, { status: newStatus });
             setTasks((prev) =>
                 prev.map((x) => (x.id === id ? { ...x, completed: newCompleted, status: newStatus } : x)),
             );
             markSaving(id);
+            try {
+                if (newStatus === 'done') addToast && addToast({ title: 'Marked completed', variant: 'success' });
+                else addToast && addToast({ title: 'Marked open', variant: 'info' });
+            } catch {}
         } catch (e) {
             console.error("Failed to update status", e);
         }
     };
     const setPriority = async (id, p) => {
         try {
-            await taskService.update(id, { priority: p });
+            await (await getTaskService()).update(id, { priority: p });
             setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, priority: p } : t)));
             markSaving(id);
         } catch (e) {
             console.error("Failed to update priority", e);
         }
     };
+    const setStatus = async (id, s) => {
+        try {
+            await taskService.update(id, { status: s });
+            setTasks((prev) =>
+                prev.map((t) =>
+                    t.id === id
+                        ? { ...t, status: s, completed: s === 'done' }
+                        : t,
+                ),
+            );
+            markSaving(id);
+            // show a success toast for completed tasks
+            try {
+                if (s === 'done') {
+                    addToast && addToast({ title: 'Marked completed', variant: 'success' });
+                } else if (s === 'open') {
+                    addToast && addToast({ title: 'Marked open', variant: 'info' });
+                }
+            } catch {}
+        } catch (e) {
+            console.error('Failed to update status', e);
+        }
+    };
     const deleteTask = async (id) => {
         try {
-            await taskService.remove(id);
+            await (await getTaskService()).remove(id);
             setTasks((prev) => prev.filter((t) => t.id !== id));
         } catch (e) {
             console.error("Failed to delete task", e);
@@ -372,7 +418,7 @@ export default function Tasks() {
             return;
         }
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
@@ -417,6 +463,8 @@ export default function Tasks() {
                 time: task.time || "",
                 notes: task.notes || "",
                 listIndex: task.listIndex || 1,
+                // include completionDate (raw ISO) as read-only
+                completionDate: task.completionDate || null,
                 keyAreaId: "",
             },
         });
@@ -424,9 +472,9 @@ export default function Tasks() {
     const confirmAssignAndOpen = async () => {
         const { task, kaId } = assignModal;
         if (!task || !kaId) return;
-        try {
-            // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
-            await taskService.update(task.id, { keyAreaId: kaId });
+            try {
+                // Assign to the selected Key Area (UUID) — omit listIndex (not supported by API)
+            await (await getTaskService()).update(task.id, { keyAreaId: kaId });
             // Remove from DF view
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
             setAssignModal({ open: false, task: null, kaId: "", listIndex: 1 });
@@ -455,7 +503,7 @@ export default function Tasks() {
                     // Non-API fields will be applied locally after
                     if (Object.keys(patch).length > 0) {
                         try {
-                            await taskService.update(id, patch);
+                            await (await getTaskService()).update(id, patch);
                         } catch (e) {
                             console.warn("Failed to update", id, e);
                         }
@@ -507,7 +555,7 @@ export default function Tasks() {
         if (form.duration !== undefined) patch.duration = form.duration;
         if (form.keyAreaId) patch.keyAreaId = form.keyAreaId;
         try {
-            const updated = await taskService.update(id, patch);
+            const updated = await (await getTaskService()).update(id, patch);
             if (form.keyAreaId) {
                 // Task moved to a Key Area: remove from DF list and open it in Key Areas
                 setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -551,7 +599,7 @@ export default function Tasks() {
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50">
+        <div className="flex min-h-screen bg-[#EDEDED]">
             <Sidebar 
                 user={{ name: "Hussein" }} 
                 mobileOpen={mobileSidebarOpen}
@@ -779,7 +827,7 @@ export default function Tasks() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-blue-900">Responsible</label>
+                                                <label className="block text-xs text-blue-900">Assignee</label>
                                                 <input
                                                     value={massEdit.assignee}
                                                     onChange={(e) =>
@@ -950,6 +998,7 @@ export default function Tasks() {
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
+                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
@@ -980,6 +1029,7 @@ export default function Tasks() {
                                                                             e.currentTarget.src = "/dont-forget.png";
                                                                     }}
                                                                 />
+                                                                {/* status dot removed from name field; visual indicator now in Status column */}
                                                                 <span
                                                                     className={`truncate text-xs sm:text-sm ${task.completed ? "line-through text-gray-400" : "text-gray-900"}`}
                                                                     title={task.name}
@@ -998,13 +1048,21 @@ export default function Tasks() {
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top">
                                                             <div className="flex items-center gap-2">
+                                                                {/* Status color dot (same mapping used in KeyAreas) */}
                                                                 <span
-                                                                    className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"
+                                                                    className={`inline-block w-2.5 h-2.5 rounded-full ${String(task.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(task.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`}
                                                                     aria-hidden="true"
-                                                                ></span>
-                                                                <span className="capitalize text-slate-800 text-xs sm:text-sm">
-                                                                    {task.status || "open"}
-                                                                </span>
+                                                                />
+                                                                <select
+                                                                    value={task.status || 'open'}
+                                                                    onChange={(e) => { e.stopPropagation(); setStatus(task.id, e.target.value); }}
+                                                                    className="text-xs sm:text-sm rounded-md border bg-white px-2 py-1"
+                                                                    aria-label={`Change status for ${task.name}`}
+                                                                >
+                                                                    <option value="open">Open</option>
+                                                                    <option value="in_progress">In progress</option>
+                                                                    <option value="done">Done</option>
+                                                                </select>
                                                             </div>
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top hidden md:table-cell">
@@ -1057,6 +1115,9 @@ export default function Tasks() {
                                                                     task.end_date,
                                                                 )}
                                                         </td>
+                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
+                                                            {task.completionDate ? new Date(task.completionDate).toLocaleString() : "—"}
+                                                        </td>
                                                     </tr>
                                                     {/* Row expansion removed per new design */}
                                                 </React.Fragment>
@@ -1088,11 +1149,13 @@ export default function Tasks() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <DontForgetComposer
-                                    open={showComposer}
-                                    onClose={() => setShowComposer(false)}
-                                    onAdd={(data) => addDontForgetTask(data)}
-                                />
+                                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                                    <DontForgetComposer
+                                        open={showComposer}
+                                        onClose={() => setShowComposer(false)}
+                                        onAdd={(data) => addDontForgetTask(data)}
+                                    />
+                                </Suspense>
 
                                 {editModal.open && (
                                     <div
@@ -1132,6 +1195,14 @@ export default function Tasks() {
                                                         placeholder="Task title"
                                                     />
                                                 </div>
+                                                {editModal.form?.completionDate && (
+                                                    <div className="mt-1 text-xs text-slate-700">
+                                                        <span className="font-semibold">Completion Date: </span>
+                                                        <span title="Automatically recorded when marked completed">
+                                                            {new Date(editModal.form.completionDate).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                )}
                                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-1.5">
                                                     <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5">
                                                         <label className="text-xs font-semibold text-slate-900 block">
@@ -1224,7 +1295,7 @@ export default function Tasks() {
                                                     </div>
                                                     <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5">
                                                         <label className="text-xs font-semibold text-slate-900 block">
-                                                            Responsible
+                                                            Assignee
                                                         </label>
                                                         <input
                                                             value={editModal.form?.assignee || ""}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
-import authService from "../services/authService";
+// authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
     const [formData, setFormData] = useState({
@@ -63,6 +63,7 @@ export default function Registration() {
         setSubmitting(true);
         try {
             const { firstName, lastName, email, password } = formData;
+            const authService = await import("../services/authService").then((m) => m.default);
             const res = await authService.register({ firstName, lastName, email, password });
             // Save email temporarily for the verify page (resend convenience)
             try {
@@ -151,13 +152,14 @@ export default function Registration() {
                                     type="button"
                                     className="mt-4 px-4 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white font-semibold"
                                     onClick={async () => {
-                                        try {
-                                            await authService.resendVerification({ email: formData.email });
-                                            alert("Verification email resent! Please check your inbox.");
-                                        } catch (err) {
-                                            alert("Failed to resend verification email. Please try again later.");
-                                        }
-                                    }}
+                                            try {
+                                                const authService = await import("../services/authService").then((m) => m.default);
+                                                await authService.resendVerification({ email: formData.email });
+                                                alert("Verification email resent! Please check your inbox.");
+                                            } catch (err) {
+                                                alert("Failed to resend verification email. Please try again later.");
+                                            }
+                                        }}
                                 >
                                     Resend verification email
                                 </button>

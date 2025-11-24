@@ -42,12 +42,14 @@ export const Integrations = ({ showToast }) => {
             }
             
             setIntegrations(updates);
+            return updates;
         } catch (error) {
             // Fallback to localStorage
             const saved = localStorage.getItem('userIntegrations');
             if (saved) {
                 setIntegrations(prev => ({ ...prev, ...JSON.parse(saved) }));
             }
+            return null;
         } finally {
             setLoading(false);
         }
@@ -70,11 +72,9 @@ export const Integrations = ({ showToast }) => {
             switch (type) {
                 case 'googleCalendar':
                     result = await calendarService.syncGoogleCalendar();
-                    showToast('Google Calendar connected and sync initiated!');
                     break;
                 case 'outlookCalendar':
                     result = await calendarService.syncMicrosoftCalendar();
-                    showToast('Outlook Calendar connected and sync initiated!');
                     break;
                 case 'teams':
                     // For now, just simulate connection
@@ -90,8 +90,18 @@ export const Integrations = ({ showToast }) => {
                     break;
             }
             
-            // Reload integrations to get updated status
-            await loadIntegrations();
+            // Reload integrations to get updated status and show success only when backend confirms
+            const updated = await loadIntegrations();
+            if (updated) {
+                if (type === 'googleCalendar' && updated.googleCalendar && updated.googleCalendar.connected) {
+                    showToast('Google Calendar connected and sync initiated!');
+                } else if (type === 'outlookCalendar' && updated.outlookCalendar && updated.outlookCalendar.connected) {
+                    showToast('Outlook Calendar connected and sync initiated!');
+                } else if (type !== 'teams') {
+                    // If backend didn't report connected, inform the user
+                    showToast(`Connection for ${type} did not complete`, 'error');
+                }
+            }
             
         } catch (error) {
             console.error('Connection error:', error);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import {
     FaTimes,
     FaEdit,
@@ -16,7 +16,7 @@ import {
     FaChartPie,
     FaHistory,
 } from "react-icons/fa";
-import GoalForm from "./GoalForm";
+const GoalForm = React.lazy(() => import("./GoalForm"));
 
 const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -45,13 +45,15 @@ const GoalDetailModal = ({ goal, onClose, keyAreas, onUpdate, onDelete }) => {
 
     if (isEditing) {
         return (
-            <GoalForm
-                goal={goal}
-                onClose={handleCancelEdit}
-                onGoalCreated={handleSave}
-                keyAreas={keyAreas}
-                isEditing={true}
-            />
+            <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                <GoalForm
+                    goal={goal}
+                    onClose={handleCancelEdit}
+                    onGoalCreated={handleSave}
+                    keyAreas={keyAreas}
+                    isEditing={true}
+                />
+            </Suspense>
         );
     }
 

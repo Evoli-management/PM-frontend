@@ -52,10 +52,10 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
             
             setPreferences(newPreferences);
             
-            // Generate time slots based on working hours
+            // Generate time slots for the full day (no working-hours restriction)
             const slots = generateTimeSlots(
-                newPreferences.workingHours.startTime,
-                newPreferences.workingHours.endTime,
+                "00:00",
+                "24:00",
                 slotSizeMinutes
             );
             setTimeSlots(slots);
@@ -120,9 +120,10 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
 
     // Update time slots when preferences change
     const updateTimeSlots = (workingHours = preferences.workingHours, timeFormat = preferences.timeFormat) => {
+        // Keep behavior consistent: update time slots as full-day slots
         const slots = generateTimeSlots(
-            workingHours.startTime,
-            workingHours.endTime,
+            "00:00",
+            "24:00",
             slotSizeMinutes
         );
         setTimeSlots(slots);

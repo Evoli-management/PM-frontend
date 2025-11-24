@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import authService from "../services/authService";
 
 export default function VerifyEmailChange() {
     const { search } = useLocation();
@@ -15,16 +14,17 @@ export default function VerifyEmailChange() {
             return;
         }
         
-        authService
-            .confirmEmailChange(token)
-            .then(() => {
+        (async () => {
+            try {
+                const { default: auth } = await import("../services/authService");
+                await auth.confirmEmailChange(token);
                 setStatus("Email address changed successfully! Please log in with your new email address.");
                 setTimeout(() => navigate("/login"), 3000);
-            })
-            .catch((e) => {
+            } catch (e) {
                 const msg = e?.response?.data?.message || "Email change verification failed";
                 setStatus(typeof msg === "string" ? msg : "Email change verification failed");
-            });
+            }
+        })();
     }, [search, navigate]);
 
     return (
