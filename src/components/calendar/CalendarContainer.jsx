@@ -105,6 +105,14 @@ const CalendarContainer = () => {
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
+    // 5-day vs 7-day week preference (persisted)
+    const [workWeek, setWorkWeek] = useState(() => {
+        try {
+            return localStorage.getItem('calendar:workWeek') === 'true';
+        } catch (e) {
+            return false;
+        }
+    });
 
     // Load persisted view/date on mount
     useEffect(() => {
@@ -187,8 +195,17 @@ const CalendarContainer = () => {
         try {
             localStorage.setItem("calendar:view", view);
             localStorage.setItem("calendar:date", currentDate.toISOString());
+            // persist workWeek preference as well
+            try { localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false'); } catch (_) {}
         } catch {}
     }, [view, currentDate]);
+
+    // persist workWeek preference when changed
+    useEffect(() => {
+        try {
+            localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false');
+        } catch (_) {}
+    }, [workWeek]);
 
     // Helper: determine if a todo spans the given day (date-only compare)
     const isTodoInRangeOfDay = (t, dayDate) => {
@@ -225,7 +242,8 @@ const CalendarContainer = () => {
                 // start Monday
                 start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
                 end.setTime(start.getTime());
-                end.setDate(start.getDate() + 6);
+                const daysCount = workWeek ? 5 : 7;
+                end.setDate(start.getDate() + (daysCount - 1));
             } else if (view === "day") {
                 // Fetch exactly the selected day; tasks spanning the day will be included by backend overlap logic
                 start.setTime(currentDate.getTime());
@@ -337,7 +355,8 @@ const CalendarContainer = () => {
         if (view === "week") {
             start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
             end.setTime(start.getTime());
-            end.setDate(start.getDate() + 6);
+            const daysCount = workWeek ? 5 : 7;
+            end.setDate(start.getDate() + (daysCount - 1));
         } else if (view === "day") {
             // Exact day range for refresh
             start.setTime(currentDate.getTime());
@@ -926,7 +945,7 @@ const CalendarContainer = () => {
                 d.setDate(d.getDate() + delta);
                 break;
             case "week":
-                d.setDate(d.getDate() + 7 * delta);
+                d.setDate(d.getDate() + (workWeek ? 5 * delta : 7 * delta));
                 break;
             case "month":
                 d.setMonth(d.getMonth() + delta);
@@ -961,7 +980,8 @@ const CalendarContainer = () => {
             const weekStart = new Date(d);
             weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
             const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
+            const daysCount = workWeek ? 5 : 7;
+            weekEnd.setDate(weekEnd.getDate() + (daysCount - 1));
             const sameYear = weekStart.getFullYear() === weekEnd.getFullYear();
             const startStr = weekStart.toLocaleDateString(undefined, {
                 month: "short",
@@ -1020,7 +1040,8 @@ const CalendarContainer = () => {
             start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
             start.setHours(0, 0, 0, 0);
             end.setTime(start.getTime());
-            end.setDate(start.getDate() + 6);
+            const daysCount = workWeek ? 5 : 7;
+            end.setDate(start.getDate() + (daysCount - 1));
             end.setHours(23, 59, 59, 999);
         } else if (view === "month") {
             // First day to last day of month
@@ -1116,6 +1137,8 @@ const CalendarContainer = () => {
                         onAddTaskOrActivity={openAddModal}
                         view={view}
                         onChangeView={setView}
+                            workWeek={workWeek}
+                            setWorkWeek={setWorkWeek}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
