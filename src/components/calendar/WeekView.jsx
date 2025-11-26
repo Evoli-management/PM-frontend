@@ -34,6 +34,8 @@ const WeekView = ({
     onChangeFilter,
     loading = false,
     activities = [],
+    workWeek = false,
+    setWorkWeek = () => {},
 }) => {
     const [slotSize, setSlotSize] = useState(defaultSlotSize);
     const {
@@ -49,6 +51,7 @@ const WeekView = ({
 
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
+    // workWeek is controlled by parent (CalendarContainer)
     const [colOverlay, setColOverlay] = useState(null);
 
     // Fixed time column width; day columns will flex to fill available space
@@ -148,8 +151,9 @@ const WeekView = ({
         const measure = () => {
             try {
                 const w = el.getBoundingClientRect().width || el.clientWidth || 0;
-                // days is always 7 in week view
-                const cw = Math.max(0, (w - TIME_COL_PX) / 7);
+                // number of day columns depends on workWeek preference
+                const cols = workWeek ? 5 : 7;
+                const cw = Math.max(0, (w - TIME_COL_PX) / cols);
                 setColumnWidth(cw);
             } catch (e) {}
         };
@@ -161,13 +165,14 @@ const WeekView = ({
             ro.disconnect();
             window.removeEventListener("resize", measure);
         };
-    }, [weekScrollRef.current]);
+    }, [weekScrollRef.current, workWeek]);
 
-    // Calculate week start (Monday)
+    // Calculate week start (Monday) and days (respect workWeek preference)
     const weekStart = new Date(currentDate || new Date());
     weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const daysCount = workWeek ? 5 : 7;
     const days = Array.from(
-        { length: 7 },
+        { length: daysCount },
         (_, i) =>
             new Date(
                 weekStart.getFullYear(),
@@ -268,7 +273,7 @@ const WeekView = ({
 
     // Range label for the week
     const endOfWeek = new Date(weekStart);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setDate(endOfWeek.getDate() + (daysCount - 1));
     const weekLabel = `${formatDate(weekStart)} — ${formatDate(endOfWeek)}`;
 
     // Helper: does event start fall within this slot minute range?
@@ -344,6 +349,7 @@ const WeekView = ({
                 {/* Header with navigation inside the view */}
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
+                        
                         <button
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 36, minHeight: 36 }}
@@ -399,6 +405,7 @@ const WeekView = ({
                                 </div>
                             )}
                         </div>
+                        {/* toggle moved to right side */}
                     </div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         {weekLabel}
@@ -409,6 +416,52 @@ const WeekView = ({
                         )}
                     </h2>
                     <div className="flex items-center gap-2">
+                        <div
+                            role="group"
+                            aria-label="Week length"
+                            tabIndex={0}
+                            className="inline-flex items-center rounded bg-white border border-slate-200 shadow-sm mr-2"
+                            onKeyDown={(e) => {
+                                try {
+                                    // Left/Down -> 5-day, Right/Up -> 7-day
+                                    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+                                        e.preventDefault();
+                                        setWorkWeek(true);
+                                    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+                                        e.preventDefault();
+                                        setWorkWeek(false);
+                                    } else if (e.key === "Home") {
+                                        e.preventDefault();
+                                        setWorkWeek(true);
+                                    } else if (e.key === "End") {
+                                        e.preventDefault();
+                                        setWorkWeek(false);
+                                    }
+                                } catch (__) {}
+                            }}
+                        >
+                            <button
+                                type="button"
+                                aria-pressed={workWeek}
+                                onClick={() => { try { setWorkWeek(true); } catch(_) {} }}
+                                className={`px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${workWeek ? 'text-white bg-blue-600' : 'text-slate-700 hover:bg-slate-50'}`}
+                                title="5 day week (Mon-Fri)"
+                            >
+                                <span className="sr-only">Show 5 day week</span>
+                                <span aria-hidden>5d</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                aria-pressed={!workWeek}
+                                onClick={() => { try { setWorkWeek(false); } catch(_) {} }}
+                                className={`px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${!workWeek ? 'text-white bg-blue-600' : 'text-slate-700 hover:bg-slate-50'}`}
+                                title="7 day week (Mon-Sun)"
+                            >
+                                <span className="sr-only">Show 7 day week</span>
+                                <span aria-hidden>7d</span>
+                            </button>
+                        </div>
                         <button
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 36, minHeight: 36 }}
@@ -433,7 +486,7 @@ const WeekView = ({
                                         th = ths[1 + dIdx];
                                     }
                                     let left = TIME_COL_PX + (columnWidth || 0) * dIdx;
-                                    let width = columnWidth || (container.getBoundingClientRect().width - TIME_COL_PX) / 7;
+                                    let width = columnWidth || (container.getBoundingClientRect().width - TIME_COL_PX) / daysCount;
                                     let top = 0;
                                     let height = container.scrollHeight || container.getBoundingClientRect().height;
                                     if (th) {
@@ -456,7 +509,8 @@ const WeekView = ({
                                             top = r.top - crect.top + container.scrollTop;
                                         }
                                         // compute bottom from the last child element of container
-                                        const last = container.querySelector('.flex-1.grid');
+                                        // the right-side columns container is the .flex-1 element (grid class may be applied via style)
+                                        const last = container.querySelector('.flex-1');
                                         if (last) {
                                             const lr = last.getBoundingClientRect();
                                             const lastBottom = lr.bottom - crect.top + container.scrollTop;
@@ -536,8 +590,8 @@ const WeekView = ({
                                         >
                                             <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">All-Day</span>
                                         </td>
-                                        {/* single cell spanning the 7 day columns; we will render multi-day task bars inside */}
-                                        <td className="border-r border-gray-100 px-2 py-2 align-top" colSpan={7}>
+                                        {/* single cell spanning the day columns; we will render multi-day task bars inside */}
+                                        <td className="border-r border-gray-100 px-2 py-2 align-top" colSpan={daysCount}>
                                             <div style={{ position: 'relative', minHeight: 40 }}>
                                                 {(() => {
                                                     try {
@@ -578,11 +632,11 @@ const WeekView = ({
                                                                 const rawStartIndex = Math.floor((sStart - weekStart) / dayMs);
                                                                 const rawEndIndex = Math.floor((eEnd - weekStart) / dayMs);
                                                                 const startIndex = Math.max(0, rawStartIndex);
-                                                                const endIndex = Math.min(6, rawEndIndex);
-                                                                const leftPct = (startIndex / 7) * 100;
-                                                                const widthPct = ((endIndex - startIndex + 1) / 7) * 100;
+                                                                const endIndex = Math.min(daysCount - 1, rawEndIndex);
+                                                                const leftPct = (startIndex / daysCount) * 100;
+                                                                const widthPct = ((endIndex - startIndex + 1) / daysCount) * 100;
                                                                 const continuesLeft = rawStartIndex < 0;
-                                                                const continuesRight = rawEndIndex > 6;
+                                                                const continuesRight = rawEndIndex > (daysCount - 1);
 
                                                                 // resolve color same as below
                                                                 const kindKey = t.kind || t.type || t.kindName || null;
@@ -658,7 +712,7 @@ const WeekView = ({
                                             const [fh, fm] = firstSlot.split(":").map(Number);
                                             const startMinutes = fh * 60 + (fm || 0);
                                             const pxPerMinute = (measuredSlotPx || ITEM_SIZE) / slotSize;
-                                            const colW = columnWidth || Math.max(0, ((listOuterRef.current && listOuterRef.current.getBoundingClientRect().width) || 0 - TIME_COL_PX) / 7);
+                                            const colW = columnWidth || Math.max(0, ((listOuterRef.current && listOuterRef.current.getBoundingClientRect().width) || 0 - TIME_COL_PX) / daysCount);
 
                                             const [resizing, setResizing] = React.useState(null);
 
@@ -1157,8 +1211,8 @@ const WeekView = ({
                                 </button>
                             </div>
 
-                            {/* RIGHT: seven day columns, each stacking tasks+activities */}
-                            <div className="flex-1 grid grid-cols-7 gap-0">
+                            {/* RIGHT: day columns (5 or 7 depending on workWeek) */}
+                            <div className="flex-1" style={{ display: 'grid', gridTemplateColumns: `repeat(${daysCount}, minmax(0, 1fr))`, gap: 0 }}>
                                 {days.map((date, dIdx) => {
                                     const startDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
                                     const endDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
