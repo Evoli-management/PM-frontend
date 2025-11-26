@@ -40,18 +40,55 @@ export default function MonthView({
     });
 
     // Use slots from preferences — fall back to ALL_HOURS.
-    const SLOTS = timeSlots.length > 0 ? timeSlots : ALL_HOURS;
+    // Normalize slots to remove a trailing "24:00" boundary which can
+    // duplicate midnight/noon labels when formatted (e.g. "24:00" -> "12:00 PM").
+    const rawSlots = timeSlots.length > 0 ? timeSlots : ALL_HOURS;
+    const SLOTS = rawSlots.filter((s) => String(s) !== "24:00");
     // For month view we only want one column per hour (no half-hour columns)
     const HOUR_SLOTS = SLOTS.filter((s) => String(s).endsWith(":00"));
 
     // Layout constants - adjust these to change column / lane sizing
     const ALL_DAY_COL_WIDTH = 120; // was 80px
+    const WEEK_COL_WIDTH = 48; // width for the left 'Week' column (was 40)
     const HOUR_COL_WIDTH = 80; // per-hour column width fallback
     const LANE_WIDTH = 72; // was 36px for all-day range lanes
     const LANE_GAP = 6; // gap between lanes
     const LANE_HEIGHT = 18; // vertical stacking height for multi-day lanes
     const CENTERED_BAR_FRACTION = 0.5; // fraction of column width to use for centered bars
     const CENTERED_BAR_WIDTH = 60; // target centered bar width in px
+
+    const MONTHS = [
+        { short: "Jan", long: "January", index: 0 },
+        { short: "Feb", long: "February", index: 1 },
+        { short: "Mar", long: "March", index: 2 },
+        { short: "Apr", long: "April", index: 3 },
+        { short: "May", long: "May", index: 4 },
+        { short: "Jun", long: "June", index: 5 },
+        { short: "Jul", long: "July", index: 6 },
+        { short: "Aug", long: "August", index: 7 },
+        { short: "Sep", long: "September", index: 8 },
+        { short: "Oct", long: "October", index: 9 },
+        { short: "Nov", long: "November", index: 10 },
+        { short: "Dec", long: "December", index: 11 },
+    ];
+
+    // Resolve public URL base in a way that works for CRA and Vite.
+    // Use try/catch to avoid referencing `process` at parse time in environments
+    // (like Vite) where `process` is not defined.
+    let PUBLIC_URL = "";
+    try {
+        // Try CRA style first — may throw if `process` is undefined
+        PUBLIC_URL = (process && process.env && process.env.PUBLIC_URL) || "";
+    } catch (e) {
+        // ignore
+    }
+    try {
+        if (!PUBLIC_URL && import.meta && import.meta.env && import.meta.env.BASE_URL) {
+            PUBLIC_URL = import.meta.env.BASE_URL || "";
+        }
+    } catch (e) {
+        // ignore
+    }
 
     // Determine working-hours numeric bounds (hours) from preferences, fallback to full day
     const WORK_START = workingHours?.startTime
@@ -76,8 +113,65 @@ export default function MonthView({
         (_, i) => new Date(year, month, i + 1),
     );
 
+// Helper: ISO week number (weeks start on Monday, week 1 = week with Jan 4th)
+const isoWeekNumber = (date) => {
+    // Work in UTC to avoid timezone issues
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+    // ISO: week starts on Monday, so we convert to a "Monday-based" index
+    // 0 = Monday, 6 = Sunday
+    const day = (d.getUTCDay() + 6) % 7;
+
+    // Move to Thursday of this week, which is the ISO anchor
+    d.setUTCDate(d.getUTCDate() - day + 3);
+
+    // First Thursday of the ISO year (week 1 is the week with Jan 4)
+    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+
+    // Calculate the ISO week number
+    const diff = d - firstThursday; // ms difference
+    const week = 1 + Math.round(diff / (7 * 24 * 60 * 60 * 1000));
+
+    return week;
+};
+    // Compute week-number cells (rowSpan + week number) so we can render
+    // a single week number per ISO week and span it across that week's rows.
+    //
+    // ISO-8601 rules:
+    // - Week starts on Monday.
+    // - Week 1 is the week that contains Jan 4 (or first Thursday).
+    // We use strict "label on Monday" logic: only rows where the date is
+    // a Monday will receive a week label. This means leading partial weeks
+    // whose Monday falls in the previous month will not be labeled here.
+    const weekCells = {};
+    for (let i = 0; i < monthDays.length; i++) {
+        const d = monthDays[i];
+        const isMonday = d.getDay() === 1; // 1 = Monday in local time
+
+        // Only label rows that are Mondays (strict Monday labeling).
+        if (!isMonday) continue;
+
+        // Compute how many rows (days) this week spans in this month,
+        // i.e., until the next Monday or end of the month.
+        let span = 1;
+        for (let j = i + 1; j < monthDays.length; j++) {
+            if (monthDays[j].getDay() === 1) break; // next Monday
+            span += 1;
+        }
+
+        weekCells[i] = {
+            weekNumber: isoWeekNumber(d),
+            rowSpan: span,
+        };
+    }
+
+
     // Helper: Parse date string to Date.
     const toLocal = (dateStr) => new Date(dateStr);
+
+    // Month picker UI state (custom popover)
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
+    const [pickerYear, setPickerYear] = useState(baseDate.getFullYear());
 
     // Helper: parse a hex or rgb/rgba color string into {r,g,b}
     function parseColorToRgb(input) {
@@ -348,6 +442,7 @@ export default function MonthView({
     }, [rangeTasks, todos]);
 
     const gridRef = useRef(null);
+    const redLineRef = useRef(null);
     const dayRowRefs = useRef([]);
     const [highlightToday, setHighlightToday] = useState(false);
     const tableRef = useRef(null);
@@ -723,66 +818,126 @@ export default function MonthView({
 
     // Vertical red line for current time
     useEffect(() => {
-        const update = () => {
-            if (!gridRef.current || !tableRef.current) return;
-            const scrollContainer = rightScrollRef.current || gridRef.current;
-            const now = new Date();
-            if (now.getMonth() !== month) {
-                try { scrollContainer.style.setProperty("--red-line-left", "-9999px"); } catch (_) {}
-                return;
-            }
-            const hourIdx = HOUR_SLOTS.findIndex((h) => {
-                const [hr] = h.split(":");
-                return now.getHours() === Number(hr);
-            });
-            if (hourIdx === -1) {
-                try { scrollContainer.style.setProperty("--red-line-left", "-9999px"); } catch (_) {}
-                return;
-            }
+        if (!gridRef.current || !tableRef.current) return undefined;
 
+        let rafId = null;
+        const wrapper = () => rightScrollRef.current;
+        const containerEl = () => gridRef.current;
+
+        // Compute and position the red-line inside the right-side wrapper.
+        // The line is placed inside the wrapper so horizontal scrolling moves
+        // it naturally (no JS updates required for horizontal scroll) — we
+        // only update once per rAF / second for time progression and on
+        // resize/layout changes.
+        const computeAndSetLeft = (now = new Date()) => {
             try {
-                const ths = tableRef.current.querySelectorAll("thead th");
-                const targetTh = ths[hourIdx];
-                if (!targetTh) {
-                    try { scrollContainer.style.setProperty("--red-line-left", "-9999px"); } catch (_) {}
+                const table = tableRef.current;
+                const wrap = wrapper();
+                const container = containerEl();
+                if (!table || !wrap || !container) return;
+
+                if (now.getMonth() !== month) {
+                    try { if (redLineRef.current) {
+                        redLineRef.current.style.left = '-9999px';
+                        redLineRef.current.style.top = '0px';
+                        redLineRef.current.style.height = '0px';
+                    } } catch (_) {}
                     return;
                 }
-                const containerRect =
-                    gridRef.current.getBoundingClientRect();
-                const thRect = targetTh.getBoundingClientRect();
-                // The hour table sits inside a horizontally scrollable wrapper; prefer
-                // its scrollLeft when available so the vertical red line tracks with
-                // horizontal scrolling of the hours grid.
-                const scrollContainer = rightScrollRef.current || gridRef.current;
-                const colLeft =
-                    thRect.left - containerRect.left + (scrollContainer.scrollLeft || 0);
-                const colWidth = thRect.width || HOUR_COL_WIDTH;
-                const left =
-                    colLeft + (now.getMinutes() / 60) * colWidth;
-                try { scrollContainer.style.setProperty("--red-line-left", `${left}px`); } catch (_) {}
-            } catch (e) {
+
+                const hourIdx = HOUR_SLOTS.findIndex((h) => {
+                    const [hr] = h.split(":");
+                    return now.getHours() === Number(hr);
+                });
+                if (hourIdx === -1) {
+                    try { if (redLineRef.current) redLineRef.current.style.left = '-9999px'; } catch (_) {}
+                    return;
+                }
+
+                const ths = table.querySelectorAll("thead th");
+                const targetTh = ths[hourIdx];
+                if (!targetTh) {
+                    try { if (redLineRef.current) redLineRef.current.style.left = '-9999px'; } catch (_) {}
+                    return;
+                }
+
+                const colWidth = targetTh.offsetWidth || HOUR_COL_WIDTH;
+
+                // left within the table/wrapper content coordinates
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                const fraction = (minutes + seconds / 60) / 60; // fraction inside the hour
+                const leftWithinTable = (targetTh.offsetLeft || 0) + fraction * colWidth;
+
+                // Compute vertical top/height using the first/last all-day row
+                const rows = allDayRefs.current.filter(Boolean);
+                if (!rows.length) {
+                    try { if (redLineRef.current) redLineRef.current.style.left = '-9999px'; } catch (_) {}
+                    return;
+                }
+
+                const firstRect = rows[0].getBoundingClientRect();
+                const lastRect = rows[rows.length - 1].getBoundingClientRect();
+                const wrapRect = wrap.getBoundingClientRect();
+
+                // top relative to the wrapper's content coordinate space
+                const topInWrapper = firstRect.top - wrapRect.top + (wrap.scrollTop || 0);
+                const bottomInWrapper = lastRect.bottom - wrapRect.top + (wrap.scrollTop || 0);
+                const height = Math.max(0, bottomInWrapper - topInWrapper);
+
                 try {
-                    gridRef.current.style.setProperty(
-                        "--red-line-left",
-                        "-9999px",
-                    );
-                } catch {}
+                    const el = redLineRef.current;
+                    if (!el) return;
+                    el.style.left = `${leftWithinTable}px`;
+                    el.style.top = `${Math.max(0, topInWrapper)}px`;
+                    el.style.height = `${height}px`;
+                    el.style.transform = 'translateX(-50%)';
+                } catch (_) {}
+            } catch (e) {
+                try { if (redLineRef.current) redLineRef.current.style.left = '-9999px'; } catch (_) {}
             }
         };
 
-        update();
-        const interval = setInterval(update, 60000);
-        const onResize = () => update();
+        // Throttle updates via rAF during scroll
+        const scheduleCompute = () => {
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+                computeAndSetLeft();
+                rafId = null;
+            });
+        };
+
+        // Initial compute (defensive)
+        try { computeAndSetLeft(); } catch (_) {}
+
+        // Use a lightweight loop: schedule a rAF measurement then wait ~1s
+        // before scheduling the next rAF. This reduces main-thread work
+        // compared to a tight setInterval and avoids long setTimeout
+        // handler overruns while keeping the indicator moving.
+        let timeoutId = null;
+        let running = true;
+        const tick = () => {
+            if (!running) return;
+            requestAnimationFrame(() => {
+                try { computeAndSetLeft(new Date()); } catch (_) {}
+            });
+            timeoutId = setTimeout(tick, 1000);
+        };
+        tick();
+
+        const onResize = () => scheduleCompute();
         window.addEventListener("resize", onResize);
-        // Listen to horizontal scroll on the hours wrapper so the red line updates
-        // while the user scrolls the hours horizontally.
-        gridRef.current?.addEventListener("scroll", onResize);
-        rightScrollRef.current?.addEventListener("scroll", onResize);
+
+        // Listen to the outer container's vertical scroll to schedule recompute.
+        const contEl = gridRef.current;
+        contEl?.addEventListener("scroll", scheduleCompute, { passive: true });
+
         return () => {
-            clearInterval(interval);
+            running = false;
+            try { clearTimeout(timeoutId); } catch (_) {}
             window.removeEventListener("resize", onResize);
-            gridRef.current?.removeEventListener("scroll", onResize);
-            rightScrollRef.current?.removeEventListener("scroll", onResize);
+            try { contEl?.removeEventListener("scroll", scheduleCompute); } catch (_) {}
+            if (rafId) cancelAnimationFrame(rafId);
         };
     }, [month, HOUR_SLOTS]);
 
@@ -957,6 +1112,85 @@ export default function MonthView({
                     </div>
                 </div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
+                    <div style={{ position: 'relative', display: 'inline-block', marginRight: 6 }}>
+                        <button
+                            type="button"
+                            aria-label="Choose month"
+                            className="inline-flex items-center justify-center p-1 rounded hover:bg-slate-100"
+                            onClick={() => {
+                                setPickerYear(baseDate.getFullYear());
+                                setShowMonthPicker((s) => !s);
+                            }}
+                        >
+                            <img src={PUBLIC_URL + '/calendar.png'} alt="Calendar" style={{ width: 18, height: 18 }} />
+                        </button>
+
+                        {showMonthPicker && (
+                            <div className="w-80 rounded-[26px] bg-white shadow-xl p-4 flex flex-col gap-4"
+                                style={{ position: 'absolute', top: 36, left: 0, zIndex: 300 }}
+                            >
+                                {/* Header */}
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPickerYear((y) => y - 1)}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    >
+                                        <FaChevronLeft className="text-xs" />
+                                    </button>
+
+                                    <div className="px-6 py-1.5 rounded-full bg-slate-100 text-slate-900 text-sm font-semibold tracking-wide">
+                                        {pickerYear}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setPickerYear((y) => y + 1)}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    >
+                                        <FaChevronRight className="text-xs" />
+                                    </button>
+                                </div>
+
+                                {/* Months grid */}
+                                <div className="grid grid-cols-3 gap-x-6 gap-y-4 text-center">
+                                    {MONTHS.map((m) => {
+                                        const isSelected = pickerYear === baseDate.getFullYear() && baseDate.getMonth() === m.index;
+
+                                        const base =
+                                            "flex flex-col items-center justify-center rounded-2xl px-2 py-1.5 cursor-pointer transition-colors";
+                                        const state = isSelected
+                                            ? "bg-blue-50 border border-blue-400 text-blue-700"
+                                            : "border border-transparent text-slate-900 hover:bg-slate-50";
+
+                                        return (
+                                            <button
+                                                key={m.index}
+                                                type="button"
+                                                onClick={() => {
+                                                    try {
+                                                        const src = currentDate || today;
+                                                        const target = new Date(pickerYear, m.index, 1);
+                                                        const monthsDiff = (target.getFullYear() - src.getFullYear()) * 12 + (target.getMonth() - src.getMonth());
+                                                        if (typeof onShiftDate === 'function') onShiftDate(monthsDiff);
+                                                    } catch (e) {}
+                                                    setShowMonthPicker(false);
+                                                }}
+                                                className={`${base} ${state}`}
+                                            >
+                                                <span className="text-sm font-semibold leading-tight">
+                                                    {m.short}
+                                                </span>
+                                                <span className="text-[11px] text-slate-500 leading-tight">
+                                                    {m.long}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     {baseDate.toLocaleString("default", {
                         month: "long",
                         year: "numeric",
@@ -967,6 +1201,7 @@ export default function MonthView({
                         </span>
                     )}
                 </h2>
+                {/* month picker is a custom popover (see calendar button) */}
                 <div className="flex items-center gap-2">
                     <button
                         className="px-3 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50"
@@ -1045,14 +1280,26 @@ export default function MonthView({
                             style={{
                                 borderCollapse: "separate",
                                 borderSpacing: 0,
-                                width: 176,
-                                minWidth: 176,
-                                maxWidth: 176,
+                                width: WEEK_COL_WIDTH + 96 + ALL_DAY_COL_WIDTH,
+                                minWidth: WEEK_COL_WIDTH + 96 + ALL_DAY_COL_WIDTH,
+                                maxWidth: WEEK_COL_WIDTH + 96 + ALL_DAY_COL_WIDTH,
                                 tableLayout: "fixed",
                             }}
                         >
                             <thead>
                                 <tr className="bg-white">
+                                    <th
+                                        className="text-center px-2 py-2 text-xs font-semibold text-gray-400"
+                                        style={{
+                                            width: `${WEEK_COL_WIDTH}px`,
+                                            minWidth: `${WEEK_COL_WIDTH}px`,
+                                            maxWidth: `${WEEK_COL_WIDTH}px`,
+                                            borderRight: "2px solid rgba(226,232,240,1)",
+                                            boxSizing: "border-box",
+                                        }}
+                                    >
+                                        Week
+                                    </th>
                                     <th
                                         className="text-left px-2 py-2 text-xs font-semibold text-gray-400"
                                         style={{
@@ -1063,7 +1310,7 @@ export default function MonthView({
                                             boxSizing: "border-box",
                                         }}
                                     >
-                                        &nbsp;
+                                        Date
                                     </th>
                                     <th
                                         className="text-center px-2 py-2 text-xs font-semibold text-gray-400"
@@ -1095,11 +1342,60 @@ export default function MonthView({
                                         date.getFullYear() ===
                                             (currentDate || today).getFullYear();
 
+                                    // Determine if this row is covered by a previous
+                                    // week's rowspan. If so, we must NOT render any
+                                    // cell for the Week column here — the earlier
+                                    // rowspan occupies that column for this row.
+                                    let coveredByPrevWeek = false;
+                                    for (const k in weekCells) {
+                                        const start = parseInt(k, 10);
+                                        const span = weekCells[k].rowSpan;
+                                        if (start < idx && start + span > idx) {
+                                            coveredByPrevWeek = true;
+                                            break;
+                                        }
+                                    }
+
                                     return (
                                         <tr
                                             key={idx}
                                             className="bg-white mv-left-row"
                                         >
+                                            {weekCells[idx] ? (
+                                                <td
+                                                    rowSpan={weekCells[idx].rowSpan}
+                                                    className="px-2 pt-2 pb-1 text-sm text-slate-500 text-center align-top"
+                                                    style={{
+                                                        width: `${WEEK_COL_WIDTH}px`,
+                                                        minWidth: `${WEEK_COL_WIDTH}px`,
+                                                        maxWidth: `${WEEK_COL_WIDTH}px`,
+                                                        borderRight: "2px solid rgba(226,232,240,1)",
+                                                        boxSizing: "border-box",
+                                                        verticalAlign: 'top',
+                                                    }}
+                                                >
+                                                    <div style={{ lineHeight: 1 }}>{weekCells[idx].weekNumber}</div>
+                                                </td>
+                                            ) : coveredByPrevWeek ? null : (
+                                                // Render an empty placeholder cell so subsequent
+                                                // date and all-day cells keep their expected
+                                                // column positions (prevents date text from
+                                                // appearing under the "Week" header).
+                                                <td
+                                                    className="px-2 pt-2 pb-1 text-sm text-center align-top"
+                                                    style={{
+                                                        width: `${WEEK_COL_WIDTH}px`,
+                                                        minWidth: `${WEEK_COL_WIDTH}px`,
+                                                        maxWidth: `${WEEK_COL_WIDTH}px`,
+                                                        borderRight: "2px solid rgba(226,232,240,1)",
+                                                        boxSizing: "border-box",
+                                                        verticalAlign: 'top',
+                                                        color: 'transparent',
+                                                    }}
+                                                >
+                                                    &nbsp;
+                                                </td>
+                                            )}
                                             <td
                                                 className={`px-2 py-2 text-sm font-semibold ${
                                                     isWeekend
@@ -1168,8 +1464,9 @@ export default function MonthView({
                                 // Use scrollbar-gutter: stable to reserve space for the
                                 // horizontal scrollbar and avoid layout shifts that change
                                 // row heights when the scrollbar appears/disappears.
-                                style={{ maxWidth: "calc(100% - 176px)", position: 'relative', overflowY: 'hidden', scrollbarGutter: 'stable', msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+                                style={{ maxWidth: `calc(100% - ${40 + 96 + ALL_DAY_COL_WIDTH}px)`, position: 'relative', overflowY: 'hidden', scrollbarGutter: 'stable', msOverflowStyle: 'none', scrollbarWidth: 'none' }}
                             >
+                            <div style={{ position: 'relative' }}>
                             <table
                                 ref={tableRef}
                                 className="min-w-full border border-gray-200 rounded-r-lg"
@@ -1469,35 +1766,32 @@ export default function MonthView({
                                 </tbody>
                             </table>
 
-                            {/* Red line (placed inside the hours wrapper so it scrolls with the hours table) */}
-                            <div
-                                style={{
-                                    position: "absolute",
-                                    left: "var(--red-line-left)",
-                                    top:
-                                        overlayMetrics.rows &&
-                                        overlayMetrics.rows.length > 0
-                                            ? `${overlayMetrics.rows[0].top}px`
-                                            : 0,
-                                    height:
-                                        overlayMetrics.rows &&
-                                        overlayMetrics.rows.length > 0
-                                            ? `${
-                                                  overlayMetrics.rows[
-                                                      overlayMetrics.rows.length - 1
-                                                  ].bottom - overlayMetrics.rows[0].top
-                                              }px`
-                                            : "100%",
-                                    width: "1px",
-                                    background: "red",
-                                    transform: "translateX(-50%)",
-                                    zIndex: 10,
-                                    pointerEvents: "none",
-                                }}
-                            />
+                                {/* Red line (rendered inside the right hours wrapper so it scrolls horizontally with the table
+                                    and avoids layout jitter while the left container handles vertical scrolling) */}
+                                <div
+                                    ref={redLineRef}
+                                    aria-hidden="true"
+                                    style={{
+                                        position: 'absolute',
+                                        left: '-9999px',
+                                        top: 0,
+                                        height: '0px',
+                                        width: '1px',
+                                        background: 'red',
+                                        willChange: 'left, top, height, transform',
+                                        transform: 'translateX(-50%)',
+                                        zIndex: 20,
+                                        pointerEvents: 'none',
+                                    }}
+                                />
+
+                            </div>
+
                         </div>
                         </>
                     </div>
+
+                    {/* Red line is rendered inside the right-side wrapper (see above) */}
 
                     {/* Today row overlay */}
                     {rowOverlay && rowOverlay.visible && (
