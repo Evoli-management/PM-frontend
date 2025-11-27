@@ -939,7 +939,26 @@ const CalendarContainer = () => {
 
     // Shift current date depending on active view
     const shiftDate = (delta) => {
+        // Backwards-compatible: delta can be a number (meaning shift by current view units)
+        // or an object like { months: n } to explicitly shift by months regardless of view.
         const d = new Date(currentDate);
+
+        if (typeof delta === "object" && delta !== null) {
+            if (typeof delta.months === "number") {
+                d.setMonth(d.getMonth() + delta.months);
+                setCurrentDate(d);
+                return;
+            }
+            if (typeof delta.days === "number") {
+                d.setDate(d.getDate() + delta.days);
+                setCurrentDate(d);
+                return;
+            }
+            // unknown object shape — fallthrough to numeric behavior if possible
+            delta = Number(delta) || 0;
+        }
+
+        // numeric delta: keep previous behavior (shift by unit according to active view)
         switch (view) {
             case "day":
                 d.setDate(d.getDate() + delta);
@@ -1099,6 +1118,7 @@ const CalendarContainer = () => {
                     <QuarterView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        onSetDate={setCurrentDate}
                         view={view}
                         onChangeView={setView}
                         filterType={filterType}
