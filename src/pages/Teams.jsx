@@ -223,9 +223,9 @@ export default function Teams() {
                         onClick={() => setMobileSidebarOpen(false)}
                     />
                 )}
-                <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto">
+                <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto px-1 md:px-2">
                     <div className="max-w-full overflow-x-hidden pb-8 min-h-full">
-                        <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
+                        <div className="flex items-center justify-between gap-2 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-3">
                                 <button
                                     className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
@@ -236,8 +236,8 @@ export default function Teams() {
                                 </button>
                             </div>
                         </div>
-                        <div className="px-2 md:px-4">
-                            <div className="mx-auto max-w-5xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
+                        <div>
+                            <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                         <div className="space-y-4">
                             <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
                             <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
