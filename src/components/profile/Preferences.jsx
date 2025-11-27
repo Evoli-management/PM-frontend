@@ -15,6 +15,7 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
     const [highlighted, setHighlighted] = React.useState(-1);
     const inputRef = React.useRef(null);
     const listRef = React.useRef(null);
+    const containerRef = React.useRef(null);
 
     useEffect(() => {
         let mounted = true;
@@ -62,6 +63,23 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
             }
         }
     }, [highlighted]);
+
+    // Close the dropdown when clicking outside
+    useEffect(() => {
+        if (!open) return;
+        const onDocClick = (ev) => {
+            const target = ev.target;
+            if (!containerRef.current) return;
+            if (!containerRef.current.contains(target)) {
+                setOpen(false);
+                setQuery('');
+                setHighlighted(-1);
+                if (inputRef.current) inputRef.current.blur();
+            }
+        };
+        document.addEventListener('mousedown', onDocClick);
+        return () => document.removeEventListener('mousedown', onDocClick);
+    }, [open]);
 
     const handleKeyDown = (e) => {
         if (!open) return;
