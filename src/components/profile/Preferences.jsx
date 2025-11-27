@@ -12,6 +12,9 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
     const [query, setQuery] = React.useState('');
     const [zones, setZones] = React.useState([]);
     const [open, setOpen] = React.useState(false);
+    const [highlighted, setHighlighted] = React.useState(-1);
+    const inputRef = React.useRef(null);
+    const listRef = React.useRef(null);
 
     useEffect(() => {
         let mounted = true;
@@ -40,24 +43,114 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
         return zones.filter((z) => z.toLowerCase().includes(q));
     }, [zones, query]);
 
+    // Reset highlighted index when filtered list changes or opens
+    useEffect(() => {
+        if (open) {
+            const idx = filtered.findIndex((z) => z === value);
+            setHighlighted(idx >= 0 ? idx : (filtered.length > 0 ? 0 : -1));
+        } else {
+            setHighlighted(-1);
+        }
+    }, [filtered, open, value]);
+
+    // Keep highlighted item scrolled into view
+    useEffect(() => {
+        if (highlighted >= 0 && listRef.current) {
+            const el = listRef.current.children[highlighted];
+            if (el && typeof el.scrollIntoView === 'function') {
+                el.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }, [highlighted]);
+
+    const handleKeyDown = (e) => {
+        if (!open) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlighted((h) => {
+                const next = h + 1;
+                return next >= filtered.length ? 0 : next;
+            });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlighted((h) => {
+                const prev = h - 1;
+                return prev < 0 ? Math.max(0, filtered.length - 1) : prev;
+            });
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlighted >= 0 && filtered[highlighted]) {
+                const sel = filtered[highlighted];
+                onChange(sel);
+                setOpen(false);
+                setQuery('');
+                // return focus to input
+                if (inputRef.current) inputRef.current.focus();
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setOpen(false);
+            setQuery('');
+            if (inputRef.current) inputRef.current.blur();
+        }
+    };
+
+    const detected = (() => {
+        try {
+            return getBrowserTimeZone();
+        } catch (e) {
+            return '';
+        }
+    })();
+
     return (
         <div className="relative">
             <div className="flex items-center space-x-2">
                 <input
+                    ref={inputRef}
                     type="text"
                     placeholder="Search timezone or type to detect"
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
                     onFocus={() => setOpen(true)}
+                    onKeyDown={handleKeyDown}
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
                     className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                 />
-                <button type="button" onClick={() => { onChange(getBrowserTimeZone()); setQuery(''); }} className="text-sm text-blue-600">Auto</button>
+                <button
+                    type="button"
+                    onClick={() => { onChange(detected || getBrowserTimeZone()); setQuery(''); }}
+                    className="text-sm text-blue-600"
+                    title={detected ? `Auto-detected: ${detected}` : 'Auto-detected timezone'}
+                >
+                    {detected ? `Auto (Detected: ${detected})` : 'Auto'}
+                </button>
             </div>
             {open && filtered && filtered.length > 0 && (
-                <ul className="absolute z-40 bg-white border border-gray-200 rounded mt-1 max-h-48 overflow-auto w-full shadow-sm">
-                    {filtered.slice(0, 200).map((z) => (
-                        <li key={z} className={`px-2 py-1 text-sm hover:bg-blue-50 cursor-pointer ${z === value ? 'bg-blue-50' : ''}`} onMouseDown={() => { onChange(z); setOpen(false); setQuery(''); }}>{z}</li>
-                    ))}
+                <ul
+                    ref={listRef}
+                    role="listbox"
+                    aria-label="Timezones"
+                    className="absolute z-40 bg-white border border-gray-200 rounded mt-1 max-h-48 overflow-auto w-full shadow-sm"
+                >
+                    {filtered.slice(0, 200).map((z, idx) => {
+                        const isSelected = z === value;
+                        const isHighlighted = idx === highlighted;
+                        return (
+                            <li
+                                key={z}
+                                role="option"
+                                aria-selected={isSelected}
+                                tabIndex={-1}
+                                onMouseDown={() => { onChange(z); setOpen(false); setQuery(''); }}
+                                onMouseEnter={() => setHighlighted(idx)}
+                                className={`px-2 py-1 text-sm cursor-pointer ${isSelected ? 'bg-blue-50' : ''} ${isHighlighted ? 'bg-blue-100' : ''}`}
+                            >
+                                {z}
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </div>
