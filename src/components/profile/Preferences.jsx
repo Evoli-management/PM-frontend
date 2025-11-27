@@ -448,6 +448,77 @@ export const Preferences = ({ showToast }) => {
     };
     
     const updatePreference = (key, value) => {
+        // If the user changes the timeFormat, convert existing work hours to the new format
+        if (key === 'timeFormat') {
+            const to24 = value === '24h';
+            const to24Time = (t) => {
+                if (!t) return t;
+                // already 24h HH:MM
+                const h24 = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+                const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+                const m24 = t.match(h24);
+                if (m24) {
+                    // normalize to HH:MM (pad hour)
+                    return `${String(m24[1]).padStart(2,'0')}:${m24[2]}`;
+                }
+                const m = t.match(ampm);
+                if (m) {
+                    let hh = parseInt(m[1], 10);
+                    const mm = m[2];
+                    const ap = m[3].toUpperCase();
+                    if (ap === 'PM' && hh !== 12) hh += 12;
+                    if (ap === 'AM' && hh === 12) hh = 0;
+                    return `${String(hh).padStart(2,'0')}:${mm}`;
+                }
+                // fallback: try to parse naive numeric like '8:00 AM' variations
+                try {
+                    const parsed = new Date(`1970-01-01T${t}`);
+                    if (!isNaN(parsed.getTime())) return `${String(parsed.getHours()).padStart(2,'0')}:${String(parsed.getMinutes()).padStart(2,'0')}`;
+                } catch (_) {}
+                return t;
+            };
+            const to12Time = (t) => {
+                if (!t) return t;
+                const h24 = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+                const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+                const m24 = t.match(h24);
+                if (m24) {
+                    let hh = parseInt(m24[1], 10);
+                    const mm = m24[2];
+                    const ap = hh >= 12 ? 'PM' : 'AM';
+                    const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+                    return `${displayHour}:${mm} ${ap}`;
+                }
+                const m = t.match(ampm);
+                if (m) {
+                    // normalize spacing/padding
+                    let hh = parseInt(m[1], 10);
+                    const mm = m[2];
+                    const ap = m[3].toUpperCase();
+                    const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+                    return `${displayHour}:${mm} ${ap}`;
+                }
+                try {
+                    const parsed = new Date(`1970-01-01T${t}`);
+                    if (!isNaN(parsed.getTime())) {
+                        const hh = parsed.getHours();
+                        const mm = String(parsed.getMinutes()).padStart(2,'0');
+                        const ap = hh >= 12 ? 'PM' : 'AM';
+                        const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+                        return `${displayHour}:${mm} ${ap}`;
+                    }
+                } catch (_) {}
+                return t;
+            };
+
+            setPreferences(prev => ({
+                ...prev,
+                timeFormat: value,
+                workStartTime: to24 ? to24Time(prev.workStartTime) : to12Time(prev.workStartTime),
+                workEndTime: to24 ? to24Time(prev.workEndTime) : to12Time(prev.workEndTime)
+            }));
+            return;
+        }
         setPreferences(prev => ({ ...prev, [key]: value }));
     };
 
@@ -600,7 +671,7 @@ export const Preferences = ({ showToast }) => {
                         <TimePicker
                             value={preferences.workStartTime}
                             onChange={(value) => updatePreference('workStartTime', value)}
-                            use24Hour={use24Hour}
+                            use24Hour={preferences.timeFormat === '24h'}
                             className="w-full"
                             label="Work Start Time"
                         />
@@ -609,7 +680,7 @@ export const Preferences = ({ showToast }) => {
                         <TimePicker
                             value={preferences.workEndTime}
                             onChange={(value) => updatePreference('workEndTime', value)}
-                            use24Hour={use24Hour}
+                            use24Hour={preferences.timeFormat === '24h'}
                             className="w-full"
                             label="Work End Time"
                         />
@@ -617,7 +688,7 @@ export const Preferences = ({ showToast }) => {
                 </div>
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         <div>
