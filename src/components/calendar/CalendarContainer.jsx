@@ -277,11 +277,11 @@ const CalendarContainer = () => {
                 try {
                     const tzMod = await import('../../utils/time');
                     const { formatUtcForUser } = tzMod;
-                    const enriched = (allEvents || []).map((ev) => ({
+                    const enriched = await Promise.all((allEvents || []).map(async (ev) => ({
                         ...ev,
-                        formattedStart: ev.start ? formatUtcForUser(ev.start, timezone) : null,
-                        formattedEnd: ev.end ? formatUtcForUser(ev.end, timezone) : null,
-                    }));
+                        formattedStart: ev.start ? await formatUtcForUser(ev.start, timezone) : null,
+                        formattedEnd: ev.end ? await formatUtcForUser(ev.end, timezone) : null,
+                    })));
                     setEvents(enriched);
                 } catch (e) {
                     // Fallback: store raw events if utils fail
