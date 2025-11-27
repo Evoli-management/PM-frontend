@@ -365,7 +365,15 @@ export const Preferences = ({ showToast }) => {
             
             // Add other supported fields
             if (preferences.timeFormat) apiData.timeFormat = preferences.timeFormat;
-            if (preferences.dateFormat) apiData.dateFormat = preferences.dateFormat;
+            if (preferences.dateFormat) {
+                // Resolve 'auto' to a locale-driven pattern before sending to API
+                if (preferences.dateFormat === 'auto') {
+                    const locale = (navigator && navigator.language) || 'en-US';
+                    apiData.dateFormat = detectPatternFromLocale(locale);
+                } else {
+                    apiData.dateFormat = preferences.dateFormat;
+                }
+            }
             if (preferences.theme) apiData.theme = preferences.theme;
             if (preferences.goalRemindersEmail !== undefined) apiData.goalRemindersEmail = preferences.goalRemindersEmail;
             if (preferences.goalRemindersDesktop !== undefined) apiData.goalRemindersDesktop = preferences.goalRemindersDesktop;
@@ -442,6 +450,45 @@ export const Preferences = ({ showToast }) => {
     const updatePreference = (key, value) => {
         setPreferences(prev => ({ ...prev, [key]: value }));
     };
+
+    // Helpers for date format detection and sample preview
+    const detectPatternFromLocale = (locale) => {
+        try {
+            const sample = new Date(2025, 10, 27); // 27 Nov 2025
+            const parts = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' })
+                .formatToParts(sample)
+                .filter(p => ['year', 'month', 'day'].includes(p.type))
+                .map(p => p.type);
+            const seq = parts.join('-');
+            if (seq === 'month-day-year' || seq === 'month-day-year') return 'MM/dd/yyyy';
+            if (seq === 'day-month-year') return 'dd/MM/yyyy';
+            if (seq === 'year-month-day') return 'yyyy-MM-dd';
+            // fallback
+            return 'MM/dd/yyyy';
+        } catch (e) {
+            return 'MM/dd/yyyy';
+        }
+    };
+
+    const sampleForFormat = (fmt) => {
+        const sample = new Date(2025, 10, 27);
+        if (fmt === 'auto') {
+            const locale = (navigator && navigator.language) || 'en-US';
+            return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'numeric', day: 'numeric' }).format(sample);
+        }
+        switch (fmt) {
+            case 'MM/dd/yyyy':
+                return `${String(sample.getMonth() + 1).padStart(2, '0')}/${String(sample.getDate()).padStart(2, '0')}/${sample.getFullYear()}`;
+            case 'dd/MM/yyyy':
+                return `${String(sample.getDate()).padStart(2, '0')}/${String(sample.getMonth() + 1).padStart(2, '0')}/${sample.getFullYear()}`;
+            case 'yyyy-MM-dd':
+                return `${sample.getFullYear()}-${String(sample.getMonth() + 1).padStart(2, '0')}-${String(sample.getDate()).padStart(2, '0')}`;
+            case 'MMM dd, yyyy':
+                return new Intl.DateTimeFormat((navigator && navigator.language) || 'en-US', { year: 'numeric', month: 'short', day: '2-digit' }).format(sample);
+            default:
+                return fmt;
+        }
+    };
     
     const resetToDefaults = async () => {
         setSaving(true);
@@ -514,16 +561,20 @@ export const Preferences = ({ showToast }) => {
                     </Field>
                     
                     <Field label="Date Format">
-                        <select
-                            value={preferences.dateFormat}
-                            onChange={(e) => updatePreference('dateFormat', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                        >
-                            <option value="MM/dd/yyyy">MM/DD/YYYY</option>
-                            <option value="dd/MM/yyyy">DD/MM/YYYY</option>
-                            <option value="yyyy-MM-dd">YYYY-MM-DD</option>
-                            <option value="MMM dd, yyyy">MMM DD, YYYY</option>
-                        </select>
+                        <div>
+                            <select
+                                value={preferences.dateFormat}
+                                onChange={(e) => updatePreference('dateFormat', e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                            >
+                                <option value="auto">Auto</option>
+                                <option value="MM/dd/yyyy">MM/DD/YYYY</option>
+                                <option value="dd/MM/yyyy">DD/MM/YYYY</option>
+                                <option value="yyyy-MM-dd">YYYY-MM-DD</option>
+                                <option value="MMM dd, yyyy">MMM DD, YYYY</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">Example: <span className="font-medium">{sampleForFormat(preferences.dateFormat)}</span></p>
+                        </div>
                     </Field>
                     
                     <Field label="Time Format">
