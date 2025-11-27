@@ -285,6 +285,18 @@ export const Preferences = ({ showToast }) => {
             return () => mediaQuery.removeEventListener('change', handler);
         }
     }, [preferences.theme]);
+
+    // Apply language setting to the document so UI frameworks and
+    // assistive tech can pick up the current language immediately.
+    useEffect(() => {
+        try {
+            if (preferences.language) {
+                document.documentElement.lang = preferences.language;
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [preferences.language]);
     
     const loadPreferences = async () => {
         setLoading(true);
@@ -426,7 +438,38 @@ export const Preferences = ({ showToast }) => {
                     }
                 }));
             }
-            
+
+            // Notify other parts of the app about locale/timezone/language changes
+            // which are not necessarily owned by the calendar preferences hook.
+            if (preferences.timezone) {
+                window.dispatchEvent(new CustomEvent('timezoneChanged', {
+                    detail: { timeZone: preferences.timezone }
+                }));
+            }
+
+            if (preferences.language) {
+                window.dispatchEvent(new CustomEvent('languageChanged', {
+                    detail: { language: preferences.language }
+                }));
+            }
+
+            // Broadcast reminder preference changes so any notification UI can update
+            window.dispatchEvent(new CustomEvent('goalRemindersChanged', {
+                detail: {
+                    email: preferences.goalRemindersEmail,
+                    desktop: preferences.goalRemindersDesktop,
+                    timing: preferences.goalReminderTiming
+                }
+            }));
+
+            window.dispatchEvent(new CustomEvent('pmRemindersChanged', {
+                detail: {
+                    email: preferences.pmRemindersEmail,
+                    desktop: preferences.pmRemindersDesktop,
+                    timing: preferences.pmReminderTiming
+                }
+            }));
+
             // `theme` is a client-only visual preference and not accepted by the
             // backend schema. We keep it locally (applied via the effect above)
             // but do not send it to the API to avoid 400 validation errors.
@@ -512,7 +555,22 @@ export const Preferences = ({ showToast }) => {
                 workStartTime: to24 ? to24Time(prev.workStartTime) : to12Time(prev.workStartTime),
                 workEndTime: to24 ? to24Time(prev.workEndTime) : to12Time(prev.workEndTime)
             }));
+            // Notify other parts of the app immediately so UI updates without needing to Save
+            try {
+                window.dispatchEvent(new CustomEvent('timeFormatChanged', { detail: { timeFormat: value } }));
+            } catch (__) {}
             return;
+        }
+        // Immediate broadcasts for date format, timezone and language so changes reflect instantly
+        if (key === 'dateFormat') {
+            try { window.dispatchEvent(new CustomEvent('dateFormatChanged', { detail: { dateFormat: value } })); } catch (__) {}
+        }
+        if (key === 'timezone') {
+            try { window.dispatchEvent(new CustomEvent('timezoneChanged', { detail: { timeZone: value } })); } catch (__) {}
+        }
+        if (key === 'language') {
+            try { window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: value } })); } catch (__) {}
+            try { document.documentElement.lang = value; } catch (__) {}
         }
         setPreferences(prev => ({ ...prev, [key]: value }));
     };
