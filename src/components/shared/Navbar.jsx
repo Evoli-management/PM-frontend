@@ -244,7 +244,7 @@ export default function Navbar() {
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
         >
-            <div className="w-full px-2 md:px-4 py-2 flex items-center">
+            <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
                     <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
@@ -256,7 +256,7 @@ export default function Navbar() {
                     </Link>
                     
                     {/* Site-wide search */}
-                    <div className="max-w-6xl ml-auto mr-4 relative" ref={searchRef}>
+                    <div className="w-[calc(50%-1rem)] absolute left-[45%] transform -translate-x-1/2 relative" ref={searchRef}>
                         <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 shadow-sm">
                             <FaSearch className="text-gray-500 mr-2" />
                             <input
