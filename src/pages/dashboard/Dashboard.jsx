@@ -26,8 +26,7 @@ import { CSS } from '@dnd-kit/utilities';
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
 import ActivityFeed from "../../components/dashboard/widgets/ActivityFeed.jsx";
-import QuickAddBar from "../../components/dashboard/widgets/QuickAddBar.jsx";
-import StrokesPanel from "../../components/dashboard/widgets/StrokesPanel.jsx";
+
 import StatsCard from "../../components/dashboard/widgets/StatsCard.jsx";
 import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
 import WeeklyTrendBars from "../../components/dashboard/widgets/WeeklyTrendBars.jsx";
@@ -62,10 +61,7 @@ const fallbackCalendar = [
     { id: 3, title: "Focus: API integration", start: "14:00", end: "16:00" },
 ];
 
-const fallbackStrokes = {
-    received: [{ id: 1, from: "Dana", msg: "Great work on the release!", time: "1d" }],
-    given: [{ id: 2, to: "Bob", msg: "Thanks for jumping on the bug fix.", time: "3d" }],
-};
+
 
 function EChart({ data = [], labels = [] }) {
     // responsive SVG chart with axes, grid and tooltip
@@ -255,19 +251,14 @@ export default function Dashboard() {
 
     const defaultPrefs = {
         widgets: {
-            quickAdd: true,
             myDay: true,
             goals: true,
             enps: true,
-            strokes: true,
-            productivity: true,
             calendarPreview: true,
             activity: true,
-            suggestions: false,
-            teamOverview: false,
         },
-        // explicit order for all widgets — will be kept in localStorage
-        widgetOrder: ["quickAdd", "myDay", "goals", "enps", "strokes", "productivity", "calendarPreview", "activity", "suggestions", "teamOverview"],
+        // explicit order for all widgets — will be kept in localStorage (quickAdd removed to avoid duplication with navbar)
+        widgetOrder: ["myDay", "goals", "enps", "calendarPreview", "activity"],
         theme: "light", // or 'dark'
     };
 
@@ -379,14 +370,12 @@ export default function Dashboard() {
     const [activeGoals, setActiveGoals] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
     const [calendarToday, setCalendarToday] = useState([]);
-    const [strokes, setStrokes] = useState({ received: [], given: [] });
     
     // Loading and error states
     const [dataLoading, setDataLoading] = useState({
         goals: true,
         activity: true,
         calendar: true,
-        strokes: true,
     });
     const [dataErrors, setDataErrors] = useState({});
 
@@ -481,17 +470,7 @@ export default function Dashboard() {
                 setDataLoading(prev => ({ ...prev, calendar: false }));
             }
 
-            // Load Strokes (if service becomes available)
-            try {
-                // For now, use fallback data since strokes service might not be implemented yet
-                setStrokes(fallbackStrokes);
-                setDataLoading(prev => ({ ...prev, strokes: false }));
-            } catch (error) {
-                console.error("Failed to load strokes:", error);
-                setStrokes(fallbackStrokes);
-                setDataErrors(prev => ({ ...prev, strokes: error.message }));
-                setDataLoading(prev => ({ ...prev, strokes: false }));
-            }
+
         };
 
         loadDashboardData();
@@ -530,34 +509,9 @@ export default function Dashboard() {
         }
     };
 
-    // Quick Add state - Enhanced for real data creation
-    const [quickAddOpen, setQuickAddOpen] = useState(null); // 'task'|'goal'|'stroke'|'note'|'appointment'
-    const [message, setMessage] = useState("");
-    const [quickAddLoading, setQuickAddLoading] = useState(false);
 
-    // Listen for global quick-add events from Navbar (or other components)
-    useEffect(() => {
-        const handler = (e) => {
-            try {
-                const t = (e?.detail && e.detail.type) || e?.type || null;
-                if (t) {
-                    setQuickAddOpen(t);
-                    // Ensure any existing message is cleared
-                    setMessage("");
-                    // Allow focus to happen when input mounts
-                    setTimeout(() => {
-                        const el = document.getElementById('quickAddInput');
-                        if (el) el.focus();
-                    }, 80);
-                }
-            } catch (err) {
-                console.warn('open-quickadd handler error', err);
-            }
-        };
 
-        window.addEventListener('open-quickadd', handler);
-        return () => window.removeEventListener('open-quickadd', handler);
-    }, []);
+
     
     // Handle drag end event - Simple swap between two widgets
     const handleDragEnd = (event) => {
@@ -614,85 +568,7 @@ export default function Dashboard() {
         window.location.reload(); // Simple approach - could be optimized
     };
     
-    async function doQuickAdd(type, inputValue = "") {
-        if (!inputValue.trim()) return;
-        
-        setQuickAddLoading(true);
-        try {
-            switch (type) {
-                case 'goal':
-                    // Use real goal service
-                    const { createGoal } = await import("../../services/goalService");
-                    await createGoal({
-                        title: inputValue.trim(),
-                        description: `Quick goal created from dashboard`,
-                        visibility: "public",
-                    });
-                    setMessage(`✅ Goal "${inputValue}" created successfully!`);
-                    // Refresh goals data
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                    break;
-                    
-                case 'task':
-                    // Create activity entry for now (until task service is integrated)
-                    const activitySvc = await getActivityService();
-                    await activitySvc.create({ text: `New task: ${inputValue.trim()}`, taskId: null });
-                    setMessage(`✅ Task "${inputValue}" added to activity feed!`);
-                    break;
 
-                case 'activity':
-                    // Create a free-form activity (same as note)
-                    const activitySvc2 = await getActivityService();
-                    await activitySvc2.create({ text: `${inputValue.trim()}`, taskId: null });
-                    setMessage(`✅ Activity "${inputValue}" added to activity feed!`);
-                    break;
-
-                case 'stroke':
-                    // Use activity endpoint to record a recognition/stroke
-                    const activitySvc3 = await getActivityService();
-                    await activitySvc3.create({ text: `Stroke: ${inputValue.trim()}`, taskId: null });
-                    setMessage(`✅ Stroke for "${inputValue}" sent!`);
-                    break;
-                    
-                case 'appointment':
-                    // Use real calendar service
-                    const today = new Date();
-                    const startTime = new Date(today.getTime() + 60 * 60 * 1000); // 1 hour from now
-                    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
-                    
-                    await calendarService.createEvent({
-                        title: inputValue.trim(),
-                        startTime: startTime.toISOString(),
-                        endTime: endTime.toISOString(),
-                        description: "Quick appointment created from dashboard",
-                    });
-                    setMessage(`✅ Appointment "${inputValue}" scheduled!`);
-                    break;
-                    
-                case 'note':
-                    // Create as activity for now
-                    const activitySvc4 = await getActivityService();
-                    await activitySvc4.create({ text: `Note: ${inputValue.trim()}`, taskId: null });
-                    setMessage(`✅ Note "${inputValue}" saved!`);
-                    break;
-                    
-                default:
-                    setMessage(`✅ ${type} "${inputValue}" added!`);
-            }
-            
-            setTimeout(() => setMessage(""), 3000);
-            setQuickAddOpen(null);
-            
-        } catch (error) {
-            console.error(`Failed to create ${type}:`, error);
-            setMessage(`❌ Failed to create ${type}. Please try again.`);
-            setTimeout(() => setMessage(""), 3000);
-        } finally {
-            setQuickAddLoading(false);
-        }
-    }
 
     // Onboarding tip removed per user preference
 
@@ -718,8 +594,8 @@ export default function Dashboard() {
         appointments: calendarToday.length
     };
     
-    const productivity = { productive: 24, trap: 6 }; // TODO: Replace with real productivity tracking
-    const [prodTrend, setProdTrend] = useState([6, 7, 6, 8, 7, 9, 8]);
+
+
 
     // Activity filter + drill modal
     const [activityFilter, setActivityFilter] = useState("all"); // all|tasks|goals|recognitions
@@ -803,8 +679,8 @@ export default function Dashboard() {
     }
 
     // Determine which widgets are visible and keep their selection order
-    // quickAdd is handled separately (top fixed widget and non-draggable)
-    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k] && k !== 'quickAdd');
+    // All widgets are now draggable (quickAdd removed to avoid duplication with navbar)
+    const visibleWidgetKeys = (prefs.widgetOrder || []).filter((k) => prefs.widgets[k]);
 
     // Create a unified widget renderer
     const renderWidget = (key, index) => {
@@ -812,35 +688,26 @@ export default function Dashboard() {
         // Flexible height to fit content but maintain consistency
         const widgetClass = 'w-full h-96 min-h-96';
 
-        if (key === "quickAdd") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                        <QuickAddBar
-                            onOpen={(t) => {
-                                try {
-                                    const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
-                                    window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
-                                } catch (err) {
-                                    console.warn('quickAdd dispatch error', err);
-                                }
-                            }}
-                            message={message}
-                        />
-                    </div>
-                </SortableWidget>
-            );
-        }
+
 
         if (key === "myDay") {
             return (
                 <SortableWidget key={key} id={key}>
                     <div className={widgetClass}>
-                        <StatsCard title="My Day" tooltip="Your daily schedule: appointments and tasks" href="#/calendar">
-                            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
-                            <div className="text-xs font-medium opacity-80">tasks</div>
-                            <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
-                        </StatsCard>
+                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold text-blue-700">My Day</h3>
+                                <span className="text-xs text-[CanvasText] opacity-60" title="Your daily schedule: appointments and tasks">ℹ️</span>
+                            </div>
+                            <div className="flex-1 flex flex-col justify-center items-center">
+                                <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
+                                <div className="text-xs font-medium opacity-80">tasks</div>
+                                <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{myDayStats.overdue} overdue • {myDayStats.appointments} appointments</div>
+                            </div>
+                            <div className="mt-3">
+                                <a href="#/calendar" className="text-sm text-blue-600 hover:text-blue-800">View Calendar</a>
+                            </div>
+                        </div>
                     </div>
                 </SortableWidget>
             );
@@ -887,32 +754,36 @@ export default function Dashboard() {
                                 Failed to load goals: {dataErrors.goals}
                                 <div className="mt-2 text-xs">Using fallback data</div>
                             </div>
-                        ) : activeGoals.length === 0 ? (
-                            <div className="text-[CanvasText] opacity-70">
-                                No active goals yet. <a href="#/goals" className="text-blue-600">Create your first goal</a>!
-                            </div>
                         ) : (
-                            <ul className="space-y-4">
-                                {activeGoals.map((g, i) => (
-                                    <li key={g.id || i} className="p-3 border rounded">
-                                        <div className="flex justify-between items-center">
-                                            <div className="font-semibold">{g.title}</div>
-                                            <div className="text-sm opacity-70">{g.progress || 0}%</div>
-                                        </div>
-                                        <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
-                                            <div 
-                                                className="h-2 bg-blue-500 transition-all duration-300" 
-                                                style={{ width: `${g.progress || 0}%` }} 
-                                            />
-                                        </div>
-                                        {g.dueDate && (
-                                            <div className="text-xs text-[CanvasText] opacity-60 mt-1">
-                                                Due: {new Date(g.dueDate).toLocaleDateString()}
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
+                            <div className="flex-1 overflow-y-auto">
+                                {activeGoals.length === 0 ? (
+                                    <div className="text-[CanvasText] opacity-70">
+                                        No active goals yet. <a href="#/goals" className="text-blue-600">Create your first goal</a>!
+                                    </div>
+                                ) : (
+                                    <ul className="space-y-4">
+                                        {activeGoals.map((g, i) => (
+                                            <li key={g.id || i} className="p-3 border rounded">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="font-semibold">{g.title}</div>
+                                                    <div className="text-sm opacity-70">{g.progress || 0}%</div>
+                                                </div>
+                                                <div className="mt-2 bg-gray-100 dark:bg-neutral-700 rounded h-2 overflow-hidden">
+                                                    <div 
+                                                        className="h-2 bg-blue-500 transition-all duration-300" 
+                                                        style={{ width: `${g.progress || 0}%` }} 
+                                                    />
+                                                </div>
+                                                {g.dueDate && (
+                                                    <div className="text-xs text-[CanvasText] opacity-60 mt-1">
+                                                        Due: {new Date(g.dueDate).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -942,36 +813,9 @@ export default function Dashboard() {
             );
         }
 
-        if (key === "strokes") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Strokes</h3>
-                        <StrokesPanel strokes={strokes} />
-                    </div>
-                </div>
-                </SortableWidget>
-            );
-        }
 
-        if (key === "productivity") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <StatsCard title="Productivity" tooltip="Hours logged this week: productive vs trap">
-                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{productivity.productive}h</div>
-                        <div className="text-xs font-medium opacity-80">productive</div>
-                        <div className="text-[10px] text-[CanvasText] opacity-70 mt-1">{productivity.trap}h trap</div>
-                        <div className="mt-2 w-full h-2 bg-gray-100 dark:bg-neutral-700 rounded overflow-hidden flex">
-                            <div className="h-2 bg-green-500" style={{ width: `${(productivity.productive/(productivity.productive+productivity.trap||1))*100}%` }} />
-                            <div className="h-2 bg-red-500" style={{ width: `${(productivity.trap/(productivity.productive+productivity.trap||1))*100}%` }} />
-                        </div>
-                    </StatsCard>
-                </div>
-                </SortableWidget>
-            );
-        }
+
+
 
         if (key === "calendarPreview") {
             return (
@@ -1069,43 +913,9 @@ export default function Dashboard() {
             );
         }
 
-        if (key === "suggestions") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Suggestions</h3>
-                        <ul className="list-disc pl-6 text-sm text-[CanvasText] opacity-80">
-                            <li>Recommend goal: "Automate weekly reporting" (template)</li>
-                            <li>Next best action: Finish API tests before lunch</li>
-                            <li>Insight: You're most productive in the morning (9–12)</li>
-                        </ul>
-                    </div>
-                </div>
-                </SortableWidget>
-            );
-        }
 
-        if (key === "teamOverview") {
-            return (
-                <SortableWidget key={key} id={key}>
-                    <div className={widgetClass}>
-                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                        <h3 className="font-semibold text-blue-700 mb-3">Team Performance Overview</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                            <div className="p-3 border rounded">Team goals completion: 68%</div>
-                            <div className="p-3 border rounded">Avg workload: 32h/week</div>
-                            <div className="p-3 border rounded">eNPS trend: steady ↑</div>
-                            <div className="p-3 border rounded">Strokes leaderboard: Dana (5)</div>
-                        </div>
-                        <div className="mt-3 flex justify-end">
-                            <button className="px-3 py-1 border rounded text-sm" title="Export team report">Export report</button>
-                        </div>
-                    </div>
-                </div>
-                </SortableWidget>
-            );
-        }
+
+
 
         return null;
     };
@@ -1158,9 +968,9 @@ export default function Dashboard() {
                         onClick={() => setMobileSidebarOpen(false)}
                     />
                 )}
-                <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto">
-                    <div className="max-w-full overflow-x-hidden pb-8 min-h-full">
-                        <div className="flex items-center justify-between gap-2 mb-2 p-2 md:p-3 pb-0 md:pb-0">
+                <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
+                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
+                        <div className="flex items-center justify-between gap-2 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-3">
                                 <button
                                     className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
@@ -1169,32 +979,13 @@ export default function Dashboard() {
                                 >
                                     <FaBars />
                                 </button>
-                                <h1 className="text-2xl font-semibold text-blue-700 dark:text-blue-300">Dashboard</h1>
                             </div>
                         </div>
-                        <div className="px-2 md:px-4">
+                        <div className="px-1 md:px-2">
 
-                            {/* Quick Add fixed widget at top (non-draggable) */}
-                            {prefs.widgets.quickAdd && (
-                                <div className="mb-3">
-                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
-                                        <QuickAddBar
-                                            onOpen={(t) => {
-                                                try {
-                                                    // Map lightweight quick types to the modal manager's types
-                                                    const mapped = (t === 'note' || t === 'stroke') ? 'activity' : t;
-                                                    window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: mapped } }));
-                                                } catch (err) {
-                                                    console.warn('quickAdd dispatch error', err);
-                                                }
-                                            }}
-                                            message={message}
-                                        />
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Unified Widget Grid - All widgets in draggable layout (quickAdd excluded) */}
+
+                            {/* Unified Widget Grid - All widgets in draggable layout */}
                             {visibleWidgetKeys.length > 0 && (
                                 <div className="w-full">
                                     <DndContext 
@@ -1206,7 +997,7 @@ export default function Dashboard() {
                                             items={visibleWidgetKeys} 
                                             strategy={rectSortingStrategy}
                                         >
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1 md:gap-2">
                                                 {visibleWidgetKeys.map((key, index) => renderWidget(key, index))}
                                             </div>
                                         </SortableContext>
@@ -1219,52 +1010,7 @@ export default function Dashboard() {
                 </main>
             </div>
 
-                {/* Quick Add inline form area */}
-                {quickAddOpen && (
-                    <div className="fixed left-1/2 -translate-x-1/2 bottom-4 sm:bottom-8 z-50 w-[95vw] max-w-96 bg-[Canvas] border rounded shadow p-4 text-[CanvasText]">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="font-semibold">Quick Add — {quickAddOpen}</div>
-                            <button
-                                onClick={() => setQuickAddOpen(null)}
-                                className="text-xs text-[CanvasText] opacity-60"
-                                disabled={quickAddLoading}
-                            >
-                                Close
-                            </button>
-                        </div>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const input = e.target.querySelector('input');
-                            doQuickAdd(quickAddOpen, input.value);
-                        }}>
-                            <input
-                                id="quickAddInput"
-                                className="w-full border rounded p-2 mb-2 bg-[Canvas]"
-                                placeholder={`Enter ${quickAddOpen} title`}
-                                autoFocus
-                                disabled={quickAddLoading}
-                                required
-                            />
-                            <div className="flex justify-end gap-2">
-                                <button 
-                                    type="button"
-                                    onClick={() => setQuickAddOpen(null)} 
-                                    className="px-3 py-1 border rounded text-sm"
-                                    disabled={quickAddLoading}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm disabled:opacity-50"
-                                    disabled={quickAddLoading}
-                                >
-                                    {quickAddLoading ? "Creating..." : "Add"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                )}
+
 
                 {/* Drill-in modal for Activity */}
 

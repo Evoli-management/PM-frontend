@@ -210,30 +210,34 @@ export default function Teams() {
     );
 
     return (
-        <div className="min-h-screen bg-[#EDEDED] px-2 py-4 sm:px-4 sm:py-6">
-            <div className="flex gap-[5mm]">
+        <div className="min-h-screen bg-[#EDEDED]">
+            <div className="flex w-full min-h-screen">
                 <Sidebar 
+                    user={{ name: "Hussein" }} 
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />
-
-                {/* Mobile backdrop */}
                 {mobileSidebarOpen && (
                     <div 
-                        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                        className="fixed inset-0 bg-black/40 z-30 md:hidden"
                         onClick={() => setMobileSidebarOpen(false)}
                     />
                 )}
-
-                <main className="flex-1">
-                    {/* Mobile menu button */}
-                    <button
-                        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
-                        onClick={() => setMobileSidebarOpen(true)}
-                    >
-                        <FaBars className="h-5 w-5 text-gray-600" />
-                    </button>
-                    <div className="mx-auto max-w-5xl rounded-lg bg-white p-3 shadow-sm sm:p-4">
+                <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto px-1 md:px-2">
+                    <div className="max-w-full overflow-x-hidden pb-8 min-h-full">
+                        <div className="flex items-center justify-between gap-2 mb-0 p-0 pb-0">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                                    onClick={() => setMobileSidebarOpen(true)}
+                                    aria-label="Open sidebar"
+                                >
+                                    <FaBars />
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                         <div className="space-y-4">
                             <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
                             <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
@@ -593,7 +597,9 @@ export default function Teams() {
                                     </div>
                                 </div>
                             </Section>
+                            </div>
                         </div>
+                    </div>
                     </div>
                 </main>
             </div>

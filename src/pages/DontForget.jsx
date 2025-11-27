@@ -1196,7 +1196,7 @@ export default function DontForget() {
                 />
             )}
 
-            <main className="flex-1 min-w-0 w-full transition-all ml-0 md:ml-[3mm]">
+            <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
                 {/* Mobile menu button */}
                 <button
                     className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
@@ -1314,8 +1314,7 @@ export default function DontForget() {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex-1 min-w-0 w-full transition-all ml-0 md:ml-[3mm]">
-                    <div className="overflow-hidden">
+                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full px-1 md:px-2">
                         {viewMode === "dont-forget" ? (
                             <div className="max-w-full overflow-x-hidden">
                                 <div className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6">
@@ -1371,8 +1370,7 @@ export default function DontForget() {
                                 </div>
 
                                 <div className="mb-4">
-                                    <div className="max-w-7xl mx-auto p-6">
-                                        <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
+                                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                 {/* Header area */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="col-span-3 md:col-span-2">
@@ -1677,14 +1675,12 @@ export default function DontForget() {
                                     users={users}
                                     goals={goals}
                                 />
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
-                        ) : (
-                            <div className="p-6 text-gray-500">Select a view.</div>
-                        )}
+                        </div>
                     </div>
+                ) : (
+                            <div className="p-2 text-gray-500">Select a view.</div>
+                        )}
                     </div>
                 )}
             </main>
