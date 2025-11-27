@@ -37,6 +37,7 @@ import { useToast } from "../shared/ToastProvider.jsx";
 import { normalizeActivity } from '../../utils/keyareasHelpers';
 import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
+import useCalendarPreferences from '../../hooks/useCalendarPreferences';
 
 const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
@@ -52,6 +53,7 @@ const EVENT_CATEGORIES = {
 
 const CalendarContainer = () => {
     const { addToast } = useToast();
+    const { formatDate, formatTime } = useCalendarPreferences();
     // Elephant Task state
     const [elephantTasks, setElephantTasks] = useState([]);
     const [elephantTaskModalOpen, setElephantTaskModalOpen] = useState(false);
@@ -273,7 +275,20 @@ const CalendarContainer = () => {
                 
                 // Merge events and appointments
                 const allEvents = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
-                setEvents(allEvents);
+                // Attach human-friendly labels converted from UTC -> user's timezone
+                try {
+                    // Use the synchronous wrapper; preloadTzLib is called at app startup so this will work.
+                    const { formatUtcForUserSync } = await import('../../utils/time');
+                    const enriched = (allEvents || []).map((ev) => ({
+                        ...ev,
+                        formattedStart: ev.start ? formatUtcForUserSync(ev.start, timezone) : null,
+                        formattedEnd: ev.end ? formatUtcForUserSync(ev.end, timezone) : null,
+                    }));
+                    setEvents(enriched);
+                } catch (e) {
+                    // Fallback: store raw events if utils fail
+                    setEvents(allEvents);
+                }
                 setTodos(Array.isArray(tds) ? tds : []);
 
                 // Load elephant tasks
@@ -450,7 +465,7 @@ const CalendarContainer = () => {
                     const updated = await svc.update(taskId, patch);
                     // Update local todos
                     setTodos((prev) => prev.map((t) => (String(t.id) === String(taskId) ? updated : t)));
-                    addToast({ title: "Task updated", description: `Moved to ${start.toLocaleString()}`, variant: "success" });
+                    addToast({ title: "Task updated", description: `Moved to ${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
                 } catch (err) {
                     console.warn("Failed to update task from drop", err);
                     addToast({ title: "Failed to update task", description: String(err?.message || err), variant: "error" });
@@ -491,7 +506,7 @@ const CalendarContainer = () => {
             setEvents((prev) => [...prev, created]);
             addToast({
                 title: "Event created",
-                description: `${title} at ${start.toLocaleTimeString()}`,
+                description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`,
                 variant: "success",
             });
         } catch (err) {
@@ -520,7 +535,7 @@ const CalendarContainer = () => {
                     // update local weekActivities and unattachedActivities if present
                     setWeekActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
                     setUnattachedActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
-                    addToast({ title: "Activity updated", description: `Moved to ${start.toLocaleString()}`, variant: "success" });
+                    addToast({ title: "Activity updated", description: `Moved to ${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
                 } catch (err) {
                     console.warn("Failed to update activity from drop", err);
                     addToast({ title: "Failed to update activity", description: String(err?.message || err), variant: "error" });
@@ -555,7 +570,7 @@ const CalendarContainer = () => {
                 timezone: tz,
             });
             setEvents((prev) => [...prev, created]);
-            addToast({ title: "Event created", description: `${title} at ${start.toLocaleTimeString()}`, variant: "success" });
+            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
         } catch (err) {
             console.warn("Failed to create calendar event from activity drop", err);
             addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
@@ -916,7 +931,7 @@ const CalendarContainer = () => {
             setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
             addToast({
                 title: "Event updated",
-                description: `Moved to ${newStartDate.toLocaleString()}${targetEnd ? ` - ${targetEnd.toLocaleTimeString()}` : ""}`,
+                description: `Moved to ${formatDate(newStartDate)} ${formatTime(`${String(newStartDate.getHours()).padStart(2,'0')}:${String(newStartDate.getMinutes()).padStart(2,'0')}`)}${targetEnd ? ` - ${formatTime(`${String(targetEnd.getHours()).padStart(2,'0')}:${String(targetEnd.getMinutes()).padStart(2,'0')}`)}` : ""}`,
                 variant: "success",
             });
         } catch (err) {
@@ -984,14 +999,7 @@ const CalendarContainer = () => {
     // Human-readable label for current range (day/week/month/quarter)
     const rangeLabel = (() => {
         const d = new Date(currentDate);
-        const fmtDay = (dt, opts = {}) =>
-            dt.toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-                ...opts,
-            });
+        const fmtDay = (dt, opts = {}) => formatDate(dt, { includeWeekday: true, ...opts });
         if (view === "day") {
             return fmtDay(d);
         }
@@ -1001,28 +1009,19 @@ const CalendarContainer = () => {
             const weekEnd = new Date(weekStart);
             const daysCount = workWeek ? 5 : 7;
             weekEnd.setDate(weekEnd.getDate() + (daysCount - 1));
-            const sameYear = weekStart.getFullYear() === weekEnd.getFullYear();
-            const startStr = weekStart.toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: sameYear ? undefined : "numeric",
-            });
-            const endStr = weekEnd.toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-            });
+            const startStr = formatDate(weekStart);
+            const endStr = formatDate(weekEnd);
             return `${startStr} — ${endStr}`;
         }
         if (view === "month") {
-            return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+            return formatDate(d, { longMonth: true });
         }
         if (view === "quarter") {
             const q = Math.floor(d.getMonth() / 3) + 1;
             return `Q${q} ${d.getFullYear()}`;
         }
         if (view === "list") {
-            return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+            return formatDate(d, { longMonth: true });
         }
         return "";
     })();

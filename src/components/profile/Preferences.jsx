@@ -2,8 +2,183 @@ import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
 import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
+import userProfileService from '../../services/userProfileService';
 import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
+import { getBrowserTimeZone } from '../../utils/time';
+
+// Searchable IANA timezone selector (in-component to avoid adding a new file)
+const IanaTimezoneSelect = ({ value, onChange }) => {
+    const [query, setQuery] = React.useState('');
+    const [zones, setZones] = React.useState([]);
+    const [open, setOpen] = React.useState(false);
+    const [highlighted, setHighlighted] = React.useState(-1);
+    const inputRef = React.useRef(null);
+    const listRef = React.useRef(null);
+    const containerRef = React.useRef(null);
+
+    useEffect(() => {
+        let mounted = true;
+        try {
+            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+                try {
+                    const vals = Intl.supportedValuesOf('timeZone');
+                    if (mounted) setZones(Array.isArray(vals) ? vals : []);
+                    return;
+                } catch (e) {
+                    // fall through to fallback list
+                }
+            }
+        } catch (e) {}
+        // Fallback shortlist if browser doesn't support supportedValuesOf
+        const fallback = [
+            'UTC','Europe/Ljubljana','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Toronto','Asia/Tokyo','Asia/Shanghai','Asia/Kolkata','Australia/Sydney'
+        ];
+        if (mounted) setZones(fallback);
+        return () => { mounted = false; };
+    }, []);
+
+    const filtered = React.useMemo(() => {
+        const q = String(query || '').toLowerCase();
+        if (!q) return zones;
+        return zones.filter((z) => z.toLowerCase().includes(q));
+    }, [zones, query]);
+
+    // Reset highlighted index when filtered list changes or opens
+    useEffect(() => {
+        if (open) {
+            const idx = filtered.findIndex((z) => z === value);
+            setHighlighted(idx >= 0 ? idx : (filtered.length > 0 ? 0 : -1));
+        } else {
+            setHighlighted(-1);
+        }
+    }, [filtered, open, value]);
+
+    // Keep highlighted item scrolled into view
+    useEffect(() => {
+        if (highlighted >= 0 && listRef.current) {
+            const el = listRef.current.children[highlighted];
+            if (el && typeof el.scrollIntoView === 'function') {
+                el.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }, [highlighted]);
+
+    // Close the dropdown when clicking outside
+    useEffect(() => {
+        if (!open) return;
+        const onDocClick = (ev) => {
+            const target = ev.target;
+            if (!containerRef.current) return;
+            if (!containerRef.current.contains(target)) {
+                setOpen(false);
+                setQuery('');
+                setHighlighted(-1);
+                if (inputRef.current) inputRef.current.blur();
+            }
+        };
+        document.addEventListener('pointerdown', onDocClick);
+        // keep mouse support for environments that don't have pointer events
+        document.addEventListener('mousedown', onDocClick);
+        return () => {
+            document.removeEventListener('pointerdown', onDocClick);
+            document.removeEventListener('mousedown', onDocClick);
+        };
+    }, [open]);
+
+    const handleKeyDown = (e) => {
+        if (!open) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlighted((h) => {
+                const next = h + 1;
+                return next >= filtered.length ? 0 : next;
+            });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlighted((h) => {
+                const prev = h - 1;
+                return prev < 0 ? Math.max(0, filtered.length - 1) : prev;
+            });
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (highlighted >= 0 && filtered[highlighted]) {
+                const sel = filtered[highlighted];
+                onChange(sel);
+                setOpen(false);
+                setQuery('');
+                // return focus to input
+                if (inputRef.current) inputRef.current.focus();
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setOpen(false);
+            setQuery('');
+            if (inputRef.current) inputRef.current.blur();
+        }
+    };
+
+    const detected = (() => {
+        try {
+            return getBrowserTimeZone();
+        } catch (e) {
+            return '';
+        }
+    })();
+
+    return (
+        <div className="relative">
+            <div className="flex items-center space-x-2">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Search timezone or type to detect"
+                    value={query}
+                    onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    onKeyDown={handleKeyDown}
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                    className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                />
+                <button
+                    type="button"
+                    onClick={() => { onChange(detected || getBrowserTimeZone()); setQuery(''); }}
+                    className="text-sm text-blue-600"
+                    title={detected ? `Auto-detected: ${detected}` : 'Auto-detected timezone'}
+                >
+                    {detected ? `Auto (Detected: ${detected})` : 'Auto'}
+                </button>
+            </div>
+            {open && filtered && filtered.length > 0 && (
+                <ul
+                    ref={listRef}
+                    role="listbox"
+                    aria-label="Timezones"
+                    className="absolute z-40 bg-white border border-gray-200 rounded mt-1 max-h-48 overflow-auto w-full shadow-sm"
+                >
+                    {filtered.slice(0, 200).map((z, idx) => {
+                        const isSelected = z === value;
+                        const isHighlighted = idx === highlighted;
+                        return (
+                            <li
+                                key={z}
+                                role="option"
+                                aria-selected={isSelected}
+                                tabIndex={-1}
+                                onMouseDown={() => { onChange(z); setOpen(false); setQuery(''); }}
+                                onMouseEnter={() => setHighlighted(idx)}
+                                className={`px-2 py-1 text-sm cursor-pointer ${isSelected ? 'bg-blue-50' : ''} ${isHighlighted ? 'bg-blue-100' : ''}`}
+                            >
+                                {z}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+};
 
 // Simple Toggle component for nested preferences
 const SimpleToggle = ({ checked, onChange, disabled = false }) => (
@@ -110,6 +285,18 @@ export const Preferences = ({ showToast }) => {
             return () => mediaQuery.removeEventListener('change', handler);
         }
     }, [preferences.theme]);
+
+    // Apply language setting to the document so UI frameworks and
+    // assistive tech can pick up the current language immediately.
+    useEffect(() => {
+        try {
+            if (preferences.language) {
+                document.documentElement.lang = preferences.language;
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [preferences.language]);
     
     const loadPreferences = async () => {
         setLoading(true);
@@ -190,8 +377,15 @@ export const Preferences = ({ showToast }) => {
             
             // Add other supported fields
             if (preferences.timeFormat) apiData.timeFormat = preferences.timeFormat;
-            if (preferences.dateFormat) apiData.dateFormat = preferences.dateFormat;
-            if (preferences.theme) apiData.theme = preferences.theme;
+            if (preferences.dateFormat) {
+                // Resolve 'auto' to a locale-driven pattern before sending to API
+                if (preferences.dateFormat === 'auto') {
+                    const locale = (navigator && navigator.language) || 'en-US';
+                    apiData.dateFormat = detectPatternFromLocale(locale);
+                } else {
+                    apiData.dateFormat = preferences.dateFormat;
+                }
+            }
             if (preferences.goalRemindersEmail !== undefined) apiData.goalRemindersEmail = preferences.goalRemindersEmail;
             if (preferences.goalRemindersDesktop !== undefined) apiData.goalRemindersDesktop = preferences.goalRemindersDesktop;
             if (preferences.goalReminderTiming) apiData.goalReminderTiming = preferences.goalReminderTiming;
@@ -199,8 +393,17 @@ export const Preferences = ({ showToast }) => {
             if (preferences.pmRemindersDesktop !== undefined) apiData.pmRemindersDesktop = preferences.pmRemindersDesktop;
             if (preferences.pmReminderTiming) apiData.pmReminderTiming = preferences.pmReminderTiming;
 
-            // Save to API
+            // Save to API (preferences)
             await userPreferencesService.updatePreferences(apiData);
+            // Persist timezone to user profile as canonical source for IANA timezone
+            if (preferences.timezone) {
+                try {
+                    await userProfileService.updateProfile({ timeZone: preferences.timezone });
+                } catch (e) {
+                    // non-fatal: preferences still saved; log briefly
+                    console.warn('Failed to persist timezone to profile:', e);
+                }
+            }
             
             // Also save all preferences to localStorage for legacy support
             localStorage.setItem('userPreferences', JSON.stringify(preferences));
@@ -235,14 +438,41 @@ export const Preferences = ({ showToast }) => {
                     }
                 }));
             }
-            
-            if (apiData.theme) {
-                window.dispatchEvent(new CustomEvent('themeChanged', {
-                    detail: {
-                        theme: apiData.theme
-                    }
+
+            // Notify other parts of the app about locale/timezone/language changes
+            // which are not necessarily owned by the calendar preferences hook.
+            if (preferences.timezone) {
+                window.dispatchEvent(new CustomEvent('timezoneChanged', {
+                    detail: { timeZone: preferences.timezone }
                 }));
             }
+
+            if (preferences.language) {
+                window.dispatchEvent(new CustomEvent('languageChanged', {
+                    detail: { language: preferences.language }
+                }));
+            }
+
+            // Broadcast reminder preference changes so any notification UI can update
+            window.dispatchEvent(new CustomEvent('goalRemindersChanged', {
+                detail: {
+                    email: preferences.goalRemindersEmail,
+                    desktop: preferences.goalRemindersDesktop,
+                    timing: preferences.goalReminderTiming
+                }
+            }));
+
+            window.dispatchEvent(new CustomEvent('pmRemindersChanged', {
+                detail: {
+                    email: preferences.pmRemindersEmail,
+                    desktop: preferences.pmRemindersDesktop,
+                    timing: preferences.pmReminderTiming
+                }
+            }));
+
+            // `theme` is a client-only visual preference and not accepted by the
+            // backend schema. We keep it locally (applied via the effect above)
+            // but do not send it to the API to avoid 400 validation errors.
             
             showToast('Preferences saved successfully');
         } catch (error) {
@@ -256,7 +486,132 @@ export const Preferences = ({ showToast }) => {
     };
     
     const updatePreference = (key, value) => {
+        // If the user changes the timeFormat, convert existing work hours to the new format
+        if (key === 'timeFormat') {
+            const to24 = value === '24h';
+            const to24Time = (t) => {
+                if (!t) return t;
+                // already 24h HH:MM
+                const h24 = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+                const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+                const m24 = t.match(h24);
+                if (m24) {
+                    // normalize to HH:MM (pad hour)
+                    return `${String(m24[1]).padStart(2,'0')}:${m24[2]}`;
+                }
+                const m = t.match(ampm);
+                if (m) {
+                    let hh = parseInt(m[1], 10);
+                    const mm = m[2];
+                    const ap = m[3].toUpperCase();
+                    if (ap === 'PM' && hh !== 12) hh += 12;
+                    if (ap === 'AM' && hh === 12) hh = 0;
+                    return `${String(hh).padStart(2,'0')}:${mm}`;
+                }
+                // fallback: try to parse naive numeric like '8:00 AM' variations
+                try {
+                    const parsed = new Date(`1970-01-01T${t}`);
+                    if (!isNaN(parsed.getTime())) return `${String(parsed.getHours()).padStart(2,'0')}:${String(parsed.getMinutes()).padStart(2,'0')}`;
+                } catch (_) {}
+                return t;
+            };
+            const to12Time = (t) => {
+                if (!t) return t;
+                const h24 = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+                const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+                const m24 = t.match(h24);
+                if (m24) {
+                    let hh = parseInt(m24[1], 10);
+                    const mm = m24[2];
+                    const ap = hh >= 12 ? 'PM' : 'AM';
+                    const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+                    return `${displayHour}:${mm} ${ap}`;
+                }
+                const m = t.match(ampm);
+                if (m) {
+                    // normalize spacing/padding
+                    let hh = parseInt(m[1], 10);
+                    const mm = m[2];
+                    const ap = m[3].toUpperCase();
+                    const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+                    return `${displayHour}:${mm} ${ap}`;
+                }
+                try {
+                    const parsed = new Date(`1970-01-01T${t}`);
+                    if (!isNaN(parsed.getTime())) {
+                        const hh = parsed.getHours();
+                        const mm = String(parsed.getMinutes()).padStart(2,'0');
+                        const ap = hh >= 12 ? 'PM' : 'AM';
+                        const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+                        return `${displayHour}:${mm} ${ap}`;
+                    }
+                } catch (_) {}
+                return t;
+            };
+
+            setPreferences(prev => ({
+                ...prev,
+                timeFormat: value,
+                workStartTime: to24 ? to24Time(prev.workStartTime) : to12Time(prev.workStartTime),
+                workEndTime: to24 ? to24Time(prev.workEndTime) : to12Time(prev.workEndTime)
+            }));
+            // Notify other parts of the app immediately so UI updates without needing to Save
+            try {
+                window.dispatchEvent(new CustomEvent('timeFormatChanged', { detail: { timeFormat: value } }));
+            } catch (__) {}
+            return;
+        }
+        // Immediate broadcasts for date format, timezone and language so changes reflect instantly
+        if (key === 'dateFormat') {
+            try { window.dispatchEvent(new CustomEvent('dateFormatChanged', { detail: { dateFormat: value } })); } catch (__) {}
+        }
+        if (key === 'timezone') {
+            try { window.dispatchEvent(new CustomEvent('timezoneChanged', { detail: { timeZone: value } })); } catch (__) {}
+        }
+        if (key === 'language') {
+            try { window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: value } })); } catch (__) {}
+            try { document.documentElement.lang = value; } catch (__) {}
+        }
         setPreferences(prev => ({ ...prev, [key]: value }));
+    };
+
+    // Helpers for date format detection and sample preview
+    const detectPatternFromLocale = (locale) => {
+        try {
+            const sample = new Date(2025, 10, 27); // 27 Nov 2025
+            const parts = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' })
+                .formatToParts(sample)
+                .filter(p => ['year', 'month', 'day'].includes(p.type))
+                .map(p => p.type);
+            const seq = parts.join('-');
+            if (seq === 'month-day-year' || seq === 'month-day-year') return 'MM/dd/yyyy';
+            if (seq === 'day-month-year') return 'dd/MM/yyyy';
+            if (seq === 'year-month-day') return 'yyyy-MM-dd';
+            // fallback
+            return 'MM/dd/yyyy';
+        } catch (e) {
+            return 'MM/dd/yyyy';
+        }
+    };
+
+    const sampleForFormat = (fmt) => {
+        const sample = new Date(2025, 10, 27);
+        if (fmt === 'auto') {
+            const locale = (navigator && navigator.language) || 'en-US';
+            return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'numeric', day: 'numeric' }).format(sample);
+        }
+        switch (fmt) {
+            case 'MM/dd/yyyy':
+                return `${String(sample.getMonth() + 1).padStart(2, '0')}/${String(sample.getDate()).padStart(2, '0')}/${sample.getFullYear()}`;
+            case 'dd/MM/yyyy':
+                return `${String(sample.getDate()).padStart(2, '0')}/${String(sample.getMonth() + 1).padStart(2, '0')}/${sample.getFullYear()}`;
+            case 'yyyy-MM-dd':
+                return `${sample.getFullYear()}-${String(sample.getMonth() + 1).padStart(2, '0')}-${String(sample.getDate()).padStart(2, '0')}`;
+            case 'MMM dd, yyyy':
+                return new Intl.DateTimeFormat((navigator && navigator.language) || 'en-US', { year: 'numeric', month: 'short', day: '2-digit' }).format(sample);
+            default:
+                return fmt;
+        }
     };
     
     const resetToDefaults = async () => {
@@ -323,32 +678,27 @@ export const Preferences = ({ showToast }) => {
                     </Field>
                     
                     <Field label="Timezone">
-                        <select
+                        <IanaTimezoneSelect
                             value={preferences.timezone}
-                            onChange={(e) => updatePreference('timezone', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                        >
-                            <option value="America/New_York">Eastern Time</option>
-                            <option value="America/Chicago">Central Time</option>
-                            <option value="America/Denver">Mountain Time</option>
-                            <option value="America/Los_Angeles">Pacific Time</option>
-                            <option value="Europe/London">GMT</option>
-                            <option value="Europe/Paris">CET</option>
-                            <option value="Asia/Tokyo">JST</option>
-                        </select>
+                            onChange={(val) => updatePreference('timezone', val)}
+                        />
                     </Field>
                     
                     <Field label="Date Format">
-                        <select
-                            value={preferences.dateFormat}
-                            onChange={(e) => updatePreference('dateFormat', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                        >
-                            <option value="MM/dd/yyyy">MM/DD/YYYY</option>
-                            <option value="dd/MM/yyyy">DD/MM/YYYY</option>
-                            <option value="yyyy-MM-dd">YYYY-MM-DD</option>
-                            <option value="MMM dd, yyyy">MMM DD, YYYY</option>
-                        </select>
+                        <div>
+                            <select
+                                value={preferences.dateFormat}
+                                onChange={(e) => updatePreference('dateFormat', e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                            >
+                                <option value="auto">Auto</option>
+                                <option value="MM/dd/yyyy">MM/DD/YYYY</option>
+                                <option value="dd/MM/yyyy">DD/MM/YYYY</option>
+                                <option value="yyyy-MM-dd">YYYY-MM-DD</option>
+                                <option value="MMM dd, yyyy">MMM DD, YYYY</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">Example: <span className="font-medium">{sampleForFormat(preferences.dateFormat)}</span></p>
+                        </div>
                     </Field>
                     
                     <Field label="Time Format">
@@ -374,7 +724,7 @@ export const Preferences = ({ showToast }) => {
                         <TimePicker
                             value={preferences.workStartTime}
                             onChange={(value) => updatePreference('workStartTime', value)}
-                            use24Hour={use24Hour}
+                            use24Hour={preferences.timeFormat === '24h'}
                             className="w-full"
                             label="Work Start Time"
                         />
@@ -383,7 +733,7 @@ export const Preferences = ({ showToast }) => {
                         <TimePicker
                             value={preferences.workEndTime}
                             onChange={(value) => updatePreference('workEndTime', value)}
-                            use24Hour={use24Hour}
+                            use24Hour={preferences.timeFormat === '24h'}
                             className="w-full"
                             label="Work End Time"
                         />
@@ -391,7 +741,7 @@ export const Preferences = ({ showToast }) => {
                 </div>
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         <div>
