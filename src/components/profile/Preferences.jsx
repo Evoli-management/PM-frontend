@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
 import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
+import userProfileService from '../../services/userProfileService';
 import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
 
@@ -199,8 +200,17 @@ export const Preferences = ({ showToast }) => {
             if (preferences.pmRemindersDesktop !== undefined) apiData.pmRemindersDesktop = preferences.pmRemindersDesktop;
             if (preferences.pmReminderTiming) apiData.pmReminderTiming = preferences.pmReminderTiming;
 
-            // Save to API
+            // Save to API (preferences)
             await userPreferencesService.updatePreferences(apiData);
+            // Persist timezone to user profile as canonical source for IANA timezone
+            if (preferences.timezone) {
+                try {
+                    await userProfileService.updateProfile({ timeZone: preferences.timezone });
+                } catch (e) {
+                    // non-fatal: preferences still saved; log briefly
+                    console.warn('Failed to persist timezone to profile:', e);
+                }
+            }
             
             // Also save all preferences to localStorage for legacy support
             localStorage.setItem('userPreferences', JSON.stringify(preferences));
