@@ -275,13 +275,13 @@ const CalendarContainer = () => {
                 const allEvents = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
                 // Attach human-friendly labels converted from UTC -> user's timezone
                 try {
-                    const tzMod = await import('../../utils/time');
-                    const { formatUtcForUser } = tzMod;
-                    const enriched = await Promise.all((allEvents || []).map(async (ev) => ({
+                    // Use the synchronous wrapper; preloadTzLib is called at app startup so this will work.
+                    const { formatUtcForUserSync } = await import('../../utils/time');
+                    const enriched = (allEvents || []).map((ev) => ({
                         ...ev,
-                        formattedStart: ev.start ? await formatUtcForUser(ev.start, timezone) : null,
-                        formattedEnd: ev.end ? await formatUtcForUser(ev.end, timezone) : null,
-                    })));
+                        formattedStart: ev.start ? formatUtcForUserSync(ev.start, timezone) : null,
+                        formattedEnd: ev.end ? formatUtcForUserSync(ev.end, timezone) : null,
+                    }));
                     setEvents(enriched);
                 } catch (e) {
                     // Fallback: store raw events if utils fail

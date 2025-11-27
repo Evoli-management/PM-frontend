@@ -5,6 +5,64 @@ import userPreferencesService from '../../services/userPreferencesService';
 import userProfileService from '../../services/userProfileService';
 import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
+import { getBrowserTimeZone } from '../../utils/time';
+
+// Searchable IANA timezone selector (in-component to avoid adding a new file)
+const IanaTimezoneSelect = ({ value, onChange }) => {
+    const [query, setQuery] = React.useState('');
+    const [zones, setZones] = React.useState([]);
+    const [open, setOpen] = React.useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        try {
+            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+                try {
+                    const vals = Intl.supportedValuesOf('timeZone');
+                    if (mounted) setZones(Array.isArray(vals) ? vals : []);
+                    return;
+                } catch (e) {
+                    // fall through to fallback list
+                }
+            }
+        } catch (e) {}
+        // Fallback shortlist if browser doesn't support supportedValuesOf
+        const fallback = [
+            'UTC','Europe/Ljubljana','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Toronto','Asia/Tokyo','Asia/Shanghai','Asia/Kolkata','Australia/Sydney'
+        ];
+        if (mounted) setZones(fallback);
+        return () => { mounted = false; };
+    }, []);
+
+    const filtered = React.useMemo(() => {
+        const q = String(query || '').toLowerCase();
+        if (!q) return zones;
+        return zones.filter((z) => z.toLowerCase().includes(q));
+    }, [zones, query]);
+
+    return (
+        <div className="relative">
+            <div className="flex items-center space-x-2">
+                <input
+                    type="text"
+                    placeholder="Search timezone or type to detect"
+                    value={query}
+                    onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                />
+                <button type="button" onClick={() => { onChange(getBrowserTimeZone()); setQuery(''); }} className="text-sm text-blue-600">Auto</button>
+            </div>
+            {open && filtered && filtered.length > 0 && (
+                <ul className="absolute z-40 bg-white border border-gray-200 rounded mt-1 max-h-48 overflow-auto w-full shadow-sm">
+                    {filtered.slice(0, 200).map((z) => (
+                        <li key={z} className={`px-2 py-1 text-sm hover:bg-blue-50 cursor-pointer ${z === value ? 'bg-blue-50' : ''}`} onMouseDown={() => { onChange(z); setOpen(false); setQuery(''); }}>{z}</li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+};
 
 // Simple Toggle component for nested preferences
 const SimpleToggle = ({ checked, onChange, disabled = false }) => (
@@ -333,19 +391,10 @@ export const Preferences = ({ showToast }) => {
                     </Field>
                     
                     <Field label="Timezone">
-                        <select
+                        <IanaTimezoneSelect
                             value={preferences.timezone}
-                            onChange={(e) => updatePreference('timezone', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                        >
-                            <option value="America/New_York">Eastern Time</option>
-                            <option value="America/Chicago">Central Time</option>
-                            <option value="America/Denver">Mountain Time</option>
-                            <option value="America/Los_Angeles">Pacific Time</option>
-                            <option value="Europe/London">GMT</option>
-                            <option value="Europe/Paris">CET</option>
-                            <option value="Asia/Tokyo">JST</option>
-                        </select>
+                            onChange={(val) => updatePreference('timezone', val)}
+                        />
                     </Field>
                     
                     <Field label="Date Format">
