@@ -77,8 +77,13 @@ const IanaTimezoneSelect = ({ value, onChange }) => {
                 if (inputRef.current) inputRef.current.blur();
             }
         };
+        document.addEventListener('pointerdown', onDocClick);
+        // keep mouse support for environments that don't have pointer events
         document.addEventListener('mousedown', onDocClick);
-        return () => document.removeEventListener('mousedown', onDocClick);
+        return () => {
+            document.removeEventListener('pointerdown', onDocClick);
+            document.removeEventListener('mousedown', onDocClick);
+        };
     }, [open]);
 
     const handleKeyDown = (e) => {
