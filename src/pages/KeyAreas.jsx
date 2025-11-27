@@ -2376,8 +2376,7 @@ export default function KeyAreas() {
                         )}
                         {selectedKA && (
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
-                                <div className="max-w-7xl mx-auto p-6">
-                                    <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
+                                <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
                                         <div className="flex items-center justify-between border-b pb-2">
                                             <div className="flex items-center gap-2">
@@ -2945,7 +2944,6 @@ export default function KeyAreas() {
                                             </button>
                                         </div>
                                     </div>
-                                </div>
                             </div>
                         )}
                         {/* Global Activities popover (attached to hamburger) */}

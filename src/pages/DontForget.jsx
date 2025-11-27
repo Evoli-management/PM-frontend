@@ -1314,19 +1314,7 @@ export default function DontForget() {
                         </div>
                     </div>
                 ) : (
-                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
-                        <div className="flex items-center justify-between gap-2 mb-0 p-0 pb-0">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
-                                    onClick={() => setMobileSidebarOpen(true)}
-                                    aria-label="Open sidebar"
-                                >
-                                    <FaBars />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="px-1 md:px-2">
+                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full px-1 md:px-2">
                         {viewMode === "dont-forget" ? (
                             <div className="max-w-full overflow-x-hidden">
                                 <div className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6">
@@ -1382,8 +1370,7 @@ export default function DontForget() {
                                 </div>
 
                                 <div className="mb-4">
-                                    <div className="max-w-7xl mx-auto p-2">
-                                        <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
+                                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                 {/* Header area */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="col-span-3 md:col-span-2">
@@ -1688,14 +1675,12 @@ export default function DontForget() {
                                     users={users}
                                     goals={goals}
                                 />
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
-                        ) : (
+                        </div>
+                    </div>
+                ) : (
                             <div className="p-2 text-gray-500">Select a view.</div>
                         )}
-                        </div>
                     </div>
                 )}
             </main>
