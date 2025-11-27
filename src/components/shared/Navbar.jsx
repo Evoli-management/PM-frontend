@@ -1,8 +1,14 @@
 
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import taskService from "../../services/taskService";
+import activityService from "../../services/activityService";
+import goalService from "../../services/goalService";
+import keyAreaService from "../../services/keyAreaService";
+import calendarService from "../../services/calendarService";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
@@ -36,6 +42,8 @@ export default function Navbar() {
     const widgetsRef = useRef(null);
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const searchRef = useRef(null);
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
@@ -48,16 +56,19 @@ export default function Navbar() {
     });
     const [search, setSearch] = useState("");
 
-    // Handle search functionality
-    const handleSearch = (searchTerm) => {
+    // Handle global search functionality across entire system
+    const handleSearch = async (searchTerm) => {
         if (!searchTerm.trim()) {
             setSearchResults([]);
             setShowSearchResults(false);
             return;
         }
 
-        // Define searchable items with their routes and types
-        const searchableItems = [
+        const searchLower = searchTerm.toLowerCase();
+        const results = [];
+
+        // Search pages/navigation (immediate results)
+        const pageItems = [
             { title: "Dashboard", route: "/dashboard", type: "page", description: "Main dashboard overview" },
             { title: "Calendar", route: "/calendar", type: "page", description: "View and manage appointments" },
             { title: "Don't Forget", route: "/tasks?dontforget=1", type: "page", description: "Quick task reminders" },
@@ -67,22 +78,151 @@ export default function Navbar() {
             { title: "Team", route: "/teams", type: "page", description: "Team collaboration and management" },
             { title: "Profile Settings", route: "/profile", type: "page", description: "User profile and settings" },
         ];
-
-        // Filter items based on search term
-        const results = searchableItems.filter(item => 
-            item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.description.toLowerCase().includes(searchTerm.toLowerCase())
+        
+        const matchingPages = pageItems.filter(item => 
+            item.title.toLowerCase().includes(searchLower) ||
+            item.description.toLowerCase().includes(searchLower)
         );
+        results.push(...matchingPages);
 
-        setSearchResults(results);
+        // Show immediate page results first
+        setSearchResults([...results]);
+        updateDropdownPosition();
         setShowSearchResults(true);
+        setSearchLoading(true);
+
+        try {
+
+            // Search tasks globally
+            try {
+                const tasks = await taskService.getTasks();
+                const matchingTasks = tasks.filter(task => 
+                    task.title?.toLowerCase().includes(searchLower) ||
+                    task.description?.toLowerCase().includes(searchLower) ||
+                    task.name?.toLowerCase().includes(searchLower)
+                ).slice(0, 5); // Limit results
+                
+                matchingTasks.forEach(task => {
+                    results.push({
+                        title: task.title || task.name || 'Untitled Task',
+                        route: `/tasks?id=${task.id}`,
+                        type: "task",
+                        description: task.description || 'Task'
+                    });
+                });
+                
+                // Update results with tasks
+                setSearchResults([...results]);
+            } catch (e) {
+                console.warn('Task search failed:', e);
+            }
+
+            // Search activities globally
+            try {
+                const activities = await activityService.getActivities();
+                const matchingActivities = activities.filter(activity => 
+                    activity.title?.toLowerCase().includes(searchLower) ||
+                    activity.description?.toLowerCase().includes(searchLower) ||
+                    activity.name?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingActivities.forEach(activity => {
+                    results.push({
+                        title: activity.title || activity.name || 'Untitled Activity',
+                        route: `/activities?id=${activity.id}`,
+                        type: "activity",
+                        description: activity.description || 'Activity'
+                    });
+                });
+            } catch (e) {
+                console.warn('Activity search failed:', e);
+            }
+
+            // Search goals globally
+            try {
+                const goals = await goalService.getGoals();
+                const matchingGoals = goals.filter(goal => 
+                    goal.title?.toLowerCase().includes(searchLower) ||
+                    goal.description?.toLowerCase().includes(searchLower) ||
+                    goal.name?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingGoals.forEach(goal => {
+                    results.push({
+                        title: goal.title || goal.name || 'Untitled Goal',
+                        route: `/goals?id=${goal.id}`,
+                        type: "goal",
+                        description: goal.description || 'Goal'
+                    });
+                });
+            } catch (e) {
+                console.warn('Goal search failed:', e);
+            }
+
+            // Search key areas globally
+            try {
+                const keyAreas = await keyAreaService.getKeyAreas();
+                const matchingKeyAreas = keyAreas.filter(area => 
+                    area.name?.toLowerCase().includes(searchLower) ||
+                    area.description?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingKeyAreas.forEach(area => {
+                    results.push({
+                        title: area.name || 'Untitled Key Area',
+                        route: `/key-areas?id=${area.id}`,
+                        type: "key-area",
+                        description: area.description || 'Key Area'
+                    });
+                });
+            } catch (e) {
+                console.warn('Key Area search failed:', e);
+            }
+
+            // Search calendar appointments globally
+            try {
+                const appointments = await calendarService.getAppointments();
+                const matchingAppointments = appointments.filter(appointment => 
+                    appointment.title?.toLowerCase().includes(searchLower) ||
+                    appointment.description?.toLowerCase().includes(searchLower) ||
+                    appointment.summary?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingAppointments.forEach(appointment => {
+                    results.push({
+                        title: appointment.title || appointment.summary || 'Untitled Appointment',
+                        route: `/calendar?id=${appointment.id}`,
+                        type: "appointment",
+                        description: appointment.description || 'Calendar Appointment'
+                    });
+                });
+            } catch (e) {
+                console.warn('Calendar search failed:', e);
+            }
+
+        } catch (error) {
+            console.error('Global search error:', error);
+        }
+
+        setSearchResults(results.slice(0, 10)); // Limit total results to 10
+        setShowSearchResults(true);
+        setSearchLoading(false);
     };
 
-    // Handle search input change
+    // Handle search input change with debouncing for better performance
     const handleSearchChange = (e) => {
         const value = e.target.value;
         setSearch(value);
-        handleSearch(value);
+        
+        // Clear previous timeout
+        if (window.searchTimeout) {
+            clearTimeout(window.searchTimeout);
+        }
+        
+        // Debounce search to avoid too many API calls
+        window.searchTimeout = setTimeout(() => {
+            handleSearch(value);
+        }, 150); // Wait 150ms after user stops typing for faster response
     };
 
     // Handle search result click
@@ -104,6 +244,17 @@ export default function Navbar() {
             setShowSearchResults(false);
         }
     };
+
+    // Handle window resize to update dropdown position
+    useEffect(() => {
+        const handleResize = () => {
+            if (showSearchResults) {
+                updateDropdownPosition();
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [showSearchResults]);
 
     // Close search results when clicking outside
     useEffect(() => {
@@ -239,7 +390,7 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-40 border-b border-gray-200"
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
@@ -269,28 +420,54 @@ export default function Navbar() {
                             />
                         </div>
                         
-                        {/* Search Results Dropdown */}
-                        {showSearchResults && searchResults.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-64 overflow-y-auto">
-                                {searchResults.map((result, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => handleSearchResultClick(result.route)}
-                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                        {/* Search Results Portal */}
+                        {showSearchResults && createPortal(
+                            <div>
+                                {(searchResults.length > 0 || searchLoading) && (
+                                    <div 
+                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto"
+                                        style={{
+                                            top: `${dropdownPosition.top + 4}px`,
+                                            left: `${dropdownPosition.left}px`,
+                                            width: `${dropdownPosition.width}px`,
+                                            zIndex: 99999
+                                        }}
                                     >
-                                        <div className="font-medium text-gray-800">{result.title}</div>
-                                        <div className="text-sm text-gray-500">{result.description}</div>
-                                        <div className="text-xs text-blue-600 mt-1">{result.type}</div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        
-                        {/* No Results Message */}
-                        {showSearchResults && search && searchResults.length === 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 px-4 py-3">
-                                <div className="text-gray-500 text-sm">No results found for "{search}"</div>
-                            </div>
+                                        {searchResults.map((result, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => handleSearchResultClick(result.route)}
+                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                                            >
+                                                <div className="font-medium text-gray-800">{result.title}</div>
+                                                <div className="text-sm text-gray-500">{result.description}</div>
+                                                <div className="text-xs text-blue-600 mt-1">{result.type}</div>
+                                            </button>
+                                        ))}
+                                        {searchLoading && (
+                                            <div className="px-4 py-3 text-center">
+                                                <div className="text-sm text-gray-500">Searching across system...</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {/* No Results Message */}
+                                {search && searchResults.length === 0 && !searchLoading && (
+                                    <div 
+                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-3"
+                                        style={{
+                                            top: `${dropdownPosition.top + 4}px`,
+                                            left: `${dropdownPosition.left}px`,
+                                            width: `${dropdownPosition.width}px`,
+                                            zIndex: 99999
+                                        }}
+                                    >
+                                        <div className="text-gray-500 text-sm">No results found for "{search}"</div>
+                                    </div>
+                                )}
+                            </div>,
+                            document.body
                         )}
                     </div>
                     
