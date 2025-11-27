@@ -2053,9 +2053,7 @@ export default function KeyAreas() {
 
     return (
         <div className="min-h-screen bg-[#EDEDED]">
-            <div className="flex w-full overflow-x-hidden">
-                {" "}
-                {/* ensure wrapper hides overflow */}
+            <div className="flex w-full min-h-screen">
                 <Sidebar
                     user={{ name: "User" }}
                     collapsed={sidebarCollapsed}
@@ -2128,19 +2126,25 @@ export default function KeyAreas() {
                         isSaving={isSavingActivity}
                     />
                 )}
-                <main
-                    className={`flex-1 min-w-0 w-full transition-all ${mobileSidebarOpen ? "ml-64" : "ml-0"} md:ml-[3mm]`}
-                >
-                    {" "}
-                    {/* min-w-0 prevents overflow of flex children */}
-                    <div className="max-w-full overflow-x-hidden">
-                        {" "}
-                        {/* content constrained to available width */}
-                        {/* Header / Search / New KA */}
-                        <div
-                            className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6"
-                            style={{ display: selectedTaskFull ? "none" : undefined }}
-                        >
+                <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
+                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
+                        <div className="flex items-center justify-between gap-2 mb-0 p-0 pb-0">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                                    onClick={() => setMobileSidebarOpen(true)}
+                                    aria-label="Open sidebar"
+                                >
+                                    <FaBars />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-1 md:px-2">
+                            {/* Header / Search / New KA */}
+                            <div
+                                className="flex items-center justify-between gap-3 mb-4 mt-4 md:mt-6"
+                                style={{ display: selectedTaskFull ? "none" : undefined }}
+                            >
                             {!selectedKA ? (
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
@@ -3148,16 +3152,17 @@ export default function KeyAreas() {
                                 {/* Kanban/Calendar already rendered above based on view */}
                             </div>
                         )}
-                        {/* Create/Edit KA Modal */}
-                        <KeyAreaModal
-                            isOpen={showForm}
-                            editing={editing}
-                            onSave={onSaveKA}
-                            onCancel={() => {
-                                setShowForm(false);
-                                setEditing(null);
-                            }}
-                        />
+                            {/* Create/Edit KA Modal */}
+                            <KeyAreaModal
+                                isOpen={showForm}
+                                editing={editing}
+                                onSave={onSaveKA}
+                                onCancel={() => {
+                                    setShowForm(false);
+                                    setEditing(null);
+                                }}
+                            />
+                        </div>
                     </div>
                 </main>
             </div>
