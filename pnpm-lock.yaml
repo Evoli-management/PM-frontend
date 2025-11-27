@@ -48,8 +48,11 @@ importers:
         specifier: ^2.0.4
         version: 2.0.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       date-fns:
-        specifier: ^4.1.0
-        version: 4.1.0
+        specifier: ^2.30.0
+        version: 2.30.0
+      date-fns-tz:
+        specifier: ^2.0.1
+        version: 2.0.1(date-fns@2.30.0)
       lucide-react:
         specifier: ^0.511.0
         version: 0.511.0(react@19.2.0)
@@ -1169,8 +1172,14 @@ packages:
   date-arithmetic@4.1.0:
     resolution: {integrity: sha512-QWxYLR5P/6GStZcdem+V1xoto6DMadYWpMXU82ES3/RfR3Wdwr3D0+be7mgOJ+Ov0G9D5Dmb9T17sNLQYj9XOg==}
 
-  date-fns@4.1.0:
-    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
+  date-fns-tz@2.0.1:
+    resolution: {integrity: sha512-fJCG3Pwx8HUoLhkepdsP7Z5RsucUi+ZBOxyM5d0ZZ6c4SdYustq0VMmOu6Wf7bli+yS/Jwp91TOCqn9jMcVrUA==}
+    peerDependencies:
+      date-fns: 2.x
+
+  date-fns@2.30.0:
+    resolution: {integrity: sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==}
+    engines: {node: '>=0.11'}
 
   dayjs@1.11.19:
     resolution: {integrity: sha512-t5EcLVS6QPBNqM2z8fakk/NKel+Xzshgt8FFKAn+qwlD1pzZWxh0nVCrvFK7ZDb6XucZeF9z8C7CBWTRIVApAw==}
@@ -3433,7 +3442,13 @@ snapshots:
 
   date-arithmetic@4.1.0: {}
 
-  date-fns@4.1.0: {}
+  date-fns-tz@2.0.1(date-fns@2.30.0):
+    dependencies:
+      date-fns: 2.30.0
+
+  date-fns@2.30.0:
+    dependencies:
+      '@babel/runtime': 7.28.4
 
   dayjs@1.11.19: {}
 

@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
+import TimePicker from "../ui/TimePicker.jsx";
+// TimePicker used with scoped inner classes so styles don't override external fields
+import useCalendarPreferences from "../../hooks/useCalendarPreferences";
 
 // Unified Appointment form for create and edit
 // Props:
@@ -13,6 +15,7 @@ import { useToast } from "../shared/ToastProvider.jsx";
 // - onUpdated: (updatedEvent) => void (edit mode)
 const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60, onClose, onCreated, onUpdated, users = [] }) => {
     const { addToast } = useToast();
+    const { use24Hour } = useCalendarPreferences();
     const isEdit = Boolean(event && event.id);
     const initial = useMemo(() => {
         if (isEdit && event.start) return new Date(event.start);
@@ -21,8 +24,8 @@ const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60
     }, [isEdit, event?.start, startDate]);
     const initialEndCalc = useMemo(() => {
         if (isEdit && event.end) return new Date(event.end);
-        const { end } = clampToBusinessHours(initial, defaultDurationMinutes);
-        return end;
+        // No longer clamp to business hours; treat default duration as simple offset
+        return new Date(initial.getTime() + defaultDurationMinutes * 60000);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEdit, event?.end, initial, defaultDurationMinutes]);
 
@@ -162,10 +165,7 @@ const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60
                 addToast({ title: "End must be after start", variant: "error" });
                 return;
             }
-            if (!withinBusinessHours(s) || !withinBusinessHours(e)) {
-                addToast({ title: "Outside business hours", description: "Use between 08:00–17:00", variant: "error" });
-                return;
-            }
+            // No business-hours restriction: allow creating appointments at any time of day
             setSaving(true);
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
             if (isEdit) {
@@ -233,11 +233,36 @@ const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60
                     box-shadow: none !important;
                     outline: none !important;
                 }
-                /* left-focus keeps a subtle green ring similar to create-task modal */
+                /* left-focus keeps a subtle green ring for left-column inputs */
                 .appointment-modal .left-focus:focus, .appointment-modal .left-focus:focus-visible {
                     box-shadow: 0 0 0 4px rgba(16,185,129,0.12) !important;
                     outline: 2px solid rgba(16,185,129,0.08) !important;
                 }
+
+                /* Right-column appointment controls: visible grey border and purple outline on focus with no shadow */
+                .appointment-modal .appointment-time-control,
+                .appointment-modal select[name=assignee],
+                .appointment-modal input[name=start_date],
+                .appointment-modal input[name=end_date] {
+                    border-color: #cbd5e1 !important; /* slate-300 */
+                    background-color: #ffffff !important;
+                }
+
+                .appointment-modal .appointment-time-control:focus,
+                .appointment-modal select[name=assignee]:focus,
+                .appointment-modal input[name=start_date]:focus,
+                .appointment-modal input[name=end_date]:focus,
+                .appointment-modal .appointment-time-control:focus-visible,
+                .appointment-modal select[name=assignee]:focus-visible,
+                .appointment-modal input[name=start_date]:focus-visible,
+                .appointment-modal input[name=end_date]:focus-visible {
+                    box-shadow: none !important;
+                    outline: 2px solid var(--assignee-accent) !important;
+                    outline-offset: 0px !important;
+                    border-color: var(--assignee-accent) !important;
+                }
+
+                .appointment-modal .appointment-time-control { cursor: pointer; }
                 `}</style>
                 <div className="relative px-5 py-2 border-b border-slate-200">
                     <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
@@ -286,13 +311,14 @@ const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60
 
                         <div>
                             <label className="text-sm font-medium text-slate-700">Start time</label>
-                                <input
-                                    type="time"
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none mt-0.5"
-                                    value={startTimeStr}
-                                    onChange={(e) => setStartTimeStr(e.target.value)}
-                                    required
-                                />
+                            <TimePicker
+                                value={startTimeStr}
+                                onChange={(v) => setStartTimeStr(v)}
+                                use24Hour={use24Hour}
+                                outerClassName="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none mt-0.5"
+                                innerClassName="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                label="Start time"
+                            />
                         </div>
 
                         {/* Row 2 */}
@@ -321,13 +347,14 @@ const AppointmentModal = ({ startDate, event = null, defaultDurationMinutes = 60
 
                         <div>
                             <label className="text-sm font-medium text-slate-700">End time</label>
-                                <input
-                                    type="time"
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none mt-0.5"
-                                    value={endTimeStr}
-                                    onChange={(e) => setEndTimeStr(e.target.value)}
-                                    required
-                                />
+                            <TimePicker
+                                value={endTimeStr}
+                                onChange={(v) => setEndTimeStr(v)}
+                                use24Hour={use24Hour}
+                                outerClassName="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none mt-0.5"
+                                innerClassName="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                label="End time"
+                            />
                         </div>
 
                         {/* Row 3 */}

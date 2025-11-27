@@ -34,10 +34,10 @@ import elephantTaskService from "../../services/elephantTaskService";
 import AvailabilityBlock from "./AvailabilityBlock";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
-import { withinBusinessHours, clampToBusinessHours } from "../../utils/businessHours";
 import { normalizeActivity } from '../../utils/keyareasHelpers';
 import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
+import useCalendarPreferences from '../../hooks/useCalendarPreferences';
 
 const VIEWS = ["day", "week", "month", "quarter", "list"];
 const EVENT_CATEGORIES = {
@@ -53,6 +53,7 @@ const EVENT_CATEGORIES = {
 
 const CalendarContainer = () => {
     const { addToast } = useToast();
+    const { formatDate, formatTime } = useCalendarPreferences();
     // Elephant Task state
     const [elephantTasks, setElephantTasks] = useState([]);
     const [elephantTaskModalOpen, setElephantTaskModalOpen] = useState(false);
@@ -106,6 +107,14 @@ const CalendarContainer = () => {
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
+    // 5-day vs 7-day week preference (persisted)
+    const [workWeek, setWorkWeek] = useState(() => {
+        try {
+            return localStorage.getItem('calendar:workWeek') === 'true';
+        } catch (e) {
+            return false;
+        }
+    });
 
     // Load persisted view/date on mount
     useEffect(() => {
@@ -188,8 +197,17 @@ const CalendarContainer = () => {
         try {
             localStorage.setItem("calendar:view", view);
             localStorage.setItem("calendar:date", currentDate.toISOString());
+            // persist workWeek preference as well
+            try { localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false'); } catch (_) {}
         } catch {}
     }, [view, currentDate]);
+
+    // persist workWeek preference when changed
+    useEffect(() => {
+        try {
+            localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false');
+        } catch (_) {}
+    }, [workWeek]);
 
     // Helper: determine if a todo spans the given day (date-only compare)
     const isTodoInRangeOfDay = (t, dayDate) => {
@@ -226,7 +244,8 @@ const CalendarContainer = () => {
                 // start Monday
                 start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
                 end.setTime(start.getTime());
-                end.setDate(start.getDate() + 6);
+                const daysCount = workWeek ? 5 : 7;
+                end.setDate(start.getDate() + (daysCount - 1));
             } else if (view === "day") {
                 // Fetch exactly the selected day; tasks spanning the day will be included by backend overlap logic
                 start.setTime(currentDate.getTime());
@@ -256,7 +275,20 @@ const CalendarContainer = () => {
                 
                 // Merge events and appointments
                 const allEvents = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
-                setEvents(allEvents);
+                // Attach human-friendly labels converted from UTC -> user's timezone
+                try {
+                    // Use the synchronous wrapper; preloadTzLib is called at app startup so this will work.
+                    const { formatUtcForUserSync } = await import('../../utils/time');
+                    const enriched = (allEvents || []).map((ev) => ({
+                        ...ev,
+                        formattedStart: ev.start ? formatUtcForUserSync(ev.start, timezone) : null,
+                        formattedEnd: ev.end ? formatUtcForUserSync(ev.end, timezone) : null,
+                    }));
+                    setEvents(enriched);
+                } catch (e) {
+                    // Fallback: store raw events if utils fail
+                    setEvents(allEvents);
+                }
                 setTodos(Array.isArray(tds) ? tds : []);
 
                 // Load elephant tasks
@@ -338,7 +370,8 @@ const CalendarContainer = () => {
         if (view === "week") {
             start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
             end.setTime(start.getTime());
-            end.setDate(start.getDate() + 6);
+            const daysCount = workWeek ? 5 : 7;
+            end.setDate(start.getDate() + (daysCount - 1));
         } else if (view === "day") {
             // Exact day range for refresh
             start.setTime(currentDate.getTime());
@@ -407,16 +440,40 @@ const CalendarContainer = () => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
-            if (!withinBusinessHours(start)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Schedule only between 08:00 and 17:00",
-                    variant: "warning",
-                });
+            // No business-hours restriction; compute end as simple duration offset
+            const end = new Date(start.getTime() + defaultMinutes * 60000);
+            const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+
+            // If we dropped an existing task (id), update its start/end on the task service
+            if (taskId && todos.find((t) => String(t.id) === String(taskId))) {
+                try {
+                    const svc = await getTaskService();
+                    const existing = todos.find((t) => String(t.id) === String(taskId));
+                    // compute duration from existing task if present, otherwise defaultMinutes
+                    let durationMs = defaultMinutes * 60000;
+                    try {
+                        const s0 = new Date(existing.startDate || existing.start_date || existing.date || null);
+                        const e0 = new Date(existing.endDate || existing.end_date || existing.date || null);
+                        if (!isNaN(s0.getTime()) && !isNaN(e0.getTime())) {
+                            durationMs = Math.max(0, e0.getTime() - s0.getTime());
+                        }
+                    } catch (_) {}
+
+                    const newEnd = new Date(start.getTime() + durationMs);
+                    const toISO = (d) => d.toISOString();
+                    const patch = { startDate: toISO(start), endDate: toISO(newEnd) };
+                    const updated = await svc.update(taskId, patch);
+                    // Update local todos
+                    setTodos((prev) => prev.map((t) => (String(t.id) === String(taskId) ? updated : t)));
+                    addToast({ title: "Task updated", description: `Moved to ${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
+                } catch (err) {
+                    console.warn("Failed to update task from drop", err);
+                    addToast({ title: "Failed to update task", description: String(err?.message || err), variant: "error" });
+                }
                 return;
             }
-            const { end } = clampToBusinessHours(start, defaultMinutes);
-            const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+
+            // Otherwise create a calendar appointment (existing behavior)
             // Try to find a title from todos if not provided
             let title =
                 (typeof taskOrId === "object" && taskOrId?.title) ||
@@ -449,7 +506,7 @@ const CalendarContainer = () => {
             setEvents((prev) => [...prev, created]);
             addToast({
                 title: "Event created",
-                description: `${title} at ${start.toLocaleTimeString()}`,
+                description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`,
                 variant: "success",
             });
         } catch (err) {
@@ -463,15 +520,29 @@ const CalendarContainer = () => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
-            if (!withinBusinessHours(start)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Schedule only between 08:00 and 17:00",
-                    variant: "warning",
-                });
+            // No business-hours restriction; compute end as simple duration offset
+            const end = new Date(start.getTime() + defaultMinutes * 60000);
+
+            // If an existing activity id was dropped, update its date
+            const activityId = typeof activityOrObj === "string" ? activityOrObj : activityOrObj?.id;
+            if (activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
+                try {
+                    const svc = await getActivityService();
+                    const toISO = (d) => d.toISOString();
+                    // activities may use `date` or `startDate` fields; prefer `date`
+                    const payload = { date: toISO(start) };
+                    const updated = await svc.update(activityId, payload);
+                    // update local weekActivities and unattachedActivities if present
+                    setWeekActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
+                    setUnattachedActivities((prev) => prev.map((a) => (String(a.id) === String(activityId) ? updated : a)));
+                    addToast({ title: "Activity updated", description: `Moved to ${formatDate(start)} ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
+                } catch (err) {
+                    console.warn("Failed to update activity from drop", err);
+                    addToast({ title: "Failed to update activity", description: String(err?.message || err), variant: "error" });
+                }
                 return;
             }
-            const { end } = clampToBusinessHours(start, defaultMinutes);
+
             const title =
                 (typeof activityOrObj === "object" && (activityOrObj.text || activityOrObj.title)) ||
                 "Activity";
@@ -499,7 +570,7 @@ const CalendarContainer = () => {
                 timezone: tz,
             });
             setEvents((prev) => [...prev, created]);
-            addToast({ title: "Event created", description: `${title} at ${start.toLocaleTimeString()}`, variant: "success" });
+            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
         } catch (err) {
             console.warn("Failed to create calendar event from activity drop", err);
             addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
@@ -790,14 +861,8 @@ const CalendarContainer = () => {
                 // Immediately create a calendar event at the selected time for this new task
                 try {
                     let start = new Date(when);
-                    if (!withinBusinessHours(start)) {
-                        addToast({
-                            title: "Outside business hours",
-                            description: "Adjusted to 08:00",
-                            variant: "warning",
-                        });
-                    }
-                    const { end } = clampToBusinessHours(start, 60); // default 60 minutes
+                    // No business-hours restriction; default event length is 60 minutes
+                    const end = new Date(start.getTime() + 60 * 60000);
                     const ev = await calendarService.createEvent({
                         title: form.title,
                         start: start.toISOString(),
@@ -822,14 +887,7 @@ const CalendarContainer = () => {
     // Double-click now opens appointment modal instead of auto-creating
     const handleQuickCreate = (date) => {
         const start = new Date(date);
-        if (!withinBusinessHours(start)) {
-            addToast({
-                title: "Outside business hours",
-                description: "Use a slot between 08:00 and 17:00",
-                variant: "warning",
-            });
-            return;
-        }
+        // Allow quick-create at any time
         setAppointmentInitialStart(start);
         setAppointmentModalOpen(true);
     };
@@ -837,25 +895,33 @@ const CalendarContainer = () => {
     // Move event (drag existing event into a new slot)
     const handleEventMove = async (eventId, newStartDate, newEndDate) => {
         try {
-            if (!withinBusinessHours(newStartDate)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Allowed window 08:00–17:00",
-                    variant: "error",
-                });
-                return;
-            }
             // Determine end time: use provided newEndDate (resize) or default 30 minutes (move)
             const targetEnd = newEndDate ? newEndDate : new Date(newStartDate.getTime() + 30 * 60 * 1000);
-            if (!withinBusinessHours(targetEnd)) {
-                addToast({
-                    title: "Outside business hours",
-                    description: "Allowed window 08:00–17:00",
-                    variant: "error",
-                });
-                return;
-            }
-            const payload = { start: newStartDate.toISOString(), end: targetEnd.toISOString() };
+            // Include timezone for appointment updates to match create flow and
+            // ensure server-side business-hours checks use the correct zone.
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+            // Format datetimes using local-offset ISO formatter (same as create flow)
+            const toOffsetISO = (d) => {
+                try {
+                    const pad = (n) => String(n).padStart(2, "0");
+                    const y = d.getFullYear();
+                    const m = pad(d.getMonth() + 1);
+                    const day = pad(d.getDate());
+                    const hh = pad(d.getHours());
+                    const mm = pad(d.getMinutes());
+                    const ss = pad(d.getSeconds());
+                    const off = -d.getTimezoneOffset();
+                    const sign = off >= 0 ? "+" : "-";
+                    const oh = pad(Math.floor(Math.abs(off) / 60));
+                    const om = pad(Math.abs(off) % 60);
+                    return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
+                } catch (__) {
+                    return d.toISOString();
+                }
+            };
+
+            const payload = { start: toOffsetISO(newStartDate), end: toOffsetISO(targetEnd), timezone: tz };
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
             const isAppointment = current?.kind === "appointment";
@@ -865,30 +931,64 @@ const CalendarContainer = () => {
             setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
             addToast({
                 title: "Event updated",
-                description: `Moved to ${newStartDate.toLocaleString()}${targetEnd ? ` - ${targetEnd.toLocaleTimeString()}` : ""}`,
+                description: `Moved to ${formatDate(newStartDate)} ${formatTime(`${String(newStartDate.getHours()).padStart(2,'0')}:${String(newStartDate.getMinutes()).padStart(2,'0')}`)}${targetEnd ? ` - ${formatTime(`${String(targetEnd.getHours()).padStart(2,'0')}:${String(targetEnd.getMinutes()).padStart(2,'0')}`)}` : ""}`,
                 variant: "success",
             });
         } catch (err) {
+            // Try to extract meaningful server error details (validation messages)
             console.warn("Failed to move event", err);
-            addToast({ title: "Failed to update event", description: String(err?.message || err), variant: "error" });
+            let details = String(err?.message || err);
+            try {
+                const respData = err?.response?.data;
+                if (respData) {
+                    // backend usually returns { statusCode, message, error }
+                    if (typeof respData === 'string') details = respData;
+                    else if (Array.isArray(respData?.message)) details = respData.message.join('; ');
+                    else if (respData?.message) details = String(respData.message);
+                    else details = JSON.stringify(respData);
+                }
+            } catch (_) {}
+            addToast({ title: "Failed to update event", description: details, variant: "error" });
         }
     };
 
     // Shift current date depending on active view
     const shiftDate = (delta) => {
+        // Backwards-compatible: delta can be a number (meaning shift by current view units)
+        // or an object like { months: n } to explicitly shift by months regardless of view.
         const d = new Date(currentDate);
+
+        if (typeof delta === "object" && delta !== null) {
+            if (typeof delta.months === "number") {
+                d.setMonth(d.getMonth() + delta.months);
+                setCurrentDate(d);
+                return;
+            }
+            if (typeof delta.days === "number") {
+                d.setDate(d.getDate() + delta.days);
+                setCurrentDate(d);
+                return;
+            }
+            // unknown object shape — fallthrough to numeric behavior if possible
+            delta = Number(delta) || 0;
+        }
+
+        // numeric delta: keep previous behavior (shift by unit according to active view)
         switch (view) {
             case "day":
                 d.setDate(d.getDate() + delta);
                 break;
             case "week":
-                d.setDate(d.getDate() + 7 * delta);
+                d.setDate(d.getDate() + (workWeek ? 5 * delta : 7 * delta));
                 break;
             case "month":
                 d.setMonth(d.getMonth() + delta);
                 break;
             case "quarter":
-                d.setMonth(d.getMonth() + 3 * delta);
+                // Treat numeric deltas as single-month steps for the quarter view
+                // so navigation (both view-local and global header) scrolls the
+                // 3-month window by one month at a time (Jan-Mar -> Feb-Apr).
+                d.setMonth(d.getMonth() + delta);
                 break;
             case "list":
                 d.setMonth(d.getMonth() + delta);
@@ -902,14 +1002,7 @@ const CalendarContainer = () => {
     // Human-readable label for current range (day/week/month/quarter)
     const rangeLabel = (() => {
         const d = new Date(currentDate);
-        const fmtDay = (dt, opts = {}) =>
-            dt.toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-                ...opts,
-            });
+        const fmtDay = (dt, opts = {}) => formatDate(dt, { includeWeekday: true, ...opts });
         if (view === "day") {
             return fmtDay(d);
         }
@@ -917,29 +1010,21 @@ const CalendarContainer = () => {
             const weekStart = new Date(d);
             weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
             const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
-            const sameYear = weekStart.getFullYear() === weekEnd.getFullYear();
-            const startStr = weekStart.toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: sameYear ? undefined : "numeric",
-            });
-            const endStr = weekEnd.toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-            });
+            const daysCount = workWeek ? 5 : 7;
+            weekEnd.setDate(weekEnd.getDate() + (daysCount - 1));
+            const startStr = formatDate(weekStart);
+            const endStr = formatDate(weekEnd);
             return `${startStr} — ${endStr}`;
         }
         if (view === "month") {
-            return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+            return formatDate(d, { longMonth: true });
         }
         if (view === "quarter") {
             const q = Math.floor(d.getMonth() / 3) + 1;
             return `Q${q} ${d.getFullYear()}`;
         }
         if (view === "list") {
-            return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+            return formatDate(d, { longMonth: true });
         }
         return "";
     })();
@@ -976,7 +1061,8 @@ const CalendarContainer = () => {
             start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
             start.setHours(0, 0, 0, 0);
             end.setTime(start.getTime());
-            end.setDate(start.getDate() + 6);
+            const daysCount = workWeek ? 5 : 7;
+            end.setDate(start.getDate() + (daysCount - 1));
             end.setHours(23, 59, 59, 999);
         } else if (view === "month") {
             // First day to last day of month
@@ -1034,6 +1120,7 @@ const CalendarContainer = () => {
                     <QuarterView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
+                        onSetDate={setCurrentDate}
                         view={view}
                         onChangeView={setView}
                         filterType={filterType}
@@ -1072,6 +1159,8 @@ const CalendarContainer = () => {
                         onAddTaskOrActivity={openAddModal}
                         view={view}
                         onChangeView={setView}
+                            workWeek={workWeek}
+                            setWorkWeek={setWorkWeek}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
@@ -1212,6 +1301,14 @@ const CalendarContainer = () => {
                                     const d = addDate || new Date();
                                     return d.toISOString().slice(0, 10);
                                 })(),
+                                time: (() => {
+                                    try {
+                                        const d = addDate || new Date();
+                                        const hh = String(d.getHours()).padStart(2, '0');
+                                        const mm = String(d.getMinutes()).padStart(2, '0');
+                                        return `${hh}:${mm}`;
+                                    } catch { return '09:30'; }
+                                })(),
                             }}
                             onSave={async (data) => {
                                 // data follows CreateTaskModal payload (title, description, date, time, dueDate, endDate, key_area_id, list_index, ...)
@@ -1248,10 +1345,8 @@ const CalendarContainer = () => {
                                     try {
                                         if (data.date && data.time) {
                                             let start = new Date(`${data.date}T${data.time}`);
-                                            if (!withinBusinessHours(start)) {
-                                                addToast({ title: 'Outside business hours', description: 'Adjusted to business hours', variant: 'warning' });
-                                            }
-                                            const { end } = clampToBusinessHours(start, 60);
+                                            // No business-hours restriction; default event length is 60 minutes
+                                            const end = new Date(start.getTime() + 60 * 60000);
                                             const ev = await calendarService.createEvent({
                                                 title: createdTask.title,
                                                 start: start.toISOString(),
