@@ -156,35 +156,47 @@ export default function QuarterView({
         } catch (__) {}
     };
 
-    // Equalize heights after layout. Runs on content change and window resize.
-    useLayoutEffect(() => {
+    // Equalize heights after paint to avoid blocking the main thread during
+    // navigation. Previously this used useLayoutEffect which runs before
+    // browser paint and can make clicks feel sluggish when many DOM
+    // measurements happen. We now schedule measurements in requestAnimationFrame
+    // inside a useEffect so the UI can update immediately and the measurements
+    // occur right after paint.
+    useEffect(() => {
         if (!rowRefs.current || rowRefs.current.length === 0) return;
-        // find max number of weeks across months
-        const maxWeeks = Math.max(...rowRefs.current.map((m) => (m ? m.length : 0)));
-        for (let w = 0; w < maxWeeks; w++) {
-            for (let day = 0; day < 7; day++) {
-                // reset heights first
-                for (let m = 0; m < rowRefs.current.length; m++) {
-                    const el = rowRefs.current[m]?.[w]?.[day];
-                    if (el) el.style.height = "";
-                }
-                // compute max
-                let maxH = 0;
-                for (let m = 0; m < rowRefs.current.length; m++) {
-                    const el = rowRefs.current[m]?.[w]?.[day];
-                    if (el) {
-                        const h = el.getBoundingClientRect().height;
-                        if (h > maxH) maxH = h;
-                    }
-                }
-                if (maxH > 0) {
+        let raf = null;
+        const run = () => {
+            // find max number of weeks across months
+            const maxWeeks = Math.max(...rowRefs.current.map((m) => (m ? m.length : 0)));
+            for (let w = 0; w < maxWeeks; w++) {
+                for (let day = 0; day < 7; day++) {
+                    // reset heights first
                     for (let m = 0; m < rowRefs.current.length; m++) {
                         const el = rowRefs.current[m]?.[w]?.[day];
-                        if (el) el.style.height = `${maxH}px`;
+                        if (el) el.style.height = "";
+                    }
+                    // compute max
+                    let maxH = 0;
+                    for (let m = 0; m < rowRefs.current.length; m++) {
+                        const el = rowRefs.current[m]?.[w]?.[day];
+                        if (el) {
+                            const h = el.getBoundingClientRect().height;
+                            if (h > maxH) maxH = h;
+                        }
+                    }
+                    if (maxH > 0) {
+                        for (let m = 0; m < rowRefs.current.length; m++) {
+                            const el = rowRefs.current[m]?.[w]?.[day];
+                            if (el) el.style.height = `${maxH}px`;
+                        }
                     }
                 }
             }
-        }
+        };
+        raf = requestAnimationFrame(run);
+        return () => {
+            if (raf) cancelAnimationFrame(raf);
+        };
     }, [events, todos]);
 
     useEffect(() => {
