@@ -5,14 +5,13 @@ import {
     FaCalendarAlt,
     FaLock,
     FaChevronDown,
-    FaSearch,
     FaGripVertical,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
 
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
-    { label: "Calendar", icon: <FaCalendarAlt />, to: "/calendar", section: "Main" },
+    { label: "Calendar", icon: <FaCalendarAlt className="text-green-600" />, to: "/calendar", section: "Main" },
     {
         label: "Don't Forget",
         icon: (
@@ -66,7 +65,6 @@ export default function Sidebar({
     const location = useLocation();
     const [keyAreasList, setKeyAreasList] = useState([]);
     const [internalCollapsed, setInternalCollapsed] = useState(false);
-    const [search, setSearch] = useState("");
     const [keyAreasOpen, setKeyAreasOpen] = useState(false);
     const [draggedItem, setDraggedItem] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -275,14 +273,11 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-0 md:translate-x-0 md:ml-4 md:mr-2 hidden-mobile`}
+            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-0 md:translate-x-0 md:ml-1 md:mr-1 hidden-mobile`}
             aria-label="Sidebar"
         >
             <div className="flex-1 overflow-y-auto no-scrollbar pb-2">
                 <div className="mb-6 flex items-center gap-2 px-2">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-8 h-8" />
-                    {!collapsed && <span className="font-bold text-lg text-blue-900">Practical Manager</span>}
-
                     <div className="ml-auto flex items-center gap-2">
                         {mobileOpen && (
                             <button
@@ -328,26 +323,10 @@ export default function Sidebar({
                     </div>
                 </div>
                 
-                {!collapsed && (
-                    <div className="mb-4 px-2">
-                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow">
-                            <FaSearch className="text-blue-700 mr-2" />
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search..."
-                                className="bg-transparent outline-none text-sm w-full"
-                            />
-                        </div>
-                    </div>
-                )}
-                
                 <div className={`px-2`}>
                     <div className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
                         <nav aria-label="Sidebar navigation">
                             {navItems
-                                .filter((item) => item.label.toLowerCase().includes(search.toLowerCase()))
                                 .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
                                 .map((item) => {
                                     const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
