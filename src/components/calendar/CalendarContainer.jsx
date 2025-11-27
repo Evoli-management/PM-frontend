@@ -985,7 +985,10 @@ const CalendarContainer = () => {
                 d.setMonth(d.getMonth() + delta);
                 break;
             case "quarter":
-                d.setMonth(d.getMonth() + 3 * delta);
+                // Treat numeric deltas as single-month steps for the quarter view
+                // so navigation (both view-local and global header) scrolls the
+                // 3-month window by one month at a time (Jan-Mar -> Feb-Apr).
+                d.setMonth(d.getMonth() + delta);
                 break;
             case "list":
                 d.setMonth(d.getMonth() + delta);

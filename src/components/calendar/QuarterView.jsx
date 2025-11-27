@@ -12,14 +12,14 @@ function getWeekNumber(date) {
     return weekNo;
 }
 
-function getQuarterMonths(date, quarterOffset = 0) {
+// Return three consecutive months starting from the given date's month
+// and optionally shifted by `monthOffset` months. This enables sliding
+// quarter windows like Jan–Mar -> Feb–Apr -> Mar–May when the container
+// changes the currentDate by single-month steps.
+function getQuarterMonths(date, monthOffset = 0) {
     const month = date.getMonth();
     const year = date.getFullYear();
-    const currentQuarter = Math.floor(month / 3);
-    const targetQuarter = currentQuarter + quarterOffset;
-    const targetYear = year + Math.floor(targetQuarter / 4);
-    const startMonth = (targetQuarter % 4) * 3;
-    return [0, 1, 2].map((i) => new Date(targetYear, startMonth + i, 1));
+    return [0, 1, 2].map((i) => new Date(year, month + monthOffset + i, 1));
 }
 
 function getWeeksInQuarter(months) {
