@@ -37,13 +37,11 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
     }, [setActiveTab]);
 
     return (
-        <div className="mx-auto max-w-6xl rounded-lg bg-white p-4 shadow-sm">
-            <h1 className="mb-4 text-xl font-semibold text-gray-800">Profile Settings</h1>
-
-            <div className="grid gap-4 lg:grid-cols-[240px_auto]">
+        <div className="flex flex-col w-full h-full rounded-xl bg-white p-2 shadow-md border border-gray-200">
+            <div className="grid flex-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
                 {/* Left sidebar - tabs */}
-                <nav className="rounded border border-gray-300 bg-gray-50 p-3">
-                    <div className="space-y-1">
+                <nav className="rounded-xl border border-gray-200 bg-gray-50/90 p-2.5 flex flex-col h-full">
+                    <div className="space-y-1 pr-0.5">
                         {tabs.map((tab) => (
                             <button
                                 key={tab}
@@ -61,7 +59,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                 </nav>
 
                 {/* Main content area */}
-                <div className="rounded border border-gray-300 bg-gray-50 p-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 h-full">
                     {children}
                 </div>
             </div>

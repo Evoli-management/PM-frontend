@@ -88,8 +88,8 @@ export default function ProfileSetting() {
     };
 
     return (
-        <div className="min-h-screen bg-[#EDEDED] px-2 py-4 sm:px-4 sm:py-6">
-            <div className="flex gap-[5mm]">
+        <div className="min-h-screen bg-[#EDEDED] px-2 py-4 sm:px-4 sm:py-6 flex flex-col">
+            <div className="flex flex-1 gap-[5mm] min-h-0">
                 <Sidebar 
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
@@ -103,7 +103,7 @@ export default function ProfileSetting() {
                     />
                 )}
 
-                <main className="flex-1">
+                <main className="flex-1 flex flex-col min-h-0">
                     {/* Mobile menu button */}
                     <button
                         className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-lg border border-gray-200"
@@ -111,9 +111,11 @@ export default function ProfileSetting() {
                     >
                         <FaBars className="h-5 w-5 text-gray-600" />
                     </button>
-                    <ProfileLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-                        {renderTabContent()}
-                    </ProfileLayout>
+                    <div className="flex-1 flex min-h-0">
+                        <ProfileLayout activeTab={activeTab} setActiveTab={setActiveTab}>
+                            {renderTabContent()}
+                        </ProfileLayout>
+                    </div>
                 </main>
             </div>
             

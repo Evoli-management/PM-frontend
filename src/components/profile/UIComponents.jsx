@@ -160,8 +160,8 @@ export const Field = ({
 };
 
 // Enhanced Section Component
-export const Section = ({ title, children, description = "" }) => (
-    <section className="mt-4 pt-3">
+export const Section = ({ title, children, description = "", className = "" }) => (
+    <section className={`mt-4 pt-3 ${className}`}>
         <div className="mb-2">
             <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{title}</h2>
             {description && (
@@ -203,13 +203,15 @@ export const LoadingButton = ({
     onClick, 
     variant = 'primary',
     disabled = false,
+    className = '',
     ...props 
 }) => {
     const baseClasses = "px-4 py-2 text-sm font-medium rounded transition-colors";
     const variants = {
         primary: "bg-blue-600 hover:bg-blue-700 text-white",
         secondary: "bg-gray-200 hover:bg-gray-300 text-gray-700",
-        danger: "bg-red-600 hover:bg-red-700 text-white"
+        danger: "bg-red-600 hover:bg-red-700 text-white",
+        outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
     };
 
     return (
@@ -217,7 +219,7 @@ export const LoadingButton = ({
             {...props}
             onClick={onClick}
             disabled={loading || disabled}
-            className={`${baseClasses} ${variants[variant]} ${
+            className={`${baseClasses} ${variants[variant]} ${className} ${
                 (loading || disabled) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
         >

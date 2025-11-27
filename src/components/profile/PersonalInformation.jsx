@@ -270,10 +270,10 @@ export const PersonalInformation = ({ showToast }) => {
     return (
         <div className="space-y-4">
             {/* Compact Profile Header */}
-            <Section title="Personal Details" icon="👤">
-                <div className="bg-white shadow-sm ring-1 ring-gray-100 rounded-lg p-3">
-                    <div className="flex flex-col md:flex-row md:items-start gap-4">
-                        <div className="flex-shrink-0">
+            <Section title="Personal Details" icon="👤" className="mt-0 pt-0">
+                <div className="bg-white rounded-2xl p-5 lg:p-6 space-y-6">
+                    <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+                        <div className="flex-shrink-0 w-full max-w-xs mx-auto lg:mx-0 rounded-2xl p-4 text-center">
                             <AvatarManager
                                 avatarPreview={avatarPreview}
                                 setAvatarPreview={setAvatarPreview}
@@ -283,9 +283,9 @@ export const PersonalInformation = ({ showToast }) => {
                             />
                         </div>
 
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 content-start mt-14 lg:mt-20">
                             <div className="space-y-1">
-                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
@@ -294,13 +294,13 @@ export const PersonalInformation = ({ showToast }) => {
                                 <input
                                     value={isEditingPersonal ? personalDraft.firstName : savedPersonal.firstName}
                                     onChange={handlePersonalChange('firstName')}
-                                    className={`w-full px-2 py-1.5 text-sm border-b border-gray-200 ${isEditingPersonal ? 'bg-white focus:border-gray-400' : 'bg-gray-50 cursor-default'} focus:outline-none`}
+                                    className={`w-full rounded-lg border px-3 py-2.5 text-sm ${isEditingPersonal ? 'bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100' : 'bg-gray-50 border-gray-200 cursor-default text-gray-700'}`}
                                     readOnly={!isEditingPersonal}
                                 />
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
@@ -309,13 +309,13 @@ export const PersonalInformation = ({ showToast }) => {
                                 <input
                                     value={isEditingPersonal ? personalDraft.lastName : savedPersonal.lastName}
                                     onChange={handlePersonalChange('lastName')}
-                                    className={`w-full px-2 py-1.5 text-sm border-b border-gray-200 ${isEditingPersonal ? 'bg-white focus:border-gray-400' : 'bg-gray-50 cursor-default'} focus:outline-none`}
+                                    className={`w-full rounded-lg border px-3 py-2.5 text-sm ${isEditingPersonal ? 'bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100' : 'bg-gray-50 border-gray-200 cursor-default text-gray-700'}`}
                                     readOnly={!isEditingPersonal}
                                 />
                             </div>
 
                             <div className="space-y-1 md:col-span-2">
-                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                     </svg>
@@ -324,14 +324,14 @@ export const PersonalInformation = ({ showToast }) => {
                                 <input
                                     type="email"
                                     value={savedPersonal.email}
-                                    className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed focus:outline-none"
+                                    className="w-full rounded-lg border px-3 py-2.5 text-sm bg-gray-50 text-gray-600 cursor-not-allowed border-gray-200"
                                     disabled
                                     readOnly
                                 />
                             </div>
 
                             <div className="space-y-1 md:col-span-2">
-                                <label className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                     <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                     </svg>
@@ -340,23 +340,42 @@ export const PersonalInformation = ({ showToast }) => {
                                 <input
                                     value={isEditingPersonal ? personalDraft.phone : savedPersonal.phone}
                                     onChange={handlePersonalChange('phone')}
-                                    className={`w-full px-2 py-1.5 text-sm border-b border-gray-200 ${isEditingPersonal ? 'bg-white focus:border-gray-400' : 'bg-gray-50 cursor-default'} focus:outline-none`}
+                                    className={`w-full rounded-lg border px-3 py-2.5 text-sm ${isEditingPersonal ? 'bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100' : 'bg-gray-50 border-gray-200 cursor-default text-gray-700'}`}
                                     readOnly={!isEditingPersonal}
                                 />
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="flex justify-end items-center gap-2 mt-3">
-                    {isEditingPersonal ? (
-                        <>
-                            <LoadingButton variant="outline" onClick={cancelPersonalEdit} disabled={isLoading}>Cancel</LoadingButton>
-                            <LoadingButton onClick={savePersonalInfo} isLoading={isLoading} loadingText="Saving...">Save</LoadingButton>
-                        </>
-                    ) : (
-                        <LoadingButton variant="outline" onClick={() => setIsEditingPersonal(true)}>Edit</LoadingButton>
-                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-10 mt-6">
+                        {isEditingPersonal ? (
+                            <>
+                                <LoadingButton
+                                    variant="outline"
+                                    onClick={cancelPersonalEdit}
+                                    disabled={isLoading}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Cancel
+                                </LoadingButton>
+                                <LoadingButton
+                                    onClick={savePersonalInfo}
+                                    isLoading={isLoading}
+                                    loadingText="Saving..."
+                                    className="w-full sm:w-auto"
+                                >
+                                    Save
+                                </LoadingButton>
+                            </>
+                        ) : (
+                            <LoadingButton
+                                onClick={() => setIsEditingPersonal(true)}
+                                className="w-full sm:w-auto"
+                            >
+                                Edit
+                            </LoadingButton>
+                        )}
+                    </div>
                 </div>
             </Section>
         </div>

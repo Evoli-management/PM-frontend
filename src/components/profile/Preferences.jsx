@@ -23,6 +23,27 @@ const SimpleToggle = ({ checked, onChange, disabled = false }) => (
     </button>
 );
 
+const REMINDER_SECTIONS = [
+    {
+        id: 'pm',
+        tabLabel: 'PracticalManager',
+        title: 'PracticalManager Notifications',
+        description: 'System reminders and notifications',
+        emailKey: 'pmRemindersEmail',
+        desktopKey: 'pmRemindersDesktop',
+        timingKey: 'pmReminderTiming'
+    },
+    {
+        id: 'goal',
+        tabLabel: 'Goal Reminders',
+        title: 'Goal Reminder Notifications',
+        description: 'Reminders for goals and deadlines',
+        emailKey: 'goalRemindersEmail',
+        desktopKey: 'goalRemindersDesktop',
+        timingKey: 'goalReminderTiming'
+    }
+];
+
 export const Preferences = ({ showToast }) => {
     // Use calendar preferences hook to get current time format
     const { 
@@ -66,6 +87,7 @@ export const Preferences = ({ showToast }) => {
     
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [activeReminderTab, setActiveReminderTab] = useState(REMINDER_SECTIONS[0].id);
     
     useEffect(() => {
         loadPreferences();
@@ -177,7 +199,7 @@ export const Preferences = ({ showToast }) => {
                 return;
             }
 
-            // Prepare API data - only send backend-supported fields
+            // Prepare API data - only send backend-supported fields (theme/language remain client-side)
             const apiData = {};
             
             // Only include time fields if they're properly formatted
@@ -191,7 +213,6 @@ export const Preferences = ({ showToast }) => {
             // Add other supported fields
             if (preferences.timeFormat) apiData.timeFormat = preferences.timeFormat;
             if (preferences.dateFormat) apiData.dateFormat = preferences.dateFormat;
-            if (preferences.theme) apiData.theme = preferences.theme;
             if (preferences.goalRemindersEmail !== undefined) apiData.goalRemindersEmail = preferences.goalRemindersEmail;
             if (preferences.goalRemindersDesktop !== undefined) apiData.goalRemindersDesktop = preferences.goalRemindersDesktop;
             if (preferences.goalReminderTiming) apiData.goalReminderTiming = preferences.goalReminderTiming;
@@ -236,10 +257,10 @@ export const Preferences = ({ showToast }) => {
                 }));
             }
             
-            if (apiData.theme) {
+            if (preferences.theme) {
                 window.dispatchEvent(new CustomEvent('themeChanged', {
                     detail: {
-                        theme: apiData.theme
+                        theme: preferences.theme
                     }
                 }));
             }
@@ -295,6 +316,8 @@ export const Preferences = ({ showToast }) => {
         }
     };
     
+    const activeReminderConfig = REMINDER_SECTIONS.find(section => section.id === activeReminderTab) || REMINDER_SECTIONS[0];
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -405,93 +428,68 @@ export const Preferences = ({ showToast }) => {
                 </div>
             </Section>
             
-            {/* PracticalManager Reminders - THIRD */}
             <Section 
-                title="PracticalManager Reminders" 
-                description="Manage system-wide reminder notifications"
+                title="Reminder Preferences" 
+                description="Switch between PracticalManager and goal reminders without leaving the card"
             >
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">PracticalManager Notifications</h4>
-                            <p className="text-sm text-gray-600 mt-1">System reminders and notifications</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Email</span>
-                                <SimpleToggle
-                                    checked={preferences.pmRemindersEmail}
-                                    onChange={(checked) => updatePreference('pmRemindersEmail', checked)}
-                                />
-                            </div>
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
-                                <SimpleToggle
-                                    checked={preferences.pmRemindersDesktop}
-                                    onChange={(checked) => updatePreference('pmRemindersDesktop', checked)}
-                                />
-                            </div>
-                        </div>
+                    <div className="flex flex-wrap gap-2">
+                        {REMINDER_SECTIONS.map((section) => (
+                            <button
+                                key={section.id}
+                                type="button"
+                                onClick={() => setActiveReminderTab(section.id)}
+                                aria-pressed={activeReminderTab === section.id}
+                                className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                                    activeReminderTab === section.id
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                {section.tabLabel}
+                            </button>
+                        ))}
                     </div>
-                    <Field label="Reminder Timing">
-                        <select
-                            value={preferences.pmReminderTiming}
-                            onChange={(e) => updatePreference('pmReminderTiming', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                        >
-                            <option value="5min">5 minutes before</option>
-                            <option value="15min">15 minutes before</option>
-                            <option value="30min">30 minutes before</option>
-                            <option value="1hour">1 hour before</option>
-                            <option value="2hours">2 hours before</option>
-                            <option value="1day">1 day before</option>
-                        </select>
-                    </Field>
-                </div>
-            </Section>
-            
-            {/* Goal Reminders - FOURTH */}
-            <Section 
-                title="Goal Reminders" 
-                description="Configure goal-related reminder notifications"
-            >
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">Goal Reminder Notifications</h4>
-                            <p className="text-sm text-gray-600 mt-1">Reminders for goals and deadlines</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Email</span>
-                                <SimpleToggle
-                                    checked={preferences.goalRemindersEmail}
-                                    onChange={(checked) => updatePreference('goalRemindersEmail', checked)}
-                                />
+
+                    <div className="space-y-4 p-4 rounded-2xl border border-gray-200 bg-white shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex-1">
+                                <h4 className="font-medium text-gray-900">{activeReminderConfig.title}</h4>
+                                <p className="text-sm text-gray-600 mt-1">{activeReminderConfig.description}</p>
                             </div>
-                            <div className="text-center">
-                                <span className="text-xs text-gray-500 block mb-1">Desktop</span>
-                                <SimpleToggle
-                                    checked={preferences.goalRemindersDesktop}
-                                    onChange={(checked) => updatePreference('goalRemindersDesktop', checked)}
-                                />
+                            <div className="flex items-center space-x-4">
+                                <div className="text-center">
+                                    <span className="text-xs text-gray-500 block mb-1">Email</span>
+                                    <SimpleToggle
+                                        checked={!!preferences[activeReminderConfig.emailKey]}
+                                        onChange={(checked) => updatePreference(activeReminderConfig.emailKey, checked)}
+                                    />
+                                </div>
+                                <div className="text-center">
+                                    <span className="text-xs text-gray-500 block mb-1">Desktop</span>
+                                    <SimpleToggle
+                                        checked={!!preferences[activeReminderConfig.desktopKey]}
+                                        onChange={(checked) => updatePreference(activeReminderConfig.desktopKey, checked)}
+                                    />
+                                </div>
                             </div>
                         </div>
+
+                        <Field label="Reminder Timing">
+                            <select
+                                value={preferences[activeReminderConfig.timingKey] || '5min'}
+                                onChange={(e) => updatePreference(activeReminderConfig.timingKey, e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
+                            >
+                                <option value="5min">5 minutes before</option>
+                                <option value="15min">15 minutes before</option>
+                                <option value="30min">30 minutes before</option>
+                                <option value="1hour">1 hour before</option>
+                                <option value="2hours">2 hours before</option>
+                                <option value="1day">1 day before</option>
+                            </select>
+                        </Field>
                     </div>
-                    <Field label="Reminder Timing">
-                        <select
-                            value={preferences.goalReminderTiming}
-                            onChange={(e) => updatePreference('goalReminderTiming', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
-                        >
-                            <option value="5min">5 minutes before</option>
-                            <option value="15min">15 minutes before</option>
-                            <option value="30min">30 minutes before</option>
-                            <option value="1hour">1 hour before</option>
-                            <option value="2hours">2 hours before</option>
-                            <option value="1day">1 day before</option>
-                        </select>
-                    </Field>
                 </div>
             </Section>
 
