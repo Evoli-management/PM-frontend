@@ -209,6 +209,18 @@ export default function Navbar() {
         setSearchLoading(false);
     };
 
+    // Update dropdown position based on search input position
+    const updateDropdownPosition = () => {
+        if (!searchRef.current) return;
+        
+        const rect = searchRef.current.getBoundingClientRect();
+        setDropdownPosition({
+            top: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+            width: rect.width
+        });
+    };
+
     // Handle search input change with debouncing for better performance
     const handleSearchChange = (e) => {
         const value = e.target.value;
@@ -425,12 +437,11 @@ export default function Navbar() {
                             <div>
                                 {(searchResults.length > 0 || searchLoading) && (
                                     <div 
-                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto"
+                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-[200]"
                                         style={{
                                             top: `${dropdownPosition.top + 4}px`,
                                             left: `${dropdownPosition.left}px`,
-                                            width: `${dropdownPosition.width}px`,
-                                            zIndex: 99999
+                                            width: `${dropdownPosition.width}px`
                                         }}
                                     >
                                         {searchResults.map((result, index) => (
@@ -455,12 +466,11 @@ export default function Navbar() {
                                 {/* No Results Message */}
                                 {search && searchResults.length === 0 && !searchLoading && (
                                     <div 
-                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-3"
+                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-3 z-[200]"
                                         style={{
                                             top: `${dropdownPosition.top + 4}px`,
                                             left: `${dropdownPosition.left}px`,
-                                            width: `${dropdownPosition.width}px`,
-                                            zIndex: 99999
+                                            width: `${dropdownPosition.width}px`
                                         }}
                                     >
                                         <div className="text-gray-500 text-sm">No results found for "{search}"</div>
@@ -486,7 +496,7 @@ export default function Navbar() {
                             </button>
 
                             {openWidgets && (
-                                <div className="absolute right-20 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-50 p-2">
+                                <div className="absolute right-20 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-[150] p-2">
                                     <div className="px-2 py-1 text-xs text-slate-500 border-b">Widgets</div>
                                     <div className="p-2 max-h-64 overflow-auto">
                                         {widgetKeys.map((w) => {
@@ -527,7 +537,7 @@ export default function Navbar() {
                         </button>
 
                         {openQuick && (
-                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
                                 <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
                                     role="menuitem"
@@ -633,7 +643,7 @@ export default function Navbar() {
                             </svg>
                         </button>
                         {open && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
                                 <Link
                                     to="/profile"
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
