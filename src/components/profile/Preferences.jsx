@@ -374,7 +374,6 @@ export const Preferences = ({ showToast }) => {
                     apiData.dateFormat = preferences.dateFormat;
                 }
             }
-            if (preferences.theme) apiData.theme = preferences.theme;
             if (preferences.goalRemindersEmail !== undefined) apiData.goalRemindersEmail = preferences.goalRemindersEmail;
             if (preferences.goalRemindersDesktop !== undefined) apiData.goalRemindersDesktop = preferences.goalRemindersDesktop;
             if (preferences.goalReminderTiming) apiData.goalReminderTiming = preferences.goalReminderTiming;
@@ -428,13 +427,9 @@ export const Preferences = ({ showToast }) => {
                 }));
             }
             
-            if (apiData.theme) {
-                window.dispatchEvent(new CustomEvent('themeChanged', {
-                    detail: {
-                        theme: apiData.theme
-                    }
-                }));
-            }
+            // `theme` is a client-only visual preference and not accepted by the
+            // backend schema. We keep it locally (applied via the effect above)
+            // but do not send it to the API to avoid 400 validation errors.
             
             showToast('Preferences saved successfully');
         } catch (error) {
