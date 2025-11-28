@@ -38,8 +38,17 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
         setError(null);
         
         try {
-            const userPrefs = await userPreferencesService.getPreferences();
-            
+            const userPrefsRaw = await userPreferencesService.getPreferences();
+            // Accept either camelCase or snake_case responses from API
+            const userPrefs = {
+                ...userPrefsRaw,
+                timeFormat: userPrefsRaw.timeFormat ?? userPrefsRaw.time_format,
+                dateFormat: userPrefsRaw.dateFormat ?? userPrefsRaw.date_format,
+                timezone: userPrefsRaw.timezone ?? userPrefsRaw.time_zone ?? userPrefsRaw.timeZone,
+                workStartTime: userPrefsRaw.workStartTime ?? userPrefsRaw.work_start_time,
+                workEndTime: userPrefsRaw.workEndTime ?? userPrefsRaw.work_end_time,
+            };
+
             const newPreferences = {
                 workingHours: {
                     startTime: userPrefs.workStartTime || '08:00',

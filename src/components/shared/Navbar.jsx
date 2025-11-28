@@ -1,8 +1,14 @@
 
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FaUser, FaBolt, FaTh } from "react-icons/fa";
+import { createPortal } from "react-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import taskService from "../../services/taskService";
+import activityService from "../../services/activityService";
+import * as goalService from "../../services/goalService";
+import keyAreaService from "../../services/keyAreaService";
+import calendarService from "../../services/calendarService";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
@@ -31,8 +37,14 @@ export default function Navbar() {
     }, [open, openQuick]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
     const widgetsRef = useRef(null);
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+    const searchRef = useRef(null);
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem('pm:dashboard:prefs');
@@ -42,6 +54,230 @@ export default function Navbar() {
             return {};
         }
     });
+    const [search, setSearch] = useState("");
+
+    // Handle global search functionality across entire system
+    const handleSearch = async (searchTerm) => {
+        if (!searchTerm.trim()) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+            return;
+        }
+
+        const searchLower = searchTerm.toLowerCase();
+        const results = [];
+
+        // Search pages/navigation (immediate results)
+        const pageItems = [
+            { title: "Dashboard", route: "/dashboard", type: "page", description: "Main dashboard overview" },
+            { title: "Calendar", route: "/calendar", type: "page", description: "View and manage appointments" },
+            { title: "Don't Forget", route: "/tasks?dontforget=1", type: "page", description: "Quick task reminders" },
+            { title: "Goals & Tracking", route: "/goals", type: "page", description: "Manage goals and track progress" },
+            { title: "Key Areas", route: "/key-areas", type: "page", description: "Organize work by key areas" },
+            { title: "Ideas", route: "/key-areas?select=ideas", type: "page", description: "Brainstorm and manage ideas" },
+            { title: "Team", route: "/teams", type: "page", description: "Team collaboration and management" },
+            { title: "Profile Settings", route: "/profile", type: "page", description: "User profile and settings" },
+        ];
+        
+        const matchingPages = pageItems.filter(item => 
+            item.title.toLowerCase().includes(searchLower) ||
+            item.description.toLowerCase().includes(searchLower)
+        );
+        results.push(...matchingPages);
+
+        // Show immediate page results first
+        setSearchResults([...results]);
+        updateDropdownPosition();
+        setShowSearchResults(true);
+        setSearchLoading(true);
+
+        try {
+
+            // Search tasks globally
+            try {
+                const tasks = await taskService.getTasks();
+                const matchingTasks = tasks.filter(task => 
+                    task.title?.toLowerCase().includes(searchLower) ||
+                    task.description?.toLowerCase().includes(searchLower) ||
+                    task.name?.toLowerCase().includes(searchLower)
+                ).slice(0, 5); // Limit results
+                
+                matchingTasks.forEach(task => {
+                    results.push({
+                        title: task.title || task.name || 'Untitled Task',
+                        route: `/tasks?id=${task.id}`,
+                        type: "task",
+                        description: task.description || 'Task'
+                    });
+                });
+                
+                // Update results with tasks
+                setSearchResults([...results]);
+            } catch (e) {
+                console.warn('Task search failed:', e);
+            }
+
+            // Search activities globally
+            try {
+                const activities = await activityService.getActivities();
+                const matchingActivities = activities.filter(activity => 
+                    activity.title?.toLowerCase().includes(searchLower) ||
+                    activity.description?.toLowerCase().includes(searchLower) ||
+                    activity.name?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingActivities.forEach(activity => {
+                    results.push({
+                        title: activity.title || activity.name || 'Untitled Activity',
+                        route: `/activities?id=${activity.id}`,
+                        type: "activity",
+                        description: activity.description || 'Activity'
+                    });
+                });
+            } catch (e) {
+                console.warn('Activity search failed:', e);
+            }
+
+            // Search goals globally
+            try {
+                const goals = await goalService.getGoals();
+                const matchingGoals = goals.filter(goal => 
+                    goal.title?.toLowerCase().includes(searchLower) ||
+                    goal.description?.toLowerCase().includes(searchLower) ||
+                    goal.name?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingGoals.forEach(goal => {
+                    results.push({
+                        title: goal.title || goal.name || 'Untitled Goal',
+                        route: `/goals?id=${goal.id}`,
+                        type: "goal",
+                        description: goal.description || 'Goal'
+                    });
+                });
+            } catch (e) {
+                console.warn('Goal search failed:', e);
+            }
+
+            // Search key areas globally
+            try {
+                const keyAreas = await keyAreaService.getKeyAreas();
+                const matchingKeyAreas = keyAreas.filter(area => 
+                    area.name?.toLowerCase().includes(searchLower) ||
+                    area.description?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingKeyAreas.forEach(area => {
+                    results.push({
+                        title: area.name || 'Untitled Key Area',
+                        route: `/key-areas?id=${area.id}`,
+                        type: "key-area",
+                        description: area.description || 'Key Area'
+                    });
+                });
+            } catch (e) {
+                console.warn('Key Area search failed:', e);
+            }
+
+            // Search calendar appointments globally
+            try {
+                const appointments = await calendarService.getAppointments();
+                const matchingAppointments = appointments.filter(appointment => 
+                    appointment.title?.toLowerCase().includes(searchLower) ||
+                    appointment.description?.toLowerCase().includes(searchLower) ||
+                    appointment.summary?.toLowerCase().includes(searchLower)
+                ).slice(0, 5);
+                
+                matchingAppointments.forEach(appointment => {
+                    results.push({
+                        title: appointment.title || appointment.summary || 'Untitled Appointment',
+                        route: `/calendar?id=${appointment.id}`,
+                        type: "appointment",
+                        description: appointment.description || 'Calendar Appointment'
+                    });
+                });
+            } catch (e) {
+                console.warn('Calendar search failed:', e);
+            }
+
+        } catch (error) {
+            console.error('Global search error:', error);
+        }
+
+        setSearchResults(results.slice(0, 10)); // Limit total results to 10
+        setShowSearchResults(true);
+        setSearchLoading(false);
+    };
+
+    // Update dropdown position based on search input position
+    const updateDropdownPosition = () => {
+        if (!searchRef.current) return;
+        
+        const rect = searchRef.current.getBoundingClientRect();
+        setDropdownPosition({
+            top: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+            width: rect.width
+        });
+    };
+
+    // Handle search input change with debouncing for better performance
+    const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearch(value);
+        
+        // Clear previous timeout
+        if (window.searchTimeout) {
+            clearTimeout(window.searchTimeout);
+        }
+        
+        // Debounce search to avoid too many API calls
+        window.searchTimeout = setTimeout(() => {
+            handleSearch(value);
+        }, 150); // Wait 150ms after user stops typing for faster response
+    };
+
+    // Handle search result click
+    const handleSearchResultClick = (route) => {
+        navigate(route);
+        setSearch("");
+        setSearchResults([]);
+        setShowSearchResults(false);
+    };
+
+    // Handle Enter key for search
+    const handleSearchKeyPress = (e) => {
+        if (e.key === 'Enter' && searchResults.length > 0) {
+            handleSearchResultClick(searchResults[0].route);
+        }
+        if (e.key === 'Escape') {
+            setSearch("");
+            setSearchResults([]);
+            setShowSearchResults(false);
+        }
+    };
+
+    // Handle window resize to update dropdown position
+    useEffect(() => {
+        const handleResize = () => {
+            if (showSearchResults) {
+                updateDropdownPosition();
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [showSearchResults]);
+
+    // Close search results when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchRef.current && !searchRef.current.contains(e.target)) {
+                setShowSearchResults(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // List of public routes where navbar should not be shown
     const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
@@ -112,18 +348,13 @@ export default function Navbar() {
         return () => document.removeEventListener('keydown', onKey);
     }, [openQuick]);
 
-    // Widget keys shown in Navbar control (keeps labels simple)
+    // Widget keys shown in Navbar control (keeps labels simple) - QuickAdd removed to avoid duplication with navbar quick actions
     const widgetKeys = [
-        { key: 'quickAdd', label: 'Quick Add' },
         { key: 'myDay', label: 'My Day' },
         { key: 'goals', label: 'Goals' },
         { key: 'enps', label: 'eNPS' },
-        { key: 'strokes', label: 'Strokes' },
-        { key: 'productivity', label: 'Productivity' },
         { key: 'calendarPreview', label: 'Calendar Preview' },
         { key: 'activity', label: "What's New" },
-        { key: 'suggestions', label: 'Suggestions' },
-        { key: 'teamOverview', label: 'Team Overview' },
     ];
 
     // Toggle a widget on/off and persist to dashboard prefs in localStorage
@@ -171,13 +402,13 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-40 border-b border-gray-200"
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
         >
             <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
-                    <Link to="/" className="font-bold tracking-wide flex items-center gap-2">
+                    <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
@@ -186,7 +417,71 @@ export default function Navbar() {
                         />
                         <span className="sr-only">Practical Manager</span>
                     </Link>
-                <div className="relative flex items-center gap-3">
+                    
+                    {/* Site-wide search */}
+                    <div className="w-[calc(50%-1rem)] absolute left-[45%] transform -translate-x-1/2 relative" ref={searchRef}>
+                        <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 shadow-sm">
+                            <FaSearch className="text-gray-500 mr-2" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={handleSearchChange}
+                                onKeyDown={handleSearchKeyPress}
+                                placeholder="Search across site..."
+                                className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder-gray-500"
+                            />
+                        </div>
+                        
+                        {/* Search Results Portal */}
+                        {showSearchResults && createPortal(
+                            <div>
+                                {(searchResults.length > 0 || searchLoading) && (
+                                    <div 
+                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-[200]"
+                                        style={{
+                                            top: `${dropdownPosition.top + 4}px`,
+                                            left: `${dropdownPosition.left}px`,
+                                            width: `${dropdownPosition.width}px`
+                                        }}
+                                    >
+                                        {searchResults.map((result, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => handleSearchResultClick(result.route)}
+                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                                            >
+                                                <div className="font-medium text-gray-800">{result.title}</div>
+                                                <div className="text-sm text-gray-500">{result.description}</div>
+                                                <div className="text-xs text-blue-600 mt-1">{result.type}</div>
+                                            </button>
+                                        ))}
+                                        {searchLoading && (
+                                            <div className="px-4 py-3 text-center">
+                                                <div className="text-sm text-gray-500">Searching across system...</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {/* No Results Message */}
+                                {search && searchResults.length === 0 && !searchLoading && (
+                                    <div 
+                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-3 z-[200]"
+                                        style={{
+                                            top: `${dropdownPosition.top + 4}px`,
+                                            left: `${dropdownPosition.left}px`,
+                                            width: `${dropdownPosition.width}px`
+                                        }}
+                                    >
+                                        <div className="text-gray-500 text-sm">No results found for "{search}"</div>
+                                    </div>
+                                )}
+                            </div>,
+                            document.body
+                        )}
+                    </div>
+                    
+                <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     {/* Widgets control: only show on Dashboard route */}
                     {location.pathname === '/dashboard' && (
                         <div className="relative" ref={widgetsRef}>
@@ -201,7 +496,7 @@ export default function Navbar() {
                             </button>
 
                             {openWidgets && (
-                                <div className="absolute right-20 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-50 p-2">
+                                <div className="absolute right-20 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-[150] p-2">
                                     <div className="px-2 py-1 text-xs text-slate-500 border-b">Widgets</div>
                                     <div className="p-2 max-h-64 overflow-auto">
                                         {widgetKeys.map((w) => {
@@ -242,7 +537,7 @@ export default function Navbar() {
                         </button>
 
                         {openQuick && (
-                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
                                 <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
                                     role="menuitem"
@@ -348,7 +643,7 @@ export default function Navbar() {
                             </svg>
                         </button>
                         {open && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-50">
+                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
                                 <Link
                                     to="/profile"
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
