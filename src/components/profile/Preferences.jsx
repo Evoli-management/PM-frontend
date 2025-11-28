@@ -302,7 +302,16 @@ export const Preferences = ({ showToast }) => {
         setLoading(true);
         try {
             // Load from API first
-            const apiPreferences = await userPreferencesService.getPreferences();
+            const apiPreferencesRaw = await userPreferencesService.getPreferences();
+            // Normalize API response to accept either camelCase or snake_case keys
+            const apiPreferences = {
+                ...apiPreferencesRaw,
+                timeFormat: apiPreferencesRaw.timeFormat ?? apiPreferencesRaw.time_format,
+                dateFormat: apiPreferencesRaw.dateFormat ?? apiPreferencesRaw.date_format,
+                timezone: apiPreferencesRaw.timezone ?? apiPreferencesRaw.time_zone ?? apiPreferencesRaw.timeZone,
+                workStartTime: apiPreferencesRaw.workStartTime ?? apiPreferencesRaw.work_start_time,
+                workEndTime: apiPreferencesRaw.workEndTime ?? apiPreferencesRaw.work_end_time,
+            };
             
             // Load legacy preferences from localStorage for backward compatibility
             const localPreferences = JSON.parse(localStorage.getItem('userPreferences') || '{}');
@@ -312,9 +321,13 @@ export const Preferences = ({ showToast }) => {
                 ...prev,
                 ...localPreferences,
                 ...apiPreferences,
-                // Map API fields to component fields
+                // Ensure work hours are taken from normalized API fields when available
                 workStartTime: apiPreferences.workStartTime || prev.workStartTime,
                 workEndTime: apiPreferences.workEndTime || prev.workEndTime,
+                // Ensure timeFormat/dateFormat/timezone also pick normalized values
+                timeFormat: apiPreferences.timeFormat || prev.timeFormat,
+                dateFormat: apiPreferences.dateFormat || prev.dateFormat,
+                timezone: apiPreferences.timezone || prev.timezone,
             }));
         } catch (error) {
             console.error('Error loading preferences:', error);
