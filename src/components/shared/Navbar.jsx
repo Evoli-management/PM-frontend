@@ -6,7 +6,7 @@ import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
 import taskService from "../../services/taskService";
 import activityService from "../../services/activityService";
-import goalService from "../../services/goalService";
+import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
 
