@@ -4,7 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-    base: "/", // ✅ Use root path for local development
+    // Use repository subpath when building for production GitHub Pages.
+    // When developing locally we keep the root base for the dev server.
+    base: process.env.NODE_ENV === 'production' ? '/PM-frontend/' : '/',
     plugins: [react(), tailwindcss()],
     // Fix: some dependencies (or older compiled code) import deep paths like
     // 'date-fns/format/index.js' which are not exposed by date-fns' package
