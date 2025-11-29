@@ -820,215 +820,215 @@ const buildRecurringPattern = ({
                         />
                     </div>
 
-                    {/* 2-column layout */}
+                    {/* 2-column layout: left = date/time, right = details */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        {/* Row 1: Description / Start time */}
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                Description
-                            </label>
-                            <input
-                                name="description"
-                                className="left-focus mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                placeholder="Brief description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                            />
-                        </div>
+                        {/* Left column: start date, end date, start time, end time */}
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    Start date
+                                </label>
+                                <div className="relative mt-0">
+                                    <input
+                                        ref={startRef}
+                                        name="start_date"
+                                        type="date"
+                                        className="left-focus no-calendar w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                        value={startDateStr}
+                                        onChange={(e) => setStartDateStr(e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                        aria-label="Open date picker"
+                                        onClick={() => {
+                                            try {
+                                                startRef.current?.showPicker?.();
+                                                startRef.current?.focus?.();
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                        }}
+                                    >
+                                        📅
+                                    </button>
+                                </div>
+                            </div>
 
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                Start time
-                            </label>
-                            <TimePicker
-                                value={startTimeStr}
-                                onChange={(v) => setStartTimeStr(v)}
-                                use24Hour={use24Hour}
-                                outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                label="Start time"
-                            />
-                        </div>
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    End date
+                                </label>
+                                <div className="relative mt-0">
+                                    <input
+                                        ref={endRef}
+                                        name="end_date"
+                                        type="date"
+                                        className="left-focus no-calendar w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                        value={endDateStr}
+                                        onChange={(e) => setEndDateStr(e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                        aria-label="Open date picker"
+                                        onClick={() => {
+                                            try {
+                                                endRef.current?.showPicker?.();
+                                                endRef.current?.focus?.();
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                        }}
+                                    >
+                                        📅
+                                    </button>
+                                </div>
+                            </div>
 
-                        {/* Row 2: Start date / End time */}
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                Start date
-                            </label>
-                            <div className="relative mt-0">
-                                <input
-                                    ref={startRef}
-                                    name="start_date"
-                                    type="date"
-                                    className="left-focus no-calendar w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                    value={startDateStr}
-                                    onChange={(e) => setStartDateStr(e.target.value)}
-                                    required
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    Start time
+                                </label>
+                                <TimePicker
+                                    value={startTimeStr}
+                                    onChange={(v) => setStartTimeStr(v)}
+                                    use24Hour={use24Hour}
+                                    outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                    innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    label="Start time"
                                 />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                                    aria-label="Open date picker"
-                                    onClick={() => {
-                                        try {
-                                            startRef.current?.showPicker?.();
-                                            startRef.current?.focus?.();
-                                        } catch {
-                                            /* ignore */
-                                        }
-                                    }}
-                                >
-                                    📅
-                                </button>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    End time
+                                </label>
+                                <TimePicker
+                                    value={endTimeStr}
+                                    onChange={(v) => setEndTimeStr(v)}
+                                    use24Hour={use24Hour}
+                                    outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                    innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    label="End time"
+                                />
                             </div>
                         </div>
 
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                End time
-                            </label>
-                            <TimePicker
-                                value={endTimeStr}
-                                onChange={(v) => setEndTimeStr(v)}
-                                use24Hour={use24Hour}
-                                outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                label="End time"
-                            />
-                        </div>
-
-                        {/* Row 3: End date / Assignee */}
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                End date
-                            </label>
-                            <div className="relative mt-0">
+                        {/* Right column: description, key area, assignee, goal */}
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    Description
+                                </label>
                                 <input
-                                    ref={endRef}
-                                    name="end_date"
-                                    type="date"
-                                    className="left-focus no-calendar w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
-                                    value={endDateStr}
-                                    onChange={(e) => setEndDateStr(e.target.value)}
-                                    required
+                                    name="description"
+                                    className="left-focus mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                    placeholder="Brief description"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
                                 />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                                    aria-label="Open date picker"
-                                    onClick={() => {
-                                        try {
-                                            endRef.current?.showPicker?.();
-                                            endRef.current?.focus?.();
-                                        } catch {
-                                            /* ignore */
-                                        }
-                                    }}
-                                >
-                                    📅
-                                </button>
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                Assignee
-                            </label>
-                            <div className="relative mt-0">
-                                <select
-                                    name="assignee"
-                                    className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
-                                    value={assignee}
-                                    onChange={(e) => setAssignee(e.target.value)}
-                                >
-                                    <option value="">— Unassigned —</option>
-                                    {Array.isArray(users) &&
-                                        users.map((u) => (
-                                            <option
-                                                key={u.id || u.userId || u.email}
-                                                value={u.id || u.userId || u.email}
-                                            >
-                                                {u.name ||
-                                                    u.fullName ||
-                                                    u.email ||
-                                                    String(u.id || u.userId)}
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    Key area
+                                </label>
+                                <div className="relative mt-0">
+                                    <select
+                                        name="keyArea"
+                                        className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                        value={keyAreaId}
+                                        onChange={(e) => setKeyAreaId(e.target.value)}
+                                    >
+                                        <option value="">— No key area —</option>
+                                        {Array.isArray(keyAreas) && keyAreas.map((k) => (
+                                            <option key={k.id || k.keyAreaId || k._id} value={k.id || k.keyAreaId || k._id}>
+                                                {k.title || k.name || String(k.id)}
                                             </option>
                                         ))}
-                                </select>
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    aria-hidden="true"
-                                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-                                >
-                                    <path
-                                        fill="currentColor"
-                                        d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
-                                    />
-                                </svg>
+                                    </select>
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                                    >
+                                        <path
+                                            fill="currentColor"
+                                            d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
+                                        />
+                                    </svg>
+                                </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="text-sm font-medium text-slate-700">
-                                Key area
-                            </label>
-                            <div className="relative mt-0">
-                                <select
-                                    name="keyArea"
-                                    className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
-                                    value={keyAreaId}
-                                    onChange={(e) => setKeyAreaId(e.target.value)}
-                                >
-                                    <option value="">— No key area —</option>
-                                    {Array.isArray(keyAreas) && keyAreas.map((k) => (
-                                        <option key={k.id || k.keyAreaId || k._id} value={k.id || k.keyAreaId || k._id}>
-                                            {k.title || k.name || String(k.id)}
-                                        </option>
-                                    ))}
-                                </select>
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    aria-hidden="true"
-                                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-                                >
-                                    <path
-                                        fill="currentColor"
-                                        d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
-                                    />
-                                </svg>
-                            </div>
-                        </div>
-
-                                <div>
-                                    <label className="text-sm font-medium text-slate-700">
-                                        Link goal
-                                    </label>
-                                    <div className="relative mt-0">
-                                        <select
-                                            name="goal"
-                                            className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
-                                            value={goalId}
-                                            onChange={(e) => setGoalId(e.target.value)}
-                                        >
-                                            <option value="">— No goal —</option>
-                                            {Array.isArray(goals) && goals.map((g) => (
-                                                <option key={g.id || g.goalId || g._id} value={g.id || g.goalId || g._id}>
-                                                    {g.title || g.name || g.goalTitle || String(g.id)}
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    Assignee
+                                </label>
+                                <div className="relative mt-0">
+                                    <select
+                                        name="assignee"
+                                        className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                        value={assignee}
+                                        onChange={(e) => setAssignee(e.target.value)}
+                                    >
+                                        <option value="">— Unassigned —</option>
+                                        {Array.isArray(users) &&
+                                            users.map((u) => (
+                                                <option
+                                                    key={u.id || u.userId || u.email}
+                                                    value={u.id || u.userId || u.email}
+                                                >
+                                                    {u.name || u.fullName || u.email || String(u.id || u.userId)}
                                                 </option>
                                             ))}
-                                        </select>
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-                                        >
-                                            <path
-                                                fill="currentColor"
-                                                d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
-                                            />
-                                        </svg>
-                                    </div>
+                                    </select>
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                                    >
+                                        <path
+                                            fill="currentColor"
+                                            d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
+                                        />
+                                    </svg>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-slate-700">
+                                    Link goal
+                                </label>
+                                <div className="relative mt-0">
+                                    <select
+                                        name="goal"
+                                        className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                        value={goalId}
+                                        onChange={(e) => setGoalId(e.target.value)}
+                                    >
+                                        <option value="">— No goal —</option>
+                                        {Array.isArray(goals) && goals.map((g) => (
+                                            <option key={g.id || g.goalId || g._id} value={g.id || g.goalId || g._id}>
+                                                {g.title || g.name || g.goalTitle || String(g.id)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                                    >
+                                        <path
+                                            fill="currentColor"
+                                            d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Recurrence */}
