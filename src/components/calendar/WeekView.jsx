@@ -933,6 +933,7 @@ const WeekView = ({
                                                                                         className="p-1 rounded hover:bg-black/10 transition-colors"
                                                                                         onClick={(e) => {
                                                                                             try { e.stopPropagation(); } catch (_) {}
+                                                                                            if (typeof onDeleteRequest === 'function') return onDeleteRequest(ev, e);
                                                                                             onEventClick && onEventClick(ev, 'delete');
                                                                                         }}
                                                                                         aria-label={`Delete ${ev.title}`}

@@ -1043,6 +1043,8 @@ export default function DayView({
                                 className="p-1 rounded hover:bg-black/10 transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // prefer explicit delete handler so parent can show a popover anchored to the click
+                                  if (typeof onDeleteRequest === 'function') return onDeleteRequest(appt, e);
                                   onEventClick && onEventClick(appt, 'delete');
                                 }}
                                 aria-label={`Delete ${title}`}

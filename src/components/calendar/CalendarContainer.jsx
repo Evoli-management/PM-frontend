@@ -592,24 +592,152 @@ const CalendarContainer = () => {
         }
     };
 
-    const handleDeleteEvent = async (event) => {
-        if (!event?.id) return;
-        
-        const confirmed = window.confirm(`Are you sure you want to delete "${event.title}"?`);
-        if (!confirmed) return;
-        
-        try {
-            await calendarService.deleteEvent(event.id);
-            setEvents((prev) => prev.filter((e) => e.id !== event.id));
-            addToast({ title: "Appointment deleted", variant: "success" });
-        } catch (error) {
-            console.error("Delete error:", error);
-            addToast({ 
-                title: "Failed to delete appointment", 
-                message: error.message,
-                variant: "error" 
-            });
+    // Delete popover state and handler (triggered from DayView/WeekView delete icon)
+    const [deletePopoverVisible, setDeletePopoverVisible] = useState(false);
+    const [deletePopoverPos, setDeletePopoverPos] = useState({ x: 0, y: 0 });
+    const [deleteTargetEvent, setDeleteTargetEvent] = useState(null);
+    const [deleteScopeChoice, setDeleteScopeChoice] = useState('occurrence');
+    const [deleting, setDeleting] = useState(false);
+    // Simple confirm for non-recurring deletes (custom top-center UI)
+    const [simpleConfirmVisible, setSimpleConfirmVisible] = useState(false);
+    const [simpleConfirmTarget, setSimpleConfirmTarget] = useState(null);
+    const [simpleDeleting, setSimpleDeleting] = useState(false);
+
+    // Update (drag/resize) popover for recurring appointments
+    const [updatePopoverVisible, setUpdatePopoverVisible] = useState(false);
+    const [updateScopeChoice, setUpdateScopeChoice] = useState('occurrence');
+    const [updateTargetEvent, setUpdateTargetEvent] = useState(null);
+    const [updatePending, setUpdatePending] = useState({ start: null, end: null });
+
+    const handleDeleteRequest = (event, mouseEvent) => {
+        if (!event) return;
+
+        // If the appointment is NOT recurring, show the custom top-center confirmation UI
+        const isRecurring = Boolean(event.recurringPattern || event.recurrence);
+        if (!isRecurring) {
+            setSimpleConfirmTarget(event);
+            setSimpleConfirmVisible(true);
+            return;
         }
+
+        // For recurring appointments, show the scoped delete popover
+        // position popover near click; use clientX/clientY (still tracked if needed)
+        const x = (mouseEvent && mouseEvent.clientX) || (window.innerWidth / 2);
+        const y = (mouseEvent && mouseEvent.clientY) || (window.innerHeight / 2);
+        setDeletePopoverPos({ x, y });
+        setDeleteTargetEvent(event);
+        setDeleteScopeChoice('occurrence');
+        setDeletePopoverVisible(true);
+    };
+
+    const confirmSimpleDelete = async () => {
+        const event = simpleConfirmTarget;
+        if (!event || !event.id) return;
+        try {
+            setSimpleDeleting(true);
+            if (event.kind === 'appointment') {
+                await calendarService.deleteAppointment(event.id);
+            } else {
+                await calendarService.deleteEvent(event.id);
+            }
+            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            addToast({ title: 'Appointment deleted', variant: 'success' });
+            setSimpleConfirmVisible(false);
+            setSimpleConfirmTarget(null);
+        } catch (err) {
+            console.error('Delete error:', err);
+            addToast({ title: 'Failed to delete appointment', description: String(err?.message || err), variant: 'error' });
+        } finally {
+            setSimpleDeleting(false);
+        }
+    };
+
+    const cancelSimpleDelete = () => {
+        setSimpleConfirmVisible(false);
+        setSimpleConfirmTarget(null);
+    };
+
+    const confirmDeleteFromPopover = async () => {
+        const event = deleteTargetEvent;
+        if (!event || !event.id) return;
+        try {
+            setDeleting(true);
+            if (event.kind === 'appointment') {
+                const opts = {};
+                if (deleteScopeChoice === 'occurrence') {
+                    opts.editScope = 'occurrence';
+                    opts.occurrenceStart = event.start;
+                } else if (deleteScopeChoice === 'future') {
+                    opts.editScope = 'future';
+                    opts.occurrenceStart = event.start;
+                } else if (deleteScopeChoice === 'series') {
+                    opts.editScope = 'series';
+                }
+                await calendarService.deleteAppointment(event.id, opts);
+            } else {
+                await calendarService.deleteEvent(event.id);
+            }
+            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            addToast({ title: 'Appointment deleted', variant: 'success' });
+            setDeletePopoverVisible(false);
+        } catch (err) {
+            console.error('Delete error:', err);
+            addToast({ title: 'Failed to delete appointment', description: String(err?.message || err), variant: 'error' });
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const confirmUpdateFromPopover = async () => {
+        const event = updateTargetEvent;
+        if (!event || !event.id) return;
+        try {
+            const opts = {};
+            if (updateScopeChoice === 'occurrence') {
+                opts.editScope = 'occurrence';
+                opts.occurrenceStart = event.start;
+            } else if (updateScopeChoice === 'future') {
+                opts.editScope = 'future';
+                opts.occurrenceStart = event.start;
+            } else if (updateScopeChoice === 'series') {
+                opts.editScope = 'series';
+            }
+
+            // Combine pending start/end with opts and send
+            const payload = {
+                start: updatePending.start,
+                end: updatePending.end,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+                ...opts,
+            };
+
+            const updated = await calendarService.updateAppointment(event.id, payload);
+            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+            addToast({ title: 'Appointment updated', variant: 'success' });
+            setUpdatePopoverVisible(false);
+            setUpdateTargetEvent(null);
+        } catch (err) {
+            console.error('Update error:', err);
+            let details = String(err?.message || err);
+            try {
+                const respData = err?.response?.data;
+                if (respData) {
+                    if (typeof respData === 'string') details = respData;
+                    else if (Array.isArray(respData?.message)) details = respData.message.join('; ');
+                    else if (respData?.message) details = String(respData.message);
+                    else details = JSON.stringify(respData);
+                }
+            } catch (_) {}
+            addToast({ title: 'Failed to update appointment', description: details, variant: 'error' });
+        }
+    };
+
+    const handleDeleteEvent = async (event) => {
+        // Delegate to the popover flow so the user is presented with scoped delete options
+        // instead of browser prompts. The popover will position itself; pass null for mouseEvent
+        // when we don't have a click position.
+        if (!event) return;
+        handleDeleteRequest(event, null);
     };
 
     const [addDefaultTab, setAddDefaultTab] = useState("task");
@@ -925,6 +1053,18 @@ const CalendarContainer = () => {
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
             const isAppointment = current?.kind === "appointment";
+
+            // If this is a recurring appointment, prompt for edit scope (occurrence/future/series)
+            const isRecurring = Boolean(current?.recurringPattern || current?.recurrence || current?.seriesId);
+            if (isAppointment && isRecurring) {
+                // open update popover to ask scope before applying
+                setUpdateTargetEvent(current);
+                setUpdatePending({ start: toOffsetISO(newStartDate), end: toOffsetISO(targetEnd) });
+                setUpdateScopeChoice('occurrence');
+                setUpdatePopoverVisible(true);
+                return;
+            }
+
             const updated = await (isAppointment
                 ? calendarService.updateAppointment(eventId, payload)
                 : calendarService.updateEvent(eventId, payload));
@@ -1170,6 +1310,7 @@ const CalendarContainer = () => {
                         onTaskDrop={handleTaskDrop}
                         onEventMove={handleEventMove}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         activities={weekActivities}
                     />
@@ -1195,6 +1336,7 @@ const CalendarContainer = () => {
                         onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         onActivityClick={openEditActivity}
                         onPlanTomorrow={() => {}}
@@ -1378,6 +1520,8 @@ const CalendarContainer = () => {
                     startDate={appointmentInitialStart}
                     defaultDurationMinutes={30}
                     users={usersList}
+                    goals={goalsList}
+                    keyAreas={keyAreas}
                     onClose={() => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
@@ -1395,6 +1539,8 @@ const CalendarContainer = () => {
                 <AppointmentModal
                     event={selectedEvent}
                     users={usersList}
+                    goals={goalsList}
+                    keyAreas={keyAreas}
                     onClose={() => {
                         setModalOpen(false);
                         setSelectedEvent(null);
@@ -1407,6 +1553,7 @@ const CalendarContainer = () => {
                         setSelectedEvent(null);
                         addToast({ title: "Appointment updated", variant: "success" });
                     }}
+                    
                     defaultDurationMinutes={30}
                 />
             )}
@@ -1643,6 +1790,175 @@ const CalendarContainer = () => {
                 onSave={handleElephantTaskSaved}
                 taskId={selectedTaskForElephant}
             />
+
+            {/* Simple top-center confirm for non-recurring deletes */}
+            {simpleConfirmVisible && simpleConfirmTarget && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="simple-delete-title"
+                    className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-80"
+                >
+                    <div id="simple-delete-title" className="font-semibold">Delete appointment</div>
+                    <div className="mt-2 text-sm">Are you sure you want to delete "{simpleConfirmTarget?.title}"?</div>
+                    <div className="mt-3 flex items-center gap-2">
+                        <button
+                            type="button"
+                            className="rounded-md bg-red-600 px-3 py-1 text-sm font-medium text-white hover:bg-red-700"
+                            onClick={confirmSimpleDelete}
+                            disabled={simpleDeleting}
+                        >
+                            {simpleDeleting ? 'Deleting...' : 'Delete'}
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+                            onClick={cancelSimpleDelete}
+                            disabled={simpleDeleting}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete popover anchored to click when delete icon clicked on an appointment */}
+            {deletePopoverVisible && deleteTargetEvent && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="delete-popover-title"
+                    className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-100"
+                >
+                    <div className="font-semibold">Delete recurring appointment</div>
+
+                    <div className="mt-2 flex flex-col gap-2">
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="delete-scope-pop"
+                                value="occurrence"
+                                checked={deleteScopeChoice === 'occurrence'}
+                                onChange={() => setDeleteScopeChoice('occurrence')}
+                            />
+                            <span>Delete this occurrence only</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="delete-scope-pop"
+                                value="future"
+                                checked={deleteScopeChoice === 'future'}
+                                onChange={() => setDeleteScopeChoice('future')}
+                            />
+                            <span>Delete this and all future occurrences</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="delete-scope-pop"
+                                value="series"
+                                checked={deleteScopeChoice === 'series'}
+                                onChange={() => setDeleteScopeChoice('series')}
+                            />
+                            <span>Delete the entire series</span>
+                        </label>
+
+                        <p className="text-xs text-slate-500">
+                            Note: you can delete a single occurrence, truncate a series (future occurrences), or delete the entire series.
+                        </p>
+
+                        <div className="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                className="rounded-md bg-red-600 px-3 py-1 text-sm font-medium text-white hover:bg-red-700"
+                                onClick={confirmDeleteFromPopover}
+                                disabled={deleting}
+                            >
+                                {deleting ? 'Deleting...' : 'Confirm delete'}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+                                onClick={() => setDeletePopoverVisible(false)}
+                                disabled={deleting}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Update popover for drag/resize of recurring appointments */}
+            {updatePopoverVisible && updateTargetEvent && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="update-popover-title"
+                    className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-100"
+                >
+                    <div className="font-semibold">Edit recurring appointment</div>
+
+                    <div className="mt-2 flex flex-col gap-2">
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="update-scope-pop"
+                                value="occurrence"
+                                checked={updateScopeChoice === 'occurrence'}
+                                onChange={() => setUpdateScopeChoice('occurrence')}
+                            />
+                            <span>Edit this occurrence only</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="update-scope-pop"
+                                value="future"
+                                checked={updateScopeChoice === 'future'}
+                                onChange={() => setUpdateScopeChoice('future')}
+                            />
+                            <span>Edit this and all future occurrences</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="update-scope-pop"
+                                value="series"
+                                checked={updateScopeChoice === 'series'}
+                                onChange={() => setUpdateScopeChoice('series')}
+                            />
+                            <span>Edit the entire series</span>
+                        </label>
+
+                        <p className="text-xs text-slate-500">
+                            Choose whether this drag/resize should affect only this occurrence, future occurrences, or the whole series.
+                        </p>
+
+                        <div className="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                className="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700"
+                                onClick={confirmUpdateFromPopover}
+                            >
+                                Apply
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md bg-slate-100 px-3 py-1 text-sm"
+                                onClick={() => { setUpdatePopoverVisible(false); setUpdateTargetEvent(null); }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
