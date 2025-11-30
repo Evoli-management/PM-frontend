@@ -19,6 +19,7 @@ const navItems = [
                 src={`${import.meta.env.BASE_URL}dont-forget.png`}
                 alt="Don't forget"
                 className="w-6 h-6 object-contain"
+                style={{ filter: 'hue-rotate(10deg) saturate(1.6) brightness(0.95)' }}
             />
         ),
         to: { pathname: "/tasks", search: "?dontforget=1" },
