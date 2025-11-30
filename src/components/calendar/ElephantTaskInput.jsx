@@ -129,11 +129,7 @@ const ElephantTaskInput = ({ viewType, dateStart, dateEnd, onTaskChange }) => {
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-medium text-orange-700 uppercase tracking-wide">
-                                    {viewType} Elephant Task
-                                </span>
-                            </div>
+                            
 
                             {/* Wrapper keeps the original visual markup; editable area is an inner element so we can place buttons inside the same bordered box. */}
                             <div className="w-full min-h-[1.5rem] bg-white border border-orange-200 rounded px-2 py-1 text-sm cursor-text hover:border-orange-300 transition-colors relative" aria-label={`${viewType} elephant task input`}> 
