@@ -820,10 +820,10 @@ const buildRecurringPattern = ({
                         />
                     </div>
 
-                    {/* 2-column layout: left = date/time, right = details */}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {/* 2-column layout turned into 3-column with centered separator */}
+                    <div className="grid grid-cols-1 gap-y-4 md:grid-cols-[1fr_auto_1fr] md:gap-x-0.5">
                         {/* Left column: start date, end date, start time, end time */}
-                        <div className="space-y-3">
+                        <div className="space-y-3 md:col-span-1">
                             <div>
                                 <label className="text-sm font-medium text-slate-700">
                                     Start date
@@ -917,8 +917,13 @@ const buildRecurringPattern = ({
                             </div>
                         </div>
 
+                        {/* separator column centered between left and right on md+ */}
+                        <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
+                            <div className="w-px bg-slate-400 my-2" />
+                        </div>
+
                         {/* Right column: description, key area, assignee, goal */}
-                        <div className="space-y-3">
+                        <div className="space-y-3 md:col-span-1">
                             <div>
                                 <label className="text-sm font-medium text-slate-700">
                                     Description

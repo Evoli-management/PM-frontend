@@ -16,6 +16,8 @@ const safeDate = (v) => {
   }
 };
 
+const defaultDate = new Date().toISOString().slice(0, 10);
+
 // inline SVG icons (untyped)
 
 const IconChevron = (props) => (
@@ -45,8 +47,10 @@ export default function EditActivityModal({
   const [listNamesMap, setListNamesMap] = useState({});
   const [title, setTitle] = useState(initialData.text || initialData.activity_name || '');
   const [description, setDescription] = useState(initialData.notes || initialData.description || '');
-  const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate));
-  const [endDate, setEndDate] = useState(safeDate(initialData.date_end || initialData.endDate));
+  const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate) || defaultDate);
+  const [endDate, setEndDate] = useState(safeDate(initialData.date_end || initialData.endDate) || defaultDate);
+  const [keyAreaError, setKeyAreaError] = useState('');
+  const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
   const [duration, setDuration] = useState(initialData.duration || '');
   const [keyAreaId, setKeyAreaId] = useState(
@@ -132,6 +136,17 @@ export default function EditActivityModal({
   if (!isOpen) return null;
 
   const handleSave = () => {
+    // Validate required fields
+    if (!keyAreaId) {
+      setKeyAreaError('Please select a Key Area');
+      try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (_) {}
+      return;
+    }
+    if (!listIndex) {
+      setListError('Please select a List');
+      try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (_) {}
+      return;
+    }
     const payload = {
       ...initialData,
       text: (title || '').trim(),
@@ -189,8 +204,8 @@ export default function EditActivityModal({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <div className="grid grid-rows-6 gap-2">
+  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
+    <div className="grid grid-rows-6 gap-2 md:col-span-1">
             <div className="flex flex-col">
               <label className="text-sm font-medium text-slate-700">Description</label>
               <input
@@ -280,24 +295,29 @@ export default function EditActivityModal({
             </div>
             <div aria-hidden="true" />
           </div>
+          {/* separator column centered between left and right on md+ */}
+          <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
+            <div className="w-px bg-slate-400 my-2" />
+          </div>
 
             {/* RIGHT column */}
-            <div className="grid grid-rows-6 gap-2 content-start">
+            <div className="grid grid-rows-6 gap-2 content-start md:col-span-1">
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
-                  <select name="key_area_id" className={`${selectCls} mt-0 h-9`} value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
+                  <select name="key_area_id" className={`${selectCls} mt-0 h-9`} value={keyAreaId} onChange={(e) => { setKeyAreaId(e.target.value); setKeyAreaError(''); }} required>
                     <option value="">— Select Key Area —</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (<option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
-              </div>
+                {keyAreaError ? (<p className="mt-1 text-xs text-red-600">{keyAreaError}</p>) : null}
+                </div>
 
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
-                  <select name="list_index" className={`${selectCls} mt-0 h-9`} value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))}>
+                  <select name="list_index" className={`${selectCls} mt-0 h-9`} value={listIndex} onChange={(e) => { setListIndex(Number(e.target.value)); setListError(''); }} required>
                     {(availableLists && availableLists.length ? availableLists : [1]).map((n) => {
                       const namesSource = (Object.keys(listNamesMap || {}).length ? listNamesMap : ((localKeyAreas && localKeyAreas.length) ? (localKeyAreas.find(k => String(k.id) === String(keyAreaId))?.listNames || {}) : {}));
                       const label = namesSource && (namesSource[n] || namesSource[String(n)]) ? (namesSource[n] || namesSource[String(n)]) : `List ${n}`;
@@ -306,6 +326,7 @@ export default function EditActivityModal({
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
+                {listError ? (<p className="mt-1 text-xs text-red-600">{listError}</p>) : null}
               </div>
 
               <div className="flex flex-col">
@@ -320,7 +341,7 @@ export default function EditActivityModal({
               </div>
 
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-slate-700">Assignee</label>
+                <label className="text-sm font-medium text-slate-700">Responsible</label>
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
