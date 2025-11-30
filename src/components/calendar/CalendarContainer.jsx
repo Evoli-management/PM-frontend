@@ -436,16 +436,18 @@ const CalendarContainer = () => {
     };
 
     // Drag-and-drop: create an appointment for a task
-    const handleTaskDrop = async (taskOrId, date) => {
+    const handleTaskDrop = async (taskOrId, date, dropEffect) => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
             // No business-hours restriction; compute end as simple duration offset
             const end = new Date(start.getTime() + defaultMinutes * 60000);
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+            const effect = String(dropEffect || "").toLowerCase();
+            const isCopyDrop = effect.includes("copy");
 
-            // If we dropped an existing task (id), update its start/end on the task service
-            if (taskId && todos.find((t) => String(t.id) === String(taskId))) {
+            // If this was NOT a copy-drop and we dropped an existing task (id), update its start/end on the task service
+            if (!isCopyDrop && taskId && todos.find((t) => String(t.id) === String(taskId))) {
                 try {
                     const svc = await getTaskService();
                     const existing = todos.find((t) => String(t.id) === String(taskId));
@@ -473,7 +475,7 @@ const CalendarContainer = () => {
                 return;
             }
 
-            // Otherwise create a calendar appointment (existing behavior)
+            // Otherwise create a calendar appointment (existing behavior / copy-from-list)
             // Try to find a title from todos if not provided
             let title =
                 (typeof taskOrId === "object" && taskOrId?.title) ||
@@ -495,28 +497,75 @@ const CalendarContainer = () => {
                 const om = pad(Math.abs(off) % 60);
                 return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            const created = await calendarService.createAppointment({
+            // Try to include optional metadata (key area, goal) when available so
+            // the appointment editor can prefill these fields.
+            // Resolve metadata. The drop source sometimes only sends an id (string),
+            // so if we received a string, try to find the full task object in
+            // `todos` to extract key area, goal and assignee.
+            let resolvedTask = null;
+            if (typeof taskOrId === "string") {
+                try {
+                    resolvedTask = (todos || []).find((t) => String(t.id) === String(taskOrId));
+                } catch (_) {
+                    resolvedTask = null;
+                }
+            } else if (typeof taskOrId === "object") {
+                resolvedTask = taskOrId;
+            }
+
+            const keyAreaId = (resolvedTask && (resolvedTask.keyAreaId || resolvedTask.key_area_id || resolvedTask.keyArea)) || null;
+            const goalId = (resolvedTask && (resolvedTask.goalId || resolvedTask.goal_id || resolvedTask.goal)) || null;
+            const assignee = (resolvedTask && (resolvedTask.assignee || resolvedTask.assigneeId || resolvedTask.assignee_name || resolvedTask.assigned_to)) || null;
+
+            const payload = {
                 title,
                 description,
                 start: toOffsetISO(start),
                 end: toOffsetISO(end),
                 timezone: tz,
-            });
-            // Optimistic merge
-            setEvents((prev) => [...prev, created]);
+                ...(goalId ? { goalId: String(goalId) } : {}),
+                ...(keyAreaId ? { keyAreaId: String(keyAreaId) } : {}),
+            };
+            if (import.meta.env.DEV) {
+                try { console.debug('Creating appointment payload', payload); } catch (_) {}
+            }
+            const created = await calendarService.createAppointment(payload);
+            if (import.meta.env.DEV) {
+                try { console.debug('Appointment created (server response)', created); } catch (_) {}
+            }
+            // Attach client-side assignee info so the appointment modal can prefill
+            // the Assignee select immediately after creation (this is client-only
+            // metadata; backend does not currently persist assignee for appointments).
+            const createdWithMeta = { ...(created || {}), ...(assignee ? { assignee } : {}) };
+            if (import.meta.env.DEV) {
+                try { console.debug('Appointment merged client-side meta', createdWithMeta); } catch (_) {}
+            }
+            // Optimistic merge: add the created appointment to the calendar but
+            // do NOT open the editor automatically. The user can click the
+            // event to edit it when they're ready.
+            setEvents((prev) => [...prev, createdWithMeta]);
             addToast({
                 title: "Event created",
-                description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`,
+                description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`,
                 variant: "success",
             });
         } catch (err) {
             console.warn("Failed to create calendar event from drop", err);
-            addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
+            // Try to extract server-provided details for better user feedback
+            const serverData = err?.response?.data;
+            let details = String(err?.message || err);
+            try {
+                if (serverData) {
+                    const serverMsg = serverData.message || serverData.error || serverData.detail || JSON.stringify(serverData);
+                    details = String(serverMsg);
+                }
+            } catch (_) {}
+            addToast({ title: "Failed to create event", description: details, variant: "error" });
         }
     };
 
     // Drag-and-drop: create an appointment for an activity
-    const handleActivityDrop = async (activityOrObj, date) => {
+    const handleActivityDrop = async (activityOrObj, date, dropEffect) => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
@@ -525,7 +574,9 @@ const CalendarContainer = () => {
 
             // If an existing activity id was dropped, update its date
             const activityId = typeof activityOrObj === "string" ? activityOrObj : activityOrObj?.id;
-            if (activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
+            const effect = String(dropEffect || "").toLowerCase();
+            const isCopyDrop = effect.includes("copy");
+            if (!isCopyDrop && activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
                 try {
                     const svc = await getActivityService();
                     const toISO = (d) => d.toISOString();
@@ -562,24 +613,82 @@ const CalendarContainer = () => {
                 const om = pad(Math.abs(off) % 60);
                 return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            const created = await calendarService.createAppointment({
+            // Resolve metadata (key area, goal, assignee).
+            // If we were passed an id (string), try to find the activity in
+            // `weekActivities` or `unattachedActivities`. If found, use the
+            // activity's own metadata or fall back to its parent task (from
+            // `todos`) when available.
+            let resolvedActivity = null;
+            if (typeof activityOrObj === "string") {
+                try {
+                    resolvedActivity = (weekActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                        (unattachedActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                        null;
+                } catch (_) {
+                    resolvedActivity = null;
+                }
+            } else if (typeof activityOrObj === "object") {
+                resolvedActivity = activityOrObj;
+            }
+
+            let keyAreaId = null;
+            let goalId = null;
+            let assignee = null;
+            if (resolvedActivity) {
+                keyAreaId = resolvedActivity.keyAreaId || resolvedActivity.key_area_id || resolvedActivity.keyArea || null;
+                goalId = resolvedActivity.goalId || resolvedActivity.goal_id || resolvedActivity.goal || null;
+                assignee = resolvedActivity.assignee || resolvedActivity.assigneeId || resolvedActivity.assignee_name || resolvedActivity.assigned_to || null;
+                // If activity doesn't have keyArea/goal, try parent task
+                if ((!keyAreaId || !goalId) && (resolvedActivity.taskId || resolvedActivity.task_id || resolvedActivity.task)) {
+                    try {
+                        const parentId = resolvedActivity.taskId || resolvedActivity.task_id || resolvedActivity.task;
+                        const parent = (todos || []).find((t) => String(t.id) === String(parentId));
+                        if (parent) {
+                            keyAreaId = keyAreaId || parent.keyAreaId || parent.key_area_id || null;
+                            goalId = goalId || parent.goalId || parent.goal_id || parent.goal || null;
+                            assignee = assignee || parent.assignee || parent.assigneeId || parent.assignee_name || parent.assigned_to || null;
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            const payload = {
                 title,
                 description,
                 start: toOffsetISO(start),
                 end: toOffsetISO(end),
                 timezone: tz,
-            });
-            setEvents((prev) => [...prev, created]);
-            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
+                ...(goalId ? { goalId: String(goalId) } : {}),
+                ...(keyAreaId ? { keyAreaId: String(keyAreaId) } : {}),
+            };
+            if (import.meta.env.DEV) {
+                try { console.debug('Creating appointment payload', payload); } catch (_) {}
+            }
+            const created = await calendarService.createAppointment(payload);
+            const createdWithMeta = { ...(created || {}), ...(assignee ? { assignee } : {}) };
+            setEvents((prev) => [...prev, createdWithMeta]);
+            // Do not open the editor right away; let the user click the event to edit.
+            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`, variant: "success" });
         } catch (err) {
             console.warn("Failed to create calendar event from activity drop", err);
-            addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
+            const serverData = err?.response?.data;
+            let details = String(err?.message || err);
+            try {
+                if (serverData) {
+                    const serverMsg = serverData.message || serverData.error || serverData.detail || JSON.stringify(serverData);
+                    details = String(serverMsg);
+                }
+            } catch (_) {}
+            addToast({ title: "Failed to create event", description: details, variant: "error" });
         }
     };
 
     // Event modal logic
     // Event modal logic
     const openModal = (event = null, action = null) => {
+        if (import.meta.env.DEV) {
+            try { console.debug('openModal called with event', event, 'action', action); } catch (_) {}
+        }
         if (action === 'delete') {
             handleDeleteEvent(event);
         } else if (action === 'edit') {
@@ -592,24 +701,152 @@ const CalendarContainer = () => {
         }
     };
 
-    const handleDeleteEvent = async (event) => {
-        if (!event?.id) return;
-        
-        const confirmed = window.confirm(`Are you sure you want to delete "${event.title}"?`);
-        if (!confirmed) return;
-        
-        try {
-            await calendarService.deleteEvent(event.id);
-            setEvents((prev) => prev.filter((e) => e.id !== event.id));
-            addToast({ title: "Appointment deleted", variant: "success" });
-        } catch (error) {
-            console.error("Delete error:", error);
-            addToast({ 
-                title: "Failed to delete appointment", 
-                message: error.message,
-                variant: "error" 
-            });
+    // Delete popover state and handler (triggered from DayView/WeekView delete icon)
+    const [deletePopoverVisible, setDeletePopoverVisible] = useState(false);
+    const [deletePopoverPos, setDeletePopoverPos] = useState({ x: 0, y: 0 });
+    const [deleteTargetEvent, setDeleteTargetEvent] = useState(null);
+    const [deleteScopeChoice, setDeleteScopeChoice] = useState('occurrence');
+    const [deleting, setDeleting] = useState(false);
+    // Simple confirm for non-recurring deletes (custom top-center UI)
+    const [simpleConfirmVisible, setSimpleConfirmVisible] = useState(false);
+    const [simpleConfirmTarget, setSimpleConfirmTarget] = useState(null);
+    const [simpleDeleting, setSimpleDeleting] = useState(false);
+
+    // Update (drag/resize) popover for recurring appointments
+    const [updatePopoverVisible, setUpdatePopoverVisible] = useState(false);
+    const [updateScopeChoice, setUpdateScopeChoice] = useState('occurrence');
+    const [updateTargetEvent, setUpdateTargetEvent] = useState(null);
+    const [updatePending, setUpdatePending] = useState({ start: null, end: null });
+
+    const handleDeleteRequest = (event, mouseEvent) => {
+        if (!event) return;
+
+        // If the appointment is NOT recurring, show the custom top-center confirmation UI
+        const isRecurring = Boolean(event.recurringPattern || event.recurrence);
+        if (!isRecurring) {
+            setSimpleConfirmTarget(event);
+            setSimpleConfirmVisible(true);
+            return;
         }
+
+        // For recurring appointments, show the scoped delete popover
+        // position popover near click; use clientX/clientY (still tracked if needed)
+        const x = (mouseEvent && mouseEvent.clientX) || (window.innerWidth / 2);
+        const y = (mouseEvent && mouseEvent.clientY) || (window.innerHeight / 2);
+        setDeletePopoverPos({ x, y });
+        setDeleteTargetEvent(event);
+        setDeleteScopeChoice('occurrence');
+        setDeletePopoverVisible(true);
+    };
+
+    const confirmSimpleDelete = async () => {
+        const event = simpleConfirmTarget;
+        if (!event || !event.id) return;
+        try {
+            setSimpleDeleting(true);
+            if (event.kind === 'appointment') {
+                await calendarService.deleteAppointment(event.id);
+            } else {
+                await calendarService.deleteEvent(event.id);
+            }
+            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            addToast({ title: 'Appointment deleted', variant: 'success' });
+            setSimpleConfirmVisible(false);
+            setSimpleConfirmTarget(null);
+        } catch (err) {
+            console.error('Delete error:', err);
+            addToast({ title: 'Failed to delete appointment', description: String(err?.message || err), variant: 'error' });
+        } finally {
+            setSimpleDeleting(false);
+        }
+    };
+
+    const cancelSimpleDelete = () => {
+        setSimpleConfirmVisible(false);
+        setSimpleConfirmTarget(null);
+    };
+
+    const confirmDeleteFromPopover = async () => {
+        const event = deleteTargetEvent;
+        if (!event || !event.id) return;
+        try {
+            setDeleting(true);
+            if (event.kind === 'appointment') {
+                const opts = {};
+                if (deleteScopeChoice === 'occurrence') {
+                    opts.editScope = 'occurrence';
+                    opts.occurrenceStart = event.start;
+                } else if (deleteScopeChoice === 'future') {
+                    opts.editScope = 'future';
+                    opts.occurrenceStart = event.start;
+                } else if (deleteScopeChoice === 'series') {
+                    opts.editScope = 'series';
+                }
+                await calendarService.deleteAppointment(event.id, opts);
+            } else {
+                await calendarService.deleteEvent(event.id);
+            }
+            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            addToast({ title: 'Appointment deleted', variant: 'success' });
+            setDeletePopoverVisible(false);
+        } catch (err) {
+            console.error('Delete error:', err);
+            addToast({ title: 'Failed to delete appointment', description: String(err?.message || err), variant: 'error' });
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const confirmUpdateFromPopover = async () => {
+        const event = updateTargetEvent;
+        if (!event || !event.id) return;
+        try {
+            const opts = {};
+            if (updateScopeChoice === 'occurrence') {
+                opts.editScope = 'occurrence';
+                opts.occurrenceStart = event.start;
+            } else if (updateScopeChoice === 'future') {
+                opts.editScope = 'future';
+                opts.occurrenceStart = event.start;
+            } else if (updateScopeChoice === 'series') {
+                opts.editScope = 'series';
+            }
+
+            // Combine pending start/end with opts and send
+            const payload = {
+                start: updatePending.start,
+                end: updatePending.end,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+                ...opts,
+            };
+
+            const updated = await calendarService.updateAppointment(event.id, payload);
+            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+            addToast({ title: 'Appointment updated', variant: 'success' });
+            setUpdatePopoverVisible(false);
+            setUpdateTargetEvent(null);
+        } catch (err) {
+            console.error('Update error:', err);
+            let details = String(err?.message || err);
+            try {
+                const respData = err?.response?.data;
+                if (respData) {
+                    if (typeof respData === 'string') details = respData;
+                    else if (Array.isArray(respData?.message)) details = respData.message.join('; ');
+                    else if (respData?.message) details = String(respData.message);
+                    else details = JSON.stringify(respData);
+                }
+            } catch (_) {}
+            addToast({ title: 'Failed to update appointment', description: details, variant: 'error' });
+        }
+    };
+
+    const handleDeleteEvent = async (event) => {
+        // Delegate to the popover flow so the user is presented with scoped delete options
+        // instead of browser prompts. The popover will position itself; pass null for mouseEvent
+        // when we don't have a click position.
+        if (!event) return;
+        handleDeleteRequest(event, null);
     };
 
     const [addDefaultTab, setAddDefaultTab] = useState("task");
@@ -925,6 +1162,18 @@ const CalendarContainer = () => {
             // Decide endpoint based on event kind in current state
             const current = events.find((e) => e.id === eventId);
             const isAppointment = current?.kind === "appointment";
+
+            // If this is a recurring appointment, prompt for edit scope (occurrence/future/series)
+            const isRecurring = Boolean(current?.recurringPattern || current?.recurrence || current?.seriesId);
+            if (isAppointment && isRecurring) {
+                // open update popover to ask scope before applying
+                setUpdateTargetEvent(current);
+                setUpdatePending({ start: toOffsetISO(newStartDate), end: toOffsetISO(targetEnd) });
+                setUpdateScopeChoice('occurrence');
+                setUpdatePopoverVisible(true);
+                return;
+            }
+
             const updated = await (isAppointment
                 ? calendarService.updateAppointment(eventId, payload)
                 : calendarService.updateEvent(eventId, payload));
@@ -1170,6 +1419,7 @@ const CalendarContainer = () => {
                         onTaskDrop={handleTaskDrop}
                         onEventMove={handleEventMove}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         activities={weekActivities}
                     />
@@ -1195,6 +1445,7 @@ const CalendarContainer = () => {
                         onActivityDrop={handleActivityDrop}
                         onEventMove={handleEventMove}
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
+                        onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         onActivityClick={openEditActivity}
                         onPlanTomorrow={() => {}}
@@ -1378,6 +1629,8 @@ const CalendarContainer = () => {
                     startDate={appointmentInitialStart}
                     defaultDurationMinutes={30}
                     users={usersList}
+                    goals={goalsList}
+                    keyAreas={keyAreas}
                     onClose={() => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
@@ -1395,6 +1648,8 @@ const CalendarContainer = () => {
                 <AppointmentModal
                     event={selectedEvent}
                     users={usersList}
+                    goals={goalsList}
+                    keyAreas={keyAreas}
                     onClose={() => {
                         setModalOpen(false);
                         setSelectedEvent(null);
@@ -1407,6 +1662,7 @@ const CalendarContainer = () => {
                         setSelectedEvent(null);
                         addToast({ title: "Appointment updated", variant: "success" });
                     }}
+                    
                     defaultDurationMinutes={30}
                 />
             )}
@@ -1643,6 +1899,175 @@ const CalendarContainer = () => {
                 onSave={handleElephantTaskSaved}
                 taskId={selectedTaskForElephant}
             />
+
+            {/* Simple top-center confirm for non-recurring deletes */}
+            {simpleConfirmVisible && simpleConfirmTarget && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="simple-delete-title"
+                    className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-80"
+                >
+                    <div id="simple-delete-title" className="font-semibold">Delete appointment</div>
+                    <div className="mt-2 text-sm">Are you sure you want to delete "{simpleConfirmTarget?.title}"?</div>
+                    <div className="mt-3 flex items-center gap-2">
+                        <button
+                            type="button"
+                            className="rounded-md bg-red-600 px-3 py-1 text-sm font-medium text-white hover:bg-red-700"
+                            onClick={confirmSimpleDelete}
+                            disabled={simpleDeleting}
+                        >
+                            {simpleDeleting ? 'Deleting...' : 'Delete'}
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+                            onClick={cancelSimpleDelete}
+                            disabled={simpleDeleting}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete popover anchored to click when delete icon clicked on an appointment */}
+            {deletePopoverVisible && deleteTargetEvent && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="delete-popover-title"
+                    className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-100"
+                >
+                    <div className="font-semibold">Delete recurring appointment</div>
+
+                    <div className="mt-2 flex flex-col gap-2">
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="delete-scope-pop"
+                                value="occurrence"
+                                checked={deleteScopeChoice === 'occurrence'}
+                                onChange={() => setDeleteScopeChoice('occurrence')}
+                            />
+                            <span>Delete this occurrence only</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="delete-scope-pop"
+                                value="future"
+                                checked={deleteScopeChoice === 'future'}
+                                onChange={() => setDeleteScopeChoice('future')}
+                            />
+                            <span>Delete this and all future occurrences</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="delete-scope-pop"
+                                value="series"
+                                checked={deleteScopeChoice === 'series'}
+                                onChange={() => setDeleteScopeChoice('series')}
+                            />
+                            <span>Delete the entire series</span>
+                        </label>
+
+                        <p className="text-xs text-slate-500">
+                            Note: you can delete a single occurrence, truncate a series (future occurrences), or delete the entire series.
+                        </p>
+
+                        <div className="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                className="rounded-md bg-red-600 px-3 py-1 text-sm font-medium text-white hover:bg-red-700"
+                                onClick={confirmDeleteFromPopover}
+                                disabled={deleting}
+                            >
+                                {deleting ? 'Deleting...' : 'Confirm delete'}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+                                onClick={() => setDeletePopoverVisible(false)}
+                                disabled={deleting}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Update popover for drag/resize of recurring appointments */}
+            {updatePopoverVisible && updateTargetEvent && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="update-popover-title"
+                    className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-100"
+                >
+                    <div className="font-semibold">Edit recurring appointment</div>
+
+                    <div className="mt-2 flex flex-col gap-2">
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="update-scope-pop"
+                                value="occurrence"
+                                checked={updateScopeChoice === 'occurrence'}
+                                onChange={() => setUpdateScopeChoice('occurrence')}
+                            />
+                            <span>Edit this occurrence only</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="update-scope-pop"
+                                value="future"
+                                checked={updateScopeChoice === 'future'}
+                                onChange={() => setUpdateScopeChoice('future')}
+                            />
+                            <span>Edit this and all future occurrences</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="update-scope-pop"
+                                value="series"
+                                checked={updateScopeChoice === 'series'}
+                                onChange={() => setUpdateScopeChoice('series')}
+                            />
+                            <span>Edit the entire series</span>
+                        </label>
+
+                        <p className="text-xs text-slate-500">
+                            Choose whether this drag/resize should affect only this occurrence, future occurrences, or the whole series.
+                        </p>
+
+                        <div className="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                className="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700"
+                                onClick={confirmUpdateFromPopover}
+                            >
+                                Apply
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md bg-slate-100 px-3 py-1 text-sm"
+                                onClick={() => { setUpdatePopoverVisible(false); setUpdateTargetEvent(null); }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

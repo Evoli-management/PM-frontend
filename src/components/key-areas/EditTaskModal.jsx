@@ -15,6 +15,8 @@ const safeDate = (v) => {
   }
 };
 
+const defaultDate = new Date().toISOString().slice(0, 10);
+
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
 
 // inline SVG icons (untyped)
@@ -46,8 +48,10 @@ export default function EditTaskModal({
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
   const [assignee, setAssignee] = useState(initialData.assignee || '');
-  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate));
-  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate));
+  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate) || defaultDate);
+  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate) || defaultDate);
+  const [keyAreaError, setKeyAreaError] = useState('');
+  const [listError, setListError] = useState('');
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate));
   const [duration, setDuration] = useState(initialData.duration || initialData.duration_minutes || '');
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 2);
@@ -79,10 +83,10 @@ export default function EditTaskModal({
     if (description !== nextDescription) setDescription(nextDescription);
     const nextAssignee = initialData.assignee || '';
     if (assignee !== nextAssignee) setAssignee(nextAssignee);
-    const nextStart = safeDate(initialData.start_date || initialData.startDate);
-    if (startDate !== nextStart) setStartDate(nextStart);
-    const nextEnd = safeDate(initialData.end_date || initialData.endDate);
-    if (endDate !== nextEnd) setEndDate(nextEnd);
+  const nextStart = safeDate(initialData.start_date || initialData.startDate) || defaultDate;
+  if (startDate !== nextStart) setStartDate(nextStart);
+  const nextEnd = safeDate(initialData.end_date || initialData.endDate) || defaultDate;
+  if (endDate !== nextEnd) setEndDate(nextEnd);
     const nextDeadline = safeDate(initialData.deadline || initialData.dueDate);
     if (deadline !== nextDeadline) setDeadline(nextDeadline);
     const nextDuration = initialData.duration || initialData.duration_minutes || '';
@@ -289,6 +293,18 @@ export default function EditTaskModal({
   if (!isOpen) return null;
 
   const handleSave = () => {
+    // Validate required fields
+    if (!keyAreaId) {
+      setKeyAreaError('Please select a Key Area');
+      try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (_) {}
+      return;
+    }
+    if (!listIndex) {
+      setListError('Please select a List');
+      try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (_) {}
+      return;
+    }
+
     const payload = {
       ...initialData,
       // ensure we include a usable id for update flows
@@ -373,9 +389,9 @@ export default function EditTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
             {/* LEFT column */}
-            <div className="grid grid-rows-5 gap-0">
+            <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
@@ -501,9 +517,13 @@ export default function EditTaskModal({
                 />
               </div>
             </div>
+            {/* separator column centered between left and right on md+ */}
+            <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
+              <div className="w-px bg-slate-400 my-2" />
+            </div>
 
             {/* RIGHT column */}
-            <div className="grid grid-rows-5 gap-0">
+            <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
@@ -511,7 +531,8 @@ export default function EditTaskModal({
                     name="key_area_id"
                     className={selectCls}
                     value={keyAreaId}
-                    onChange={(e) => setKeyAreaId(e.target.value)}
+                    onChange={(e) => { setKeyAreaId(e.target.value); setKeyAreaError(''); }}
+                    required
                   >
                     <option value="">— Select Key Area —</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (
@@ -520,6 +541,7 @@ export default function EditTaskModal({
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
+                {keyAreaError ? (<p className="mt-1 text-xs text-red-600">{keyAreaError}</p>) : null}
               </div>
 
               <div>
@@ -529,7 +551,8 @@ export default function EditTaskModal({
                     name="list_index"
                     className={selectCls}
                     value={listIndex}
-                    onChange={(e) => setListIndex(Number(e.target.value))}
+                    onChange={(e) => { setListIndex(Number(e.target.value)); setListError(''); }}
+                    required
                   >
                       {// compute available lists using listNames and allTasks similar to other modals
                         (() => {
@@ -561,10 +584,11 @@ export default function EditTaskModal({
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
+                {listError ? (<p className="mt-1 text-xs text-red-600">{listError}</p>) : null}
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">Assignee</label>
+                <label className="text-sm font-medium text-slate-700">Responsible</label>
                 <div className="relative mt-0">
                   <select
                     name="assignee"

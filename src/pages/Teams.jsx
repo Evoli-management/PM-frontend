@@ -225,8 +225,8 @@ export default function Teams() {
                 )}
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all md:ml-[1mm] overflow-y-auto px-1 md:px-2">
                     <div className="max-w-full overflow-x-hidden pb-8 min-h-full">
-                        <div className="flex items-center justify-between gap-2 mb-0 p-0 pb-0">
-                            <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
+                            <div className="flex items-center gap-4">
                                 <button
                                     className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
                                     onClick={() => setMobileSidebarOpen(true)}

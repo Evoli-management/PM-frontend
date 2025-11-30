@@ -49,7 +49,6 @@ export default function MonthView({
 
     // Layout constants - adjust these to change column / lane sizing
     const ALL_DAY_COL_WIDTH = 120; // was 80px
-    const WEEK_COL_WIDTH = 48; // width for the left 'Week' column (was 40)
     const HOUR_COL_WIDTH = 80; // per-hour column width fallback
     const LANE_WIDTH = 72; // was 36px for all-day range lanes
     const LANE_GAP = 6; // gap between lanes
@@ -1244,15 +1243,15 @@ const isoWeekNumber = (date) => {
             >
                 <div
                     ref={gridRef}
-                    className="relative pb-6"
-                    style={{
-                        maxHeight: "60vh",
-                        overflowX: "hidden",
-                        overflowY: "auto",
-                        scrollBehavior: "smooth",
-                        contain: "paint",
-                        willChange: "scroll-position",
-                    }}
+                        className="relative pb-6"
+                        style={{
+                            height: 600,
+                            overflowX: "hidden",
+                            overflowY: "auto",
+                            scrollBehavior: "smooth",
+                            contain: "paint",
+                            willChange: "scroll-position",
+                        }}
                 >
                     <div className="flex">
                             {/* Today row overlay */}
@@ -1280,26 +1279,15 @@ const isoWeekNumber = (date) => {
                             style={{
                                 borderCollapse: "separate",
                                 borderSpacing: 0,
-                                width: WEEK_COL_WIDTH + 96 + ALL_DAY_COL_WIDTH,
-                                minWidth: WEEK_COL_WIDTH + 96 + ALL_DAY_COL_WIDTH,
-                                maxWidth: WEEK_COL_WIDTH + 96 + ALL_DAY_COL_WIDTH,
+                                width: 96 + ALL_DAY_COL_WIDTH,
+                                minWidth: 96 + ALL_DAY_COL_WIDTH,
+                                maxWidth: 96 + ALL_DAY_COL_WIDTH,
                                 tableLayout: "fixed",
                             }}
                         >
                             <thead>
                                 <tr className="bg-white">
-                                    <th
-                                        className="text-center px-2 py-2 text-xs font-semibold text-gray-400"
-                                        style={{
-                                            width: `${WEEK_COL_WIDTH}px`,
-                                            minWidth: `${WEEK_COL_WIDTH}px`,
-                                            maxWidth: `${WEEK_COL_WIDTH}px`,
-                                            borderRight: "2px solid rgba(226,232,240,1)",
-                                            boxSizing: "border-box",
-                                        }}
-                                    >
-                                        Week
-                                    </th>
+                                    {/* Week column removed — week numbers will be shown inside the date cell on Mondays */}
                                     <th
                                         className="text-left px-2 py-2 text-xs font-semibold text-gray-400"
                                         style={{
@@ -1361,41 +1349,7 @@ const isoWeekNumber = (date) => {
                                             key={idx}
                                             className="bg-white mv-left-row"
                                         >
-                                            {weekCells[idx] ? (
-                                                <td
-                                                    rowSpan={weekCells[idx].rowSpan}
-                                                    className="px-2 pt-2 pb-1 text-sm text-slate-500 text-center align-top"
-                                                    style={{
-                                                        width: `${WEEK_COL_WIDTH}px`,
-                                                        minWidth: `${WEEK_COL_WIDTH}px`,
-                                                        maxWidth: `${WEEK_COL_WIDTH}px`,
-                                                        borderRight: "2px solid rgba(226,232,240,1)",
-                                                        boxSizing: "border-box",
-                                                        verticalAlign: 'top',
-                                                    }}
-                                                >
-                                                    <div style={{ lineHeight: 1 }}>{weekCells[idx].weekNumber}</div>
-                                                </td>
-                                            ) : coveredByPrevWeek ? null : (
-                                                // Render an empty placeholder cell so subsequent
-                                                // date and all-day cells keep their expected
-                                                // column positions (prevents date text from
-                                                // appearing under the "Week" header).
-                                                <td
-                                                    className="px-2 pt-2 pb-1 text-sm text-center align-top"
-                                                    style={{
-                                                        width: `${WEEK_COL_WIDTH}px`,
-                                                        minWidth: `${WEEK_COL_WIDTH}px`,
-                                                        maxWidth: `${WEEK_COL_WIDTH}px`,
-                                                        borderRight: "2px solid rgba(226,232,240,1)",
-                                                        boxSizing: "border-box",
-                                                        verticalAlign: 'top',
-                                                        color: 'transparent',
-                                                    }}
-                                                >
-                                                    &nbsp;
-                                                </td>
-                                            )}
+                                            {/* Week column removed; week numbers are shown inside the date cell for Mondays */}
                                             <td
                                                 className={`px-2 py-2 text-sm font-semibold ${
                                                     isWeekend
@@ -1415,14 +1369,23 @@ const isoWeekNumber = (date) => {
                                                     boxSizing: "border-box",
                                                 }}
                                             >
-                                                {new Intl.DateTimeFormat(
-                                                    undefined,
-                                                    {
-                                                        weekday: "short",
-                                                        day: "numeric",
-                                                        timeZone: userTimeZone,
-                                                    },
-                                                ).format(date)}
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        {new Intl.DateTimeFormat(
+                                                            undefined,
+                                                            {
+                                                                weekday: "short",
+                                                                day: "numeric",
+                                                                timeZone: userTimeZone,
+                                                            },
+                                                        ).format(date)}
+                                                    </div>
+                                                    {weekCells[idx] && weekCells[idx].weekNumber ? (
+                                                        <div className="text-[11px] text-slate-500">
+                                                            {weekCells[idx].weekNumber}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
                                             </td>
                                             <td
                                                 ref={(el) =>
@@ -1464,7 +1427,7 @@ const isoWeekNumber = (date) => {
                                 // Use scrollbar-gutter: stable to reserve space for the
                                 // horizontal scrollbar and avoid layout shifts that change
                                 // row heights when the scrollbar appears/disappears.
-                                style={{ maxWidth: `calc(100% - ${40 + 96 + ALL_DAY_COL_WIDTH}px)`, position: 'relative', overflowY: 'hidden', scrollbarGutter: 'stable', msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+                                style={{ maxWidth: `calc(100% - ${96 + ALL_DAY_COL_WIDTH}px)`, position: 'relative', overflowY: 'hidden', scrollbarGutter: 'stable', msOverflowStyle: 'none', scrollbarWidth: 'none' }}
                             >
                             <div style={{ position: 'relative' }}>
                             <table
@@ -1652,56 +1615,22 @@ const isoWeekNumber = (date) => {
                                                             }}
                                                             onDrop={(e) => {
                                                                 try {
-                                                                    const taskId =
-                                                                        e.dataTransfer.getData(
-                                                                            "taskId",
-                                                                        );
-                                                                    if (
-                                                                        !taskId ||
-                                                                        typeof onTaskDrop !==
-                                                                            "function"
-                                                                    )
-                                                                        return;
-                                                                    const [
-                                                                        hr,
-                                                                        min,
-                                                                    ] = h.split(
-                                                                        ":",
+                                                                    const taskId = e.dataTransfer.getData("taskId");
+                                                                    if (!taskId || typeof onTaskDrop !== "function") return;
+                                                                    const [hr, min] = h.split(":");
+                                                                    const dt = new Date(
+                                                                        date.getFullYear(),
+                                                                        date.getMonth(),
+                                                                        date.getDate(),
+                                                                        parseInt(hr, 10) || 0,
+                                                                        parseInt(min, 10) || 0,
+                                                                        0,
+                                                                        0,
                                                                     );
-                                                                    const dt =
-                                                                        new Date(
-                                                                            date.getFullYear(),
-                                                                            date.getMonth(),
-                                                                            date.getDate(),
-                                                                            parseInt(
-                                                                                hr,
-                                                                                10,
-                                                                            ) || 0,
-                                                                            parseInt(
-                                                                                min,
-                                                                                10,
-                                                                            ) || 0,
-                                                                            0,
-                                                                            0,
-                                                                        );
-                                                                    const task =
-                                                                        (todos ||
-                                                                            []).find(
-                                                                            (
-                                                                                t,
-                                                                            ) =>
-                                                                                String(
-                                                                                    t.id,
-                                                                                ) ===
-                                                                                String(
-                                                                                    taskId,
-                                                                                ),
-                                                                        );
-                                                                    if (task)
-                                                                        onTaskDrop(
-                                                                            task,
-                                                                            dt,
-                                                                        );
+                                                                    const task = (todos || []).find((t) => String(t.id) === String(taskId));
+                                                                    // Pass the dropEffect so parent can decide copy vs move
+                                                                    const dropEffect = e.dataTransfer.dropEffect || e.dataTransfer.effectAllowed || "";
+                                                                    if (task) onTaskDrop(task, dt, dropEffect);
                                                                 } catch {}
                                                             }}
                                                             title="Click to add appointment"

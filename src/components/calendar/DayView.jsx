@@ -545,7 +545,6 @@ export default function DayView({
   );
 
   return (
-    <div className="px-4 md:px-8">
   <div className="flex items-start gap-1">
         <div className="flex-1">
           {/* compact header */}
@@ -655,10 +654,10 @@ export default function DayView({
             </div>
           </div>
 
-          {/* CALENDAR CARD */}
-          <div
+              {/* CALENDAR CARD */}
+              <div
             className="bg-white border border-blue-50 rounded-lg shadow-sm p-3 pr-2 overflow-hidden"
-            style={{ height: 500 }}
+            style={{ height: 600 }}
           >
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
@@ -915,11 +914,13 @@ export default function DayView({
                                     return;
                                   }
                                   if (taskId && typeof onTaskDrop === "function") {
-                                    onTaskDrop(taskId, dt);
+                                    const dropEffect = data.dropEffect || data.effectAllowed || "";
+                                    onTaskDrop(taskId, dt, dropEffect);
                                     return;
                                   }
                                   if (activityId && typeof onActivityDrop === "function") {
-                                    onActivityDrop(activityId, dt);
+                                    const dropEffect = data.dropEffect || data.effectAllowed || "";
+                                    onActivityDrop(activityId, dt, dropEffect);
                                     return;
                                   }
                                 } catch (__) {}
@@ -1043,6 +1044,8 @@ export default function DayView({
                                 className="p-1 rounded hover:bg-black/10 transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // prefer explicit delete handler so parent can show a popover anchored to the click
+                                  if (typeof onDeleteRequest === 'function') return onDeleteRequest(appt, e);
                                   onEventClick && onEventClick(appt, 'delete');
                                 }}
                                 aria-label={`Delete ${title}`}
@@ -1109,6 +1112,5 @@ export default function DayView({
           </div>
         </div>
       </div>
-    </div>
   );
 }
