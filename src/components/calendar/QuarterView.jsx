@@ -217,7 +217,7 @@ export default function QuarterView({
         return () => window.removeEventListener("resize", onResize);
     }, []);
     return (
-        <div className="p-0" style={{ boxShadow: "none" }}>
+        <>
             <style>{`
                 @keyframes blinkRow {
                     0% { background-color: rgba(59,130,246,0.12) !important; box-shadow: none !important; }
@@ -229,7 +229,7 @@ export default function QuarterView({
                 .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
             `}</style>
             {/* Quarter navigation inside view */}
-            <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+            <div className="flex items-center justify-between py-3 bg-white border-b border-gray-200">
                 <div className="flex items-center gap-2">
                     {/* Back first, then View dropdown */}
                     <button
@@ -306,7 +306,7 @@ export default function QuarterView({
                 </div>
             </div>
             {/* Calendar grid: three independent month columns */}
-            <div ref={gridRef} className="flex gap-6 px-6 pb-6 overflow-auto" style={{ maxWidth: "100vw", maxHeight: "60vh" }}>
+            <div ref={gridRef} className="flex gap-6 pb-6 overflow-auto" style={{ maxWidth: "100vw", maxHeight: "600px" }}>
                 {months.map((monthDate, mIdx) => {
                     // Build weeks for this month (Mon..Sun) starting with week that contains the 1st
                     const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -434,6 +434,6 @@ export default function QuarterView({
                     );
                 })}
             </div>
-        </div>
+        </>
     );
 }

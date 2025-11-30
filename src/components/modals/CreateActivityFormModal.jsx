@@ -37,6 +37,8 @@ export default function CreateActivityFormModal({
     }
   }
 
+  const defaultDate = new Date().toISOString().slice(0, 10)
+
   const IconChevron = (props) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path
@@ -48,8 +50,8 @@ export default function CreateActivityFormModal({
 
   const [title, setTitle] = useState(initialData.text || '')
   const [description, setDescription] = useState(initialData.description || '')
-  const [startDate, setStartDate] = useState(safeDate(initialData.startDate || initialData.date_start))
-  const [endDate, setEndDate] = useState(safeDate(initialData.endDate || initialData.date_end))
+  const [startDate, setStartDate] = useState(safeDate(initialData.startDate || initialData.date_start) || defaultDate)
+  const [endDate, setEndDate] = useState(safeDate(initialData.endDate || initialData.date_end) || defaultDate)
   const [endAuto, setEndAuto] = useState(!(initialData.endDate || initialData.date_end))
   const [deadline, setDeadline] = useState(safeDate(initialData.deadline || initialData.dueDate))
   const [priority, setPriority] = useState(initialData.priority ?? initialData.priority_level ?? 'normal')
@@ -66,6 +68,7 @@ export default function CreateActivityFormModal({
   const [assignee, setAssignee] = useState(initialData.assignee || initialData.responsible || '')
   const [duration, setDuration] = useState(initialData.duration || '')
   const [keyAreaError, setKeyAreaError] = useState('')
+  const [listError, setListError] = useState('')
 
   const startRef = useRef(null)
   const endRef = useRef(null)
@@ -75,8 +78,8 @@ export default function CreateActivityFormModal({
     if (!isOpen) return
     setTitle(initialData.text || '')
     setDescription(initialData.description || '')
-  setStartDate(safeDate(initialData.startDate || initialData.date_start))
-  const nextEnd = safeDate(initialData.endDate || initialData.date_end)
+  setStartDate(safeDate(initialData.startDate || initialData.date_start) || defaultDate)
+  const nextEnd = safeDate(initialData.endDate || initialData.date_end) || defaultDate
   setEndDate(nextEnd)
   // If initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
   setEndAuto(!Boolean(initialData.endDate || initialData.date_end))
@@ -87,7 +90,7 @@ export default function CreateActivityFormModal({
     setTaskId(initialData.taskId || initialData.task_id || initialData.task || '')
     setKeyAreaId(initialData.keyAreaId || initialData.key_area_id || initialData.keyArea || initialData.key_area || '')
     // Only prefill listIndex when the caller explicitly provided one; otherwise leave empty
-    setListIndex(initialData.list || initialData.list_index || '')
+  setListIndex(initialData.list || initialData.list_index || '')
     setAssignee(initialData.assignee || initialData.responsible || '')
     setDuration(initialData.duration || '')
   }, [isOpen, initialData])
@@ -170,6 +173,12 @@ export default function CreateActivityFormModal({
       try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (__) {}
       return
     }
+    // Require a List selection as well
+    if (!listIndex) {
+      setListError('Please select a List for the chosen Key Area')
+      try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (__) {}
+      return
+    }
     const payload = {
       text: (title || '').trim(),
       priority: priority || undefined,
@@ -214,8 +223,8 @@ export default function CreateActivityFormModal({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <div className="grid grid-rows-6 gap-2">
+  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
+          <div className="grid grid-rows-6 gap-2 md:col-span-1">
             <div className="flex flex-col">
               <label className="text-sm font-medium text-slate-700">Description</label>
               <input
@@ -315,12 +324,16 @@ export default function CreateActivityFormModal({
             {/* spacer to align with right column's extra 'Goal' row */}
             <div aria-hidden="true" />
           </div>
+          {/* separator column centered between left and right on md+ */}
+          <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
+            <div className="w-px bg-slate-400 my-2" />
+          </div>
 
-          <div className="grid grid-rows-6 gap-2 content-start">
+          <div className="grid grid-rows-6 gap-2 content-start md:col-span-1">
             <div className="flex flex-col">
               <label className="text-sm font-medium text-slate-700">Key Area</label>
               <div className="relative mt-0">
-                <select name="key_area_id" className={`${selectCls} mt-0 h-9`} value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
+                <select name="key_area_id" className={`${selectCls} mt-0 h-9`} value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)} required>
                   <option value="">— Select Key Area —</option>
                   {keyAreas.map((ka) => (<option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>))}
                 </select>
@@ -332,7 +345,7 @@ export default function CreateActivityFormModal({
             <div className="flex flex-col">
               <label className="text-sm font-medium text-slate-700">List</label>
               <div className="relative mt-0">
-                <select name="list_index" className={`${selectCls} mt-0 h-9`} value={listIndex} onChange={(e) => setListIndex(e.target.value)} disabled={!keyAreaId}>
+                <select name="list_index" className={`${selectCls} mt-0 h-9`} value={listIndex} onChange={(e) => setListIndex(e.target.value)} disabled={!keyAreaId} required>
                   {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (<option value="">— Select List —</option>)}
                   {keyAreaId && localAvailableLists.map((n) => {
                     const label = (localListNames && localListNames[n]) || (normalizedParentListNames && (normalizedParentListNames[n] || normalizedParentListNames[String(n)])) || (parentListNames && parentListNames[n]) || `List ${n}`;
@@ -341,6 +354,7 @@ export default function CreateActivityFormModal({
                 </select>
                 <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               </div>
+              {listError ? (<p className="mt-1 text-xs text-red-600">{listError}</p>) : null}
             </div>
 
             <div className="flex flex-col">
@@ -358,7 +372,7 @@ export default function CreateActivityFormModal({
             </div>
 
             <div className="flex flex-col">
-              <label className="text-sm font-medium text-slate-700">Assignee</label>
+              <label className="text-sm font-medium text-slate-700">Responsible</label>
               <div className="relative mt-0">
                 <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                   <option value="">— Unassigned —</option>

@@ -15,6 +15,8 @@ const safeDate = (v) => {
   }
 };
 
+const defaultDate = new Date().toISOString().slice(0, 10);
+
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
 
 const IconChevron = (props) => (
@@ -70,7 +72,7 @@ export default function CreateTaskModal({
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
   const [assignee, setAssignee] = useState(initialData.assignee || '');
-  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate || initialData.date));
+  const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate || initialData.date) || defaultDate);
   const [startTime, setStartTime] = useState(() => {
     try {
       // Prefer explicit start_time/startTime, then a generic `time` passed by calendar slot.
@@ -78,7 +80,7 @@ export default function CreateTaskModal({
       return initialData.start_time || initialData.startTime || initialData.time || '';
     } catch { return ''; }
   });
-  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate || initialData.date));
+  const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate || initialData.date) || defaultDate);
   const [endTime, setEndTime] = useState(() => {
     try {
       // Keep end time empty by default when not provided.
@@ -117,11 +119,11 @@ export default function CreateTaskModal({
     if (description !== nextDescription) setDescription(nextDescription);
     const nextAssignee = initialData.assignee || '';
     if (assignee !== nextAssignee) setAssignee(nextAssignee);
-  const nextStart = safeDate(initialData.start_date || initialData.startDate || initialData.date);
+  const nextStart = safeDate(initialData.start_date || initialData.startDate || initialData.date) || defaultDate;
     if (startDate !== nextStart) setStartDate(nextStart);
     const nextStartTime = initialData.start_time || initialData.startTime || initialData.time || '';
     if (nextStartTime && startTime !== nextStartTime) setStartTime(nextStartTime);
-  const nextEnd = safeDate(initialData.end_date || initialData.endDate);
+  const nextEnd = safeDate(initialData.end_date || initialData.endDate) || defaultDate;
   if (endDate !== nextEnd) setEndDate(nextEnd);
   const nextEndTime = initialData.end_time || initialData.endTime || initialData.endTime || '';
   if (nextEndTime && endTime !== nextEndTime) setEndTime(nextEndTime);
@@ -409,8 +411,8 @@ export default function CreateTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div className="grid grid-rows-5 gap-0">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
+            <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div ref={firstRowRef} style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
                 <input
@@ -492,7 +494,11 @@ export default function CreateTaskModal({
               </div>
             </div>
 
-            <div className="grid grid-rows-5 gap-0">
+            {/* separator column centered between left and right on md+ */}
+            <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
+              <div className="w-px bg-slate-400 my-2" />
+            </div>
+            <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
@@ -501,6 +507,7 @@ export default function CreateTaskModal({
                     className={selectCls}
                     value={keyAreaId}
                     onChange={(e) => setKeyAreaId(e.target.value)}
+                    required
                   >
                     <option value="">— Select Key Area —</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (
@@ -519,6 +526,7 @@ export default function CreateTaskModal({
                     className={selectCls}
                     value={listIndex}
                     onChange={(e) => setListIndex(Number(e.target.value))}
+                    required
                   >
                     {
                       (() => {
@@ -542,7 +550,7 @@ export default function CreateTaskModal({
               </div>
 
               <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
-                <label className="text-sm font-medium text-slate-700">Assignee</label>
+                <label className="text-sm font-medium text-slate-700">Responsible</label>
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>

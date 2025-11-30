@@ -52,7 +52,22 @@ const calendarService = {
 
     async updateAppointment(id, payload) {
         if (!id) throw new Error("Missing appointment id");
-        const res = await apiClient.patch(`${base}/appointments/${id}`, payload);
+        // Support generated occurrence ids of the form "<baseId>_<ISO>" used by the UI.
+        // If present, forward the base appointment id to the backend and ensure
+        // occurrence context is provided in the payload so the server can apply
+        // edits to the right occurrence/series.
+        let appointmentIdToUse = id;
+        if (typeof id === 'string' && id.includes('_')) {
+            appointmentIdToUse = id.split('_')[0];
+            // If caller didn't provide an explicit editScope/occurrenceStart, prefer occurrence edit
+            if (!payload.editScope && !payload.occurrenceStart) {
+                payload.editScope = 'occurrence';
+                // extract ISO part (everything after the first underscore)
+                const iso = id.split('_').slice(1).join('_');
+                payload.occurrenceStart = iso;
+            }
+        }
+        const res = await apiClient.patch(`${base}/appointments/${appointmentIdToUse}`, payload);
         return res.data;
     },
 
@@ -62,9 +77,19 @@ const calendarService = {
         return true;
     },
 
-    async deleteAppointment(id) {
+    async deleteAppointment(id, opts = {}) {
         if (!id) throw new Error("Missing appointment id");
-        await apiClient.delete(`${base}/appointments/${id}`);
+        let appointmentIdToUse = id;
+        const params = { ...(opts || {}) };
+        if (typeof id === 'string' && id.includes('_')) {
+            appointmentIdToUse = id.split('_')[0];
+            // if caller didn't already pass occurrence context, add occurrence delete scope
+            if (!params.editScope && !params.occurrenceStart) {
+                params.editScope = 'occurrence';
+                params.occurrenceStart = id.split('_').slice(1).join('_');
+            }
+        }
+        await apiClient.delete(`${base}/appointments/${appointmentIdToUse}`, { params });
         return true;
     },
 
