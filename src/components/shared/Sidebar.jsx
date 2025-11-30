@@ -273,7 +273,7 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-2xl overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-0 md:translate-x-0 md:ml-1 md:mr-1 hidden-mobile`}
+            className={`bg-[#F7F6F3] ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-lg border border-blue-300 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-0 left-0 z-40 md:sticky md:top-0 md:translate-x-0 md:ml-1 md:mr-1 hidden-mobile`}
             aria-label="Sidebar"
         >
             <div className="flex-1 overflow-y-auto no-scrollbar pb-2">
@@ -324,7 +324,7 @@ export default function Sidebar({
                 </div>
                 
                 <div className={`px-2`}>
-                    <div className="rounded border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
+                    <div className="rounded-none border border-gray-300 bg-[#F4F4F4] p-2 text-[13px]">
                         <nav aria-label="Sidebar navigation">
                             {navItems
                                 .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
