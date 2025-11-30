@@ -5,7 +5,7 @@ import EmptyState from "./EmptyState";
 
 const GoalList = ({ goals, onGoalClick, onUpdate, onDelete }) => {
     if (!goals || goals.length === 0) {
-        return <EmptyState onCreateClick={() => {}} />;
+        return <EmptyState onCreateClick={() => { }} />;
     }
 
     const handleComplete = async (goalId) => {
@@ -62,8 +62,8 @@ const GoalList = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                 <GoalCard
                     key={goal.id}
                     goal={goal}
-                    onOpen={onGoalClick}
-                    onEdit={onGoalClick} // This will pass the edit mode
+                    onOpen={onGoalClick} // Will open in edit mode
+                    onEdit={onGoalClick} // Both use same handler - always edit
                     onComplete={handleComplete}
                     onArchive={handleArchive}
                     onToggleVisibility={handleToggleVisibility}

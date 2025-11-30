@@ -1,26 +1,21 @@
 // src/components/goals/GoalsHeader.jsx
 import React from "react";
-import { FaPlus, FaRocket, FaTh, FaList, FaColumns, FaChartLine } from "react-icons/fa";
+import { Plus, LayoutGrid, List, Columns, TrendingUp } from "lucide-react";
 
 const GoalsHeader = ({ onAddGoal, currentView = "grid", onViewChange }) => {
     const views = [
-        { id: "grid", icon: FaTh, label: "Grid" },
-        { id: "list", icon: FaList, label: "List" },
-        { id: "kanban", icon: FaColumns, label: "Kanban" },
-        { id: "timeline", icon: FaChartLine, label: "Timeline" },
+        { id: "grid", icon: LayoutGrid, label: "Grid" },
+        { id: "list", icon: List, label: "List" },
+        { id: "kanban", icon: Columns, label: "Kanban" },
+        { id: "timeline", icon: TrendingUp, label: "Timeline" },
     ];
 
     return (
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             {/* Title Section */}
-            <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-md">
-                    <FaRocket className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
-                    <p className="text-sm text-slate-600">Track and achieve your objectives</p>
-                </div>
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
+                <p className="text-sm text-slate-600">Track and achieve your objectives</p>
             </div>
 
             {/* Actions Section */}
@@ -34,11 +29,10 @@ const GoalsHeader = ({ onAddGoal, currentView = "grid", onViewChange }) => {
                                 <button
                                     key={view.id}
                                     onClick={() => onViewChange(view.id)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${
-                                        currentView === view.id
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === view.id
                                             ? "bg-blue-500 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                                    }`}
+                                        }`}
                                     title={view.label}
                                 >
                                     <Icon className="w-3.5 h-3.5" />
@@ -52,9 +46,9 @@ const GoalsHeader = ({ onAddGoal, currentView = "grid", onViewChange }) => {
                 {/* Add Goal Button */}
                 <button
                     onClick={onAddGoal}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
                 >
-                    <FaPlus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4" />
                     <span className="text-sm font-semibold">New Goal</span>
                 </button>
             </div>

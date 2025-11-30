@@ -1,6 +1,6 @@
 // src/components/goals/MilestoneItem.jsx
 import React, { useState } from "react";
-import { FaCheck, FaClock, FaWeight } from "react-icons/fa";
+import { Check, Clock, Scale } from "lucide-react";
 
 const MilestoneItem = ({ milestone, onUpdate }) => {
     const [isUpdating, setIsUpdating] = useState(false);
@@ -20,11 +20,10 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
         <div
             className={`
       flex items-start gap-4 p-4 border-2 rounded-xl transition-all duration-300
-      ${
-          milestone.done
-              ? "border-green-200 bg-green-50/50"
-              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-      }
+      ${milestone.done
+                    ? "border-green-200 bg-green-50/50"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }
     `}
         >
             {/* Checkbox */}
@@ -40,7 +39,7 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
                 {isUpdating ? (
                     <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : milestone.done ? (
-                    <FaCheck className="w-3 h-3" />
+                    <Check className="w-3 h-3" />
                 ) : null}
             </button>
 
@@ -59,7 +58,7 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
                     {/* Weight indicator */}
                     {milestone.weight && parseFloat(milestone.weight) !== 1.0 && (
                         <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                            <FaWeight className="w-3 h-3" />
+                            <Scale className="w-3 h-3" />
                             {parseFloat(milestone.weight)}x
                         </div>
                     )}
@@ -68,7 +67,7 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
                 {/* Due date if exists */}
                 {milestone.dueDate && (
                     <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <FaClock className="w-3 h-3" />
+                        <Clock className="w-3 h-3" />
                         <span>Due {new Date(milestone.dueDate).toLocaleDateString()}</span>
                         {!milestone.done && new Date(milestone.dueDate) < new Date() && (
                             <span className="text-red-600 font-semibold">(Overdue)</span>

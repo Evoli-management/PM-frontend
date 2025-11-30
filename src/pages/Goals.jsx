@@ -6,7 +6,6 @@ import Toast from "../components/shared/Toast";
 import GoalsHeader from "../components/goals/GoalsHeader";
 import GoalList from "../components/goals/GoalList";
 const GoalForm = React.lazy(() => import("../components/goals/GoalForm"));
-import GoalDetailModal from "../components/goals/GoalDetailModal";
 import KanbanView from "../components/goals/views/KanbanView";
 import ListView from "../components/goals/views/ListView";
 import TimelineView from "../components/goals/views/TimelineView";
@@ -250,12 +249,9 @@ const Goals = () => {
         }
     };
 
-    const handleGoalClick = (goal, mode = "view") => {
-        if (mode === "edit") {
-            setSelectedGoal(goal);
-        } else {
-            setSelectedGoal(goal);
-        }
+    const handleGoalClick = (goal) => {
+        // Always open in edit mode
+        setSelectedGoal(goal);
     };
 
     const stats = getGoalStats();
@@ -263,13 +259,13 @@ const Goals = () => {
     return (
         <div className="min-h-screen bg-[#EDEDED]">
             <div className="flex w-full min-h-screen">
-                <Sidebar 
+                <Sidebar
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />
 
                 {mobileSidebarOpen && (
-                    <div 
+                    <div
                         className="fixed inset-0 bg-black/40 z-30 md:hidden"
                         onClick={() => setMobileSidebarOpen(false)}
                     />
@@ -393,13 +389,15 @@ const Goals = () => {
                                 </Suspense>
                             )}
                             {selectedGoal && (
-                                <GoalDetailModal
-                                    goal={selectedGoal}
-                                    onClose={() => setSelectedGoal(null)}
-                                    keyAreas={keyAreas}
-                                    onUpdate={handleUpdateGoal}
-                                    onDelete={handleDeleteGoal}
-                                />
+                                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                                    <GoalForm
+                                        goal={selectedGoal}
+                                        onClose={() => setSelectedGoal(null)}
+                                        onGoalCreated={handleUpdateGoal.bind(null, selectedGoal.id)}
+                                        keyAreas={keyAreas}
+                                        isEditing={true}
+                                    />
+                                </Suspense>
                             )}
 
                             {/* Toast Notifications */}
