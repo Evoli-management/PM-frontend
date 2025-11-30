@@ -332,6 +332,18 @@ export default function Sidebar({
                                 .map((item) => {
                                     const toPath = typeof item.to === 'string' ? item.to : item.to?.pathname || '';
                                     const hoverColor = toPath === '/calendar' ? 'hover:text-green-600' : (toPath === '/goals' || toPath === '/key-areas') ? 'hover:text-red-600' : item.label === "Don't Forget" ? 'hover:text-orange-600' : '';
+                                    // Ensure icons (especially <img>) stay visible when sidebar is collapsed
+                                    const renderedIcon = React.isValidElement(item.icon)
+                                        ? React.cloneElement(item.icon, {
+                                              className: `${item.icon.props.className || ''} block w-6 h-6 min-w-[24px] min-h-[24px]`,
+                                              style: {
+                                                  ...(item.icon.props.style || {}),
+                                                  ...(collapsed
+                                                      ? { filter: 'saturate(1.6) brightness(1) contrast(1.05)' }
+                                                      : {}),
+                                              },
+                                          })
+                                        : item.icon;
                                     // compute active state and active text color per item
                                     let isActive = false;
                                     try {
@@ -359,8 +371,8 @@ export default function Sidebar({
                                                     aria-expanded={keyAreasOpen}
                                                     className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                                 >
-                                                    <span className="text-xl" title={item.label}>
-                                                        {item.icon}
+                                                    <span className="text-xl flex items-center justify-center" title={item.label}>
+                                                        {renderedIcon}
                                                     </span>
                                                     {!collapsed && <span>{item.label}</span>}
                                                     {item.badge && (
@@ -474,8 +486,8 @@ export default function Sidebar({
                                         to={item.to}
                                         className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                     >
-                                                <span className="text-xl" title={item.label}>
-                                                    {item.icon}
+                                                <span className="text-xl flex items-center justify-center" title={item.label}>
+                                                    {renderedIcon}
                                                 </span>
                                                 {!collapsed && <span>{item.label}</span>}
                                                 {item.badge && (
