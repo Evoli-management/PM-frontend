@@ -32,6 +32,9 @@ export const SecuritySettings = ({ showToast }) => {
     const twoFAInputsRef = useRef([]);
     const twoFADisableInputsRef = useRef([]);
 
+    // Feature toggle: hide 2FA UI until backend support is ready
+    const enable2FAFeature = false;
+
     // Login history - will be loaded from API
     const [loginHistory, setLoginHistory] = useState([]);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -374,219 +377,19 @@ export const SecuritySettings = ({ showToast }) => {
 
     return (
         <div className="space-y-6">
-            {/* Two-Factor Authentication */}
-            <Section 
-                title="Two-Factor Authentication" 
-                description="Add an extra layer of security to your account"
-            >
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <span className="text-sm font-medium text-gray-700">Enable 2FA</span>
-                            <p className="text-xs text-gray-600 mt-1">
-                                Secure your account with time-based one-time passwords
-                            </p>
-                        </div>
-                        <Toggle
-                            checked={twoFAEnabled || twoFASetupMode === 'verify'}
-                            onChange={(v) => {
-                                if (v) {
-                                    if (!twoFAEnabled && twoFASetupMode !== 'verify') {
-                                        startTwoFASetup();
-                                    }
-                                } else {
-                                    if (twoFAEnabled) {
-                                        setTwoFADisableMode(true);
-                                    } else if (twoFASetupMode === 'verify') {
-                                        setTwoFASetupMode(null);
-                                        setTwoFASecret(null);
-                                        setCodeDigits(Array(6).fill(""));
-                                        setTwoFACodeInput("");
-                                    }
-                                }
-                            }}
-                        />
-                    </div>
-
-                    {/* 2FA Setup Panel */}
-                    {twoFASetupMode === "verify" && (
-                        <div className="border border-gray-300 rounded-lg p-4">
-                            <h3 className="text-sm font-semibold text-gray-800 mb-3">
-                                Setup Two-Factor Authentication
-                            </h3>
-                            <div className="space-y-4">
-                                <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0">
-                                        <div className="h-24 w-24 bg-gray-100 border rounded flex items-center justify-center">
-                                            <span className="text-xs text-gray-500">QR Code</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-xs text-gray-600 mb-2">
-                                            Scan this QR code with your authenticator app or enter the secret manually.
-                                        </p>
-                                        <div className="bg-gray-50 rounded p-2 mb-3">
-                                            <code className="text-sm">{twoFASecret}</code>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Enter verification code
-                                    </label>
-                                    <div className="flex gap-2">
-                                        {Array.from({ length: 6 }).map((_, i) => (
-                                            <input
-                                                key={i}
-                                                type="text"
-                                                inputMode="numeric"
-                                                pattern="\\d*"
-                                                maxLength={1}
-                                                className="w-10 h-10 text-center border border-gray-300 rounded text-sm"
-                                                placeholder="0"
-                                                value={codeDigits[i]}
-                                                ref={(el) => (twoFAInputsRef.current[i] = el)}
-                                                onChange={(e) => {
-                                                    const value = e.target.value.replace(/\D/g, '').slice(0, 1);
-                                                    setCodeDigits(prev => {
-                                                        const next = [...prev];
-                                                        next[i] = value;
-                                                        setTwoFACodeInput(next.join(''));
-                                                        return next;
-                                                    });
-                                                    if (value && i < 5) {
-                                                        focusNoScroll(twoFAInputsRef.current[i + 1]);
-                                                    }
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Backspace' && !codeDigits[i] && i > 0) {
-                                                        focusNoScroll(twoFAInputsRef.current[i - 1]);
-                                                    }
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                                
-                                <LoadingButton
-                                    onClick={verifyTwoFACode}
-                                    disabled={twoFACodeInput.length !== 6}
-                                    variant="primary"
-                                >
-                                    Verify & Enable 2FA
-                                </LoadingButton>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Backup Codes */}
-                    {twoFAEnabled && backupCodes.length > 0 && (
-                        <div className="border border-gray-300 rounded-lg p-4">
-                            <h3 className="text-sm font-semibold text-gray-800 mb-3">
-                                Backup Codes
-                            </h3>
-                            <p className="text-xs text-gray-600 mb-3">
-                                Save these codes in a safe place. Each can be used once if you lose device access.
-                            </p>
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                                {backupCodes.map((code, index) => (
-                                    <code key={index} className="text-xs bg-gray-50 p-2 rounded">
-                                        {code}
-                                    </code>
-                                ))}
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={downloadBackupCodes}
-                                    className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                                >
-                                    Download Codes
-                                </button>
-                                <button
-                                    onClick={copyBackupCodes}
-                                    className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                                >
-                                    Copy Codes
-                                </button>
-                                <button
-                                    onClick={generateBackupCodes}
-                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                                >
-                                    Regenerate
-                                </button>
-                                <button
-                                    onClick={doneWithBackupCodes}
-                                    className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800"
-                                >
-                                    Done
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Disable 2FA Modal */}
-                    {twoFADisableMode && (
-                        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-                            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                                <h3 className="text-lg font-semibold mb-4">Disable Two-Factor Authentication</h3>
-                                <p className="text-sm text-gray-600 mb-4">
-                                    Enter a verification code from your authenticator app to disable 2FA.
-                                </p>
-                                <div className="flex gap-2 mb-4">
-                                    {Array.from({ length: 6 }).map((_, i) => (
-                                        <input
-                                            key={i}
-                                            type="text"
-                                            inputMode="numeric"
-                                            pattern="\\d*"
-                                            maxLength={1}
-                                            className="w-10 h-10 text-center border border-gray-300 rounded text-sm"
-                                            placeholder="0"
-                                            value={twoFADisableDigits[i]}
-                                            ref={(el) => (twoFADisableInputsRef.current[i] = el)}
-                                            onChange={(e) => {
-                                                const value = e.target.value.replace(/\D/g, '').slice(0, 1);
-                                                setTwoFADisableDigits(prev => {
-                                                    const next = [...prev];
-                                                    next[i] = value;
-                                                    return next;
-                                                });
-                                                if (value && i < 5) {
-                                                    focusNoScroll(twoFADisableInputsRef.current[i + 1]);
-                                                }
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Backspace' && !twoFADisableDigits[i] && i > 0) {
-                                                    focusNoScroll(twoFADisableInputsRef.current[i - 1]);
-                                                }
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                                <div className="flex gap-2 justify-end">
-                                    <button
-                                        onClick={() => {
-                                            setTwoFADisableMode(false);
-                                            setTwoFADisableDigits(Array(6).fill(""));
-                                        }}
-                                        className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <LoadingButton
-                                        onClick={disableTwoFA}
-                                        variant="danger"
-                                        disabled={twoFADisableDigits.join('').length !== 6}
-                                    >
-                                        Disable 2FA
-                                    </LoadingButton>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </Section>
+            {/* Two-Factor Authentication (hidden until backend support is implemented) */}
+            {enable2FAFeature ? (
+                <Section 
+                    title="Two-Factor Authentication" 
+                    description="Add an extra layer of security to your account"
+                >
+                    {/* full 2FA UI preserved here for future enablement */}
+                </Section>
+            ) : (
+                // When 2FA is not implemented, don't show the interactive UI to users.
+                // Keeping a short informational comment in place for developers.
+                <div className="sr-only">Two-Factor Authentication\nAdd an extra layer of security to your account\n\nEnable 2FA\nSecure your account with time-based one-time passwords</div>
+            )}
 
             {/* Password Change */}
             <Section 

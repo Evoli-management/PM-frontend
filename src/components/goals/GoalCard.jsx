@@ -1,17 +1,17 @@
 // src/components/goals/GoalCard.jsx
 import React, { useState } from "react";
 import {
-    FaEye,
-    FaEdit,
-    FaCheckCircle,
-    FaTrash,
-    FaEllipsisH,
-    FaCalendarAlt,
-    FaEyeSlash,
-    FaArchive,
-    FaClock,
-    FaChevronRight,
-} from "react-icons/fa";
+    Eye,
+    Pencil,
+    CheckCircle,
+    Trash2,
+    MoreHorizontal,
+    Calendar,
+    EyeOff,
+    Archive,
+    Clock,
+    ChevronRight,
+} from "lucide-react";
 
 const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onToggleVisibility }) => {
     const [showActions, setShowActions] = useState(false);
@@ -99,13 +99,16 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
         }
     };
 
-    const handleEditClick = (e) => {
-        e.stopPropagation();
-        onOpen(goal, "edit");
+    const handleCardClick = () => {
+        // Always open in edit mode when clicking the card
+        onEdit(goal, "edit");
     };
 
     return (
-        <div className="group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden">
+        <div
+            className="group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden cursor-pointer"
+            onClick={handleCardClick}
+        >
             {/* Header Section */}
             <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
@@ -119,14 +122,13 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                             </span>
                             {goal.visibility === "private" && (
                                 <div className="p-1 bg-gray-100 rounded-md">
-                                    <FaEyeSlash className="w-3 h-3 text-gray-500" />
+                                    <EyeOff className="w-3 h-3 text-gray-500" />
                                 </div>
                             )}
                         </div>
 
                         <h3
-                            className="font-semibold text-gray-900 text-base mb-2 leading-tight cursor-pointer hover:text-blue-600 transition-colors line-clamp-2"
-                            onClick={() => onOpen(goal)}
+                            className="font-semibold text-gray-900 text-base mb-2 leading-tight hover:text-blue-600 transition-colors line-clamp-2"
                         >
                             {goal.title}
                         </h3>
@@ -141,12 +143,15 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                     {/* Quick Actions */}
                     <div className="flex items-center gap-1 ml-4">
                         <button
-                            onClick={handleEditClick}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleCardClick();
+                            }}
                             disabled={isLoading}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
                             title="Edit Goal"
                         >
-                            <FaEdit className="w-4 h-4" />
+                            <Pencil className="w-4 h-4" />
                         </button>
 
                         {goal.status === "active" && (
@@ -159,7 +164,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                 className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors disabled:opacity-50"
                                 title="Mark Complete"
                             >
-                                <FaCheckCircle className="w-4 h-4" />
+                                <CheckCircle className="w-4 h-4" />
                             </button>
                         )}
 
@@ -171,7 +176,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                 }}
                                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                             >
-                                <FaEllipsisH className="w-4 h-4" />
+                                <MoreHorizontal className="w-4 h-4" />
                             </button>
 
                             {showActions && (
@@ -186,9 +191,9 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                             className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
                                         >
                                             {goal.visibility === "public" ? (
-                                                <FaEyeSlash className="w-4 h-4" />
+                                                <EyeOff className="w-4 h-4" />
                                             ) : (
-                                                <FaEye className="w-4 h-4" />
+                                                <Eye className="w-4 h-4" />
                                             )}
                                             Make {goal.visibility === "public" ? "Private" : "Public"}
                                         </button>
@@ -201,7 +206,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                                 }}
                                                 className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
                                             >
-                                                <FaArchive className="w-4 h-4" />
+                                                <Archive className="w-4 h-4" />
                                                 Archive
                                             </button>
                                         )}
@@ -214,7 +219,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                             }}
                                             className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-3 text-sm"
                                         >
-                                            <FaTrash className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4" />
                                             Delete
                                         </button>
                                     </div>
@@ -229,7 +234,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-700">
-                                {completedMilestones}/{totalMilestones} milestones
+                                {completedMilestones}/{totalMilestones} milestones completed
                             </span>
                         </div>
                         <span className="text-sm font-semibold text-gray-900">{progressPercent}%</span>
@@ -246,15 +251,18 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                 {/* Due Date Section */}
                 <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 text-sm ${statusDisplay.color}`}>
-                        <FaCalendarAlt className="w-4 h-4" />
+                        <Calendar className="w-4 h-4" />
                         <span>{statusDisplay.text}</span>
                     </div>
 
                     <button
-                        onClick={() => onOpen(goal)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleCardClick();
+                        }}
                         className="text-gray-400 hover:text-blue-600 transition-colors p-1"
                     >
-                        <FaChevronRight className="w-3 h-3" />
+                        <ChevronRight className="w-3 h-3" />
                     </button>
                 </div>
 
@@ -269,7 +277,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                 {/* Overdue Warning - only for active overdue goals */}
                 {isOverdue && goal.status === "active" && (
                     <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-                        <FaClock className="w-4 h-4 text-red-500" />
+                        <Clock className="w-4 h-4 text-red-500" />
                         <span className="text-red-700 text-sm font-medium">Goal is overdue - needs attention</span>
                     </div>
                 )}

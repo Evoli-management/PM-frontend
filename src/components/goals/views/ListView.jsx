@@ -1,16 +1,16 @@
 // src/components/goals/views/ListView.jsx - Modern list view for goals
 import React, { useState } from "react";
 import {
-    FaEdit,
-    FaCheckCircle,
-    FaTrash,
-    FaEllipsisH,
-    FaCalendarAlt,
-    FaFlag,
-    FaEyeSlash,
-    FaArchive,
-    FaClock,
-} from "react-icons/fa";
+    Pencil,
+    CheckCircle,
+    Trash2,
+    MoreHorizontal,
+    Calendar,
+    Flag,
+    EyeOff,
+    Archive,
+    Clock,
+} from "lucide-react";
 
 const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
@@ -114,8 +114,8 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                             return completedDate < dueDate
                                 ? "Completed early"
                                 : completedDate > dueDate
-                                  ? "Completed late"
-                                  : "Completed on time";
+                                    ? "Completed late"
+                                    : "Completed on time";
                         }
                         if (goal.status === "archived") return "Archived";
                         if (isOverdue) return `${Math.abs(dueInDays)} days overdue`;
@@ -139,7 +139,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                             <h3 className="font-semibold text-slate-900 truncate">{goal.title}</h3>
                                             <div className="flex items-center gap-2 mt-1">
                                                 {goal.visibility === "private" && (
-                                                    <FaEyeSlash className="w-3 h-3 text-amber-500" />
+                                                    <EyeOff className="w-3 h-3 text-amber-500" />
                                                 )}
                                                 <span className="text-sm text-slate-500">
                                                     {completedMilestones}/{totalMilestones} milestones
@@ -163,15 +163,14 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1 bg-slate-200 rounded-full h-2">
                                             <div
-                                                className={`h-2 rounded-full transition-all duration-300 ${
-                                                    progressPercent >= 80
+                                                className={`h-2 rounded-full transition-all duration-300 ${progressPercent >= 80
                                                         ? "bg-emerald-500"
                                                         : progressPercent >= 60
-                                                          ? "bg-blue-500"
-                                                          : progressPercent >= 40
-                                                            ? "bg-amber-500"
-                                                            : "bg-slate-400"
-                                                }`}
+                                                            ? "bg-blue-500"
+                                                            : progressPercent >= 40
+                                                                ? "bg-amber-500"
+                                                                : "bg-slate-400"
+                                                    }`}
                                                 style={{ width: `${progressPercent}%` }}
                                             />
                                         </div>
@@ -184,13 +183,12 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                 {/* Due Date */}
                                 <div className="col-span-2">
                                     <div
-                                        className={`flex items-center gap-2 text-sm ${
-                                            isOverdue ? "text-red-600 font-semibold" : "text-slate-600"
-                                        }`}
+                                        className={`flex items-center gap-2 text-sm ${isOverdue ? "text-red-600 font-semibold" : "text-slate-600"
+                                            }`}
                                     >
-                                        <FaCalendarAlt className="w-3 h-3" />
+                                        <Calendar className="w-3 h-3" />
                                         <span>{new Date(goal.dueDate).toLocaleDateString()}</span>
-                                        {isOverdue && <FaClock className="w-3 h-3" />}
+                                        {isOverdue && <Clock className="w-3 h-3" />}
                                     </div>
                                 </div>
 
@@ -200,12 +198,12 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                onGoalClick(goal, "edit");
+                                                onGoalClick(goal);
                                             }}
                                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                             title="Edit Goal"
                                         >
-                                            <FaEdit className="w-4 h-4" />
+                                            <Pencil className="w-4 h-4" />
                                         </button>
 
                                         {goal.status === "active" && (
@@ -217,7 +215,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                                 className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                                 title="Mark Complete"
                                             >
-                                                <FaCheckCircle className="w-4 h-4" />
+                                                <CheckCircle className="w-4 h-4" />
                                             </button>
                                         )}
 
@@ -229,7 +227,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                                 }}
                                                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
                                             >
-                                                <FaEllipsisH className="w-4 h-4" />
+                                                <MoreHorizontal className="w-4 h-4" />
                                             </button>
 
                                             {actionGoal === goal.id && (
