@@ -331,7 +331,24 @@ export default function Sidebar({
                                 .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
                                 .map((item) => {
                                     const toPath = typeof item.to === 'string' ? item.to : item.to?.pathname || '';
-                                    const hoverColor = toPath === '/calendar' ? 'hover:text-green-600' : (toPath === '/goals' || toPath === '/key-areas') ? 'hover:text-red-600' : '';
+                                    const hoverColor = toPath === '/calendar' ? 'hover:text-green-600' : (toPath === '/goals' || toPath === '/key-areas') ? 'hover:text-red-600' : item.label === "Don't Forget" ? 'hover:text-orange-600' : '';
+                                    // compute active state and active text color per item
+                                    let isActive = false;
+                                    try {
+                                        if (typeof item.to === 'string') {
+                                            isActive = location.pathname.startsWith(item.to);
+                                        } else if (item.to && item.to.pathname) {
+                                            isActive = location.pathname.startsWith(item.to.pathname);
+                                            if (item.label === "Don't Forget") {
+                                                const params = new URLSearchParams(location.search || '');
+                                                isActive = isActive && params.get('dontforget') === '1';
+                                            }
+                                        }
+                                    } catch (e) {
+                                        isActive = false;
+                                    }
+
+                                    const colorClass = toPath === '/calendar' ? 'text-green-600' : (toPath === '/goals' || toPath === '/key-areas') ? 'text-red-600' : (item.label === "Don't Forget" ? 'text-orange-600' : 'text-blue-700');
                                     const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
 
                                     if (isKeyAreas) {
@@ -340,7 +357,7 @@ export default function Sidebar({
                                                 <button
                                                     onClick={(e) => handleKeyAreasClick(e, item)}
                                                     aria-expanded={keyAreasOpen}
-                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${location.pathname.startsWith("/key-areas") ? "bg-white text-blue-700 shadow-inner font-semibold" : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                                 >
                                                     <span className="text-xl" title={item.label}>
                                                         {item.icon}
@@ -366,7 +383,7 @@ export default function Sidebar({
                                                                     new URLSearchParams(location.search).get("ka") ===
                                                                         String(ka.id);
                                                                 const baseClasses = "flex items-center gap-2 px-3 py-2 rounded mb-2 transition text-left w-full";
-                                                                const activeClasses = "text-blue-700 font-semibold bg-white shadow-inner";
+                                                                const activeClasses = "text-red-600 font-semibold bg-white shadow-inner";
                                                                 const inactiveClasses = "text-gray-800 hover:bg-white";
                                                                 const dragOverClasses = dragOverIndex === index ? "bg-blue-100 border-2 border-blue-300 border-dashed" : "";
                                                                 
@@ -455,7 +472,7 @@ export default function Sidebar({
                                     <div key={item.label} className="mb-2">
                                     <Link
                                         to={item.to}
-                                        className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${location.pathname.startsWith(typeof item.to === 'string' ? item.to : (item.to?.pathname || '')) ? "bg-white text-blue-700 shadow-inner font-semibold" : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                        className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                     >
                                                 <span className="text-xl" title={item.label}>
                                                     {item.icon}
