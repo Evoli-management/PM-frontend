@@ -329,6 +329,8 @@ export default function Sidebar({
                             {navItems
                                 .filter((item) => (item.to === "/calendar" ? calendarEnabled : true))
                                 .map((item) => {
+                                    const toPath = typeof item.to === 'string' ? item.to : item.to?.pathname || '';
+                                    const hoverColor = toPath === '/calendar' ? 'hover:text-green-600' : (toPath === '/goals' || toPath === '/key-areas') ? 'hover:text-red-600' : '';
                                     const isKeyAreas = item.label === "Key Areas" || (item.to && item.to === "/key-areas");
 
                                     if (isKeyAreas) {
@@ -337,7 +339,7 @@ export default function Sidebar({
                                                 <button
                                                     onClick={(e) => handleKeyAreasClick(e, item)}
                                                     aria-expanded={keyAreasOpen}
-                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${location.pathname.startsWith("/key-areas") ? "bg-white text-blue-700 shadow-inner font-semibold" : "text-gray-800 hover:bg-white"}`}
+                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${location.pathname.startsWith("/key-areas") ? "bg-white text-blue-700 shadow-inner font-semibold" : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                                 >
                                                     <span className="text-xl" title={item.label}>
                                                         {item.icon}
@@ -449,11 +451,11 @@ export default function Sidebar({
                                     }
 
                                     return (
-                                        <div key={item.label} className="mb-2">
-                                            <Link
-                                                to={item.to}
-                                                className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${location.pathname.startsWith(item.to) ? "bg-white text-blue-700 shadow-inner font-semibold" : "text-gray-800 hover:bg-white"}`}
-                                            >
+                                    <div key={item.label} className="mb-2">
+                                    <Link
+                                        to={item.to}
+                                        className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${location.pathname.startsWith(typeof item.to === 'string' ? item.to : (item.to?.pathname || '')) ? "bg-white text-blue-700 shadow-inner font-semibold" : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                    >
                                                 <span className="text-xl" title={item.label}>
                                                     {item.icon}
                                                 </span>
