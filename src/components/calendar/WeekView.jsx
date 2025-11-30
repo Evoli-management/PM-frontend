@@ -259,12 +259,14 @@ const WeekView = ({
             }
             const taskId = e.dataTransfer.getData("taskId");
             if (taskId) {
-                onTaskDrop && onTaskDrop(taskId, date);
+                const dropEffect = e.dataTransfer.dropEffect || e.dataTransfer.effectAllowed || "";
+                onTaskDrop && onTaskDrop(taskId, date, dropEffect);
                 return;
             }
             const activityId = e.dataTransfer.getData("activityId");
             if (activityId) {
-                onActivityDrop && onActivityDrop(activityId, date);
+                const dropEffect = e.dataTransfer.dropEffect || e.dataTransfer.effectAllowed || "";
+                onActivityDrop && onActivityDrop(activityId, date, dropEffect);
             }
         } catch (err) {
             console.warn("Drop failed", err);

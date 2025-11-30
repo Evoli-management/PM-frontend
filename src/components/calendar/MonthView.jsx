@@ -1652,56 +1652,22 @@ const isoWeekNumber = (date) => {
                                                             }}
                                                             onDrop={(e) => {
                                                                 try {
-                                                                    const taskId =
-                                                                        e.dataTransfer.getData(
-                                                                            "taskId",
-                                                                        );
-                                                                    if (
-                                                                        !taskId ||
-                                                                        typeof onTaskDrop !==
-                                                                            "function"
-                                                                    )
-                                                                        return;
-                                                                    const [
-                                                                        hr,
-                                                                        min,
-                                                                    ] = h.split(
-                                                                        ":",
+                                                                    const taskId = e.dataTransfer.getData("taskId");
+                                                                    if (!taskId || typeof onTaskDrop !== "function") return;
+                                                                    const [hr, min] = h.split(":");
+                                                                    const dt = new Date(
+                                                                        date.getFullYear(),
+                                                                        date.getMonth(),
+                                                                        date.getDate(),
+                                                                        parseInt(hr, 10) || 0,
+                                                                        parseInt(min, 10) || 0,
+                                                                        0,
+                                                                        0,
                                                                     );
-                                                                    const dt =
-                                                                        new Date(
-                                                                            date.getFullYear(),
-                                                                            date.getMonth(),
-                                                                            date.getDate(),
-                                                                            parseInt(
-                                                                                hr,
-                                                                                10,
-                                                                            ) || 0,
-                                                                            parseInt(
-                                                                                min,
-                                                                                10,
-                                                                            ) || 0,
-                                                                            0,
-                                                                            0,
-                                                                        );
-                                                                    const task =
-                                                                        (todos ||
-                                                                            []).find(
-                                                                            (
-                                                                                t,
-                                                                            ) =>
-                                                                                String(
-                                                                                    t.id,
-                                                                                ) ===
-                                                                                String(
-                                                                                    taskId,
-                                                                                ),
-                                                                        );
-                                                                    if (task)
-                                                                        onTaskDrop(
-                                                                            task,
-                                                                            dt,
-                                                                        );
+                                                                    const task = (todos || []).find((t) => String(t.id) === String(taskId));
+                                                                    // Pass the dropEffect so parent can decide copy vs move
+                                                                    const dropEffect = e.dataTransfer.dropEffect || e.dataTransfer.effectAllowed || "";
+                                                                    if (task) onTaskDrop(task, dt, dropEffect);
                                                                 } catch {}
                                                             }}
                                                             title="Click to add appointment"

@@ -436,16 +436,18 @@ const CalendarContainer = () => {
     };
 
     // Drag-and-drop: create an appointment for a task
-    const handleTaskDrop = async (taskOrId, date) => {
+    const handleTaskDrop = async (taskOrId, date, dropEffect) => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
             // No business-hours restriction; compute end as simple duration offset
             const end = new Date(start.getTime() + defaultMinutes * 60000);
             const taskId = typeof taskOrId === "string" ? taskOrId : taskOrId?.id;
+            const effect = String(dropEffect || "").toLowerCase();
+            const isCopyDrop = effect.includes("copy");
 
-            // If we dropped an existing task (id), update its start/end on the task service
-            if (taskId && todos.find((t) => String(t.id) === String(taskId))) {
+            // If this was NOT a copy-drop and we dropped an existing task (id), update its start/end on the task service
+            if (!isCopyDrop && taskId && todos.find((t) => String(t.id) === String(taskId))) {
                 try {
                     const svc = await getTaskService();
                     const existing = todos.find((t) => String(t.id) === String(taskId));
@@ -473,7 +475,7 @@ const CalendarContainer = () => {
                 return;
             }
 
-            // Otherwise create a calendar appointment (existing behavior)
+            // Otherwise create a calendar appointment (existing behavior / copy-from-list)
             // Try to find a title from todos if not provided
             let title =
                 (typeof taskOrId === "object" && taskOrId?.title) ||
@@ -495,28 +497,75 @@ const CalendarContainer = () => {
                 const om = pad(Math.abs(off) % 60);
                 return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            const created = await calendarService.createAppointment({
+            // Try to include optional metadata (key area, goal) when available so
+            // the appointment editor can prefill these fields.
+            // Resolve metadata. The drop source sometimes only sends an id (string),
+            // so if we received a string, try to find the full task object in
+            // `todos` to extract key area, goal and assignee.
+            let resolvedTask = null;
+            if (typeof taskOrId === "string") {
+                try {
+                    resolvedTask = (todos || []).find((t) => String(t.id) === String(taskOrId));
+                } catch (_) {
+                    resolvedTask = null;
+                }
+            } else if (typeof taskOrId === "object") {
+                resolvedTask = taskOrId;
+            }
+
+            const keyAreaId = (resolvedTask && (resolvedTask.keyAreaId || resolvedTask.key_area_id || resolvedTask.keyArea)) || null;
+            const goalId = (resolvedTask && (resolvedTask.goalId || resolvedTask.goal_id || resolvedTask.goal)) || null;
+            const assignee = (resolvedTask && (resolvedTask.assignee || resolvedTask.assigneeId || resolvedTask.assignee_name || resolvedTask.assigned_to)) || null;
+
+            const payload = {
                 title,
                 description,
                 start: toOffsetISO(start),
                 end: toOffsetISO(end),
                 timezone: tz,
-            });
-            // Optimistic merge
-            setEvents((prev) => [...prev, created]);
+                ...(goalId ? { goalId: String(goalId) } : {}),
+                ...(keyAreaId ? { keyAreaId: String(keyAreaId) } : {}),
+            };
+            if (import.meta.env.DEV) {
+                try { console.debug('Creating appointment payload', payload); } catch (_) {}
+            }
+            const created = await calendarService.createAppointment(payload);
+            if (import.meta.env.DEV) {
+                try { console.debug('Appointment created (server response)', created); } catch (_) {}
+            }
+            // Attach client-side assignee info so the appointment modal can prefill
+            // the Assignee select immediately after creation (this is client-only
+            // metadata; backend does not currently persist assignee for appointments).
+            const createdWithMeta = { ...(created || {}), ...(assignee ? { assignee } : {}) };
+            if (import.meta.env.DEV) {
+                try { console.debug('Appointment merged client-side meta', createdWithMeta); } catch (_) {}
+            }
+            // Optimistic merge: add the created appointment to the calendar but
+            // do NOT open the editor automatically. The user can click the
+            // event to edit it when they're ready.
+            setEvents((prev) => [...prev, createdWithMeta]);
             addToast({
                 title: "Event created",
-                description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`,
+                description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`,
                 variant: "success",
             });
         } catch (err) {
             console.warn("Failed to create calendar event from drop", err);
-            addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
+            // Try to extract server-provided details for better user feedback
+            const serverData = err?.response?.data;
+            let details = String(err?.message || err);
+            try {
+                if (serverData) {
+                    const serverMsg = serverData.message || serverData.error || serverData.detail || JSON.stringify(serverData);
+                    details = String(serverMsg);
+                }
+            } catch (_) {}
+            addToast({ title: "Failed to create event", description: details, variant: "error" });
         }
     };
 
     // Drag-and-drop: create an appointment for an activity
-    const handleActivityDrop = async (activityOrObj, date) => {
+    const handleActivityDrop = async (activityOrObj, date, dropEffect) => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
@@ -525,7 +574,9 @@ const CalendarContainer = () => {
 
             // If an existing activity id was dropped, update its date
             const activityId = typeof activityOrObj === "string" ? activityOrObj : activityOrObj?.id;
-            if (activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
+            const effect = String(dropEffect || "").toLowerCase();
+            const isCopyDrop = effect.includes("copy");
+            if (!isCopyDrop && activityId && (Array.isArray(weekActivities) ? weekActivities : []).some((a) => String(a.id) === String(activityId))) {
                 try {
                     const svc = await getActivityService();
                     const toISO = (d) => d.toISOString();
@@ -562,24 +613,82 @@ const CalendarContainer = () => {
                 const om = pad(Math.abs(off) % 60);
                 return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            const created = await calendarService.createAppointment({
+            // Resolve metadata (key area, goal, assignee).
+            // If we were passed an id (string), try to find the activity in
+            // `weekActivities` or `unattachedActivities`. If found, use the
+            // activity's own metadata or fall back to its parent task (from
+            // `todos`) when available.
+            let resolvedActivity = null;
+            if (typeof activityOrObj === "string") {
+                try {
+                    resolvedActivity = (weekActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                        (unattachedActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                        null;
+                } catch (_) {
+                    resolvedActivity = null;
+                }
+            } else if (typeof activityOrObj === "object") {
+                resolvedActivity = activityOrObj;
+            }
+
+            let keyAreaId = null;
+            let goalId = null;
+            let assignee = null;
+            if (resolvedActivity) {
+                keyAreaId = resolvedActivity.keyAreaId || resolvedActivity.key_area_id || resolvedActivity.keyArea || null;
+                goalId = resolvedActivity.goalId || resolvedActivity.goal_id || resolvedActivity.goal || null;
+                assignee = resolvedActivity.assignee || resolvedActivity.assigneeId || resolvedActivity.assignee_name || resolvedActivity.assigned_to || null;
+                // If activity doesn't have keyArea/goal, try parent task
+                if ((!keyAreaId || !goalId) && (resolvedActivity.taskId || resolvedActivity.task_id || resolvedActivity.task)) {
+                    try {
+                        const parentId = resolvedActivity.taskId || resolvedActivity.task_id || resolvedActivity.task;
+                        const parent = (todos || []).find((t) => String(t.id) === String(parentId));
+                        if (parent) {
+                            keyAreaId = keyAreaId || parent.keyAreaId || parent.key_area_id || null;
+                            goalId = goalId || parent.goalId || parent.goal_id || parent.goal || null;
+                            assignee = assignee || parent.assignee || parent.assigneeId || parent.assignee_name || parent.assigned_to || null;
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            const payload = {
                 title,
                 description,
                 start: toOffsetISO(start),
                 end: toOffsetISO(end),
                 timezone: tz,
-            });
-            setEvents((prev) => [...prev, created]);
-            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)}`, variant: "success" });
+                ...(goalId ? { goalId: String(goalId) } : {}),
+                ...(keyAreaId ? { keyAreaId: String(keyAreaId) } : {}),
+            };
+            if (import.meta.env.DEV) {
+                try { console.debug('Creating appointment payload', payload); } catch (_) {}
+            }
+            const created = await calendarService.createAppointment(payload);
+            const createdWithMeta = { ...(created || {}), ...(assignee ? { assignee } : {}) };
+            setEvents((prev) => [...prev, createdWithMeta]);
+            // Do not open the editor right away; let the user click the event to edit.
+            addToast({ title: "Event created", description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`, variant: "success" });
         } catch (err) {
             console.warn("Failed to create calendar event from activity drop", err);
-            addToast({ title: "Failed to create event", description: String(err?.message || err), variant: "error" });
+            const serverData = err?.response?.data;
+            let details = String(err?.message || err);
+            try {
+                if (serverData) {
+                    const serverMsg = serverData.message || serverData.error || serverData.detail || JSON.stringify(serverData);
+                    details = String(serverMsg);
+                }
+            } catch (_) {}
+            addToast({ title: "Failed to create event", description: details, variant: "error" });
         }
     };
 
     // Event modal logic
     // Event modal logic
     const openModal = (event = null, action = null) => {
+        if (import.meta.env.DEV) {
+            try { console.debug('openModal called with event', event, 'action', action); } catch (_) {}
+        }
         if (action === 'delete') {
             handleDeleteEvent(event);
         } else if (action === 'edit') {

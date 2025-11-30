@@ -915,11 +915,13 @@ export default function DayView({
                                     return;
                                   }
                                   if (taskId && typeof onTaskDrop === "function") {
-                                    onTaskDrop(taskId, dt);
+                                    const dropEffect = data.dropEffect || data.effectAllowed || "";
+                                    onTaskDrop(taskId, dt, dropEffect);
                                     return;
                                   }
                                   if (activityId && typeof onActivityDrop === "function") {
-                                    onActivityDrop(activityId, dt);
+                                    const dropEffect = data.dropEffect || data.effectAllowed || "";
+                                    onActivityDrop(activityId, dt, dropEffect);
                                     return;
                                   }
                                 } catch (__) {}
