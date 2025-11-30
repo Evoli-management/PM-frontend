@@ -418,70 +418,24 @@ export default function Navbar() {
                         <span className="sr-only">Practical Manager</span>
                     </Link>
                     
-                    {/* Site-wide search */}
-                    <div className="w-[calc(50%-1rem)] absolute left-[45%] transform -translate-x-1/2 relative" ref={searchRef}>
-                        <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 shadow-sm">
-                            <FaSearch className="text-gray-500 mr-2" />
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={handleSearchChange}
-                                onKeyDown={handleSearchKeyPress}
-                                placeholder="Search across site..."
-                                className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder-gray-500"
-                            />
-                        </div>
-                        
-                        {/* Search Results Portal */}
-                        {showSearchResults && createPortal(
-                            <div>
-                                {(searchResults.length > 0 || searchLoading) && (
-                                    <div 
-                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-[200]"
-                                        style={{
-                                            top: `${dropdownPosition.top + 4}px`,
-                                            left: `${dropdownPosition.left}px`,
-                                            width: `${dropdownPosition.width}px`
-                                        }}
-                                    >
-                                        {searchResults.map((result, index) => (
-                                            <button
-                                                key={index}
-                                                onClick={() => handleSearchResultClick(result.route)}
-                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                                            >
-                                                <div className="font-medium text-gray-800">{result.title}</div>
-                                                <div className="text-sm text-gray-500">{result.description}</div>
-                                                <div className="text-xs text-blue-600 mt-1">{result.type}</div>
-                                            </button>
-                                        ))}
-                                        {searchLoading && (
-                                            <div className="px-4 py-3 text-center">
-                                                <div className="text-sm text-gray-500">Searching across system...</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                
-                                {/* No Results Message */}
-                                {search && searchResults.length === 0 && !searchLoading && (
-                                    <div 
-                                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-3 z-[200]"
-                                        style={{
-                                            top: `${dropdownPosition.top + 4}px`,
-                                            left: `${dropdownPosition.left}px`,
-                                            width: `${dropdownPosition.width}px`
-                                        }}
-                                    >
-                                        <div className="text-gray-500 text-sm">No results found for "{search}"</div>
-                                    </div>
-                                )}
-                            </div>,
-                            document.body
-                        )}
-                    </div>
+                    {/* Compact search icon (replaces large centered search bar) */}
+                    {/* Placed visually with other header actions for a cleaner layout */}
                     
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
+                    <button
+                        className="text-black hover:text-gray-700 px-3 py-1.5 rounded-full"
+                        aria-label="Search"
+                        title="Search"
+                        onClick={() => {
+                            // Placeholder: keep behavior simple — optionally open a modal or focus a hidden input
+                            try {
+                                const el = document.querySelector('input[placeholder="Search across site..."]');
+                                if (el) el.focus();
+                            } catch (e) {}
+                        }}
+                    >
+                        <FaSearch className="w-5 h-5" />
+                    </button>
                     {/* Widgets control: only show on Dashboard route */}
                     {location.pathname === '/dashboard' && (
                         <div className="relative" ref={widgetsRef}>
