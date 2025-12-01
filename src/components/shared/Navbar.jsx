@@ -407,7 +407,7 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-2"
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative"
         >
             <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
                     <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
