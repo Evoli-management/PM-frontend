@@ -49,14 +49,22 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
                 workEndTime: userPrefsRaw.workEndTime ?? userPrefsRaw.work_end_time,
             };
 
+            // Prefer API values when present, otherwise fall back to localStorage (legacy) and then defaults
+            let localPrefs = {};
+            try {
+                localPrefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+            } catch (e) {
+                localPrefs = {};
+            }
+
             const newPreferences = {
                 workingHours: {
-                    startTime: userPrefs.workStartTime || '08:00',
-                    endTime: userPrefs.workEndTime || '17:00'
+                    startTime: userPrefs.workStartTime ?? localPrefs.workStartTime ?? '08:00',
+                    endTime: userPrefs.workEndTime ?? localPrefs.workEndTime ?? '17:00'
                 },
-                timeFormat: userPrefs.timeFormat || '12h',
-                dateFormat: userPrefs.dateFormat || 'MM/dd/yyyy',
-                timezone: userPrefs.timezone || 'UTC'
+                timeFormat: userPrefs.timeFormat ?? localPrefs.timeFormat ?? '12h',
+                dateFormat: userPrefs.dateFormat ?? localPrefs.dateFormat ?? 'MM/dd/yyyy',
+                timezone: userPrefs.timezone ?? localPrefs.timezone ?? 'UTC'
             };
             
             setPreferences(newPreferences);
