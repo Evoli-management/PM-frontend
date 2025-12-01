@@ -23,7 +23,6 @@ export default function Navbar() {
         const handleClickOutside = (e) => {
             const node = menuRef.current;
             const qnode = quickRef.current;
-            const wnode = widgetsRef?.current;
             // Close profile menu if click outside
             if (open && node && !node.contains(e.target)) {
                 setOpen(false);
@@ -31,10 +30,6 @@ export default function Navbar() {
             // Close quick actions if click outside
             if (openQuick && qnode && !qnode.contains(e.target)) {
                 setOpenQuick(false);
-            }
-            // Close widgets menu if click outside
-            if (typeof openWidgets !== 'undefined' && openWidgets && wnode && !wnode.contains(e.target)) {
-                setOpenWidgets(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -407,15 +402,18 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-2"
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-0 h-10"
+            // style={{
+            //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
+            // }}
         >
-            <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
+            <div className="w-full px-2 md:px-4 h-full flex items-center justify-between">
                     <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
-                            className="hidden md:block h-8 object-contain"
-                            style={{ maxHeight: '36px' }}
+                            className="hidden md:block h-5 object-contain"
+                            style={{ maxHeight: '24px' }}
                         />
                         <span className="sr-only">Practical Manager</span>
                     </Link>
@@ -425,7 +423,7 @@ export default function Navbar() {
                     
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     <button
-                        className="text-black hover:text-gray-700 px-3 py-1.5 rounded-full"
+                        className="text-black hover:text-gray-700 px-1 py-0.5 rounded-full"
                         aria-label="Search"
                         title="Search"
                         onClick={() => {
@@ -436,19 +434,19 @@ export default function Navbar() {
                             } catch (e) {}
                         }}
                     >
-                        <FaSearch className="w-5 h-5" />
+                        <FaSearch className="w-4 h-4" />
                     </button>
                     {/* Widgets control: only show on Dashboard route */}
                     {location.pathname === '/dashboard' && (
                         <div className="relative" ref={widgetsRef}>
                             <button
                                 onClick={() => setOpenWidgets((o) => !o)}
-                                className="text-white/90 hover:text-white px-3 py-1.5 rounded-full"
+                                className="text-white/90 hover:text-white px-1 py-0.5 rounded-full"
                                 aria-haspopup="menu"
                                 aria-expanded={openWidgets ? "true" : "false"}
                                 title="Widgets"
                             >
-                                <FaTh className="text-black w-5 h-5" />
+                                    <FaTh className="text-black w-4 h-4" />
                             </button>
 
                             {openWidgets && (
@@ -481,14 +479,14 @@ export default function Navbar() {
                                     setOpenQuick(true);
                                 }
                             }}
-                            className="text-white/90 hover:text-white px-3 py-1.5 rounded-full"
+                            className="text-white/90 hover:text-white px-1 py-0.5 rounded-full"
                             aria-haspopup="menu"
                             aria-expanded={openQuick ? "true" : "false"}
                             aria-controls="quick-actions-menu"
                             title="Quick Actions"
                             aria-label="Quick Actions"
                         >
-                            <FaBolt className="text-black w-5 h-5" />
+                            <FaBolt className="text-black w-4 h-4" />
                             <span className="sr-only">Quick Actions</span>
                         </button>
 
@@ -565,11 +563,11 @@ export default function Navbar() {
                     <div className="relative" ref={menuRef}>
                         <button
                             onClick={() => setOpen((o) => !o)}
-                            className="flex items-center gap-2 rounded-full border border-white/30 bg-blue-500/40 px-2 py-1 hover:bg-blue-500/60"
+                            className="flex items-center gap-2 rounded-full border border-white/30 bg-blue-500/40 px-2 py-0.5 hover:bg-blue-500/60"
                             aria-haspopup="menu"
                             aria-expanded={open ? "true" : "false"}
                         >
-                            <span className="w-8 h-8 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
+                            <span className="w-5 h-5 rounded-full bg-white/30 text-white flex items-center justify-center overflow-hidden">
                                 {userProfile?.avatarUrl ? (
                                     <img
                                         src={userProfile.avatarUrl}
@@ -583,7 +581,7 @@ export default function Navbar() {
                                     />
                                 ) : null}
                                 <FaUser
-                                    className={`w-5 h-5 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
+                                    className={`w-3 h-3 ${userProfile?.avatarUrl ? 'hidden' : 'block'}`}
                                 />
                             </span>
                             <svg

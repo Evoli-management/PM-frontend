@@ -37,6 +37,7 @@ export const SecuritySettings = ({ showToast }) => {
 
     // Login history - will be loaded from API
     const [loginHistory, setLoginHistory] = useState([]);
+    const [loginLoading, setLoginLoading] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     // Load initial data
@@ -47,34 +48,55 @@ export const SecuritySettings = ({ showToast }) => {
     const loadSecurityData = async () => {
         try {
             setIsLoading(true);
-            
+            setLoginLoading(true);
+
             // Load 2FA status
             const twoFAStatus = await securityService.get2FAStatus();
             setTwoFAEnabled(twoFAStatus.enabled);
-            
+
             // Load login history
             const historyData = await securityService.getLoginHistory(20);
-            setLoginHistory(historyData.history || []);
-            
+            const rawHistory = historyData.history || [];
+
             // Load active sessions for current session detection
             const sessionsData = await securityService.getActiveSessions();
-            // Mark current session in login history
-            if (sessionsData.sessions && sessionsData.sessions.length > 0) {
-                const currentSession = sessionsData.sessions.find(s => s.isCurrent);
-                if (currentSession && historyData.history) {
-                    const updatedHistory = historyData.history.map(entry => ({
-                        ...entry,
-                        device: entry.browser && entry.os ? `${entry.device} - ${entry.browser}` : entry.device || 'Unknown Device',
-                        current: entry.ipAddress === currentSession.ipAddress && entry.browser === currentSession.deviceInfo?.browser
-                    }));
-                    setLoginHistory(updatedHistory);
-                }
-            }
+            const activeSessions = sessionsData.sessions || [];
+
+            const updatedHistory = rawHistory.map((entry) => {
+                const ip = entry.ipAddress || entry.ip || entry.ip_addr || entry.ipaddr || '';
+                const loginTime = entry.loginTime || entry.loggedAt || entry.createdAt || entry.at || null;
+                const deviceName = entry.device || entry.deviceName || entry.deviceInfo?.device || entry.userAgent || '';
+                const browser = entry.browser || entry.deviceInfo?.browser || '';
+                const os = entry.os || entry.deviceInfo?.os || '';
+                const location = entry.location || entry.geoLocation || '';
+
+                // Try to detect if this matches a current active session by id or ip+browser
+                const isCurrent = !!activeSessions.find(s => (
+                    (s.id && (s.id === entry.id || s.id === entry.sessionId)) ||
+                    (entry.id && s.id === entry.id) ||
+                    (s.isCurrent) ||
+                    (s.ipAddress && s.ipAddress === ip && (s.deviceInfo?.browser || s.browser) === browser)
+                ));
+
+                return {
+                    id: entry.id || entry.sessionId || entry._id || `${ip}-${browser}-${loginTime}`,
+                    device: deviceName || (browser && os ? `${browser} • ${os}` : (browser || os) ) || 'Unknown Device',
+                    browser,
+                    os,
+                    location: location || 'Unknown',
+                    ipAddress: ip,
+                    loginTime,
+                    current: isCurrent
+                };
+            });
+
+            setLoginHistory(updatedHistory);
         } catch (error) {
             console.error('Failed to load security data:', error);
             showToast('Failed to load security settings', 'error');
         } finally {
             setIsLoading(false);
+            setLoginLoading(false);
         }
     };
 
@@ -338,7 +360,7 @@ export const SecuritySettings = ({ showToast }) => {
     const revokeSession = async (sessionId) => {
         try {
             await securityService.revokeSession(sessionId);
-            setLoginHistory(prev => prev.filter(session => session.id !== sessionId || session.current));
+            setLoginHistory(prev => prev.filter(session => session.id !== sessionId));
             showToast('Session revoked successfully');
         } catch (error) {
             console.error('Failed to revoke session:', error);
@@ -600,34 +622,40 @@ export const SecuritySettings = ({ showToast }) => {
             >
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        {loginHistory.map((session) => (
-                            <div
-                                key={session.id}
-                                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                            >
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium">{session.device}</span>
-                                        {session.current && (
-                                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                                                Current
-                                            </span>
-                                        )}
+                        {loginLoading ? (
+                            <div className="p-4 text-sm text-gray-600">Loading login history...</div>
+                        ) : loginHistory.length === 0 ? (
+                            <div className="p-4 text-sm text-gray-600">No login history or active sessions found.</div>
+                        ) : (
+                            loginHistory.map((session) => (
+                                <div
+                                    key={session.id}
+                                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                                >
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium">{session.device}</span>
+                                            {session.current && (
+                                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                                    Current
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-600">
+                                            {session.location} • {session.ipAddress || session.ip} • {session.loginTime ? new Date(session.loginTime).toLocaleString() : 'Unknown time'}
+                                        </p>
                                     </div>
-                                    <p className="text-xs text-gray-600">
-                                        {session.location} • {session.ipAddress || session.ip} • {new Date(session.loginTime).toLocaleString()}
-                                    </p>
+                                    {!session.current && (
+                                        <button
+                                            onClick={() => revokeSession(session.id)}
+                                            className="px-3 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50"
+                                        >
+                                            Revoke
+                                        </button>
+                                    )}
                                 </div>
-                                {!session.current && (
-                                    <button
-                                        onClick={() => revokeSession(session.id)}
-                                        className="px-3 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50"
-                                    >
-                                        Revoke
-                                    </button>
-                                )}
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                     
                     <button
