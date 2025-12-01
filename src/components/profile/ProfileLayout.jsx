@@ -6,7 +6,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         "Security",
         "Preferences",
         "Integrations",
-        "Teams & Members"
+        // "Teams & Members" // Hidden for now until Teams feature is implemented
     ];
 
     // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
