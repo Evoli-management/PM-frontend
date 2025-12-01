@@ -410,26 +410,15 @@ export default function Navbar() {
             className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-2"
         >
             <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => window.dispatchEvent(new Event('toggle-sidebar'))}
-                            className="md:hidden text-black px-2 py-1 rounded hover:bg-slate-100"
-                            aria-label="Toggle sidebar"
-                            title="Toggle sidebar"
-                        >
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-                        </button>
-
-                        <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
-                            <img
-                                src={`${import.meta.env.BASE_URL}logo.png`}
-                                alt="Practical Manager"
-                                className="hidden md:block h-8 object-contain"
-                                style={{ maxHeight: '36px' }}
-                            />
-                            <span className="sr-only">Practical Manager</span>
-                        </Link>
-                    </div>
+                    <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
+                        <img
+                            src={`${import.meta.env.BASE_URL}logo.png`}
+                            alt="Practical Manager"
+                            className="hidden md:block h-8 object-contain"
+                            style={{ maxHeight: '36px' }}
+                        />
+                        <span className="sr-only">Practical Manager</span>
+                    </Link>
                     
                     {/* Compact search icon (replaces large centered search bar) */}
                     {/* Placed visually with other header actions for a cleaner layout */}

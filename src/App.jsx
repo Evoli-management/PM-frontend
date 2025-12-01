@@ -1,7 +1,6 @@
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
-import Sidebar from "./components/shared/Sidebar.jsx";
 import ModalManager from "./components/shared/ModalManager.jsx";
 import PrivateRoute from "./components/shared/PrivateRoute.jsx";
 import Footer from "./components/shared/Footer.jsx";
@@ -50,9 +49,7 @@ export default function App() {
             <div className="">
                 <Navbar />
                 <ModalManager />
-                <div className="flex min-h-[calc(100vh-56px)]"> 
-                    <Sidebar />
-                    <main className="flex-1">
+                <main className="flex-grow">
                     <Suspense
                         fallback={
                             <div className="w-full py-10 flex items-center justify-center text-gray-600">
@@ -104,8 +101,7 @@ export default function App() {
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
-                    </main>
-                </div>
+                </main>
                 {publicFooterRoutes.includes(currentPath) && <Footer />}
             </div>
         </Router>
