@@ -23,6 +23,7 @@ export default function Navbar() {
         const handleClickOutside = (e) => {
             const node = menuRef.current;
             const qnode = quickRef.current;
+            const wnode = widgetsRef?.current;
             // Close profile menu if click outside
             if (open && node && !node.contains(e.target)) {
                 setOpen(false);
@@ -30,6 +31,10 @@ export default function Navbar() {
             // Close quick actions if click outside
             if (openQuick && qnode && !qnode.contains(e.target)) {
                 setOpenQuick(false);
+            }
+            // Close widgets menu if click outside
+            if (typeof openWidgets !== 'undefined' && openWidgets && wnode && !wnode.contains(e.target)) {
+                setOpenWidgets(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
