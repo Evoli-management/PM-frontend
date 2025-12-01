@@ -45,6 +45,7 @@ export default function Navbar() {
     const [searchLoading, setSearchLoading] = useState(false);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const searchRef = useRef(null);
+    const [openSearch, setOpenSearch] = useState(false);
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem('pm:dashboard:prefs');
@@ -273,6 +274,7 @@ export default function Navbar() {
         const handleClickOutside = (e) => {
             if (searchRef.current && !searchRef.current.contains(e.target)) {
                 setShowSearchResults(false);
+                setOpenSearch(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -422,20 +424,73 @@ export default function Navbar() {
                     {/* Placed visually with other header actions for a cleaner layout */}
                     
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
-                    <button
-                        className="text-black hover:text-gray-700 px-1 py-0.5 rounded-full"
-                        aria-label="Search"
-                        title="Search"
-                        onClick={() => {
-                            // Placeholder: keep behavior simple — optionally open a modal or focus a hidden input
-                            try {
-                                const el = document.querySelector('input[placeholder="Search across site..."]');
-                                if (el) el.focus();
-                            } catch (e) {}
-                        }}
-                    >
-                        <FaSearch className="w-4 h-4" />
-                    </button>
+                    <div className="relative">
+                        <button
+                            className="text-black hover:text-gray-700 px-1 py-0.5 rounded-full"
+                            aria-label="Search"
+                            title="Search"
+                            onClick={() => {
+                                setOpenSearch(true);
+                                setShowSearchResults(true);
+                                // focus input after opening
+                                setTimeout(() => {
+                                    try {
+                                        if (searchRef.current) {
+                                            const el = searchRef.current.querySelector('input');
+                                            if (el) el.focus();
+                                            updateDropdownPosition();
+                                        }
+                                    } catch (e) {}
+                                }, 0);
+                            }}
+                        >
+                            <FaSearch className="w-4 h-4" />
+                        </button>
+
+                        {/* Inline compact search input and results */}
+                        {openSearch && (
+                            <div ref={searchRef} className="absolute right-0 mt-2 w-80 z-[220]">
+                                <div className="bg-white rounded-md shadow-lg border border-gray-200 p-2">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Search across site..."
+                                            value={search}
+                                            onChange={handleSearchChange}
+                                            onKeyDown={handleSearchKeyPress}
+                                            className="w-full px-3 py-1.5 text-sm border rounded bg-gray-50 focus:bg-white focus:outline-none"
+                                        />
+                                        <button
+                                            onClick={() => { setSearch(''); setSearchResults([]); setShowSearchResults(false); setOpenSearch(false); }}
+                                            className="text-sm text-gray-500 px-2"
+                                            title="Close"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Results dropdown (positioned under input) */}
+                                {showSearchResults && searchResults && searchResults.length > 0 && (
+                                    <div className="mt-1 bg-white rounded-md shadow-lg border border-gray-200 max-h-64 overflow-auto">
+                                        {searchResults.map((r, idx) => (
+                                            <div
+                                                key={idx}
+                                                onClick={() => handleSearchResultClick(r.route)}
+                                                className="px-3 py-2 hover:bg-slate-50 cursor-pointer"
+                                            >
+                                                <div className="text-sm font-medium">{r.title}</div>
+                                                <div className="text-xs text-slate-500">{r.description}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {showSearchResults && !searchLoading && searchResults.length === 0 && (
+                                    <div className="mt-1 px-3 py-2 text-sm text-gray-600">No results</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     {/* Widgets control: only show on Dashboard route */}
                     {location.pathname === '/dashboard' && (
                         <div className="relative" ref={widgetsRef}>
