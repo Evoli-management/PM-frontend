@@ -23,6 +23,7 @@ export default function Navbar() {
         const handleClickOutside = (e) => {
             const node = menuRef.current;
             const qnode = quickRef.current;
+            const wnode = widgetsRef?.current;
             // Close profile menu if click outside
             if (open && node && !node.contains(e.target)) {
                 setOpen(false);
@@ -30,6 +31,10 @@ export default function Navbar() {
             // Close quick actions if click outside
             if (openQuick && qnode && !qnode.contains(e.target)) {
                 setOpenQuick(false);
+            }
+            // Close widgets menu if click outside
+            if (typeof openWidgets !== 'undefined' && openWidgets && wnode && !wnode.contains(e.target)) {
+                setOpenWidgets(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -402,18 +407,15 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-4"
-            // style={{
-            //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
-            // }}
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-2"
         >
-            <div className="w-full px-2 md:px-4 py-4 flex items-center justify-between">
+            <div className="w-full px-2 md:px-4 py-2 flex items-center justify-between">
                     <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
-                            className="hidden md:block h-10 object-contain"
-                            style={{ maxHeight: '44px' }}
+                            className="hidden md:block h-8 object-contain"
+                            style={{ maxHeight: '36px' }}
                         />
                         <span className="sr-only">Practical Manager</span>
                     </Link>
