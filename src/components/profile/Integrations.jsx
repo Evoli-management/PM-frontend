@@ -256,7 +256,7 @@ export const Integrations = ({ showToast }) => {
                 </div>
             </Section>
             
-            {/* Communication Tools */}
+            {/* Communication Tools - hidden until implemented
             <Section 
                 title="Communication Tools" 
                 description="Connect with your team communication platforms"
@@ -274,6 +274,7 @@ export const Integrations = ({ showToast }) => {
                     />
                 </div>
             </Section>
+            */}
             
             {/* Save Button */}
             <div className="flex justify-end pt-6">
