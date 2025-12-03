@@ -27,6 +27,12 @@ const reminderManager = {
 
   async pollDue() {
     try {
+      // Don't poll when user isn't authenticated to avoid 401 spam on the server.
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        if (import.meta.env.DEV) console.debug('reminderManager: skipping poll, no access_token');
+        return;
+      }
       const res = await apiClient.get('/reminders/due');
       const rows = res.data || [];
       for (const r of rows) {
