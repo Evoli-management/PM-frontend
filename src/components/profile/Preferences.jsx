@@ -813,6 +813,23 @@ export const Preferences = ({ showToast }) => {
                             <option value="1day">1 day before</option>
                         </select>
                     </Field>
+                    <div className="flex items-center justify-end mt-2">
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    const rm = (await import('../../lib/reminderManager')).default;
+                                    await rm.testNotification();
+                                } catch (e) {
+                                    console.error('Test notification failed', e);
+                                    showToast('Test notification failed', 'error');
+                                }
+                            }}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-sm rounded"
+                        >
+                            Test Notification
+                        </button>
+                    </div>
                 </div>
             </Section>
             
