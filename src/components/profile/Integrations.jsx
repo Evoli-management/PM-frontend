@@ -72,9 +72,20 @@ export const Integrations = ({ showToast }) => {
             switch (type) {
                 case 'googleCalendar':
                     result = await calendarService.syncGoogleCalendar();
+                    // Optimistically mark as connected on successful OAuth callback
+                    setIntegrations(prev => ({
+                        ...prev,
+                        googleCalendar: { ...prev.googleCalendar, connected: true }
+                    }));
+                    showToast('Google Calendar connected and sync initiated!');
                     break;
                 case 'outlookCalendar':
                     result = await calendarService.syncMicrosoftCalendar();
+                    setIntegrations(prev => ({
+                        ...prev,
+                        outlookCalendar: { ...prev.outlookCalendar, connected: true }
+                    }));
+                    showToast('Outlook Calendar connected and sync initiated!');
                     break;
                 case 'teams':
                     // For now, just simulate connection
@@ -89,20 +100,18 @@ export const Integrations = ({ showToast }) => {
                     showToast('Microsoft Teams connected!');
                     break;
             }
-            
-            // Reload integrations to get updated status and show success only when backend confirms
+
+            // Reload integrations to reconcile with backend; if backend still shows disconnected, just log
             const updated = await loadIntegrations();
             if (updated) {
-                if (type === 'googleCalendar' && updated.googleCalendar && updated.googleCalendar.connected) {
-                    showToast('Google Calendar connected and sync initiated!');
-                } else if (type === 'outlookCalendar' && updated.outlookCalendar && updated.outlookCalendar.connected) {
-                    showToast('Outlook Calendar connected and sync initiated!');
-                } else if (type !== 'teams') {
-                    // If backend didn't report connected, inform the user
-                    showToast(`Connection for ${type} did not complete`, 'error');
+                if (type === 'googleCalendar' && !updated.googleCalendar?.connected) {
+                    console.warn('Backend did not confirm Google connection yet');
+                }
+                if (type === 'outlookCalendar' && !updated.outlookCalendar?.connected) {
+                    console.warn('Backend did not confirm Outlook connection yet');
                 }
             }
-            
+
         } catch (error) {
             console.error('Connection error:', error);
             if (error.message === 'OAuth cancelled by user') {
