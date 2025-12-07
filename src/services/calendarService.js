@@ -312,10 +312,6 @@ const calendarService = {
     async disconnectCalendar(provider) {
         if (!provider) throw new Error("Missing provider");
         
-        // For disconnect, we need the access tokens which should be stored
-        // For now, we'll call the generic disconnect endpoint
-        // TODO: Store and retrieve access tokens properly
-        
         let endpoint;
         switch (provider.toLowerCase()) {
             case 'google':
@@ -329,10 +325,8 @@ const calendarService = {
         }
         
         try {
-            // This would need proper token management
-            // For now, we'll just return success since we don't have stored tokens
-            console.warn('Disconnect requires stored access tokens - implementing basic disconnect');
-            return { success: true, message: `${provider} calendar disconnected` };
+            const res = await apiClient.post(endpoint);
+            return res.data;
         } catch (error) {
             console.error('Disconnect error:', error);
             throw error;
