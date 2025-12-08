@@ -1284,7 +1284,7 @@ export default function DontForget() {
     };
 
     return (
-        <div className="flex min-h-screen overflow-x-hidden bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50">
+        <div className="flex min-h-screen overflow-x-hidden">
             <Sidebar 
                 user={{ name: "Hussein" }} 
                 mobileOpen={mobileSidebarOpen}

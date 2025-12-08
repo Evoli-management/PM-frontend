@@ -404,7 +404,7 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative mb-0 h-10"
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative h-10 layout-panel-gap-bottom-match"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}

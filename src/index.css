@@ -1,6 +1,48 @@
 @import "tailwindcss";
 @import "./styles/responsive.css";
 
+:root {
+    --layout-panel-gap: 0px;
+    /* Use solid page background to match other pages */
+    --page-bg: #EDEDED;
+}
+
+@media (min-width: 768px) {
+    :root {
+        --layout-panel-gap: 8px;
+    }
+}
+
+/* Global background: match Don't Forget page gradient for visual consistency */
+html, body, #root {
+    height: 100%;
+}
+body {
+    min-height: 100vh;
+    background: var(--page-bg);
+    background-attachment: fixed;
+}
+
+/* Provide a wrapper class to apply the global page background. Prefer using
+   this wrapper (`.page-bg`) on the app root instead of forcing `main` with
+   !important. */
+.page-bg {
+    background: var(--page-bg);
+    min-height: 100vh;
+}
+
+.layout-panel-gap-right {
+    margin-right: var(--layout-panel-gap);
+}
+
+.layout-panel-gap-bottom {
+    margin-bottom: var(--layout-panel-gap);
+}
+
+.layout-panel-gap-bottom-match {
+    margin-bottom: calc(var(--layout-panel-gap) + 8px);
+}
+
 /* Hide scrollbars but keep scroll functionality */
 .no-scrollbar {
     -ms-overflow-style: none; /* IE and Edge */
