@@ -31,13 +31,18 @@ export default function CreateActivityFormModal({
     try {
       const d = new Date(v)
       if (isNaN(d.getTime())) return ''
-      return d.toISOString().slice(0, 10)
+      // return local date components to avoid timezone shifts
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
     } catch {
       return ''
     }
   }
 
-  const defaultDate = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   const IconChevron = (props) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>

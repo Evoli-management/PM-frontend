@@ -4,7 +4,7 @@ import Sidebar from "../components/shared/Sidebar.jsx";
 import { getPriorityLevel } from "../utils/keyareasHelpers";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
-import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
+import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars, FaCog, FaSearch } from "react-icons/fa";
 import CreateTaskModal from "../components/key-areas/CreateTaskModal.jsx";
 import EditTaskModal from "../components/key-areas/EditTaskModal.jsx";
 import TaskRow from "../components/key-areas/TaskRow.jsx";
@@ -163,6 +163,54 @@ export default function DontForget() {
         })();
         return () => { cancelled = true; };
     }, []);
+
+    // Columns / showCompleted preferences (persisted to same keys as KeyAreas for consistency)
+    const defaultVisible = {
+        responsible: true,
+        status: true,
+        priority: true,
+        quadrant: true,
+        start_date: true,
+        end_date: true,
+        deadline: true,
+        duration: true,
+        completed: true,
+    };
+    const [visibleColumns, setVisibleColumns] = useState(() => {
+        try {
+            const raw = window.localStorage.getItem('keyareas.visibleColumns');
+            if (raw) return { ...defaultVisible, ...(JSON.parse(raw) || {}) };
+        } catch (e) {}
+        return defaultVisible;
+    });
+    const [showCompleted, setShowCompleted] = useState(() => {
+        try {
+            const raw = window.localStorage.getItem('keyareas.showCompleted');
+            if (raw !== null) return raw === 'true';
+        } catch (e) {}
+        return true;
+    });
+    const [showColumnsMenu, setShowColumnsMenu] = useState(false);
+    const columnsMenuRef = useRef(null);
+    useEffect(() => {
+        try { window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns)); } catch (e) {}
+    }, [visibleColumns]);
+
+    // force header re-mount when visibleColumns changes to ensure <thead> layout updates
+    const [headerKey, setHeaderKey] = useState(0);
+    useEffect(() => { try { setHeaderKey((k) => k + 1); } catch (e) {} }, [visibleColumns]);
+    useEffect(() => { try { window.localStorage.setItem('keyareas.showCompleted', String(!!showCompleted)); } catch (e) {} }, [showCompleted]);
+    // close columns menu on outside click / Escape
+    useEffect(() => {
+        if (!showColumnsMenu) return;
+        const handleClick = (e) => { if (!columnsMenuRef.current) return; if (!columnsMenuRef.current.contains(e.target)) setShowColumnsMenu(false); };
+        const handleKey = (e) => { if (e.key === 'Escape') setShowColumnsMenu(false); };
+        document.addEventListener('mousedown', handleClick);
+        document.addEventListener('keydown', handleKey);
+        return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
+    }, [showColumnsMenu]);
+
+    
 
     // Fetch current user and goals to pass into modals so dropdowns are pre-populated
     useEffect(() => {
@@ -338,12 +386,35 @@ export default function DontForget() {
     // UI state
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [showImported, setShowImported] = useState(true);
-    const [showCompleted, setShowCompleted] = useState(true);
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
     // Full task view state (TaskFullView integration)
     const [selectedTask, setSelectedTask] = useState(null);
+
+    // Site-wide search (local copy for header) and view dropdown state to match KeyAreas header
+    const [siteSearch, setSiteSearch] = useState("");
+    const [view, setView] = useState("list");
+    const [showViewMenu, setShowViewMenu] = useState(false);
+    const viewMenuRef = useRef(null);
+
+    // close view dropdown on outside click or Escape (mirror KeyAreas behavior)
+    useEffect(() => {
+        if (!showViewMenu) return;
+        const handleClick = (e) => {
+            if (!viewMenuRef.current) return;
+            if (!viewMenuRef.current.contains(e.target)) setShowViewMenu(false);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setShowViewMenu(false);
+        };
+        document.addEventListener('mousedown', handleClick);
+        document.addEventListener('keydown', handleKey);
+        return () => {
+            document.removeEventListener('mousedown', handleClick);
+            document.removeEventListener('keydown', handleKey);
+        };
+    }, [showViewMenu]);
 
     // Activity -> create-task handler removed: DontForget does not manage activities
 
@@ -779,43 +850,75 @@ export default function DontForget() {
         }
     };
     const updateField = async (id, key, value) => {
+        // Optimistic update: apply locally, send patch, rollback on failure
+        const prevTasks = tasks;
+        const prevTask = tasks.find((t) => t.id === id);
+        if (!prevTask) return;
+
+        // Local optimistic transform for display
+        const optimistic = (t) => {
+            if (t.id !== id) return t;
+            if (key === 'priority') {
+                try {
+                    // store normalized numeric priority for consistent rendering
+                    const lvl = getPriorityLevel(value);
+                    return { ...t, priority: lvl };
+                } catch (e) {
+                    return { ...t, priority: value };
+                }
+            }
+            return { ...t, [key]: value };
+        };
+        setTasks((prev) => prev.map(optimistic));
+        markSaving(id, 2000);
+
+        // Build patch body for API
         const patch = {};
-        if (key === "name") patch.title = value;
-        else if (key === "notes") patch.description = value;
-        else if (key === "assignee") patch.assignee = value;
-        else if (key === "start_date") patch.startDate = value ? new Date(value).toISOString() : null;
-        else if (key === "end_date") patch.endDate = value ? new Date(value).toISOString() : null;
-        else if (key === "dueDate") patch.dueDate = value ? new Date(value).toISOString() : null;
-        else if (key === "duration") patch.duration = value;
-        else if (key === "status") patch.status = value;
+        if (key === 'name') patch.title = value;
+        else if (key === 'notes') patch.description = value;
+        else if (key === 'assignee') patch.assignee = value;
+        else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
+        else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
+        else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
+    else if (key === 'duration') patch.duration = value;
+    else if (key === 'priority') patch.priority = value;
+    else if (key === 'status') patch.status = value;
         else {
-            // Not backed by API (quadrant, goal, tags, time, listIndex)
-            setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, [key]: value } : t)));
-            markSaving(id);
+            // Not backed by API: keep optimistic state only
             return;
         }
+
         try {
             const updated = await (await getTaskService()).update(id, patch);
+            // reconcile server response into local task (format dates to YYYY-MM-DD)
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
                         ? {
                               ...t,
-                              name: updated.title,
-                              notes: updated.description || "",
-                              assignee: updated.assignee || "",
-                              start_date: updated.startDate ? updated.startDate.slice(0, 10) : "",
-                              end_date: updated.endDate ? updated.endDate.slice(0, 10) : "",
-                              dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : "",
-                              duration: updated.duration || "",
-                              status: updated.status,
+                              name: updated.title || t.name,
+                              notes: updated.description || t.notes || "",
+                              assignee: updated.assignee || t.assignee || "",
+                              start_date: updated.startDate ? updated.startDate.slice(0, 10) : (patch.startDate === null ? "" : t.start_date),
+                              end_date: updated.endDate ? updated.endDate.slice(0, 10) : (patch.endDate === null ? "" : t.end_date),
+                              dueDate: updated.dueDate ? updated.dueDate.slice(0, 10) : (patch.dueDate === null ? "" : t.dueDate),
+                              duration: updated.duration || t.duration || "",
+                              status: updated.status || t.status,
+                              priority: typeof updated.priority !== 'undefined' ? getPriorityLevel(updated.priority) : t.priority,
                           }
                         : t,
                 ),
             );
+            // success
             markSaving(id);
-        } catch (e) {
-            console.error("Failed to update field", e);
+        } catch (err) {
+            // rollback optimistic update
+            console.error('[DontForget] Failed to update field', err);
+            setTasks(prevTasks);
+            try {
+                const msg = err?.response?.data?.message || err?.message || 'Failed to save';
+                addToast && addToast({ type: 'error', message: msg });
+            } catch (e) {}
         }
     };
 
@@ -1212,6 +1315,7 @@ export default function DontForget() {
                                     task={selectedTask}
                                     goals={goals}
                                     users={users}
+                                    currentUserId={users && users[0] ? users[0].id : null}
                                     // DontForget does not fetch activities; provide empty map
                                     activitiesByTask={{}}
                                     onBack={() => setSelectedTask(null)}
@@ -1295,7 +1399,8 @@ export default function DontForget() {
                                     parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
-                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : undefined}
+                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : "edit don't forget task"}
+                                    isDontForgetMode={true}
                                 />
                                 {/* Activity composer removed from DontForget */}
                                 <EditTaskModal
@@ -1309,6 +1414,7 @@ export default function DontForget() {
                                     parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
+                                    isDontForgetMode={true}
                                 />
                             </div>
                         </div>
@@ -1351,20 +1457,101 @@ export default function DontForget() {
 
                                     <div className="ml-auto flex items-center gap-2">
                                         <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" className="text-slate-700 mr-2" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"></path></svg>
-                                            <input placeholder={`Search tasks in "Don't Forget"…`} className="bg-transparent outline-none text-sm w-40 sm:w-56" value={''} />
+                                            <FaSearch className="text-slate-700 mr-2" />
+                                            <input
+                                                placeholder={`Search tasks in "Don't Forget"…`}
+                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
+                                                value={siteSearch}
+                                                onChange={(e) => setSiteSearch(e.target.value)}
+                                            />
                                         </div>
-                                        <select className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm" title="Focus quadrant">
-                                            <option value="all">All Quadrants</option>
-                                            <option value="1">Q1 • Important &amp; Urgent</option>
-                                            <option value="2">Q2 • Important, Not Urgent</option>
-                                            <option value="3">Q3 • Not Important, Urgent</option>
-                                            <option value="4">Q4 • Not Important, Not Urgent</option>
-                                        </select>
-                                        <div className="relative">
-                                            <button className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50" aria-haspopup="menu" aria-expanded={false}>View
-                                                <svg className="w-4 h-4 transition-transform rotate-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/my-focus')}
+                                            className="bg-white rounded-lg border border-slate-200 px-4 py-1 text-sm font-semibold hover:bg-slate-50"
+                                            style={{ minWidth: 100 }}
+                                        >
+                                            My Focus
+                                        </button>
+                                        <div className="relative" ref={viewMenuRef}>
+                                            <button
+                                                onClick={() => setShowViewMenu((s) => !s)}
+                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
+                                                aria-haspopup="menu"
+                                                aria-expanded={showViewMenu ? "true" : "false"}
+                                            >
+                                                View
+                                                <svg
+                                                    className={`w-4 h-4 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                >
+                                                    <path d="M6 9l6 6 6-6" />
+                                                </svg>
                                             </button>
+                                            {showViewMenu && (
+                                                <div
+                                                    role="menu"
+                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
+                                                >
+                                                    {[{ key: "list", label: "List" }].map((opt) => (
+                                                        <button
+                                                            key={opt.key}
+                                                            role="menuitem"
+                                                            onClick={() => {
+                                                                setView(opt.key);
+                                                                setShowViewMenu(false);
+                                                            }}
+                                                            className={`block w-full text-left px-3 py-2 text-sm ${
+                                                                view === opt.key
+                                                                    ? "bg-blue-100 text-blue-700 font-semibold"
+                                                                    : "text-slate-800 hover:bg-slate-50"
+                                                            }`}
+                                                        >
+                                                            {opt.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="relative ml-1" ref={columnsMenuRef}>
+                                            <button
+                                                type="button"
+                                                aria-haspopup="menu"
+                                                aria-expanded={showColumnsMenu ? "true" : "false"}
+                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
+                                                onClick={() => setShowColumnsMenu((s) => !s)}
+                                                title="Columns"
+                                            >
+                                                <FaCog />
+                                            </button>
+                                            {showColumnsMenu && (
+                                                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
+                                                    <div className="font-medium mb-2">Columns</div>
+                                                    <label className="flex items-center gap-2 py-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!showCompleted}
+                                                            onChange={() => setShowCompleted((s) => !s)}
+                                                        />
+                                                        <span className="capitalize">Show completed items</span>
+                                                    </label>
+                                                    {Object.keys(visibleColumns).map((key) => (
+                                                        <label key={key} className="flex items-center gap-2 py-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!visibleColumns[key]}
+                                                                onChange={() => setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))}
+                                                            />
+                                                            <span className="capitalize">{key.replace('_', ' ')}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1514,7 +1701,7 @@ export default function DontForget() {
                                     <div className="overflow-x-auto -mx-2 sm:mx-0">
                                         <table className="min-w-full text-sm whitespace-nowrap sm:whitespace-normal">
                                             {dontForgetTasks.length > 0 && (
-                                                <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                <thead key={headerKey} className="bg-slate-50 border border-slate-200 text-slate-700">
                                                     <tr>
                                                         <th className="px-2 sm:px-3 py-2 text-left w-8">
                                                             <input
@@ -1528,18 +1715,32 @@ export default function DontForget() {
                                                             />
                                                         </th>
                                                         <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Assignee</th>
+                                                        {visibleColumns.responsible && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Responsible</th>
+                                                        )}
                                                         <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
-                                                        <th className="px-2 sm:px-3 py-2 text-center font-semibold w-24">Actions</th>
+                                                        {visibleColumns.priority && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
+                                                        )}
+                                                        {visibleColumns.quadrant && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
+                                                        )}
+                                                        {visibleColumns.start_date && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
+                                                        )}
+                                                        {visibleColumns.end_date && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
+                                                        )}
+                                                        {visibleColumns.deadline && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
+                                                        )}
+                                                        {visibleColumns.duration && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
+                                                        )}
+                                                        {visibleColumns.completed && (
+                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
+                                                        )}
+                                                        {/* Actions column removed — use row menu instead */}
                                                     </tr>
                                                 </thead>
                                             )}
@@ -1551,7 +1752,13 @@ export default function DontForget() {
                                                         q={task.quadrant}
                                                         goals={goals}
                                                         goalMap={null}
+                                                        visibleColumns={visibleColumns}
                                                         disableOpen={true}
+                                                        updateField={updateField}
+                                                        enableInlineEditing={!massEditingMode}
+                                                        isSaving={savingIds.has(task.id)}
+                                                        users={users}
+                                                        currentUserId={users && users[0] ? users[0].id : null}
                                                         isSelected={isSelected(task.id)}
                                                         onToggleSelect={() => toggleSelect(task.id)}
                                                         onOpenTask={() => openFullTaskView(task)}
@@ -1592,7 +1799,7 @@ export default function DontForget() {
 
                                                 {dontForgetTasks.length === 0 && (
                                                     <tr>
-                                                        <td className="px-6 py-8 text-gray-500" colSpan={13}>
+                                                        <td className="px-6 py-8 text-gray-500" colSpan={12}>
                                                             {`This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
                                                         </td>
                                                     </tr>
@@ -1639,6 +1846,7 @@ export default function DontForget() {
                                             parentListNames={dfListNames}
                                             users={users}
                                             goals={goals}
+                                            isDontForgetMode={true}
                                     />
 
                                 <EditTaskModal
@@ -1658,7 +1866,8 @@ export default function DontForget() {
                                     parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
-                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : undefined}
+                                    modalTitle={massEditingMode ? `Mass editing ${selectedIds.size} tasks` : "Edit Don't forget task"}
+                                    isDontForgetMode={true}
                                 />
 
                                 {/* Activity composer removed from DontForget */}
@@ -1674,6 +1883,7 @@ export default function DontForget() {
                                     parentListNames={dfListNames}
                                     users={users}
                                     goals={goals}
+                                    isDontForgetMode={true}
                                 />
                             </div>
                         </div>

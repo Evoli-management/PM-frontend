@@ -11,13 +11,13 @@ import EditTaskModal from '../components/key-areas/EditTaskModal';
 import EditActivityModal from '../components/key-areas/EditActivityModal';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
+import { FaCog } from 'react-icons/fa';
 import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
     safeParseDate,
-    toIsoMidnightOrNull,
     nullableString,
     computeEisenhowerQuadrant,
     getPriorityLevel,
@@ -51,6 +51,14 @@ const getActivityService = async () => {
     const mod = await import('../services/activityService');
     _activityService = mod.default || mod;
     return _activityService;
+};
+
+let _usersService = null;
+const getUsersService = async () => {
+    if (_usersService) return _usersService;
+    const mod = await import('../services/usersService');
+    _usersService = mod.default || mod;
+    return _usersService;
 };
 
 const api = {
@@ -123,9 +131,9 @@ const api = {
             title: task.title,
             description: nullableString(task.description),
             assignee: nullableString(task.assignee),
-            startDate: toIsoMidnightOrNull(task.start_date ?? task.startDate),
-            dueDate: toIsoMidnightOrNull(task.deadline ?? task.due_date ?? task.dueDate),
-            endDate: toIsoMidnightOrNull(task.end_date ?? task.endDate),
+            startDate: toDateOnly(task.start_date ?? task.startDate),
+            dueDate: toDateOnly(task.deadline ?? task.due_date ?? task.dueDate),
+            endDate: toDateOnly(task.end_date ?? task.endDate),
             status: (() => {
                 const s = String(task.status || "todo").toLowerCase();
                 if (s === "open") return "todo";
@@ -166,9 +174,9 @@ const api = {
             title: task.title,
             description: nullableString(task.description, true),
             assignee: nullableString(task.assignee, true),
-            startDate: toIsoMidnightOrNull(task.start_date ?? task.startDate, true),
-            dueDate: toIsoMidnightOrNull(task.deadline ?? task.due_date ?? task.dueDate, true),
-            endDate: toIsoMidnightOrNull(task.end_date ?? task.endDate, true),
+            startDate: (toDateOnly(task.start_date ?? task.startDate) || undefined),
+            dueDate: (toDateOnly(task.deadline ?? task.due_date ?? task.dueDate) || undefined),
+            endDate: (toDateOnly(task.end_date ?? task.endDate) || undefined),
             // Ensure client-side list membership is sent to the backend when present
             listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
             status: (() => {
@@ -225,7 +233,10 @@ const api = {
                 computeEisenhowerQuadrant({
                     deadline: normalized.due_date || normalized.deadline,
                     end_date: normalized.end_date,
+                    start_date: normalized.start_date,
                     priority: normalized.priority,
+                    status: normalized.status,
+                    key_area_id: normalized.key_area_id,
                 }),
             category: t.category ?? "Key Areas",
         }))(task || {});
@@ -357,10 +368,11 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
                                         <div className="text-[11px] text-slate-500 mt-0.5 truncate capitalize">
                                             {String(t.status || "open").replace("_", " ")}
                                         </div>
+                                        
                                         {/* Show read-only completion date when present */}
                                         {t.completionDate ? (
                                             <div className="text-[11px] text-slate-500 mt-1 truncate">
-                                                Completed: {new Date(t.completionDate).toLocaleString()}
+                                                Completed: {toDateOnly(t.completionDate || t.completion_date)}
                                             </div>
                                         ) : null}
                                     </button>
@@ -414,6 +426,7 @@ export default function KeyAreas() {
 
     const [taskTab, setTaskTab] = useState(1);
     const [allTasks, setAllTasks] = useState([]);
+    const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
     const handleTaskStatusChange = async (id, uiStatus) => {
         // optimistic update: set status locally (completionDate will be reconciled from server)
@@ -425,12 +438,13 @@ export default function KeyAreas() {
             // Send request to update the status
             await api.updateTask(id, { status: uiStatus });
             // Fetch canonical server state for this task so UI reflects server-side completionDate and status
+            const taskService = await getTaskService();
             const server = await taskService.get(id);
-            if (server) {
+                if (server) {
                 const normalized = {
                     ...server,
-                    // server returned via taskService.get is already FE-friendly
-                    status: server.status,
+                    // Normalize server status to UI values (open|in_progress|done)
+                    status: mapServerStatusToUi(server.status),
                     completionDate: server.completionDate || server.completion_date || null,
                     due_date: server.dueDate || server.due_date || null,
                     start_date: server.startDate || server.start_date || null,
@@ -446,14 +460,14 @@ export default function KeyAreas() {
         } catch (err) {
             console.error("Failed to update task status", err);
             // revert optimistic change by fetching the task list from backend if possible
-            try {
+                try {
+                const taskService = await getTaskService();
                 const rows = await taskService.list({ keyAreaId: selectedKA?.id });
                 const server = (Array.isArray(rows) ? rows : []).find((r) => r.id === id);
                 if (server) {
                     const normalized = {
                         ...server,
-                        // server returned via taskService.list/get is already FE-friendly
-                        status: server.status,
+                        status: mapServerStatusToUi(server.status),
                         completionDate: server.completionDate || server.completion_date || null,
                     };
                     setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)));
@@ -468,6 +482,10 @@ export default function KeyAreas() {
         }
     };
     const [searchTerm, setSearchTerm] = useState("");
+    // site-wide search state (moved to top bar). When non-empty, triggers searchResults fetch
+    const [siteSearch, setSiteSearch] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
     const [quadrant, setQuadrant] = useState("all");
     const [selectedTask, setSelectedTask] = useState(null);
     const [slideOverInitialTab, setSlideOverInitialTab] = useState("details");
@@ -488,6 +506,87 @@ export default function KeyAreas() {
         end_date: "",
     });
     const [view, setView] = useState("list");
+    const defaultVisible = {
+        responsible: true,
+        status: true,
+        priority: true,
+        quadrant: true,
+        start_date: true,
+        end_date: true,
+        deadline: true,
+        duration: true,
+        completed: true,
+    };
+    const [showCompleted, setShowCompleted] = useState(() => {
+        try {
+            const raw = window.localStorage.getItem('keyareas.showCompleted');
+            if (raw !== null) return raw === 'true';
+        } catch (_) {}
+        return true;
+    });
+    const [visibleColumns, setVisibleColumns] = useState(() => {
+        try {
+            const raw = window.localStorage.getItem('keyareas.visibleColumns');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                // merge with defaults so newly-added keys default to true
+                return { ...defaultVisible, ...parsed };
+            }
+        } catch (e) {
+            // ignore
+        }
+        return defaultVisible;
+    });
+
+    // Persist visibleColumns to localStorage so user selection survives refresh
+    useEffect(() => {
+        try {
+            window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns));
+        } catch (e) {
+            // ignore storage errors
+        }
+    }, [visibleColumns]);
+    // Persist showCompleted preference
+    useEffect(() => {
+        try {
+            window.localStorage.setItem('keyareas.showCompleted', String(!!showCompleted));
+        } catch (_) {}
+    }, [showCompleted]);
+
+    // When siteSearch changes, perform a site-wide search across all Key Areas (debounced)
+    useEffect(() => {
+        const q = String(siteSearch || "").trim();
+        let cancelled = false;
+        let timer = null;
+        if (q.length < 2) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return () => {};
+        }
+        setIsSearching(true);
+        timer = setTimeout(async () => {
+            try {
+                const kas = await api.listKeyAreas();
+                const tasksLists = await Promise.all((kas || []).map((k) => api.listTasks(k.id)));
+                const combined = (tasksLists || []).flat().map((t) => ({ ...t, key_area_id: t.key_area_id || t.keyAreaId || t.key_area }));
+                const ql = q.toLowerCase();
+                const filtered = (combined || []).filter((t) => {
+                    const title = (t.title || t.name || '').toLowerCase();
+                    const desc = (t.description || t.notes || '').toLowerCase();
+                    return title.includes(ql) || desc.includes(ql);
+                });
+                if (!cancelled) setSearchResults(filtered);
+            } catch (e) {
+                if (!cancelled) setSearchResults([]);
+            } finally {
+                if (!cancelled) setIsSearching(false);
+            }
+        }, 300);
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [siteSearch]);
     const [goals, setGoals] = useState([]);
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [showTaskComposer, setShowTaskComposer] = useState(false);
@@ -500,6 +599,8 @@ export default function KeyAreas() {
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
+    const [showColumnsMenu, setShowColumnsMenu] = useState(false);
+    const columnsMenuRef = useRef(null);
     const [openListMenu, setOpenListMenu] = useState(null); // list number for context menu
     const [listMenuPos, setListMenuPos] = useState({ top: 0, left: 0 }); // popup menu position
     const composerModalRef = useRef(null);
@@ -508,6 +609,7 @@ export default function KeyAreas() {
     const [showMassEdit, setShowMassEdit] = useState(false);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
+    const currentUserId = (users && users[0] && users[0].id) ? users[0].id : null;
 
     // Build a stable lookup map from any possible goal id key to the goal title.
     // This avoids repeated array scans in TaskRow and makes lookups resilient
@@ -550,29 +652,38 @@ export default function KeyAreas() {
             // debug: log event reception
             // eslint-disable-next-line no-console
             console.log('ka-open-activity-composer received', { tid });
-                // Reset form and editing state for new activity
-                setEditingActivityId(null);
-                setActivityForm({
-                    title: "",
-                    description: "",
-                    list: "",
-                    key_area_id: selectedKA?.id || "",
-                    assignee: "",
-                    priority: "normal",
-                    goal: "",
-                    start_date: "",
-                    end_date: "",
-                    deadline: "",
-                    finish_date: "",
-                    duration: "",
-                    _endAuto: true,
-                });
+            // Reset editing state
+            setEditingActivityId(null);
+
+            // If a taskId was provided, try to find the parent task so we can prefill
+            // the activity's Key Area, List and Task selection in the composer modal.
+            const parent = tid ? (allTasks || []).find((t) => String(t.id) === String(tid)) : null;
+
+            setActivityForm({
+                title: "",
+                description: "",
+                // Prefill list and key area from parent task when available
+                list: parent ? (parent.list || parent.list_index || parent.listIndex || '') : '',
+                key_area_id: parent ? (parent.key_area_id || parent.keyAreaId || parent.keyArea || selectedKA?.id || '') : (selectedKA?.id || ''),
+                assignee: parent ? (parent.assignee || '') : '',
+                priority: "normal",
+                goal: "",
+                start_date: "",
+                end_date: "",
+                deadline: "",
+                finish_date: "",
+                duration: "",
+                _endAuto: true,
+                // Also set the taskId so the Task dropdown is preselected
+                taskId: parent ? String(parent.id || parent.taskId || parent.task_id || '') : (tid ? String(tid) : ''),
+            });
+
             setActivityAttachTaskId(tid ? String(tid) : null);
             setShowActivityComposer(true);
         };
         window.addEventListener("ka-open-activity-composer", handler);
         return () => window.removeEventListener("ka-open-activity-composer", handler);
-        }, [selectedKA]);
+    }, [selectedKA, allTasks]);
 
     // Open task editor (reuse Add Task modal) populated for editing
     useEffect(() => {
@@ -587,7 +698,7 @@ export default function KeyAreas() {
                 if (v === "high") return "high";
                 return "normal";
             };
-            setTaskForm({
+                        setTaskForm({
                 // include id so edit modals receive a usable identifier for update flows
                 id: task.id || task.taskId || task.task_id || task._id || null,
                 title: task.title || "",
@@ -598,8 +709,13 @@ export default function KeyAreas() {
                 start_date: toDateOnly(task.start_date) || "",
                 deadline: toDateOnly(task.deadline) || "",
                 end_date: toDateOnly(task.end_date) || "",
-                status: task.status || "open",
-                priority: mapPriority(task.priority),
+                                            status: task.status || "open",
+                                            priority: (function(p) {
+                                                const s = String(p || "normal").toLowerCase();
+                                                if (s === "low" || s === "1") return 1;
+                                                if (s === "high" || s === "3") return 3;
+                                                return 2;
+                                            })(task.priority),
                 tags: task.tags || "",
                 recurrence: task.recurrence || "",
                 attachments: task.attachments || "",
@@ -687,7 +803,12 @@ export default function KeyAreas() {
                 deadline: toDateOnly(norm.deadline) || "",
                 end_date: toDateOnly(norm.end_date) || "",
                 status: norm.completed ? "done" : "open",
-                priority: mapPriority(norm.priority),
+                priority: (function(p) {
+                    const s = String(p || "normal").toLowerCase();
+                    if (s === "low" || s === "1") return 1;
+                    if (s === "high" || s === "3") return 3;
+                    return 2;
+                })(norm.priority),
                 tags: "",
                 recurrence: "",
                 attachments: "",
@@ -706,7 +827,12 @@ export default function KeyAreas() {
                 list: norm.list || "",
                 key_area_id: norm.key_area_id || selectedKA?.id || "",
                 assignee: norm.assignee || norm.responsible || "",
-                priority: mapPriority(norm.priority),
+                priority: (function(p) {
+                    const s = String(p || "normal").toLowerCase();
+                    if (s === "low" || s === "1") return 1;
+                    if (s === "high" || s === "3") return 3;
+                    return 2;
+                })(norm.priority),
                 goal: norm.goal || "",
                 start_date: toDateOnly(norm.start_date) || "",
                 end_date: toDateOnly(norm.end_date) || "",
@@ -735,13 +861,73 @@ export default function KeyAreas() {
     useEffect(() => {
         (async () => {
             try {
-                const list = await usersService.list();
-                setUsers(list);
+                const uSvc = await getUsersService();
+                const list = await uSvc.list();
+                setUsers(Array.isArray(list) ? list : []);
             } catch {
                 setUsers([]);
             }
         })();
     }, []);
+
+    // small helper to mark a task as saving for UI feedback
+    const markSaving = (id, timeout = 1200) => {
+        try {
+            setSavingIds((s) => new Set([...s, id]));
+            if (timeout) {
+                setTimeout(() => setSavingIds((s) => {
+                    const copy = new Set(s);
+                    copy.delete(id);
+                    return copy;
+                }), timeout);
+            }
+        } catch (e) {}
+    };
+
+    // Inline single-field update with optimistic UI (used by TaskRow)
+    const updateField = async (id, key, value) => {
+        const prev = Array.isArray(allTasks) ? allTasks.slice() : [];
+        const prevTask = prev.find((t) => t.id === id);
+        if (!prevTask) return;
+
+        // optimistic transform
+        const optimistic = (t) => {
+            if (t.id !== id) return t;
+            if (key === 'priority') {
+                try { return { ...t, priority: getPriorityLevel(value) }; } catch (e) { return { ...t, priority: value }; }
+            }
+            return { ...t, [key]: value };
+        };
+        setAllTasks((prev) => prev.map(optimistic));
+        markSaving(id, 2000);
+
+        // build patch
+        const patch = {};
+        if (key === 'name') patch.title = value;
+        else if (key === 'notes') patch.description = value;
+        else if (key === 'assignee') patch.assignee = value;
+        else if (key === 'start_date') patch.startDate = value ? new Date(value).toISOString() : null;
+        else if (key === 'end_date') patch.endDate = value ? new Date(value).toISOString() : null;
+        else if (key === 'dueDate' || key === 'deadline') patch.dueDate = value ? new Date(value).toISOString() : null;
+        else if (key === 'duration') patch.duration = value;
+        else if (key === 'priority') patch.priority = value;
+        else if (key === 'status') patch.status = value;
+        else {
+            // UI-only field; nothing to persist
+            return;
+        }
+
+        try {
+            const updated = await api.updateTask(id, patch);
+            // api.updateTask returns normalized UI-friendly task shape
+            setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+            markSaving(id);
+        } catch (err) {
+            console.error('[KeyAreas] Failed to update task field', err);
+            setAllTasks(prev);
+            try { addToast && addToast({ type: 'error', message: err?.message || 'Failed to save' }); } catch (e) {}
+        }
+    };
 
     const [taskForm, setTaskForm] = useState({
         title: "",
@@ -1134,6 +1320,24 @@ export default function KeyAreas() {
             document.removeEventListener("keydown", handleKey);
         };
     }, [showViewMenu]);
+
+    // close columns (gear) menu on outside click or Escape
+    useEffect(() => {
+        if (!showColumnsMenu) return;
+        const handleClick = (e) => {
+            if (!columnsMenuRef.current) return;
+            if (!columnsMenuRef.current.contains(e.target)) setShowColumnsMenu(false);
+        };
+        const handleKey = (e) => {
+            if (e.key === "Escape") setShowColumnsMenu(false);
+        };
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleKey);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleKey);
+        };
+    }, [showColumnsMenu]);
 
     // close list ellipsis menu on outside click or Escape (based on the tabs container)
     useEffect(() => {
@@ -1544,7 +1748,8 @@ export default function KeyAreas() {
             // ignore activity load failures; UI will show zeroes
         }
         setTaskTab(1);
-        setSearchTerm("");
+    setSearchTerm("");
+    setSiteSearch("");
         setQuadrant("all");
         setView("list");
     setShowTaskComposer(false);
@@ -1643,16 +1848,26 @@ export default function KeyAreas() {
     };
 
     const visibleTasks = useMemo(() => {
-        let arr = allTasks.filter((t) => (t.list_index || 1) === taskTab);
-        if (searchTerm.trim()) {
+        const isSearch = String(siteSearch || "").trim().length >= 2;
+        let arr = isSearch ? (searchResults || []) : allTasks.filter((t) => (t.list_index || 1) === taskTab);
+        // If not showing completed items, filter them out
+        if (!showCompleted) {
+            arr = arr.filter((t) => {
+                const s = String((t.status || "").toLowerCase());
+                const completed = s === 'done' || s === 'completed' || Boolean(t.completionDate);
+                return !completed;
+            });
+        }
+        if (!isSearch && searchTerm.trim()) {
             const q = searchTerm.trim().toLowerCase();
             arr = arr.filter(
                 (t) => (t.title || "").toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q),
             );
         }
+        // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
         if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
         return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant]);
+    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted]);
 
     // Debug traces removed: temporary logging used during goal/title load debugging cleared.
 
@@ -1743,7 +1958,10 @@ export default function KeyAreas() {
             next.eisenhower_quadrant = computeEisenhowerQuadrant({
                 deadline: next.deadline,
                 end_date: next.end_date,
+                start_date: next.start_date,
                 priority: next.priority,
+                status: next.status,
+                key_area_id: next.key_area_id,
             });
             // Persist
             // eslint-disable-next-line no-await-in-loop
@@ -1937,7 +2155,10 @@ export default function KeyAreas() {
         const q = computeEisenhowerQuadrant({
             deadline: updated.deadline,
             end_date: updated.end_date,
+            start_date: updated.start_date || updated.startDate,
             priority: updated.priority,
+            status: updated.status,
+            key_area_id: updated.key_area_id || updated.keyAreaId || updated.key_area || updated.keyArea,
         });
         const payload = {
             ...updated,
@@ -1972,6 +2193,17 @@ export default function KeyAreas() {
                 text: (payload.text || payload.activity_name || payload.title || "").trim(),
                 completed: !!payload.completed,
             };
+            // Include optional date/metadata fields when provided by the modal so
+            // activities created/updated from the composer retain start/end/deadline.
+            if (payload.startDate || payload.start_date || payload.date_start) body.startDate = toDateOnly(payload.startDate || payload.start_date || payload.date_start);
+            if (payload.endDate || payload.end_date || payload.date_end) body.endDate = toDateOnly(payload.endDate || payload.end_date || payload.date_end);
+            if (payload.deadline || payload.dueDate || payload.due_date) body.deadline = toDateOnly(payload.deadline || payload.dueDate || payload.due_date);
+            if (typeof payload.priority !== 'undefined') body.priority = payload.priority;
+            if (payload.keyAreaId || payload.key_area_id || payload.keyArea) body.keyAreaId = payload.keyAreaId || payload.key_area_id || payload.keyArea;
+            if (payload.list || payload.list_index || payload.listIndex) body.list = payload.list || payload.list_index || payload.listIndex;
+            if (payload.goal || payload.goalId || payload.goal_id) body.goal = payload.goal || payload.goalId || payload.goal_id;
+            if (payload.assignee || payload.responsible) body.assignee = payload.assignee || payload.responsible;
+            if (typeof payload.duration !== 'undefined') body.duration = payload.duration;
             // Allow task attachment if provided
             if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
 
@@ -1993,13 +2225,36 @@ export default function KeyAreas() {
                 if (payload.taskId) body.taskId = payload.taskId;
                 const created = await svc.create(body);
                 const tid = body.taskId || activityAttachTaskId || null;
-                if (tid) {
-                    try {
-                        const list = await svc.list({ taskId: tid });
-                        setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
-                    } catch (e) {
-                        // ignore
+                // Immediately insert the created activity into local state so UI shows
+                // the dates/fields the user provided even if the backend hasn't
+                // returned them yet. Merge `body` into the server response and
+                // normalize for UI consistency (same approach used for tasks).
+                try {
+                    if (tid) {
+                        const key = String(tid);
+                        const norm = normalizeActivity({ ...(created || {}), ...(body || {}) });
+                        setActivitiesByTask((prev) => {
+                            const copyArr = Array.isArray(prev[key]) ? prev[key].slice() : [];
+                            copyArr.push(norm);
+                            return { ...prev, [key]: copyArr };
+                        });
+                        // Try to refresh in background to pick up any server-side
+                        // normalization differences, but don't block the UI.
+                        (async () => {
+                            try {
+                                const list = await svc.list({ taskId: tid });
+                                setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
+                            } catch (__) {}
+                        })();
                     }
+                } catch (e) {
+                    // ignore local update failure and fall back to simple refetch
+                    try {
+                        if (tid) {
+                            const list = await svc.list({ taskId: tid });
+                            setActivitiesByTask((prev) => ({ ...prev, [String(tid)]: Array.isArray(list) ? list.map(normalizeActivity) : [] }));
+                        }
+                    } catch (__) {}
                 }
             }
 
@@ -2175,6 +2430,42 @@ export default function KeyAreas() {
                                             >
                                                 <FaPlus /> New Key Area
                                             </button>
+                                            {/* Gear beside header when no KA is selected */}
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={showColumnsMenu ? "true" : "false"}
+                                                    className="ml-2 px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                                    onClick={() => setShowColumnsMenu((s) => !s)}
+                                                    title="Columns"
+                                                >
+                                                    <FaCog />
+                                                </button>
+                                                {showColumnsMenu && (
+                                                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
+                                                        <div className="font-medium mb-2">Columns</div>
+                                                        <label className="flex items-center gap-2 py-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!showCompleted}
+                                                                onChange={() => setShowCompleted((s) => !s)}
+                                                            />
+                                                            <span className="capitalize">Show completed items</span>
+                                                        </label>
+                                                        {Object.keys(visibleColumns).map((key) => (
+                                                            <label key={key} className="flex items-center gap-2 py-1">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={!!visibleColumns[key]}
+                                                                    onChange={() => setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))}
+                                                                />
+                                                                <span className="capitalize">{key.replace('_', ' ')}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -2228,23 +2519,18 @@ export default function KeyAreas() {
                                             <input
                                                 placeholder={`Search tasks in "${selectedKA.title}"…`}
                                                 className="bg-transparent outline-none text-sm w-40 sm:w-56"
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                value={siteSearch}
+                                                onChange={(e) => setSiteSearch(e.target.value)}
                                             />
                                         </div>
 
-                                        <select
-                                            className="bg-white rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                                            value={quadrant}
-                                            onChange={(e) => setQuadrant(e.target.value)}
-                                            title="Focus quadrant"
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/my-focus')}
+                                            className="bg-white rounded-lg border border-slate-200 px-3 py-1 text-sm font-semibold hover:bg-slate-50"
                                         >
-                                            <option value="all">All Quadrants</option>
-                                            <option value="1">Q1 • Important & Urgent</option>
-                                            <option value="2">Q2 • Important, Not Urgent</option>
-                                            <option value="3">Q3 • Not Important, Urgent</option>
-                                            <option value="4">Q4 • Not Important, Not Urgent</option>
-                                        </select>
+                                            My Focus
+                                        </button>
 
                                         {/* View dropdown */}
                                         <div className="relative" ref={viewMenuRef}>
@@ -2274,8 +2560,6 @@ export default function KeyAreas() {
                                                 >
                                                     {[
                                                         { key: "list", label: "List" },
-                                                        { key: "kanban", label: "Kanban" },
-                                                        { key: "calendar", label: "Calendar" },
                                                     ].map((opt) => (
                                                         <button
                                                             key={opt.key}
@@ -2296,6 +2580,42 @@ export default function KeyAreas() {
                                                 </div>
                                             )}
                                         </div>
+                                        {/* Columns (gear) placed beside View in header */}
+                                        <div className="relative ml-1" ref={columnsMenuRef}>
+                                            <button
+                                                type="button"
+                                                aria-haspopup="menu"
+                                                aria-expanded={showColumnsMenu ? "true" : "false"}
+                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
+                                                onClick={() => setShowColumnsMenu((s) => !s)}
+                                                title="Columns"
+                                            >
+                                                <FaCog />
+                                            </button>
+                                            {showColumnsMenu && (
+                                                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
+                                                    <div className="font-medium mb-2">Columns</div>
+                                                    <label className="flex items-center gap-2 py-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!showCompleted}
+                                                            onChange={() => setShowCompleted((s) => !s)}
+                                                        />
+                                                        <span className="capitalize">Show completed items</span>
+                                                    </label>
+                                                    {Object.keys(visibleColumns).map((key) => (
+                                                        <label key={key} className="flex items-center gap-2 py-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!visibleColumns[key]}
+                                                                onChange={() => setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))}
+                                                            />
+                                                            <span className="capitalize">{key.replace('_', ' ')}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -2312,6 +2632,7 @@ export default function KeyAreas() {
                                     listNumbers={availableListNumbers}
                                     selectedKA={selectedKA || keyAreas.find(k => String(k.id) === String(selectedTaskFull.key_area_id))}
                                     users={users}
+                                    currentUserId={currentUserId}
                                     allTasks={allTasks}
                                     savingActivityIds={savingActivityIds}
                                     setSavingActivityIds={setSavingActivityIds}
@@ -2349,7 +2670,12 @@ export default function KeyAreas() {
                                             deadline: toDateOnly(task.deadline) || toDateOnly(task.dueDate) || "",
                                             end_date: toDateOnly(task.end_date) || toDateOnly(task.endDate) || "",
                                             status: task.status || "open",
-                                            priority: mapPriority(task.priority),
+                                            priority: (function(p) {
+                                                const s = String(p || "normal").toLowerCase();
+                                                if (s === "low" || s === "1") return 1;
+                                                if (s === "high" || s === "3") return 3;
+                                                return 2;
+                                            })(task.priority),
                                             tags: task.tags || "",
                                             recurrence: task.recurrence || "",
                                             attachments: task.attachments || "",
@@ -2750,59 +3076,70 @@ export default function KeyAreas() {
                                                                     <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">
                                                                         Task
                                                                     </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Assignee
-                                                                    </th>
+                                                                    {visibleColumns.responsible && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Responsible
+                                                                        </th>
+                                                                    )}
                                                                     <th className="px-3 py-2 text-left font-semibold">
                                                                         Status
                                                                     </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Priority
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Quadrant
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Goal
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Tags
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Start Date
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        End date
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Deadline
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Duration
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Completed
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-center font-semibold w-24" title="Actions">
-                                                                        Actions
-                                                                    </th>
+                                                                    {visibleColumns.priority && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Priority
+                                                                        </th>
+                                                                    )}
+                                                                    {visibleColumns.quadrant && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Quadrant
+                                                                        </th>
+                                                                    )}
+                                                                    {/* Goal and Tags columns removed per UX request */}
+                                                                    {visibleColumns.start_date && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Start Date
+                                                                        </th>
+                                                                    )}
+                                                                    {visibleColumns.end_date && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            End date
+                                                                        </th>
+                                                                    )}
+                                                                    {visibleColumns.deadline && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Deadline
+                                                                        </th>
+                                                                    )}
+                                                                    {visibleColumns.duration && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Duration
+                                                                        </th>
+                                                                    )}
+                                                                    {visibleColumns.completed && (
+                                                                        <th className="px-3 py-2 text-left font-semibold">
+                                                                            Completed
+                                                                        </th>
+                                                                    )}
+                                                                    {/* Actions column removed — actions available via row menu */}
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="bg-white">
                                                                 {visibleTasks.map((t) => {
-                                                                    const q =
-                                                                        t.eisenhower_quadrant ||
-                                                                        computeEisenhowerQuadrant({
-                                                                            deadline: t.deadline,
-                                                                            end_date: t.end_date,
-                                                                            priority: t.priority,
-                                                                        });
+                                                                    const q = computeEisenhowerQuadrant({
+                                                                        deadline: t.deadline,
+                                                                        end_date: t.end_date,
+                                                                        start_date: t.start_date || t.startDate,
+                                                                        priority: t.priority,
+                                                                        status: t.status,
+                                                                        key_area_id: t.key_area_id || t.keyAreaId || t.key_area || t.keyArea,
+                                                                    });
                                                                     return (
                                                                         <React.Fragment key={t.id}>
                                                                             <TaskRow
                                                                                 t={t}
                                                                                 goals={goals}
                                                                                 goalMap={goalTitleMap}
+                                                                                visibleColumns={visibleColumns}
                                                                                 q={q}
                                                                                 isSelected={isSelected(t.id)}
                                                                                 onToggleSelect={() => toggleSelect(t.id)}
@@ -2813,6 +3150,12 @@ export default function KeyAreas() {
                                                                                 getPriorityLevel={getPriorityLevel}
                                                                                 toDateOnly={toDateOnly}
                                                                                 formatDuration={formatDuration}
+                                                                                // inline editing support (optimistic single-field updates)
+                                                                                updateField={updateField}
+                                                                                enableInlineEditing={!showMassEdit}
+                                                                                users={users}
+                                                                                currentUserId={currentUserId}
+                                                                                isSaving={savingIds.has(t.id)}
                                                                                 onMouseEnter={() => {
                                                                                     if (
                                                                                         expandedActivityRows &&
@@ -2851,7 +3194,12 @@ export default function KeyAreas() {
                                                                                         deadline: toDateOnly(t.deadline) || toDateOnly(t.dueDate) || "",
                                                                                         end_date: toDateOnly(t.end_date) || toDateOnly(t.endDate) || "",
                                                                                         status: t.status || "open",
-                                                                                        priority: mapPriority(t.priority),
+                                                                                        priority: (function(p) {
+                                                                                            const s = String(p || "normal").toLowerCase();
+                                                                                            if (s === "low" || s === "1") return 1;
+                                                                                            if (s === "high" || s === "3") return 3;
+                                                                                            return 2;
+                                                                                        })(t.priority),
                                                                                         tags: t.tags || "",
                                                                                         recurrence: t.recurrence || "",
                                                                                         attachments: t.attachments || "",
@@ -2883,7 +3231,10 @@ export default function KeyAreas() {
                                                                                                 savingActivityIds={savingActivityIds}
                                                                                                 setSavingActivityIds={setSavingActivityIds}
                                                                                                 getPriorityLevel={getPriorityLevel}
-                                                                                                addToast={addToast}
+                                                                                 addToast={addToast}
+                                                                                                             enableInlineEditing={!showMassEdit}
+                                                                                                             users={users}
+                                                                                                             currentUserId={currentUserId}
                                                                                             />
                                                                                         </div>
                                                                                     </td>
