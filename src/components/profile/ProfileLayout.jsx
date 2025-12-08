@@ -6,7 +6,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         "Security",
         "Preferences",
         "Integrations",
-        "Teams & Members"
+        // "Teams & Members" // Hidden for now until Teams feature is implemented
     ];
 
     // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
@@ -40,7 +40,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         <div className="mx-auto max-w-6xl rounded-lg bg-white p-4 shadow-sm">
             <h1 className="mb-4 text-xl font-semibold text-gray-800">Profile Settings</h1>
 
-            <div className="grid gap-4 lg:grid-cols-[240px_auto]">
+            <div className="grid gap-4 lg:grid-cols-[240px_auto] items-stretch">
                 {/* Left sidebar - tabs */}
                 <nav className="rounded border border-gray-300 bg-gray-50 p-3">
                     <div className="space-y-1">
@@ -61,7 +61,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                 </nav>
 
                 {/* Main content area */}
-                <div className="rounded border border-gray-300 bg-gray-50 p-4">
+                <div className="rounded border border-gray-300 bg-gray-50 p-4 min-h-[520px]">
                     {children}
                 </div>
             </div>

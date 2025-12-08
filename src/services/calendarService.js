@@ -103,33 +103,99 @@ const calendarService = {
             // Open popup window for OAuth
             const popup = window.open(authUrl, 'google-oauth', 'width=500,height=600,scrollbars=yes,resizable=yes');
             
-            // Listen for postMessage from popup
+            let resolved = false;
+            
+            const cleanup = () => {
+                if (resolved) return;
+                resolved = true;
+                window.removeEventListener('message', messageHandler);
+                window.removeEventListener('storage', storageHandler);
+                if (broadcastChannel) {
+                    try { broadcastChannel.close(); } catch(e) {}
+                }
+                clearInterval(checkClosed);
+                try { popup.close(); } catch(e) {}
+            };
+            
+            // Method 1: Listen for postMessage from popup
             const messageHandler = async (event) => {
-                // Expecting new payload: { provider: 'google'|'graph', success: true|false }
+                console.log('Received postMessage:', event.data);
                 if (event.data && event.data.provider === 'google') {
-                    window.removeEventListener('message', messageHandler);
-                    try { popup.close(); } catch(e) {}
-
+                    console.log('Google OAuth success via postMessage');
+                    cleanup();
                     if (event.data.success === true) {
-                        // We intentionally do not expect access tokens in the message anymore.
-                        // Resolve so the caller can refresh integration status.
                         resolve({ success: true });
                     } else {
                         reject(new Error('OAuth cancelled by user'));
                     }
                 }
             };
-            
             window.addEventListener('message', messageHandler);
             
-            // Handle popup closed without auth
-            const checkClosed = setInterval(() => {
-                if (popup && popup.closed) {
-                    clearInterval(checkClosed);
-                    window.removeEventListener('message', messageHandler);
-                    reject(new Error('OAuth cancelled by user'));
+            // Method 2: BroadcastChannel (for COOP-blocked scenarios)
+            let broadcastChannel;
+            try {
+                broadcastChannel = new BroadcastChannel('oauth-callback');
+                broadcastChannel.onmessage = (event) => {
+                    console.log('Received BroadcastChannel:', event.data);
+                    if (event.data && event.data.provider === 'google') {
+                        console.log('Google OAuth success via BroadcastChannel');
+                        cleanup();
+                        if (event.data.success === true) {
+                            resolve({ success: true });
+                        } else {
+                            reject(new Error('OAuth cancelled by user'));
+                        }
+                    }
+                };
+            } catch (e) {
+                console.log('BroadcastChannel not available');
+            }
+            
+            // Method 3: localStorage event (fallback)
+            const storageHandler = (event) => {
+                console.log('Storage event:', event.key, event.newValue);
+                if (event.key === 'oauth-callback' && event.newValue) {
+                    try {
+                        const data = JSON.parse(event.newValue);
+                        console.log('Parsed oauth-callback data:', data);
+                        if (data.provider === 'google') {
+                            console.log('Google OAuth success via localStorage');
+                            cleanup();
+                            if (data.success === true) {
+                                resolve({ success: true });
+                            } else {
+                                reject(new Error('OAuth cancelled by user'));
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing oauth-callback:', e);
+                    }
                 }
-            }, 1000);
+            };
+            window.addEventListener('storage', storageHandler);
+            
+            // Handle popup closed - give it 10 seconds before rejecting
+            const checkClosed = setInterval(() => {
+                try {
+                    if (popup && popup.closed) {
+                        console.log('OAuth popup was closed');
+                        clearInterval(checkClosed);
+                        // Don't immediately reject - give BroadcastChannel/storage 2 more seconds
+                        if (!resolved) {
+                            setTimeout(() => {
+                                if (!resolved) {
+                                    cleanup();
+                                    reject(new Error('OAuth cancelled by user'));
+                                }
+                            }, 2000);
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Error checking popup.closed:', e);
+                }
+            }, 500);
         });
     },
 
@@ -142,33 +208,99 @@ const calendarService = {
             // Open popup window for OAuth
             const popup = window.open(authUrl, 'microsoft-oauth', 'width=500,height=600,scrollbars=yes,resizable=yes');
             
-            // Listen for postMessage from popup
+            let resolved = false;
+            
+            const cleanup = () => {
+                if (resolved) return;
+                resolved = true;
+                window.removeEventListener('message', messageHandler);
+                window.removeEventListener('storage', storageHandler);
+                if (broadcastChannel) {
+                    try { broadcastChannel.close(); } catch(e) {}
+                }
+                clearInterval(checkClosed);
+                try { popup.close(); } catch(e) {}
+            };
+            
+            // Method 1: Listen for postMessage from popup
             const messageHandler = async (event) => {
-                // Expecting new payload: { provider: 'google'|'graph', success: true|false }
+                console.log('Received postMessage:', event.data);
                 if (event.data && event.data.provider === 'graph') {
-                    window.removeEventListener('message', messageHandler);
-                    try { popup.close(); } catch(e) {}
-
+                    console.log('Graph OAuth success via postMessage');
+                    cleanup();
                     if (event.data.success === true) {
-                        // We intentionally do not expect access tokens in the message anymore.
-                        // Resolve so the caller can refresh integration status.
                         resolve({ success: true });
                     } else {
                         reject(new Error('OAuth cancelled by user'));
                     }
                 }
             };
-            
             window.addEventListener('message', messageHandler);
             
-            // Handle popup closed without auth
-            const checkClosed = setInterval(() => {
-                if (popup && popup.closed) {
-                    clearInterval(checkClosed);
-                    window.removeEventListener('message', messageHandler);
-                    reject(new Error('OAuth cancelled by user'));
+            // Method 2: BroadcastChannel (for COOP-blocked scenarios)
+            let broadcastChannel;
+            try {
+                broadcastChannel = new BroadcastChannel('oauth-callback');
+                broadcastChannel.onmessage = (event) => {
+                    console.log('Received BroadcastChannel:', event.data);
+                    if (event.data && event.data.provider === 'graph') {
+                        console.log('Graph OAuth success via BroadcastChannel');
+                        cleanup();
+                        if (event.data.success === true) {
+                            resolve({ success: true });
+                        } else {
+                            reject(new Error('OAuth cancelled by user'));
+                        }
+                    }
+                };
+            } catch (e) {
+                console.log('BroadcastChannel not available');
+            }
+            
+            // Method 3: localStorage event (fallback)
+            const storageHandler = (event) => {
+                console.log('Storage event:', event.key, event.newValue);
+                if (event.key === 'oauth-callback' && event.newValue) {
+                    try {
+                        const data = JSON.parse(event.newValue);
+                        console.log('Parsed oauth-callback data:', data);
+                        if (data.provider === 'graph') {
+                            console.log('Graph OAuth success via localStorage');
+                            cleanup();
+                            if (data.success === true) {
+                                resolve({ success: true });
+                            } else {
+                                reject(new Error('OAuth cancelled by user'));
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing oauth-callback:', e);
+                    }
                 }
-            }, 1000);
+            };
+            window.addEventListener('storage', storageHandler);
+            
+            // Handle popup closed - give it 10 seconds before rejecting
+            const checkClosed = setInterval(() => {
+                try {
+                    if (popup && popup.closed) {
+                        console.log('OAuth popup was closed');
+                        clearInterval(checkClosed);
+                        // Don't immediately reject - give BroadcastChannel/storage 2 more seconds
+                        if (!resolved) {
+                            setTimeout(() => {
+                                if (!resolved) {
+                                    cleanup();
+                                    reject(new Error('OAuth cancelled by user'));
+                                }
+                            }, 2000);
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Error checking popup.closed:', e);
+                }
+            }, 500);
         });
     },
 
@@ -179,10 +311,6 @@ const calendarService = {
 
     async disconnectCalendar(provider) {
         if (!provider) throw new Error("Missing provider");
-        
-        // For disconnect, we need the access tokens which should be stored
-        // For now, we'll call the generic disconnect endpoint
-        // TODO: Store and retrieve access tokens properly
         
         let endpoint;
         switch (provider.toLowerCase()) {
@@ -197,10 +325,8 @@ const calendarService = {
         }
         
         try {
-            // This would need proper token management
-            // For now, we'll just return success since we don't have stored tokens
-            console.warn('Disconnect requires stored access tokens - implementing basic disconnect');
-            return { success: true, message: `${provider} calendar disconnected` };
+            const res = await apiClient.post(endpoint);
+            return res.data;
         } catch (error) {
             console.error('Disconnect error:', error);
             throw error;

@@ -316,18 +316,21 @@ export const Preferences = ({ showToast }) => {
             // Load legacy preferences from localStorage for backward compatibility
             const localPreferences = JSON.parse(localStorage.getItem('userPreferences') || '{}');
             
-            // Merge API preferences with local ones, prioritizing API
+            // Merge API preferences with local ones.
+            // Prefer API values when present, otherwise fall back to localStorage values,
+            // and finally fall back to existing defaults (prev).
             setPreferences(prev => ({
                 ...prev,
                 ...localPreferences,
                 ...apiPreferences,
-                // Ensure work hours are taken from normalized API fields when available
-                workStartTime: apiPreferences.workStartTime || prev.workStartTime,
-                workEndTime: apiPreferences.workEndTime || prev.workEndTime,
-                // Ensure timeFormat/dateFormat/timezone also pick normalized values
-                timeFormat: apiPreferences.timeFormat || prev.timeFormat,
-                dateFormat: apiPreferences.dateFormat || prev.dateFormat,
-                timezone: apiPreferences.timezone || prev.timezone,
+                // Ensure work hours use API when available, otherwise local or prev
+                workStartTime: apiPreferences.workStartTime ?? localPreferences.workStartTime ?? prev.workStartTime,
+                workEndTime: apiPreferences.workEndTime ?? localPreferences.workEndTime ?? prev.workEndTime,
+                // Ensure timeFormat/dateFormat/timezone pick normalized API values if present,
+                // otherwise prefer localStorage then existing prev defaults
+                timeFormat: apiPreferences.timeFormat ?? localPreferences.timeFormat ?? prev.timeFormat,
+                dateFormat: apiPreferences.dateFormat ?? localPreferences.dateFormat ?? prev.dateFormat,
+                timezone: apiPreferences.timezone ?? localPreferences.timezone ?? prev.timezone,
             }));
         } catch (error) {
             console.error('Error loading preferences:', error);
@@ -810,6 +813,23 @@ export const Preferences = ({ showToast }) => {
                             <option value="1day">1 day before</option>
                         </select>
                     </Field>
+                    <div className="flex items-center justify-end mt-2">
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    const rm = (await import('../../lib/reminderManager')).default;
+                                    await rm.testNotification();
+                                } catch (e) {
+                                    console.error('Test notification failed', e);
+                                    showToast('Test notification failed', 'error');
+                                }
+                            }}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-sm rounded"
+                        >
+                            Test Notification
+                        </button>
+                    </div>
                 </div>
             </Section>
             
