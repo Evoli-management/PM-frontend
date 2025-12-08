@@ -9,13 +9,17 @@ const safeDate = (v) => {
   try {
     const d = new Date(v);
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   } catch {
     return '';
   }
 };
 
-const defaultDate = new Date().toISOString().slice(0, 10);
+const now = new Date();
+const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
 
@@ -40,6 +44,8 @@ export default function CreateTaskModal({
   availableLists = [1],
   // parentListNames: optional mapping passed by parent when no key area is selected
   parentListNames = null,
+  // When true, the modal is being used to create a Don't Forget task (DontForget page)
+  isDontForgetMode = false,
 }) {
   const firstRowRef = useRef(null);
   const [firstRowHeight, setFirstRowHeight] = useState(null);
@@ -372,6 +378,13 @@ export default function CreateTaskModal({
   const dateCls = `${inputCls} appearance-none pr-11 no-calendar`;
   const selectCls = `${inputCls} appearance-none pr-10`;
 
+  // Determine if the currently selected Key Area is the Don't Forget area
+  const selectedKA = (localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).find(
+    (a) => String(a.id) === String(keyAreaId)
+  );
+  const isDontForgetKA = !!(selectedKA && String(selectedKA.title || selectedKA.name || '').toLowerCase().match(/dont'?\s*forget/));
+  const finalIsDontForget = !!(isDontForgetMode || isDontForgetKA);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
@@ -383,7 +396,7 @@ export default function CreateTaskModal({
         `}</style>
   <div className="relative px-5 py-2 border-b border-slate-200">
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
-            Create Task
+            {finalIsDontForget ? "Create Don't forget task" : 'Create Task'}
           </h3>
           <div className="flex items-center justify-end">
             <button
@@ -507,7 +520,7 @@ export default function CreateTaskModal({
                     className={selectCls}
                     value={keyAreaId}
                     onChange={(e) => setKeyAreaId(e.target.value)}
-                    required
+                    required={!finalIsDontForget}
                   >
                     <option value="">— Select Key Area —</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (

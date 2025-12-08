@@ -1,6 +1,7 @@
 export { default } from "./DontForget.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
+import { toDateOnly } from "../utils/keyareasHelpers";
 import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
@@ -372,7 +373,7 @@ export default function Tasks() {
     };
     const setStatus = async (id, s) => {
         try {
-            await taskService.update(id, { status: s });
+            await (await getTaskService()).update(id, { status: s });
             setTasks((prev) =>
                 prev.map((t) =>
                     t.id === id
@@ -992,8 +993,7 @@ export default function Tasks() {
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Goal</th>
-                                                <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Tags</th>
+                                                {/* Goal and Tags columns removed per UX request */}
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
                                                 <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
@@ -1087,18 +1087,7 @@ export default function Tasks() {
                                                                 {task.quadrant || "—"}
                                                             </span>
                                                         </td>
-                                                        <td className="px-2 sm:px-3 py-2 align-top text-slate-800 hidden lg:table-cell">
-                                                            {task.goal ? (
-                                                                task.goal
-                                                            ) : (
-                                                                <span className="text-slate-500">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-2 sm:px-3 py-2 align-top max-w-[180px] sm:max-w-[240px] hidden xl:table-cell">
-                                                            <span className="block truncate text-slate-800 text-xs sm:text-sm">
-                                                                {task.tags ? task.tags : "—"}
-                                                            </span>
-                                                        </td>
+                                                        {/* Goal and Tags columns removed per UX request */}
                                                         <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
                                                             {task.start_date || ""}
                                                         </td>
@@ -1116,7 +1105,7 @@ export default function Tasks() {
                                                                 )}
                                                         </td>
                                                         <td className="px-2 sm:px-3 py-2 align-top text-slate-800 text-xs sm:text-sm hidden xl:table-cell">
-                                                            {task.completionDate ? new Date(task.completionDate).toLocaleString() : "—"}
+                                                            {toDateOnly(task.completionDate || task.completion_date) || "—"}
                                                         </td>
                                                     </tr>
                                                     {/* Row expansion removed per new design */}

@@ -36,62 +36,79 @@ export const nullableString = (v, allowUndefinedForEmpty = false) => {
     return s;
 };
 
-export const computeEisenhowerQuadrant = ({ deadline, end_date, priority, key_area_id = null }) => {
+export const computeEisenhowerQuadrant = ({ deadline, end_date, priority, key_area_id = null, start_date = null, status = null } = {}) => {
+    // Practical Manager rules implemented:
+    // Important = record is in a Key Area (key_area_id truthy)
+    // Urgent if (A) start_date or end_date <= today OR (B) status not completed && deadline <= today
+    // Box 1: Important & Urgent OR Don't Forget & Urgent
+    // Box 2: Important & Not urgent (including missing start/end)
+    // Box 3: Don't Forget & Not urgent
+    // Box 4: Not Important & Not urgent & Priority LOW
+
     const toStartOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const today = toStartOfDay(new Date());
     const due = safeParseDate(deadline) ? toStartOfDay(safeParseDate(deadline)) : null;
+    const start = safeParseDate(start_date) ? toStartOfDay(safeParseDate(start_date)) : null;
     const end = safeParseDate(end_date) ? toStartOfDay(safeParseDate(end_date)) : null;
 
-    const notUrgentByOnTrack = !!(
-        due &&
-        end &&
-        due.getTime() >= today.getTime() &&
-        end.getTime() <= due.getTime()
-    );
-    const notUrgentByFinishedNoDeadline = !!(
-        !due &&
-        end &&
-        end.getTime() <= today.getTime()
-    );
+    const lvl = getPriorityLevel(priority);
+    const isLowPriority = lvl === 1;
+    const isImportant = !!key_area_id;
+    const isDontForget = !isImportant;
 
+    // determine completed status (treat unknown as not completed)
+    const s = String(status || '')?.toLowerCase();
+    const isCompleted = s === 'done' || s === 'completed' || s === 'closed' || s === 'archived';
+
+    // Urgent criteria
     let urgent = false;
-    if (notUrgentByOnTrack || notUrgentByFinishedNoDeadline) {
-        urgent = false;
-    } else {
-        if (due && due.getTime() < today.getTime()) urgent = true;
-        else if (end && end.getTime() < today.getTime()) urgent = true;
-        else if (due && end && end.getTime() > due.getTime()) urgent = true;
-        else urgent = false;
+    // A) start_date or end_date is <= today (overdue). Only consider if not completed.
+    if (!isCompleted && ((start && start.getTime() <= today.getTime()) || (end && end.getTime() <= today.getTime()))) {
+        urgent = true;
+    }
+    // B) status not completed && deadline <= today
+    if (!urgent && !isCompleted && due && due.getTime() <= today.getTime()) {
+        urgent = true;
     }
 
-    // Importance precedence: High priority should mark important even if
-    // the item is in the "Don't Forget" bucket (no key_area_id). Low
-    // priority marks not important. If a key area is assigned, treat
-    // it as more likely important unless explicitly low.
-    const isDontForget = !key_area_id;
-    const isHighPriority = priority === 'high';
-    const isLowPriority = priority === 'low';
-    const isImportant = isHighPriority || (!isDontForget && !isLowPriority);
+    // Apply quadrant rules
+    // If urgent -> Box 1 (Q1) for both Key Areas and Don't Forget per rules
+    if (urgent) return 1;
 
-    if (isImportant && urgent) return 'Q1';
-    if (isImportant && !urgent) return 'Q2';
-    if (!isImportant && urgent) return 'Q3';
-    return 'Q4';
+    // Not urgent from here on
+    if (isImportant) {
+        // Important and not urgent => Q2
+        return 2;
+    }
+
+    // Not important (i.e., Don't Forget) and not urgent
+    if (isDontForget) {
+        // Q4 only when low priority
+        if (isLowPriority) return 4;
+        return 3;
+    }
+
+    // Fallback
+    return 4;
 };
 
 export const getQuadrantColorClass = (q) => {
     const n = Number(q) || 4;
-    // Use the same light-badge style as priority/status helpers for consistency
+    // Quadrant color mapping per design:
+    // 1 -> Red (Urgent & Important)
+    // 2 -> Green (Important, Not Urgent)
+    // 3 -> Orange (Not Important, Urgent)
+    // 4 -> Grey (Neither urgent nor important)
     switch (n) {
         case 1:
             return { badge: 'bg-red-100 text-red-800' };
         case 2:
-            return { badge: 'bg-amber-100 text-amber-800' };
+            return { badge: 'bg-emerald-100 text-emerald-800' };
         case 3:
-            return { badge: 'bg-blue-100 text-blue-800' };
+            return { badge: 'bg-amber-100 text-amber-800' };
         case 4:
         default:
-            return { badge: 'bg-emerald-100 text-emerald-800' };
+            return { badge: 'bg-slate-100 text-slate-700' };
     }
 };
 
@@ -110,7 +127,14 @@ export const toDateOnly = (val) => {
         if (/^\d{4}-\d{2}-\d{2}$/.test(String(val))) return String(val);
         const d = new Date(val);
         if (isNaN(d.getTime())) return "";
-        return d.toISOString().slice(0, 10);
+        // Use local date components to avoid timezone shifts when converting
+        // a date-only value (e.g. selected via <input type="date">) to a
+        // string. This prevents the common issue where local midnight is
+        // converted to a previous/next day in UTC when using toISOString().
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     } catch {
         return "";
     }
@@ -230,6 +254,66 @@ export const normalizeActivity = (a = {}) => {
     };
 };
 
+/**
+ * Resolve an assignee for display and select value.
+ * - activity: activity object (may contain assignee/responsible as string/id/object)
+ * - taskAssignee: fallback value from the parent task
+ * - users: array of known users [{id,name}]
+ * - currentUserId: id of the current user (used to resolve 'Me')
+ *
+ * Returns { display, selectValue } where selectValue is a user id string to
+ * match against <select> options when users are provided, otherwise ''.
+ */
+export const resolveAssignee = ({ activity = {}, taskAssignee = null, users = [], currentUserId = null } = {}) => {
+    const raw = activity?.assignee ?? activity?.responsible ?? taskAssignee ?? '';
+    // display name resolution
+    const display = (() => {
+        if (!raw) return '—';
+        if (typeof raw === 'object') return raw.name || raw.username || String(raw.id || '');
+        if (raw === 'Me' && currentUserId && Array.isArray(users) && users.length) {
+            const me = users.find((u) => String(u.id) === String(currentUserId));
+            return me ? (me.name || me.username || 'Me') : 'Me';
+        }
+        if (Array.isArray(users) && users.length) {
+            const byId = users.find((u) => String(u.id) === String(raw));
+            if (byId) return byId.name || byId.username || String(byId.id);
+            const byName = users.find((u) => (u.name || '') === String(raw));
+            if (byName) return byName.name || byName.username || String(byName.id);
+        }
+        return String(raw);
+    })();
+
+    // selectValue: when users list is available, prefer returning an id that matches an option
+    let selectValue = '';
+    if (Array.isArray(users) && users.length) {
+        if (raw === 'Me' && currentUserId) selectValue = String(currentUserId);
+        else if (typeof raw === 'object' && raw.id) selectValue = String(raw.id);
+        else {
+            const byId = users.find((u) => String(u.id) === String(raw));
+            if (byId) selectValue = String(byId.id);
+            else {
+                const byName = users.find((u) => (u.name || '') === String(raw));
+                if (byName) selectValue = String(byName.id);
+            }
+        }
+    }
+    return { display, selectValue };
+};
+
+/**
+ * Map a selected user id (from a <select>) back into a value suitable for
+ * persisting to the API (e.g., 'Me' sentinel or user.name). Prefers 'Me'
+ * when the selected id matches currentUserId.
+ */
+export const selectedUserIdToPersistValue = (selId, users = [], currentUserId = null) => {
+    if (!selId && selId !== 0) return '';
+    if (Array.isArray(users) && users.length) {
+        const user = users.find((u) => String(u.id) === String(selId));
+        if (user) return (currentUserId && String(user.id) === String(currentUserId)) ? 'Me' : (user.name || user.username || String(user.id));
+    }
+    return String(selId);
+};
+
 export default {
     safeParseDate,
     toIsoMidnightOrNull,
@@ -241,4 +325,6 @@ export default {
     mapUiStatusToServer,
     mapServerStatusToUi,
     normalizeActivity,
+    resolveAssignee,
+    selectedUserIdToPersistValue,
 };

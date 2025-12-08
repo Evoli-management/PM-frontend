@@ -9,13 +9,17 @@ const safeDate = (v) => {
   try {
     const d = new Date(v);
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   } catch {
     return '';
   }
 };
 
-const defaultDate = new Date().toISOString().slice(0, 10);
+const now = new Date();
+const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 const _idsOf = (arr = []) => (Array.isArray(arr) ? arr.map((x) => String(x && x.id)).join(',') : '');
 
@@ -44,6 +48,8 @@ export default function EditTaskModal({
   parentListNames = {},
   // optional custom modal title (used for mass-editing banner)
   modalTitle = undefined,
+  // When true, editing a Don't Forget task (no Key Area required)
+  isDontForgetMode = false,
 }) {
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
@@ -294,7 +300,7 @@ export default function EditTaskModal({
 
   const handleSave = () => {
     // Validate required fields
-    if (!keyAreaId) {
+    if (!keyAreaId && !isDontForgetMode) {
       setKeyAreaError('Please select a Key Area');
       try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (_) {}
       return;
@@ -532,7 +538,7 @@ export default function EditTaskModal({
                     className={selectCls}
                     value={keyAreaId}
                     onChange={(e) => { setKeyAreaId(e.target.value); setKeyAreaError(''); }}
-                    required
+                    required={!isDontForgetMode}
                   >
                     <option value="">— Select Key Area —</option>
                     {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (

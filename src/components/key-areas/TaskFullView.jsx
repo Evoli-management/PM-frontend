@@ -11,6 +11,7 @@ import {
     mapServerStatusToUi,
     mapUiStatusToServer,
     normalizeActivity,
+    resolveAssignee,
     getStatusColorClass,
     getPriorityColorClass,
     getQuadrantColorClass,
@@ -36,6 +37,14 @@ const getActivityService = async () => {
     return _activityService;
 };
 
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import('../../services/taskService');
+    _taskService = mod.default || mod;
+    return _taskService;
+};
+
 // helpers imported from utils/keyareasHelpers
 
 export default function TaskFullView({
@@ -56,10 +65,66 @@ export default function TaskFullView({
     listNumbers = [],
     selectedKA = null,
     users = [],
+    currentUserId = null,
     allTasks = [],
     savingActivityIds: savingActivityIdsProp = undefined,
     setSavingActivityIds: setSavingActivityIdsProp = undefined,
 }) {
+    // Small per-activity menu component placed near the activity icon so it's
+    // visible and not clipped by table layout. Uses local state and a ref to
+    // close on outside click / Escape.
+    const ActivityMenu = ({ item }) => {
+        const [open, setOpen] = useState(false);
+        const [anchor, setAnchor] = useState(null);
+        const btnRef = useRef(null);
+
+        useEffect(() => {
+            if (!open) return;
+            const onDown = (e) => {
+                // close when clicking outside the menu/button
+                const menuEl = document.getElementById(`activity-menu-${item.id}`);
+                if (!menuEl) return;
+                if (menuEl.contains(e.target)) return;
+                if (btnRef.current && btnRef.current.contains(e.target)) return;
+                setOpen(false);
+            };
+            const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+            document.addEventListener('mousedown', onDown);
+            document.addEventListener('keydown', onKey);
+            return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+        }, [open, item.id]);
+
+        const toggle = (e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            setAnchor({ top: rect.bottom + window.scrollY + 6, left: rect.left + window.scrollX });
+            setOpen((s) => !s);
+        };
+
+        return (
+            <div className="inline-block mr-1">
+                <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={open} onClick={toggle} className="p-1 rounded hover:bg-slate-100 text-slate-600" title="More actions">
+                    <FaEllipsisV />
+                </button>
+                {open && anchor && (
+                    <div id={`activity-menu-${item.id}`} style={{ position: 'fixed', top: anchor.top, left: anchor.left, zIndex: 9999, minWidth: 176 }} className="bg-white border border-slate-200 rounded shadow">
+                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setOpen(false); toggleRow(item.id); }}>
+                            <FaEdit className="text-slate-600" />
+                            <span>Edit</span>
+                        </button>
+                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); setOpen(false); if (confirm(`Delete activity "${(item.text||item.activity_name||'Untitled activity')}"?`)) removeActivity(item.id); }}>
+                            <FaTrash />
+                            <span>Delete</span>
+                        </button>
+                        <button type="button" className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${item.created_task_id ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}`} onClick={(e) => { e.stopPropagation(); setOpen(false); if (!item.created_task_id) createTaskFromActivity(item); }} disabled={!!item.created_task_id}>
+                            <FaAngleDoubleLeft />
+                            <span>{item.created_task_id ? 'Task created' : 'Convert to task'}</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
     const [savingActivityIdsLocal, setSavingActivityIdsLocal] = useState(new Set());
     const savingActivityIds = savingActivityIdsProp ?? savingActivityIdsLocal;
     const setSavingActivityIds = setSavingActivityIdsProp ?? setSavingActivityIdsLocal;
@@ -74,6 +139,7 @@ export default function TaskFullView({
     const [openActivityRows, setOpenActivityRows] = useState(new Set());
     const [activityModal, setActivityModal] = useState({ open: false, item: null });
     const [localUsers, setLocalUsers] = useState(users || []);
+    const [editingDate, setEditingDate] = useState({ id: null, field: null });
     const lastNotifiedRef = useRef(null);
 
     useEffect(() => {
@@ -188,6 +254,40 @@ export default function TaskFullView({
         };
     }, [list, task && task.id, activitiesByTask]);
 
+    const buildApiPayload = (values) => {
+        // build minimal payload matching backend expectations
+        const normalizeDate = (v) => {
+            if (!v && v !== 0) return undefined;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return String(v);
+            try {
+                const d = new Date(v);
+                if (isNaN(d.getTime())) return undefined;
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            } catch {
+                return undefined;
+            }
+        };
+
+        const payload = {};
+        if (values.text) payload.text = values.text;
+        if (values.note) payload.note = values.note;
+        const sd = normalizeDate(values.startDate || values.start_date);
+        if (sd) payload.startDate = sd;
+        const ed = normalizeDate(values.endDate || values.end_date);
+        if (ed) payload.endDate = ed;
+        const dl = normalizeDate(values.deadline || values.dueDate || values.due_date);
+        if (dl) payload.deadline = dl;
+        if (typeof values.completed === 'boolean') payload.completed = values.completed;
+        if (values.status) payload.status = values.status;
+        if (values.priority !== undefined && values.priority !== null) payload.priority = typeof values.priority === 'number' ? mapPriority(values.priority) : values.priority;
+        if (values.taskId || values.task_id) payload.taskId = values.taskId || values.task_id;
+        if (values.duration) payload.duration = values.duration;
+
+        return payload;
+    };
     const addActivity = async (text) => {
         const t = (text || "").trim();
         if (!t) return;
@@ -270,6 +370,132 @@ export default function TaskFullView({
             });
         }
     };
+    const setActivityAssignee = async (id, sel) => {
+        if (savingActivityIds.has(id)) return;
+        const prev = Array.isArray(list) ? [...list] : [];
+        const next = prev.map((a) => (a.id === id ? { ...a, assignee: sel } : a));
+        setList(next);
+        setSavingActivityIds((s) => new Set([...s, id]));
+        try {
+            // Backend does not accept an `assignee` field on activities (update DTO),
+            // so when changing responsible from the full-task view we update the
+            // parent task's assignee instead. This avoids a 400 Bad Request.
+            const ts = await getTaskService();
+            // sel may be user id; map to name or 'Me' when possible
+            let valueToSend = sel;
+            try {
+                const { selectedUserIdToPersistValue } = await import('../../utils/keyareasHelpers');
+                valueToSend = selectedUserIdToPersistValue(sel, localUsers.length ? localUsers : users, currentUserId);
+            } catch (e) {}
+            // Update the task's assignee (task API accepts `assignee`)
+            // eslint-disable-next-line no-console
+            console.debug('[TaskFullView] updating task assignee', task.id, { assignee: valueToSend });
+            const updatedTask = await ts.update(task.id, { assignee: valueToSend });
+            // eslint-disable-next-line no-console
+            console.debug('[TaskFullView] task update response', updatedTask);
+            // Also apply the normalized assignee value into the local activity list
+            setList((prevList) => prevList.map((a) => (a.id === id ? { ...a, assignee: valueToSend } : a)));
+            try { window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list } })); } catch (e) {}
+            // Notify other parts of the app that the task was updated so they can refresh local cache
+            try { window.dispatchEvent(new CustomEvent('ka-task-updated', { detail: { task: updatedTask } })); } catch (e) {}
+        } catch (e) {
+            console.error('Failed to update activity assignee', e);
+            setList(prev);
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
+        }
+    };
+
+    const setActivityPriority = async (id, value) => {
+        if (savingActivityIds.has(id)) return;
+        const prev = Array.isArray(list) ? [...list] : [];
+        const next = prev.map((a) => (a.id === id ? { ...a, priority: value } : a));
+        setList(next);
+        setSavingActivityIds((s) => new Set([...s, id]));
+        try {
+            const svc = await getActivityService();
+            const updated = await svc.update(id, { priority: value });
+            const norm = normalizeActivity(updated || {});
+            setList((prevList) => prevList.map((a) => (a.id === id ? norm : a)));
+            try { window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list } })); } catch (e) {}
+        } catch (e) {
+            console.error('Failed to update activity priority', e);
+            setList(prev);
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
+        }
+    };
+
+    const setActivityDate = async (id, field, value) => {
+        if (savingActivityIds.has(id)) return;
+        const prev = Array.isArray(list) ? [...list] : [];
+        const next = prev.map((a) => (a.id === id ? { ...a, [field]: value } : a));
+        setList(next);
+        setSavingActivityIds((s) => new Set([...s, id]));
+        try {
+            const svc = await getActivityService();
+            const payload = {};
+            // map incoming field names (may be snake_case from templates) to
+            // backend DTO camelCase names expected by UpdateActivityDto
+            const mapFieldName = (f) => {
+                if (!f) return f;
+                const map = {
+                    start_date: 'startDate',
+                    end_date: 'endDate',
+                    due_date: 'deadline',
+                    dueDate: 'deadline',
+                    deadline: 'deadline',
+                    startDate: 'startDate',
+                    endDate: 'endDate',
+                };
+                return map[f] || f;
+            };
+            const payloadKey = mapFieldName(field);
+            // Convert simple YYYY-MM-DD date picked by the user into an ISO
+            // datetime string (UTC midnight) because backend UpdateActivityDto
+            // expects an ISO date string. If value is falsy, send null to clear.
+            if (!value) {
+                payload[payloadKey] = null;
+            } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+                try {
+                    const [y, m, d] = String(value).split('-').map((s) => parseInt(s, 10));
+                    const iso = new Date(Date.UTC(y, m - 1, d)).toISOString();
+                    payload[payloadKey] = iso;
+                } catch (err) {
+                    payload[payloadKey] = String(value);
+                }
+            } else {
+                payload[payloadKey] = String(value);
+            }
+            // debug: log payload being sent and id
+            // eslint-disable-next-line no-console
+            console.debug('[TaskFullView] updating activity', id, payload);
+            const updated = await svc.update(id, payload);
+            const norm = normalizeActivity(updated || {});
+            setList((prevList) => prevList.map((a) => (a.id === id ? norm : a)));
+            try { window.dispatchEvent(new CustomEvent('ka-activities-updated', { detail: { refresh: true, taskId: String(task.id), list } })); } catch (e) {}
+        } catch (e) {
+            // log server response body if available to help identify validation errors
+            // eslint-disable-next-line no-console
+            console.error('Failed to update activity date', e?.response?.data || e?.message || e);
+            setList(prev);
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
+            setEditingDate({ id: null, field: null });
+        }
+    };
     const setPriorityValue = (id, value) => {
         setList(list.map((a) => (a.id === id ? { ...a, priority: value } : a)));
     };
@@ -319,7 +545,23 @@ export default function TaskFullView({
 
     return (
         <div className="bg-white rounded-xl border border-slate-200">
+            
+
             <div className="p-2 border-b border-slate-200">
+                <div className="pt-2 pl-0">
+                    <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
+                        <img
+                            alt={isDontForget ? "Don't forget" : "Key Areas"}
+                            className="w-4 h-4 object-contain opacity-70"
+                            src={isDontForget ? '/PM-frontend/dont-forget.png' : '/PM-frontend/key-area.png'}
+                            onError={(e) => {
+                                if (!e?.currentTarget) return;
+                                e.currentTarget.src = isDontForget ? '/dont-forget.png' : '/key-area.png';
+                            }}
+                        />
+                        <span className="font-medium truncate max-w-full" title={selectedKA?.title || kaTitle || ''}>{selectedKA?.title || kaTitle || (isDontForget ? "Don't Forget" : '—')}</span>
+                    </div>
+                </div>
                 <div className="flex items-start gap-2">
                     <button type="button" onClick={() => onBack && onBack()} className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center" aria-label="Back" style={{ minWidth: 36, minHeight: 36 }}>
                         <FaChevronLeft />
@@ -410,116 +652,84 @@ export default function TaskFullView({
                 </div>
             </div>
 
-            <div className="pt-2 px-3">
-                <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 rounded-md px-2 py-0.5 text-xs">
-                    <img
-                        alt={isDontForget ? "Don't forget" : "Key Areas"}
-                        className="w-4 h-4 object-contain opacity-70"
-                        src={isDontForget ? '/PM-frontend/dont-forget.png' : '/PM-frontend/key-area.png'}
-                        onError={(e) => {
-                            if (!e?.currentTarget) return;
-                            e.currentTarget.src = isDontForget ? '/dont-forget.png' : '/key-area.png';
-                        }}
-                    />
-                    <span className="font-medium truncate max-w-full" title={selectedKA?.title || kaTitle || ''}>{selectedKA?.title || kaTitle || (isDontForget ? "Don't Forget" : '—')}</span>
-                </div>
-            </div>
+            
 
-            <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-white">
+            <div className="px-3 pt-3 pb-2 bg-white">
                 <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2">
                     <div className="text-sm">
-                        <div className="grid grid-cols-11 gap-x-1">
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Assignee</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Status</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Priority</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Quadrant</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Goal</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Tags</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">End date</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Deadline</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Duration</div>
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500">Completed</div>
-                        </div>
-                        <div className="grid grid-cols-11 gap-x-1 mt-0.5">
-                            <div className="text-slate-900 truncate min-w-0">{task.assignee || '—'}</div>
-                            {(() => {
-                                const statusUi = mapServerStatusToUi(task.status || '');
-                                const statusColors = getStatusColorClass(statusUi);
-                                // Map UI status to a human-friendly label
-                                const statusLabel = statusUi === 'open' ? 'Open' : statusUi === 'in_progress' ? 'In Progress' : statusUi === 'done' ? 'Done' : String(statusUi).replace(/_/g, ' ');
-                                return (<div className="text-slate-900 capitalize truncate min-w-0 inline-flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${statusColors.dot}`} aria-hidden="true"></span>{statusLabel}</div>);
-                            })()}
-                            {(() => {
-                                const pLabel = getPriorityLabel(task.priority);
-                                const pColors = getPriorityColorClass(task.priority);
-                                const isHigh = getPriorityLevel(task.priority) === 3;
-                                return (<div className="text-slate-900 truncate min-w-0 inline-flex items-center gap-1 whitespace-nowrap">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium ${pColors.badge}`}>{pLabel}</span>
-                                    {isHigh ? <span className="inline-block text-sm font-bold text-red-600" title="Priority: High">!</span> : null}
-                                </div>);
-                            })()}
-                            <div className="min-w-0">{
-                                (() => {
-                                    // Prefer server-provided numeric quadrant, fall back to computed value
-                                    let raw = task.eisenhowerQuadrant ?? task.eisenhower_quadrant ?? null;
-                                    if (!raw) {
-                                        try {
-                                            // computeEisenhowerQuadrant expects an object; it returns strings like 'Q1'..'Q4'
-                                            const computed = computeEisenhowerQuadrant ? computeEisenhowerQuadrant({
-                                                deadline: task.deadline || task.dueDate || task.due_date,
-                                                end_date: task.end_date || task.endDate || task.end_date,
-                                                priority: task.priority,
-                                                key_area_id: task.keyAreaId ?? task.key_area_id ?? null,
-                                            }) : null;
-                                            raw = computed || null;
-                                        } catch (e) {
-                                            raw = null;
+                        <div className="grid grid-cols-9 gap-x-1">
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Responsible</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Status</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Priority</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Quadrant</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">End date</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Deadline</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Duration</div>
+                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Completed</div>
+                            </div>
+                            <div className="grid grid-cols-9 gap-x-1 mt-0.5">
+                                <div className="text-slate-900 truncate min-w-0">{task.assignee || '—'}</div>
+                                {(() => {
+                                    const statusUi = mapServerStatusToUi(task.status || '');
+                                    const statusColors = getStatusColorClass(statusUi);
+                                    // Map UI status to a human-friendly label
+                                    const statusLabel = statusUi === 'open' ? 'Open' : statusUi === 'in_progress' ? 'In Progress' : statusUi === 'done' ? 'Done' : String(statusUi).replace(/_/g, ' ');
+                                    return (<div className="text-slate-900 capitalize truncate min-w-0 inline-flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${statusColors.dot}`} aria-hidden="true"></span>{statusLabel}</div>);
+                                })()}
+                                {(() => {
+                                    const pLabel = getPriorityLabel(task.priority);
+                                    const pColors = getPriorityColorClass(task.priority);
+                                    const isHigh = getPriorityLevel(task.priority) === 3;
+                                    return (<div className="text-slate-900 truncate min-w-0 inline-flex items-center gap-1 whitespace-nowrap">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium ${pColors.badge}`}>{pLabel}</span>
+                                        {isHigh ? <span className="inline-block text-sm font-bold text-red-600" title="Priority: High">!</span> : null}
+                                    </div>);
+                                })()}
+                                <div className="min-w-0">{
+                                    (() => {
+                                            // Compute quadrant using current rules for display; fall back to server value only on error
+                                            let raw = null;
+                                            try {
+                                                raw = computeEisenhowerQuadrant({
+                                                    deadline: task.deadline || task.dueDate || task.due_date,
+                                                    end_date: task.end_date || task.endDate || task.end_date,
+                                                    start_date: task.start_date || task.startDate || null,
+                                                    priority: task.priority,
+                                                    status: task.status,
+                                                    key_area_id: task.keyAreaId ?? task.key_area_id ?? null,
+                                                });
+                                            } catch (e) {
+                                                raw = task.eisenhowerQuadrant ?? task.eisenhower_quadrant ?? null;
+                                            }
+                                        let qn = 4;
+                                        if (typeof raw === 'number') qn = Number(raw) || 4;
+                                        else if (typeof raw === 'string') {
+                                            const m = raw.match(/^Q([1-4])$/i);
+                                            if (m) qn = Number(m[1]);
+                                            else if (/^[1-4]$/.test(raw)) qn = Number(raw);
                                         }
-                                    }
-                                    let qn = 4;
-                                    if (typeof raw === 'number') qn = Number(raw) || 4;
-                                    else if (typeof raw === 'string') {
-                                        const m = raw.match(/^Q([1-4])$/i);
-                                        if (m) qn = Number(m[1]);
-                                        else if (/^[1-4]$/.test(raw)) qn = Number(raw);
-                                    }
-                                    const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
-                                    return (<span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>);
-                                })()
-                            }</div>
-                            <div className="text-slate-900 truncate min-w-0" title={task.goal || '—'}>{task.goal || '—'}</div>
-                            <div className="text-slate-900 truncate min-w-0">{(task.tags && task.tags.length) ? (
-                                <div className="flex flex-wrap gap-1">
-                                    {task.tags.map((t, i) => {
-                                        const tt = String(t || '').trim();
-                                        if (!tt) return null;
-                                        const lowered = tt.toLowerCase();
-                                        // If tag matches status or priority terms, reuse color helpers
-                                        let cls = 'bg-slate-100 text-slate-700';
-                                        if (['open', 'in_progress', 'done', 'completed', 'todo'].includes(lowered)) {
-                                            cls = getStatusColorClass(lowered).badge;
-                                        } else if (['low','normal','high','1','2','3'].includes(lowered)) {
-                                            cls = getPriorityColorClass(lowered).badge;
-                                        }
-                                        return (<span key={`${tt}-${i}`} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{tt}</span>);
-                                    })}
-                                </div>
-                            ) : '—'}</div>
-                            <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.start_date) || '—'}</div>
-                            <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.end_date) || '—'}</div>
-                            <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.deadline) || '—'}</div>
-                            <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{formatDuration ? formatDuration(task.duration) : (task.duration || '—')}</div>
-                            <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{task.completed ? String(task.completed) : '—'}</div>
-                        </div>
+                                        const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
+                                        return (<span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>);
+                                    })()
+                                }</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.start_date) || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.end_date) || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.deadline) || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{(() => {
+                                    const td = (formatDuration && (formatDuration(task.start_date || task.startDate, task.end_date || task.endDate))) || '';
+                                    return td || (task.duration || '—');
+                                })()}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{(toDateOnly(task.completionDate || task.completion_date) || '—')}</div>
+                            </div>
                     </div>
                 </div>
             </div>
 
-            <div className="px-2 pt-2 border-b border-slate-200 bg-white">
+            <div className="px-2 pt-2 bg-white">
                 <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                     {!isDontForget && (
-                        <button type="button" onClick={() => setTab('activities')} className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`}><span className="inline-flex items-center gap-1"><svg className="w-4 h-4 text-[#4DC3D8]" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></button>
+                        <div className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`} aria-label="Activities"> <span className="inline-flex items-center gap-1"><svg className="w-4 h-4 text-[#4DC3D8]" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></div>
                     )}
                 </div>
             </div>
@@ -534,18 +744,16 @@ export default function TaskFullView({
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                         <tr>
-                                            <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Assignee</th>
+                                            <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Activity</th>
+                                            <th className="px-3 py-2 text-left font-semibold">Responsible</th>
                                             <th className="px-3 py-2 text-left font-semibold">Status</th>
                                             <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Goal</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Tags</th>
-                                                    <th className="px-3 py-2 text-left font-semibold">Start date</th>
+                                            <th className="px-3 py-2 text-left font-semibold">Start date</th>
                                             <th className="px-3 py-2 text-left font-semibold">End date</th>
                                             <th className="px-3 py-2 text-left font-semibold">Deadline</th>
                                             <th className="px-3 py-2 text-left font-semibold">Duration</th>
                                             <th className="px-3 py-2 text-left font-semibold">Completed</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Actions</th>
+                                            {/* Actions column removed — actions are available via the row menu */}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -553,6 +761,7 @@ export default function TaskFullView({
                                             <tr key={a.id} className="bg-white border-b border-slate-100">
                                                 <td className="px-3 py-2 align-top">
                                                     <div className="flex items-center gap-3">
+                                                        <ActivityMenu item={a} />
                                                         <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
                                                         <div className="flex flex-col">
                                                             <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text || a.activity_name || 'Untitled activity'}</div>
@@ -560,7 +769,23 @@ export default function TaskFullView({
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 align-top text-slate-700">{a.assignee || a.responsible || task.assignee || task.responsible || '—'}</td>
+                                                <td className="px-3 py-2 align-top text-slate-700">
+                                                    {Array.isArray(localUsers) && localUsers.length ? (
+                                                            <select
+                                                                className="text-sm rounded-md border bg-white px-2 py-1"
+                                                                value={resolveAssignee({ activity: a, taskAssignee: task.assignee, users: localUsers, currentUserId }).selectValue || ''}
+                                                                onChange={async (e) => {
+                                                                    const sel = e.target.value;
+                                                                    try { await setActivityAssignee(a.id, sel); } catch (err) { console.error(err); }
+                                                                }}
+                                                            >
+                                                                <option value="">—</option>
+                                                                {localUsers.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                                                            </select>
+                                                        ) : (
+                                                            resolveAssignee({ activity: a, taskAssignee: task.assignee, users: localUsers, currentUserId }).display
+                                                        )}
+                                                </td>
                                                 <td className="px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
                                                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
@@ -571,49 +796,37 @@ export default function TaskFullView({
                                                             </select>
                                                         </div>
                                                 </td>
-                                                <td className="px-3 py-2 align-top">{(() => { const pScope = a.priority ?? task.priority; const pLabel = getPriorityLabel(pScope); const pColors = getPriorityColorClass(pScope); return (<span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${pColors.badge}`}>{pLabel}</span>); })()}</td>
-                                                <td className="px-3 py-2 align-top text-slate-700">{(() => {
-                                                        // Render goal title if available, otherwise fallback to empty string
-                                                        try {
-                                                            const goalId = a.goal || a.goalId || null;
-                                                            if (!goalId) return '';
-                                                            const found = (goals || []).find((g) => String(g.id) === String(goalId));
-                                                            return found ? (found.title || found.name || String(found.id)) : String(goalId);
-                                                        } catch (e) { return String(a.goal || a.goalId || ''); }
-                                                    })()}</td>
-                                                <td className="px-3 py-2 align-top">{(() => {
-                                                        const raw = a.tags || a.tags_list || a.tag || [];
-                                                        const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-                                                        if (!arr || arr.length === 0) return '';
-                                                        return (<div className="flex flex-wrap gap-1">
-                                                            {arr.map((t, i) => {
-                                                                const tt = String(t || '').trim();
-                                                                if (!tt) return null;
-                                                                const lowered = tt.toLowerCase();
-                                                                let cls = 'bg-slate-100 text-slate-700';
-                                                                if (['open','in_progress','done','completed','todo'].includes(lowered)) {
-                                                                    cls = getStatusColorClass(lowered).badge;
-                                                                } else if (['low','normal','high','1','2','3'].includes(lowered)) {
-                                                                    cls = getPriorityColorClass(lowered).badge;
-                                                                }
-                                                                return (<span key={`${tt}-${i}`} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{tt}</span>);
-                                                            })}
-                                                        </div>);
-                                                    })()}</td>
-                                                <td className="px-3 py-2 align-top">{toDateOnly(a.start_date) || ''}</td>
-                                                <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || ''}</td>
-                                                <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || ''}</td>
-                                                <td className="px-3 py-2 align-top">{/* duration placeholder */}</td>
-                                                <td className="px-3 py-2 align-top text-slate-800">{a.completionDate ? new Date(a.completionDate).toLocaleString() : ''}</td>
                                                 <td className="px-3 py-2 align-top">
-                                                        <div className="flex items-center gap-2">
-                                                            {/* Edit action */}
-                                                            <button type="button" onClick={() => toggleRow(a.id)} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Edit"><FaEdit className="w-4 h-4" /></button>
-                                                            {/* Tag button removed from actions column; tags are shown in their own column */}
-                                                            <button type="button" onClick={() => removeActivity(a.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md" title="Delete"><FaTrash className="w-4 h-4" /></button>
-                                                            <button type="button" onClick={() => createTaskFromActivity(a)} className="p-1 text-slate-600 hover:bg-slate-50 rounded-md" title="Convert to task"><FaAngleDoubleLeft className="w-4 h-4" /></button>
-                                                        </div>
+                                                    <select className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm" value={(function(){ const raw = a.priority ?? task.priority; if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low'; if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high'; return 'normal'; })()} onChange={async (e) => { try { await setActivityPriority(a.id, e.target.value); } catch (err) { console.error(err); } }}>
+                                                        <option value="low">Low</option>
+                                                        <option value="normal">Normal</option>
+                                                        <option value="high">High</option>
+                                                    </select>
                                                 </td>
+                                                <td className="px-3 py-2 align-top">
+                                                    {editingDate.id === a.id && editingDate.field === 'start_date' ? (
+                                                        <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.start_date) || ''} onChange={async (e) => { try { await setActivityDate(a.id, 'start_date', e.target.value); } catch (err) { console.error(err); } }} onBlur={() => setEditingDate({ id: null, field: null })} />
+                                                    ) : (
+                                                        <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingDate({ id: a.id, field: 'start_date' }); }} title="Edit start date">{toDateOnly(a.start_date) || '—'}</button>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 align-top">
+                                                    {editingDate.id === a.id && editingDate.field === 'end_date' ? (
+                                                        <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.end_date) || ''} onChange={async (e) => { try { await setActivityDate(a.id, 'end_date', e.target.value); } catch (err) { console.error(err); } }} onBlur={() => setEditingDate({ id: null, field: null })} />
+                                                    ) : (
+                                                        <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingDate({ id: a.id, field: 'end_date' }); }} title="Edit end date">{toDateOnly(a.end_date) || '—'}</button>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 align-top">
+                                                    {editingDate.id === a.id && editingDate.field === 'deadline' ? (
+                                                        <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.deadline) || ''} onChange={async (e) => { try { await setActivityDate(a.id, 'deadline', e.target.value); } catch (err) { console.error(err); } }} onBlur={() => setEditingDate({ id: null, field: null })} />
+                                                    ) : (
+                                                        <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingDate({ id: a.id, field: 'deadline' }); }} title="Edit deadline">{toDateOnly(a.deadline) || '—'}</button>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 align-top">{(formatDuration ? formatDuration(a.start_date || a.startDate, a.end_date || a.endDate) : '') || (a.duration || '')}</td>
+                                                <td className="px-3 py-2 align-top text-slate-800">{toDateOnly(a.completionDate || a.completion_date) || ''}</td>
+                                                {/* Actions column removed — use ActivityMenu in the first column */}
                                             </tr>
                                         ))}
                                     </tbody>
@@ -702,7 +915,67 @@ export default function TaskFullView({
                             setSavingActivityIds((s) => new Set([...s, activityId]));
                             try {
                                 const svc = await getActivityService();
-                                const updated = saved && saved.id ? saved : await svc.update(activityId, saved || {});
+                                // Normalize date/field aliases to the API shape before sending update.
+                                // Build a minimal, backend-friendly payload to avoid validation errors.
+                                // The backend rejects many aliases; only include allowed fields and
+                                // ensure priority is the expected string enum.
+                                const apiPayload = {};
+                                try {
+                                    const { toDateOnly } = await import('../../utils/keyareasHelpers');
+                                    if (saved) {
+                                        // text
+                                        if (typeof saved.text !== 'undefined' && saved.text !== null) apiPayload.text = (saved.text || '').trim();
+                                        // note/notes -> normalize to `note` (backend-friendly)
+                                        const noteVal = saved.notes ?? saved.note ?? saved.description ?? null;
+                                        if (noteVal !== null && typeof noteVal !== 'undefined') apiPayload.note = (noteVal || '').trim();
+
+                                        // dates: only send camelCase ISO fields (no snake_case aliases)
+                                        const rawStart = saved.startDate ?? saved.start_date ?? saved.date_start ?? saved.date ?? null;
+                                        const rawEnd = saved.endDate ?? saved.end_date ?? saved.date_end ?? null;
+                                        const rawDeadline = saved.deadline ?? saved.dueDate ?? saved.due_date ?? null;
+                                        const nStart = toDateOnly(rawStart) || null;
+                                        const nEnd = toDateOnly(rawEnd) || null;
+                                        const nDeadline = toDateOnly(rawDeadline) || null;
+                                        if (nStart) apiPayload.startDate = nStart;
+                                        if (nEnd) apiPayload.endDate = nEnd;
+                                        if (nDeadline) apiPayload.deadline = nDeadline;
+
+                                        // status/completed
+                                        if (typeof saved.status !== 'undefined') apiPayload.status = saved.status;
+                                        if (typeof saved.completed !== 'undefined') apiPayload.completed = !!saved.completed;
+
+                                        // priority: backend expects string 'high'|'normal'|'low'
+                                        if (typeof saved.priority !== 'undefined' && saved.priority !== null) {
+                                            const p = saved.priority;
+                                            let pStr = null;
+                                            if (typeof p === 'number') {
+                                                pStr = p === 3 ? 'high' : p === 2 ? 'normal' : 'low';
+                                            } else if (typeof p === 'string') {
+                                                const low = p.toLowerCase();
+                                                if (['high', 'normal', 'low'].includes(low)) pStr = low;
+                                            }
+                                            if (pStr) apiPayload.priority = pStr;
+                                        }
+
+                                        // taskId may be useful to include when updating but is optional
+                                        if (saved.taskId) apiPayload.taskId = saved.taskId;
+
+                                        // duration: if provided and non-empty, send as-is (but avoid null/empty strings)
+                                        if (typeof saved.duration !== 'undefined' && saved.duration !== null && saved.duration !== '') apiPayload.duration = saved.duration;
+
+                                        // final safety: remove any empty string values
+                                        Object.keys(apiPayload).forEach((k) => { try { if (apiPayload[k] === '') delete apiPayload[k]; } catch (__) {} });
+                                    }
+                                } catch (e) {
+                                    // Fallback: if helper import failed, still send a minimal payload with text only
+                                    if (saved && typeof saved.text !== 'undefined') apiPayload.text = (saved.text || '').trim();
+                                }
+
+                                // Debug: log final payload sent to API to help diagnose 400 errors
+                                try { console.debug('[TaskFullView] activity.update payload', { activityId, apiPayload }); } catch (__) {}
+                                // Also log a JSON string so nested objects/arrays are captured verbatim in console copy
+                                try { console.debug('[TaskFullView] activity.update payload JSON', JSON.stringify({ activityId, apiPayload })); } catch (__) {}
+                                const updated = saved && saved.id ? saved : await svc.update(activityId, apiPayload || {});
                                 const norm = normalizeActivity(updated || {});
                                 setList((prevList) => prevList.map((a) => (a.id === activityId ? norm : a)));
                                 addToast && addToast({ title: 'Activity saved', variant: 'success' });
@@ -714,7 +987,10 @@ export default function TaskFullView({
                                 }
                                 setActivityModal({ open: false, item: null });
                             } catch (e) {
-                                console.error('Failed to save activity', e);
+                                try { console.error('Failed to save activity', e); } catch (__) {}
+                                // If server returned validation details, log them for debugging (stringified so they can be copied)
+                                try { console.error('[TaskFullView] activity.update error response data:', e?.response?.data); } catch (__) {}
+                                try { console.error('[TaskFullView] activity.update error response JSON:', JSON.stringify(e?.response?.data)); } catch (__) {}
                                 setList(prev);
                                 addToast && addToast({ title: 'Failed to save activity', variant: 'error' });
                             } finally {

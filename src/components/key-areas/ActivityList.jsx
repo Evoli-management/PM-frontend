@@ -12,6 +12,14 @@ const getActivityService = async () => {
     return _activityService;
 };
 
+let _taskService = null;
+const getTaskService = async () => {
+    if (_taskService) return _taskService;
+    const mod = await import('../../services/taskService');
+    _taskService = mod.default || mod;
+    return _taskService;
+};
+
 
 export default function ActivityList({
     task,
@@ -21,6 +29,11 @@ export default function ActivityList({
     setSavingActivityIds = () => {},
     getPriorityLevel,
     addToast,
+    // when true, allow inline editing (used by KeyAreas inline-edit mode)
+    enableInlineEditing = false,
+    // optional users for responsible dropdown
+    users = [],
+    currentUserId = null,
 }) {
     if (!task || !task.id) return null;
     const taskKey = String(task.id);
@@ -29,6 +42,89 @@ export default function ActivityList({
     const setList = (updater) => {
         const nextList = typeof updater === 'function' ? updater(list) : updater;
         setActivitiesByTask((prev) => ({ ...prev, [taskKey]: nextList }));
+    };
+
+    // Generic single-field update for activities with optimistic UI
+    const updateActivityField = async (id, key, value) => {
+        const prevList = Array.isArray(list) ? list.slice() : [];
+        const prevItem = prevList.find((a) => a.id === id);
+        if (!prevItem) return;
+
+        const optimistic = (a) => (a.id === id ? { ...a, [key]: value } : a);
+        setList((prev) => prev.map(optimistic));
+        setSavingActivityIds((s) => new Set([...s, id]));
+
+        try {
+            // The backend's update DTO for activities does not accept an `assignee` field.
+            // When editing the Responsible dropdown from within a task context, update
+            // the parent task's assignee instead.
+            if (key === 'assignee') {
+                try {
+                    const ts = await getTaskService();
+                    // Map selected value (may be id) to name/'Me' when possible
+                    // use helper to map selected user id to persisted value
+                    let valueToSend = value;
+                    try {
+                        const { selectedUserIdToPersistValue } = await import('../../utils/keyareasHelpers');
+                        valueToSend = selectedUserIdToPersistValue(value, users, currentUserId);
+                    } catch (err) {}
+                    // eslint-disable-next-line no-console
+                    console.debug('[ActivityList] updating task assignee', task.id, { assignee: valueToSend });
+                    const updated = await ts.update(task.id, { assignee: valueToSend });
+                    // eslint-disable-next-line no-console
+                    console.debug('[ActivityList] task update response', updated);
+                    // apply change locally on the activity row
+                    setList((prev) => prev.map((a) => (a.id === id ? { ...a, assignee: value } : a)));
+                    addToast && addToast({ title: 'Saved', variant: 'success' });
+                    try { window.dispatchEvent(new CustomEvent('ka-task-updated', { detail: { task: updated } })); } catch (e) {}
+                } catch (err) {
+                    console.error('Failed to update task assignee from activity list', err);
+                    setList(prevList);
+                    addToast && addToast({ title: 'Failed to update assignee', variant: 'error' });
+                }
+                return;
+            }
+            const svc = await getActivityService();
+            const body = {};
+            if (key === 'text' || key === 'title') body.text = value;
+            else if (key === 'completed') body.completed = !!value;
+            else if (key === 'priority') body.priority = value;
+            else if (key === 'startDate' || key === 'endDate' || key === 'deadline') {
+                // convert YYYY-MM-DD to ISO datetime at UTC midnight to satisfy server
+                if (!value) body[key] = null;
+                else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+                    try {
+                        const [y, m, d] = String(value).split('-').map((s) => parseInt(s, 10));
+                        body[key] = new Date(Date.UTC(y, m - 1, d)).toISOString();
+                    } catch (err) {
+                        body[key] = String(value);
+                    }
+                } else {
+                    body[key] = String(value);
+                }
+            } else body[key] = value;
+
+            // debug: log payload before sending
+            // eslint-disable-next-line no-console
+            console.debug('[ActivityList] update activity payload', id, body);
+            const updated = await svc.update(id, body);
+            // normalize & replace
+            const norm = normalizeActivity(updated || {});
+            setList((prev) => prev.map((a) => (a.id === id ? { ...a, ...norm } : a)));
+            addToast && addToast({ title: 'Saved', variant: 'success' });
+        } catch (e) {
+            // print server validation response when available
+            // eslint-disable-next-line no-console
+            console.error('Failed to update activity', e?.response?.data || e?.message || e);
+            setList(prevList);
+            addToast && addToast({ title: 'Failed to update activity', variant: 'error' });
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(id);
+                return copy;
+            });
+        }
     };
 
     const toggleComplete = async (id) => {
@@ -129,6 +225,12 @@ export default function ActivityList({
                             move={move}
                             getPriorityLevel={getPriorityLevel}
                             taskPriority={task.priority}
+                            taskAssignee={task.assignee}
+                            // inline-edit props
+                            enableInlineEditing={enableInlineEditing}
+                            updateField={updateActivityField}
+                            users={users}
+                            currentUserId={currentUserId}
                         />
                     ))}
                 </div>

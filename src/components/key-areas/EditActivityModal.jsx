@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { toDateOnly } from '../../utils/keyareasHelpers';
 import { FaSave } from 'react-icons/fa';
 import Modal from '../shared/Modal';
 import { getPriorityLevel } from '../../utils/keyareasHelpers';
@@ -10,13 +11,17 @@ const safeDate = (v) => {
   try {
     const d = new Date(v);
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   } catch {
     return '';
   }
 };
 
-const defaultDate = new Date().toISOString().slice(0, 10);
+const now = new Date();
+const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 // inline SVG icons (untyped)
 
@@ -147,13 +152,22 @@ export default function EditActivityModal({
       try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (_) {}
       return;
     }
+  // Normalize dates to date-only strings (YYYY-MM-DD) to avoid timezone shifts
+  const normStart = toDateOnly(startDate) || null;
+  const normEnd = toDateOnly(endDate) || null;
+  const normDeadline = toDateOnly(deadline) || null;
+
     const payload = {
       ...initialData,
       text: (title || '').trim(),
       notes: (description || '').trim(),
-      date_start: startDate || null,
-      date_end: endDate || null,
-      deadline: deadline || null,
+      // keep legacy aliases but prefer normalized ISO fields
+  date_start: normStart,
+  date_end: normEnd,
+  deadline: normDeadline,
+  // also set camelCase aliases to help consumers that expect them
+  startDate: normStart,
+  endDate: normEnd,
       duration: duration || null,
       key_area_id: keyAreaId || null,
       list: listIndex,
@@ -162,6 +176,13 @@ export default function EditActivityModal({
       priority,
       goal: goal || null,
     };
+    // Strip empty-string values (backend treats empty string as invalid)
+    Object.keys(payload).forEach((k) => {
+      try {
+        if (payload[k] === '') delete payload[k];
+      } catch (__) {}
+    });
+
     try { console.debug('[EditActivityModal] onSave payload', payload); } catch (__) {}
     onSave && onSave(payload);
   };

@@ -331,7 +331,7 @@ export default function TaskSlideOver({
                                         <div className="bg-slate-50 border border-slate-200 rounded-md p-1.5 h-full flex flex-col">
                                             <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Summary</div>
                                             <div className="mb-1.5">
-                                                <div className="text-[11px] text-slate-600">Assignee</div>
+                                                <div className="text-[11px] text-slate-600">Responsible</div>
                                                 <input className="mt-1 w-full rounded-md border border-slate-300 bg-white p-1.5 text-sm" value={form.assignee || ""} onChange={(e) => setForm((s) => ({ ...s, assignee: e.target.value }))} disabled={readOnly} />
                                             </div>
                                             <div className="grid grid-cols-2 gap-1.5">
@@ -392,7 +392,7 @@ export default function TaskSlideOver({
                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                             <tr>
                                                 <th className="px-3 py-2 text-left w-[320px] font-semibold">Activity</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Assignee</th>
+                                                <th className="px-3 py-2 text-left font-semibold">Responsible</th>
                                                 <th className="px-3 py-2 text-left font-semibold">Status</th>
                                                 <th className="px-3 py-2 text-left font-semibold">Priority</th>
                                                 <th className="px-3 py-2 text-left font-semibold">Start date</th>
@@ -400,7 +400,7 @@ export default function TaskSlideOver({
                                                 <th className="px-3 py-2 text-left font-semibold">Deadline</th>
                                                 <th className="px-3 py-2 text-left font-semibold">Duration</th>
                                                 <th className="px-3 py-2 text-left font-semibold">Completed</th>
-                                                <th className="px-3 py-2 text-left font-semibold">Actions</th>
+                                                {/* Actions column removed — use row menu instead */}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -415,7 +415,7 @@ export default function TaskSlideOver({
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-3 py-2 align-top text-slate-700">{a.assignee || "—"}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-700">{a.assignee || task.assignee || "—"}</td>
                                                     <td className="px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
                                                             <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
@@ -431,7 +431,7 @@ export default function TaskSlideOver({
                                                     <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
                                                     <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
                                                     <td className="px-3 py-2 align-top">{/* duration placeholder */}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-800">{a.completionDate ? new Date(a.completionDate).toLocaleString() : '—'}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-800">{toDateOnly(a.completionDate || a.completion_date) || '—'}</td>
                                                     <td className="px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
                                                             {/* Tag icon: use a single consistent color regardless of activity status */}
