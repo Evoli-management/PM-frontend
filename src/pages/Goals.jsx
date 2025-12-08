@@ -214,7 +214,7 @@ const Goals = () => {
                 return (
                     <ListView
                         goals={filteredGoals}
-                        onGoalClick={handleGoalClick}
+                        onGoalClick={handleOpenGoal}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
                     />
@@ -223,7 +223,7 @@ const Goals = () => {
                 return (
                     <KanbanView
                         goals={filteredGoals}
-                        onGoalClick={handleGoalClick}
+                        onGoalClick={handleOpenGoal}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
                     />
@@ -232,7 +232,7 @@ const Goals = () => {
                 return (
                     <TimelineView
                         goals={filteredGoals}
-                        onGoalClick={handleGoalClick}
+                        onGoalClick={handleOpenGoal}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
                     />
@@ -241,7 +241,8 @@ const Goals = () => {
                 return (
                     <GoalList
                         goals={filteredGoals}
-                        onGoalClick={handleGoalClick}
+                        onGoalOpen={handleOpenGoal}
+                        onGoalEdit={handleEditGoal}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
                     />
@@ -249,9 +250,20 @@ const Goals = () => {
         }
     };
 
-    const handleGoalClick = (goal) => {
-        // Always open in edit mode
+    const handleEditGoal = (goal) => {
+        // Open the modal in edit mode for the selected goal
         setSelectedGoal(goal);
+    };
+
+    const handleOpenGoal = (goal, mode) => {
+        // Default behavior when clicking a goal card: do not open the edit modal.
+        // If the caller explicitly requests 'edit', delegate to handleEditGoal.
+        if (mode === "edit") {
+            handleEditGoal(goal);
+            return;
+        }
+        // No-op for simple card clicks (reserved for future 'view' implementation).
+        return;
     };
 
     const stats = getGoalStats();

@@ -3,7 +3,7 @@ import React from "react";
 import GoalCard from "./GoalCard";
 import EmptyState from "./EmptyState";
 
-const GoalList = ({ goals, onGoalClick, onUpdate, onDelete }) => {
+const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
     if (!goals || goals.length === 0) {
         return <EmptyState onCreateClick={() => { }} />;
     }
@@ -62,8 +62,8 @@ const GoalList = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                 <GoalCard
                     key={goal.id}
                     goal={goal}
-                    onOpen={onGoalClick} // Will open in edit mode
-                    onEdit={onGoalClick} // Both use same handler - always edit
+                    onOpen={onGoalOpen}
+                    onEdit={onGoalEdit}
                     onComplete={handleComplete}
                     onArchive={handleArchive}
                     onToggleVisibility={handleToggleVisibility}
