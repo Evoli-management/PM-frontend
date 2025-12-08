@@ -100,8 +100,19 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
     };
 
     const handleCardClick = () => {
-        // Always open in edit mode when clicking the card
-        onEdit(goal, "edit");
+        // Prefer opening/viewing the goal if an 'onOpen' handler is provided.
+        // Fall back to edit if only onEdit is supplied (preserves previous behavior).
+        if (typeof onOpen === "function") {
+            try {
+                onOpen(goal);
+                return;
+            } catch (e) {
+                // ignore and fallback
+            }
+        }
+        if (typeof onEdit === "function") {
+            onEdit(goal, "edit");
+        }
     };
 
     return (
@@ -145,7 +156,13 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                handleCardClick();
+                                // Explicitly call the edit handler so the edit modal opens in grid view
+                                if (typeof onEdit === "function") {
+                                    onEdit(goal, "edit");
+                                } else if (typeof onOpen === "function") {
+                                    // fallback
+                                    onOpen(goal);
+                                }
                             }}
                             disabled={isLoading}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
