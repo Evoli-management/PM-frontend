@@ -1,6 +1,10 @@
 // src/services/goalService.js
 import apiClient from "./apiClient";
 
+// Feature flag: allow forcing PUT for updates (useful when backend doesn't support PATCH
+// or when the dev proxy blocks PATCH). Set VITE_FORCE_PUT=true in your Vite env to enable.
+const FORCE_PUT = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_FORCE_PUT === "true";
+
 /**
  * A generic error handler for goal service calls.
  * @param {string} context - The action being performed (e.g., 'creating goal').
@@ -331,19 +335,43 @@ export const updateGoal = async (goalId, updateData) => {
         if (updateData.milestones && Array.isArray(updateData.milestones)) {
             console.log("Handling milestone updates separately");
 
-            // Update milestones via milestone service
-            const { updateMilestone } = await import("./milestoneService");
+            // Update/create milestones via milestone service
+            const { updateMilestone, createMilestone } = await import("./milestoneService");
 
-            // Update each milestone individually
+            // Update existing milestones and create new ones. Be resilient: if milestone creation fails
+            // (e.g., backend 500), don't abort the entire goal update — log and continue so the
+            // main goal fields can still be updated. Collect non-fatal errors to surface later.
+            const milestoneCreateErrors = [];
             for (const milestone of updateData.milestones) {
                 if (milestone.id) {
-                    await updateMilestone(milestone.id, {
-                        title: milestone.title,
-                        // done property may or may not be allowed in update
-                        ...(milestone.done !== undefined && { done: milestone.done }),
-                        weight: milestone.weight,
-                        dueDate: milestone.dueDate ? new Date(milestone.dueDate).toISOString() : null,
-                    });
+                    // Update existing milestone
+                    try {
+                        await updateMilestone(milestone.id, {
+                            title: milestone.title,
+                            // done property may or may not be allowed in update
+                            ...(milestone.done !== undefined && { done: milestone.done }),
+                            weight: milestone.weight,
+                            dueDate: milestone.dueDate ? new Date(milestone.dueDate).toISOString() : null,
+                        });
+                    } catch (mErr) {
+                        console.error("Failed to update milestone during goal update:", mErr);
+                        // treat milestone update failure as non-fatal as well
+                        milestoneCreateErrors.push(mErr);
+                    }
+                } else {
+                    // Create new milestone for this goal
+                    try {
+                        const created = await createMilestone(goalId, {
+                            title: milestone.title,
+                            weight: milestone.weight,
+                            dueDate: milestone.dueDate ? new Date(milestone.dueDate).toISOString() : null,
+                        });
+                        console.log("Created new milestone for goal", goalId, created);
+                    } catch (createErr) {
+                        console.error("Failed to create milestone during goal update:", createErr);
+                        // Record the error but continue with other milestones and the main update
+                        milestoneCreateErrors.push(createErr);
+                    }
                 }
             }
 
@@ -354,8 +382,12 @@ export const updateGoal = async (goalId, updateData) => {
             if (Object.keys(goalOnlyData).length > 0) {
                 updateData = goalOnlyData;
             } else {
-                // Only milestones were updated, fetch fresh goal data
-                return await getGoalById(goalId);
+                // Only milestones were updated/created, fetch fresh goal data
+                const refreshed = await getGoalById(goalId);
+                if (milestoneCreateErrors.length > 0) {
+                    console.warn("Some milestones failed to create/update during goal edit:", milestoneCreateErrors);
+                }
+                return refreshed;
             }
         }
 
@@ -400,7 +432,14 @@ export const updateGoal = async (goalId, updateData) => {
             }
         }
 
-        // Try PATCH first as it's safer for partial updates
+        // If FORCE_PUT is enabled, skip trying PATCH (useful for backends that only support PUT)
+        if (FORCE_PUT) {
+            const response = await apiClient.put(`/goals/${goalId}`, cleanUpdateData);
+            console.log("PUT update response (FORCE_PUT):", response.data);
+            return response.data;
+        }
+
+        // Try PATCH first as it's safer for partial updates. If it fails with 404, fall back to PUT.
         try {
             const response = await apiClient.patch(`/goals/${goalId}`, cleanUpdateData);
             console.log("PATCH update response:", response.data);
@@ -408,7 +447,8 @@ export const updateGoal = async (goalId, updateData) => {
         } catch (patchError) {
             // If PATCH fails with 404, try PUT
             if (patchError.response?.status === 404) {
-                console.log("PATCH not supported, falling back to PUT");
+                // Use debug level to avoid noisy logs in production/dev consoles when fallback occurs
+                console.debug("PATCH not supported, falling back to PUT");
                 const response = await apiClient.put(`/goals/${goalId}`, cleanUpdateData);
                 console.log("PUT update response:", response.data);
                 return response.data;

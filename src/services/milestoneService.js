@@ -32,15 +32,27 @@ export const createMilestone = async (goalId, milestoneData) => {
             weight: parseFloat(milestoneData.weight) || 1.0,
         };
 
-        // Handle dates properly
+        // Handle dates properly - backend 'dueDate' is a SQL DATE (no time).
         if (milestoneData.dueDate) {
-            cleanData.dueDate = new Date(milestoneData.dueDate).toISOString();
+            // Normalize to YYYY-MM-DD to avoid DB errors when inserting an ISO datetime
+            const d = new Date(milestoneData.dueDate);
+            if (!isNaN(d)) {
+                cleanData.dueDate = d.toISOString().slice(0, 10);
+            }
         }
 
         // NOTE: don't include 'done' in create operation - it's not allowed
 
-        console.log("Creating milestone with data:", cleanData);
-        const response = await apiClient.post(`/goals/${goalId}/milestones`, cleanData);
+        // Include goalId in the payload and post to the top-level /milestones endpoint
+        const payload = {
+            goalId,
+            ...cleanData,
+        };
+
+        console.log("Creating milestone with data:", payload);
+
+        // Backend exposes POST /milestones which accepts { goalId, title, dueDate, weight }
+        const response = await apiClient.post(`/milestones`, payload);
         return response.data;
     } catch (error) {
         handleMilestoneError("creating milestone", error);
@@ -62,9 +74,14 @@ export const updateMilestone = async (milestoneId, updateData) => {
         if (updateData.title !== undefined) cleanData.title = updateData.title;
         if (updateData.weight !== undefined) cleanData.weight = parseFloat(updateData.weight) || 1.0;
 
-        // Handle dates properly
+        // Handle dates properly - normalize to YYYY-MM-DD (SQL DATE)
         if (updateData.dueDate !== undefined) {
-            cleanData.dueDate = updateData.dueDate ? new Date(updateData.dueDate).toISOString() : null;
+            if (updateData.dueDate) {
+                const d = new Date(updateData.dueDate);
+                cleanData.dueDate = !isNaN(d) ? d.toISOString().slice(0, 10) : null;
+            } else {
+                cleanData.dueDate = null;
+            }
         }
 
         // Try PATCH first for 'done' updates (most likely scenario)

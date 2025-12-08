@@ -47,7 +47,7 @@ export default function App() {
     const currentPath = window.location.hash.replace(/^#\/?/, "/");
     return (
         <Router>
-            <div className="">
+            <div className="page-bg">
                 <Navbar />
                 <ModalManager />
                 <main className="flex-grow">
