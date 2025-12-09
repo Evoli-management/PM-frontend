@@ -1475,8 +1475,8 @@ const CalendarContainer = () => {
                             initialData={{
                                 text: "",
                                 // Do NOT auto-fill key area or task when creating from calendar; user should choose explicitly.
-                                key_area_id: "",
-                                taskId: "",
+                                key_area_id: null,
+                                taskId: null,
                             }}
                             tasks={Array.isArray(tasksList) ? tasksList : []}
                             keyAreas={keyAreas}
@@ -1667,7 +1667,7 @@ const CalendarContainer = () => {
                 />
             )}
             {editModalOpen && editItem && editItem.type === "task" && (
-                <EditTaskModal
+                    <EditTaskModal
                     isOpen={editModalOpen}
                     onCancel={() => {
                         setEditModalOpen(false);
@@ -1676,8 +1676,8 @@ const CalendarContainer = () => {
                     initialData={{
                         id: editItem.id,
                         // provide both snake_case and camelCase keys expected by modal
-                        key_area_id: editItem.key_area_id || editItem.keyAreaId || "",
-                        keyAreaId: editItem.key_area_id || editItem.keyAreaId || "",
+                        key_area_id: editItem.key_area_id || editItem.keyAreaId || null,
+                        keyAreaId: editItem.key_area_id || editItem.keyAreaId || null,
                         title: editItem.title || "",
                         description: editItem.description || "",
                         start_date: editItem.start_date || editItem.startDate || editItem.date || "",

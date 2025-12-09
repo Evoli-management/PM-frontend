@@ -466,7 +466,7 @@ export default function Tasks() {
                 listIndex: task.listIndex || 1,
                 // include completionDate (raw ISO) as read-only
                 completionDate: task.completionDate || null,
-                keyAreaId: "",
+                keyAreaId: null,
             },
         });
     };

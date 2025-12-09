@@ -35,7 +35,7 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
             return `${y}-${m}-${day}`;
         })();
         return {
-            keyAreaId: item?.keyAreaId || "",
+            keyAreaId: item?.keyAreaId || null,
             title: item?.title || "",
             description: item?.description || "",
             date: localDate,
@@ -50,8 +50,8 @@ export default function TaskActivityModal({ item, onClose, onSave, onDelete }) {
 
     const [activityForm, setActivityForm] = useState({
         text: item?.title || "",
-        keyAreaId: "",
-        taskId: "",
+        keyAreaId: null,
+        taskId: null,
         list_index: item?.list_index || 1,
     });
 
