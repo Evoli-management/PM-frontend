@@ -145,17 +145,14 @@ export default function DontForget() {
                         }
                     }
                 } else {
-                    // No existing KA named DontForget - create one and persist any local names
-                    const created = await svc.create({ title: "Don't Forget", description: 'Dont Forget lists' });
-                    if (cancelled) return;
-                    setDfKeyAreaId(created.id);
+                    // No existing KA named DontForget - do NOT create one automatically.
+                    // Use local list names and continue without a Key Area. Tasks created from
+                    // the Don't Forget page will be created without a key_area_id.
+                    setDfKeyAreaId(null);
                     const toUse = (localStored && Object.keys(localStored).length) ? localStored : { 1: 'List 1' };
                     setDfListNames(toUse);
-                    try {
-                        await svc.update(created.id, { listNames: toUse });
-                    } catch (e) {
-                        // ignore
-                    }
+                    // Intentionally do not call svc.create/ svc.update here so we avoid
+                    // creating a server Key Area for users who prefer not to persist it.
                 }
             } catch (e) {
                 // If key areas cannot be fetched, keep local list names (already set from localStorage)
@@ -440,7 +437,7 @@ export default function DontForget() {
                 end_date: tsk.end_date || "",
                 dueDate: tsk.dueDate || "",
                 duration: tsk.duration || "",
-                keyAreaId: "",
+                keyAreaId: null,
                 listIndex: tsk.listIndex || 1,
                 goal: tsk.goal || "",
                 tags: tsk.tags || "",
@@ -950,7 +947,7 @@ export default function DontForget() {
                 listIndex: task.listIndex || 1,
                 // include completionDate (raw ISO) as read-only
                 completionDate: task.completionDate || null,
-                keyAreaId: "",
+                keyAreaId: null,
             },
         });
     };
@@ -1077,7 +1074,7 @@ export default function DontForget() {
             end_date: f.end_date || "",
             deadline: f.dueDate || "",
             duration: f.duration || "",
-            key_area_id: f.keyAreaId || "",
+            key_area_id: f.keyAreaId || null,
             list_index: f.listIndex || 1,
             goal: f.goal || "",
             tags: f.tags || "",
@@ -1256,7 +1253,7 @@ export default function DontForget() {
             id: t.id,
             title: t.name || t.title || "",
             description: t.notes || t.description || "",
-            key_area_id: assignModal.kaId || "",
+            key_area_id: assignModal.kaId || null,
             list_index: assignModal.listIndex || 1,
         };
     };
@@ -1363,7 +1360,7 @@ export default function DontForget() {
                                             end_date: tsk.end_date || "",
                                             dueDate: tsk.dueDate || "",
                                             duration: tsk.duration || "",
-                                            keyAreaId: "",
+                                            keyAreaId: null,
                                             listIndex: tsk.listIndex || 1,
                                             goal: tsk.goal || "",
                                             tags: tsk.tags || "",
@@ -1781,7 +1778,7 @@ export default function DontForget() {
                                                                 end_date: task.end_date || "",
                                                                 dueDate: task.dueDate || "",
                                                                 duration: task.duration || "",
-                                                                keyAreaId: "",
+                                                                keyAreaId: null,
                                                                 listIndex: task.listIndex || 1,
                                                                 goal: task.goal || "",
                                                                 tags: task.tags || "",
@@ -1833,7 +1830,7 @@ export default function DontForget() {
                                                 ...data,
                                                 name: data?.title || data?.name,
                                                 dueDate: data?.dueDate || data?.deadline,
-                                                keyAreaId: data?.keyAreaId || data?.key_area_id || data?.keyAreaId,
+                                                keyAreaId: data?.keyAreaId || data?.key_area_id || null,
                                                 listIndex: data?.listIndex || data?.list_index,
                                             };
                                             addDontForgetTask(mapped);

@@ -664,7 +664,7 @@ export default function KeyAreas() {
                 description: "",
                 // Prefill list and key area from parent task when available
                 list: parent ? (parent.list || parent.list_index || parent.listIndex || '') : '',
-                key_area_id: parent ? (parent.key_area_id || parent.keyAreaId || parent.keyArea || selectedKA?.id || '') : (selectedKA?.id || ''),
+                key_area_id: parent ? (parent.key_area_id || parent.keyAreaId || parent.keyArea || selectedKA?.id || null) : (selectedKA?.id || null),
                 assignee: parent ? (parent.assignee || '') : '',
                 priority: "normal",
                 goal: "",
@@ -726,7 +726,7 @@ export default function KeyAreas() {
                           .map((n) => ({ name: n }))
                     : [],
                 assignee: task.assignee || "",
-                key_area_id: task.key_area_id || selectedKA?.id || "",
+                key_area_id: task.key_area_id || selectedKA?.id || null,
                 list: "",
                 finish_date: "",
                 duration: task.duration || "",
@@ -814,7 +814,7 @@ export default function KeyAreas() {
                 attachments: "",
                 attachmentsFiles: [],
                 assignee: norm.assignee || norm.responsible || "",
-                key_area_id: norm.key_area_id || selectedKA?.id || "",
+                key_area_id: norm.key_area_id || selectedKA?.id || null,
                 list: norm.list || "",
                 finish_date: toDateOnly(norm.completionDate) || "",
                 duration: norm.duration || "",
@@ -825,7 +825,7 @@ export default function KeyAreas() {
                 title: norm.text || "",
                 description: norm.description || norm.notes || "",
                 list: norm.list || "",
-                key_area_id: norm.key_area_id || selectedKA?.id || "",
+                key_area_id: norm.key_area_id || selectedKA?.id || null,
                 assignee: norm.assignee || norm.responsible || "",
                 priority: (function(p) {
                     const s = String(p || "normal").toLowerCase();
@@ -953,7 +953,7 @@ export default function KeyAreas() {
         title: "",
         description: "",
         list: "",
-        key_area_id: "",
+        key_area_id: null,
         assignee: "",
         priority: "normal",
         goal: "",
@@ -2119,7 +2119,7 @@ export default function KeyAreas() {
                 title: "",
                 description: "",
                 list: "",
-                key_area_id: "",
+                key_area_id: null,
                 assignee: "",
                 priority: "normal",
                 goal: "",
@@ -2683,7 +2683,7 @@ export default function KeyAreas() {
                                                 ? task.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
                                                 : [],
                                             assignee: task.assignee || "",
-                                            key_area_id: (selectedKA && selectedKA.id) || task.key_area_id || task.keyAreaId || "",
+                                            key_area_id: (selectedKA && selectedKA.id) || task.key_area_id || task.keyAreaId || null,
                                             list: "",
                                             finish_date: "",
                                             duration: task.duration || "",
@@ -3207,7 +3207,7 @@ export default function KeyAreas() {
                                                                                             ? t.attachments.split(",").filter(Boolean).map((n) => ({ name: n }))
                                                                                             : [],
                                                                                         assignee: t.assignee || "",
-                                                                                        key_area_id: t.key_area_id || t.keyAreaId || selectedKA?.id || "",
+                                                                                        key_area_id: t.key_area_id || t.keyAreaId || selectedKA?.id || null,
                                                                                         list: "",
                                                                                         finish_date: t.finish_date || "",
                                                                                         duration: t.duration || "",
@@ -3281,7 +3281,7 @@ export default function KeyAreas() {
                                                         ...s,
                                                         list_index: taskTab,
                                                         // Prefill key area with the currently selected Key Area when creating a new task
-                                                        key_area_id: selectedKA?.id || s.key_area_id || s.keyAreaId || "",
+                                                        key_area_id: selectedKA?.id || s.key_area_id || s.keyAreaId || null,
                                                     }));
                                                     setShowTaskComposer(true);
                                                 }}
