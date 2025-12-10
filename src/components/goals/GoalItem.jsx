@@ -1,10 +1,11 @@
 // src/components/goals/GoalItem.jsx
 import React from "react";
+import { calculateGoalProgress } from "../../utils/goalUtils";
 import { Link } from "react-router-dom";
 import { FaClock, FaFlag, FaArrowRight, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
 
 const GoalItem = ({ goal }) => {
-    const { id, title, description, dueDate, progressPercent = 0, status, milestones = [] } = goal;
+    const { id, title, description, dueDate, status, milestones = [] } = goal;
 
     const formattedDueDate = new Date(dueDate).toLocaleDateString("en-US", {
         year: "numeric",
@@ -15,8 +16,14 @@ const GoalItem = ({ goal }) => {
     const isOverdue = status === "active" && new Date(dueDate) < new Date();
     const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
 
-    const completedMilestones = milestones.filter((m) => m.done).length;
+    const completedMilestones =
+        (milestones || []).filter((m) => {
+            if (m && m.done) return true;
+            if (m && m.score !== undefined && m.score !== null) return parseFloat(m.score) >= 1;
+            return false;
+        }).length;
     const totalMilestones = milestones.length;
+    const progressPercent = calculateGoalProgress(goal);
 
     const getStatusConfig = (status) => {
         switch (status) {

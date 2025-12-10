@@ -1,5 +1,6 @@
 // src/components/goals/GoalCard.jsx
 import React, { useState } from "react";
+import { calculateGoalProgress } from "../../utils/goalUtils";
 import {
     Eye,
     Pencil,
@@ -17,10 +18,16 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
     const [showActions, setShowActions] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+    const completedMilestones =
+        (goal.milestones || []).filter((m) => {
+            if (m && m.done) return true;
+            if (m && m.score !== undefined && m.score !== null) {
+                return parseFloat(m.score) >= 1;
+            }
+            return false;
+        }).length || 0;
     const totalMilestones = goal.milestones?.length || 0;
-    const progressPercent =
-        totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : goal.progressPercent || 0;
+    const progressPercent = calculateGoalProgress(goal);
 
     // Always calculate time-based information
     const now = new Date();

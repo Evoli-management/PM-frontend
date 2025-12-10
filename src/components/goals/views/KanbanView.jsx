@@ -1,5 +1,6 @@
 // src/components/goals/views/KanbanView.jsx - Professional Kanban Board
 import React, { useState } from "react";
+import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
     FaEdit,
     FaCheckCircle,
@@ -74,10 +75,14 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
     };
 
     const GoalCard = ({ goal }) => {
-        const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+        const completedMilestones =
+            (goal.milestones || []).filter((m) => {
+                if (m && m.done) return true;
+                if (m && m.score !== undefined && m.score !== null) return parseFloat(m.score) >= 1;
+                return false;
+            }).length || 0;
         const totalMilestones = goal.milestones?.length || 0;
-        const progressPercent =
-            totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : goal.progressPercent || 0;
+        const progressPercent = calculateGoalProgress(goal);
 
         const now = new Date();
         const dueDate = new Date(goal.dueDate);

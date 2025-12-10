@@ -1,5 +1,6 @@
 // src/components/goals/views/ListView.jsx - Modern list view for goals
 import React, { useState } from "react";
+import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
     Pencil,
     CheckCircle,
@@ -96,12 +97,14 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
             {/* Goals List */}
             <div className="divide-y divide-slate-200">
                 {goals.map((goal) => {
-                    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+                    const completedMilestones =
+                        (goal.milestones || []).filter((m) => {
+                            if (m && m.done) return true;
+                            if (m && m.score !== undefined && m.score !== null) return parseFloat(m.score) >= 1;
+                            return false;
+                        }).length || 0;
                     const totalMilestones = goal.milestones?.length || 0;
-                    const progressPercent =
-                        totalMilestones > 0
-                            ? Math.round((completedMilestones / totalMilestones) * 100)
-                            : goal.progressPercent || 0;
+                    const progressPercent = calculateGoalProgress(goal);
 
                     const now = new Date();
                     const dueDate = new Date(goal.dueDate);

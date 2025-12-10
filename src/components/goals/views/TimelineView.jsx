@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
     FaEdit,
     FaCheckCircle,
@@ -86,12 +87,14 @@ const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <div className="space-y-6">
                 {sortedGoals.map((goal, index) => {
-                    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
+                    const completedMilestones =
+                        (goal.milestones || []).filter((m) => {
+                            if (m && m.done) return true;
+                            if (m && m.score !== undefined && m.score !== null) return parseFloat(m.score) >= 1;
+                            return false;
+                        }).length || 0;
                     const totalMilestones = goal.milestones?.length || 0;
-                    const progressPercent =
-                        totalMilestones > 0
-                            ? Math.round((completedMilestones / totalMilestones) * 100)
-                            : goal.progressPercent || 0;
+                    const progressPercent = calculateGoalProgress(goal);
 
                     const now = new Date();
                     const dueDate = new Date(goal.dueDate);

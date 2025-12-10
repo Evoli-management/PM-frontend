@@ -225,14 +225,24 @@ export const formatGoalForDisplay = (goal) => {
 export const calculateGoalProgress = (goal) => {
     if (!goal) return 0;
 
-    const completedMilestones = goal.milestones?.filter((m) => m.done).length || 0;
-    const totalMilestones = goal.milestones?.length || 0;
+    const list = goal.milestones || [];
+    if (!list || list.length === 0) return goal.progressPercent || 0;
 
-    if (totalMilestones > 0) {
-        return Math.round((completedMilestones / totalMilestones) * 100);
-    }
+    // Weighted calculation: use milestone.weight and milestone.score/done
+    const totalWeight = list.reduce((s, m) => s + (parseFloat(m.weight) || 1), 0);
+    if (totalWeight <= 0) return goal.progressPercent || 0;
 
-    return goal.progressPercent || 0;
+    const weightedScoreSum = list.reduce((s, m) => {
+        const weight = parseFloat(m.weight) || 1;
+        let score = 0;
+        if (m.done) score = 1;
+        else if (m.score !== undefined && m.score !== null) {
+            score = parseFloat(m.score) || 0;
+        }
+        return s + score * weight;
+    }, 0);
+
+    return Math.round((weightedScoreSum / totalWeight) * 100);
 };
 
 /**

@@ -155,19 +155,32 @@ const Goals = () => {
             try {
                 console.log("Goals.jsx - Attempting to delete goal:", goalId);
                 const mod = await import("../services/goalService");
-                try {
-                    console.log("Trying to archive goal first");
-                    await mod.archiveGoal(goalId);
-                    setGoals(goals.filter((g) => g.id !== goalId));
-                    setFilteredGoals(filteredGoals.filter((g) => g.id !== goalId));
-                    showToast("success", "Goal has been archived.");
-                } catch (archiveError) {
-                    console.log("Archive failed, trying hard delete");
-                    await mod.deleteGoal(goalId);
-                    setGoals(goals.filter((g) => g.id !== goalId));
-                    setFilteredGoals(filteredGoals.filter((g) => g.id !== goalId));
-                    showToast("success", "Goal has been permanently deleted.");
-                }
+                        try {
+                            console.log("Attempting permanent delete for goal:", goalId);
+                            // Prefer explicit hard delete when user requested permanent deletion
+                            if (typeof mod.deleteGoalHard === "function") {
+                                await mod.deleteGoalHard(goalId);
+                            } else {
+                                // Fallback to existing deleteGoal which may try archive first
+                                await mod.deleteGoal(goalId);
+                            }
+
+                            // Use functional updates to avoid stale-closure issues
+                            setGoals((prev) => prev.filter((g) => g.id !== goalId));
+                            setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
+                            showToast("success", "Goal has been permanently deleted.");
+                        } catch (err) {
+                            console.error("Failed to permanently delete goal, attempting archive fallback:", err);
+                            try {
+                                await mod.archiveGoal(goalId);
+                                setGoals((prev) => prev.filter((g) => g.id !== goalId));
+                                setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
+                                showToast("success", "Goal has been archived.");
+                            } catch (archiveError) {
+                                console.error("Archive fallback also failed:", archiveError);
+                                showToast("error", `Failed to delete goal: ${archiveError?.message || err?.message || 'Unknown error'}`);
+                            }
+                        }
             } catch (error) {
                 console.error("Failed to delete goal:", error);
                 showToast("error", `Failed to delete goal: ${error.message}`);
