@@ -28,6 +28,7 @@ import TeamDashboard from "./pages/dashboard/TeamDashboard.jsx";
 // Main feature pages
 import Calendar from "./pages/Calendar.jsx";
 import Goals from "./pages/Goals.jsx";
+import GoalDetail from "./pages/GoalDetail.jsx";
 import DontForget from "./pages/DontForget.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import MyFocus from "./pages/MyFocus.jsx";
@@ -80,7 +81,7 @@ export default function App() {
                             <Route path="/tasks" element={<DontForget />} />
                             <Route path="/my-focus" element={<MyFocus />} />
                             <Route path="/goals" element={<Goals />} />
-                            <Route path="/goals/:goalId" element={<Goals />} />
+                            <Route path="/goals/:goalId" element={<GoalDetail />} />
                             <Route path="/enps" element={<ENPS />} />
                             <Route path="/recognition" element={<Recognition />} />
                             <Route path="/notifications" element={<Notifications />} />
@@ -96,7 +97,7 @@ export default function App() {
                             <Route path="/tasks" element={<PrivateRoute><DontForget /></PrivateRoute>} />
                             <Route path="/my-focus" element={<PrivateRoute><MyFocus /></PrivateRoute>} />
                             <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
-                            <Route path="/goals/:goalId" element={<PrivateRoute><Goals /></PrivateRoute>} />
+                            <Route path="/goals/:goalId" element={<PrivateRoute><GoalDetail /></PrivateRoute>} />
                             <Route path="/enps" element={<PrivateRoute><ENPS /></PrivateRoute>} />
                             <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />

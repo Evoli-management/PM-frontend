@@ -73,6 +73,11 @@ export const updateMilestone = async (milestoneId, updateData) => {
         // Only include fields that are likely supported by the backend
         if (updateData.title !== undefined) cleanData.title = updateData.title;
         if (updateData.weight !== undefined) cleanData.weight = parseFloat(updateData.weight) || 1.0;
+        // Support partial 'score' updates (frontend expresses as 0..1)
+        if (updateData.score !== undefined) {
+            const s = parseFloat(updateData.score);
+            cleanData.score = isNaN(s) ? null : s;
+        }
 
         // Handle dates properly - normalize to YYYY-MM-DD (SQL DATE)
         if (updateData.dueDate !== undefined) {
