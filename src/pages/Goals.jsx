@@ -1,5 +1,6 @@
 // src/pages/Goals.jsx
 import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import Toast from "../components/shared/Toast";
 // goalService is dynamically imported where needed to allow code-splitting
@@ -36,6 +37,8 @@ const Goals = () => {
     const [toast, setToast] = useState(null);
     const [currentView, setCurrentView] = useState("grid");
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const navigate = useNavigate();
+    // route params handled by dedicated GoalDetail page; this list page only navigates to it
 
     const showToast = (type, message) => {
         setToast({ type, message });
@@ -72,6 +75,8 @@ const Goals = () => {
             }
         })();
     }, [fetchGoals]);
+
+    // Note: when user navigates to /goals/:goalId we rely on the dedicated GoalDetail page
 
     useEffect(() => {
         let filtered = [...goals];
@@ -256,14 +261,17 @@ const Goals = () => {
     };
 
     const handleOpenGoal = (goal, mode) => {
-        // Default behavior when clicking a goal card: do not open the edit modal.
-        // If the caller explicitly requests 'edit', delegate to handleEditGoal.
+        // If edit requested, open edit modal
         if (mode === "edit") {
             handleEditGoal(goal);
             return;
         }
-        // No-op for simple card clicks (reserved for future 'view' implementation).
-        return;
+        // Navigate to the goal detail route so it opens as a full page
+        if (goal && goal.id) {
+            navigate(`/goals/${goal.id}`);
+        } else {
+            // nothing else to do - detail page will handle fetching
+        }
     };
 
     const stats = getGoalStats();
@@ -284,7 +292,7 @@ const Goals = () => {
                 )}
 
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
-                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
+                    <div className="container mx-auto max-w-7xl overflow-x-hidden pb-1 min-h-full px-4">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-4">
                                 <button
@@ -411,6 +419,8 @@ const Goals = () => {
                                     />
                                 </Suspense>
                             )}
+
+                            {/* Goal detail is a separate page at /goals/:goalId; it is not rendered inline in this list view. */}
 
                             {/* Toast Notifications */}
                             {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
