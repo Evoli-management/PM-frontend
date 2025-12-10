@@ -305,108 +305,151 @@ const Goals = () => {
                 )}
 
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
-                    <div className="container mx-auto max-w-7xl overflow-x-hidden pb-1 min-h-full px-4">
+                    <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-4">
                                 <button
-                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
                                     onClick={() => setMobileSidebarOpen(true)}
+                                    className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-700"
                                     aria-label="Open sidebar"
                                 >
-                                    <FaBars />
+                                    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path>
+                                    </svg>
                                 </button>
                             </div>
                         </div>
-                        <div className="px-1 md:px-2">
-                            {/* Compact Header with Stats and Filters */}
-                            <div className="mb-4">
-                                <GoalsHeader
-                                    onAddGoal={() => setIsModalOpen(true)}
-                                    currentView={currentView}
-                                    onViewChange={setCurrentView}
-                                />
 
-                                {/* Combined Stats and Filters in Single Row */}
-                                {!isLoading && goals.length > 0 && (
-                                    <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
-                                        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
-                                            {/* Compact Stats */}
-                                            <div className="flex gap-3">
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                                                    <FaBullseye className="w-3.5 h-3.5 text-gray-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-gray-900">{stats.total}</span>
-                                                        <span className="text-xs text-gray-500">Total</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                                                    <FaRocket className="w-3.5 h-3.5 text-blue-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-blue-600">{stats.active}</span>
-                                                        <span className="text-xs text-gray-500">Active</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                                                    <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-green-600">{stats.completed}</span>
-                                                        <span className="text-xs text-gray-500">Done</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
-                                                    <FaClock className="w-3.5 h-3.5 text-red-600" />
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
-                                                        <span className="text-xs text-gray-500">Overdue</span>
-                                                    </div>
-                                                </div>
+                        <div className="px-1 md:px-2">
+                            <div className="mb-4">
+                                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                        <div>
+                                            <h1 className="text-2xl font-bold text-slate-900">Goals</h1>
+                                            <p className="text-sm text-slate-600">Track and achieve your objectives</p>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                                                <button
+                                                    onClick={() => setCurrentView("grid")}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "grid" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                    title="Grid"
+                                                >
+                                                    <span className="hidden sm:inline text-xs font-medium">Grid</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setCurrentView("list")}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "list" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                    title="List"
+                                                >
+                                                    <span className="hidden sm:inline text-xs font-medium">List</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setCurrentView("kanban")}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "kanban" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                    title="Kanban"
+                                                >
+                                                    <span className="hidden sm:inline text-xs font-medium">Kanban</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setCurrentView("timeline")}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "timeline" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
+                                                    title="Timeline"
+                                                >
+                                                    <span className="hidden sm:inline text-xs font-medium">Timeline</span>
+                                                </button>
                                             </div>
 
-                                            {/* Filters */}
-                                            <div className="flex flex-1 gap-2">
-                                                <div className="flex-1 relative">
-                                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search goals..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
-                                                    />
+                                            <button
+                                                onClick={() => setIsModalOpen(true)}
+                                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                                            >
+                                                <span className="text-sm font-semibold">New Goal</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Combined Stats and Filters in Single Row */}
+                                    {!isLoading && goals.length > 0 && (
+                                        <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
+                                            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                                                {/* Compact Stats */}
+                                                <div className="flex gap-3">
+                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                                                        <FaBullseye className="w-3.5 h-3.5 text-gray-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-gray-900">{stats.total}</span>
+                                                            <span className="text-xs text-gray-500">Total</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                                                        <FaRocket className="w-3.5 h-3.5 text-blue-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-blue-600">{stats.active}</span>
+                                                            <span className="text-xs text-gray-500">Active</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                                                        <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-green-600">{stats.completed}</span>
+                                                            <span className="text-xs text-gray-500">Done</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
+                                                        <FaClock className="w-3.5 h-3.5 text-red-600" />
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-sm font-bold text-red-600">{stats.overdue}</span>
+                                                            <span className="text-xs text-gray-500">Overdue</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
-                                                <div className="relative">
-                                                    <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                    <select
-                                                        value={statusFilter}
-                                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
-                                                    >
-                                                        <option value="all">All Status</option>
-                                                        <option value="active">Active</option>
-                                                        <option value="completed">Completed</option>
-                                                        <option value="archived">Archived</option>
-                                                    </select>
-                                                </div>
+                                                {/* Filters */}
+                                                <div className="flex flex-1 gap-2">
+                                                    <div className="flex-1 relative">
+                                                        <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search goals..."
+                                                            value={searchTerm}
+                                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors"
+                                                        />
+                                                    </div>
 
-                                                <div className="relative">
-                                                    <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
-                                                    <select
-                                                        value={sortBy}
-                                                        onChange={(e) => setSortBy(e.target.value)}
-                                                        className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
-                                                    >
-                                                        <option value="dueDate">Due Date</option>
-                                                        <option value="progress">Progress</option>
-                                                        <option value="title">Title</option>
-                                                        <option value="created">Recently Created</option>
-                                                    </select>
+                                                    <div className="relative">
+                                                        <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                        <select
+                                                            value={statusFilter}
+                                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                                            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
+                                                        >
+                                                            <option value="all">All Status</option>
+                                                            <option value="active">Active</option>
+                                                            <option value="completed">Completed</option>
+                                                            <option value="archived">Archived</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="relative">
+                                                        <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
+                                                        <select
+                                                            value={sortBy}
+                                                            onChange={(e) => setSortBy(e.target.value)}
+                                                            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
+                                                        >
+                                                            <option value="dueDate">Due Date</option>
+                                                            <option value="progress">Progress</option>
+                                                            <option value="title">Title</option>
+                                                            <option value="created">Recently Created</option>
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
 
                             {/* Main Content */}
                             <div className="goals-content">{renderContent()}</div>
