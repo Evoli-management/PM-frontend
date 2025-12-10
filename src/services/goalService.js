@@ -516,3 +516,17 @@ export const deleteGoal = async (goalId) => {
         handleError("deleting goal", error);
     }
 };
+
+/**
+ * Permanently deletes a goal (hard delete).
+ * This will call the backend DELETE /goals/:id endpoint directly.
+ */
+export const deleteGoalHard = async (goalId) => {
+    try {
+        console.log("Attempting hard delete for goal:", goalId);
+        const response = await apiClient.delete(`/goals/${goalId}`);
+        return response.data;
+    } catch (error) {
+        handleError("hard deleting goal", error);
+    }
+};
