@@ -1097,7 +1097,7 @@ export default function DayView({
         </div>
 
   {/* Sidebar: Quick actions panel */}
-  <div className="w-80 md:w-96 flex-shrink-0 -mr-4 md:-mr-8">
+  <div className="w-80 md:w-96 flex-shrink-0 mr-0">
           <div className="sticky top-2">
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 mb-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-stretch">
