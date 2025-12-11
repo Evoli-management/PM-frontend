@@ -37,6 +37,7 @@ import VerifyEmail from "./pages/VerifyEmail.jsx";
 import VerifyPasswordChange from "./pages/VerifyPasswordChange.jsx";
 import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
 import Pricing from "./pages/Pricing.jsx";
+import Reminders from "./pages/Reminders.jsx";
 
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -103,6 +104,7 @@ export default function App() {
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
                             <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
+                            <Route path="/reminders" element={<PrivateRoute><Reminders /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
                 </main>
