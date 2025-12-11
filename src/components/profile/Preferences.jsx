@@ -352,6 +352,13 @@ export const Preferences = ({ showToast }) => {
     const convertTo24HourFormat = (timeStr) => {
         if (!timeStr) return null;
         
+        // Strip seconds if present (e.g., "06:00:00" -> "06:00")
+        const withSeconds = /^(\d{1,2}):(\d{2}):\d{2}$/;
+        const secMatch = timeStr.match(withSeconds);
+        if (secMatch) {
+            return `${String(secMatch[1]).padStart(2, '0')}:${secMatch[2]}`;
+        }
+        
         // Already 24-hour HH:MM format
         const h24 = /^([01]?\d|2[0-3]):([0-5]\d)$/;
         const m24 = timeStr.match(h24);
