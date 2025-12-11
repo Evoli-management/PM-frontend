@@ -13,8 +13,10 @@ import {
     Clock,
     ChevronRight,
 } from "lucide-react";
+import { useFormattedDate } from "../../hooks/useFormattedDate";
 
 const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onToggleVisibility }) => {
+    const { formatDate } = useFormattedDate();
     const [showActions, setShowActions] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -54,7 +56,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
         }
 
         if (goal.status === "archived") {
-            return { text: `Archived (was due ${dueDate.toLocaleDateString()})`, color: "text-gray-600" };
+            return { text: `Archived (was due ${formatDate(dueDate)})`, color: "text-gray-600" };
         }
 
         // Active goals

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
 function getWeekNumber(date) {
     // ISO week number (weeks start on Monday)
@@ -54,6 +55,7 @@ export default function QuarterView({
     filterType,
     onChangeFilter,
 }) {
+    const { formatDate } = useCalendarPreferences();
     const today = new Date();
     const months = getQuarterMonths(currentDate || today, 0);
     // month display values
@@ -357,7 +359,7 @@ export default function QuarterView({
                                                                 </span>
                                                             )}
                                                             <div className={`text-sm font-semibold flex items-center gap-1 ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
-                                                                <span className="w-12 inline-block">{date.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                                                                <span className="w-12 inline-block">{formatDate(date, { includeWeekday: true }).split(',')[0]}</span>
                                                                 <span className="">{date.getDate()}</span>
                                                             </div>
                                                             {/* daily chips */}
