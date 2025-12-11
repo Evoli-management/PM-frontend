@@ -9,6 +9,7 @@ import activityService from "../../services/activityService";
 import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
+import ReminderBell from "./ReminderBell";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
@@ -614,6 +615,10 @@ export default function Navbar() {
                                 </button>
                             </div>
                         )}
+                    </div>
+
+                    <div className="relative" ref={menuRef}>
+                        <ReminderBell />
                     </div>
 
                     <div className="relative" ref={menuRef}>
