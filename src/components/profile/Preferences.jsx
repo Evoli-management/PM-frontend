@@ -383,6 +383,13 @@ export const Preferences = ({ showToast }) => {
             const workStartTime24h = convertTo24HourFormat(preferences.workStartTime);
             const workEndTime24h = convertTo24HourFormat(preferences.workEndTime);
 
+            // Debug logging
+            console.log('=== Work Hours Save Debug ===');
+            console.log('Original workStartTime:', preferences.workStartTime);
+            console.log('Original workEndTime:', preferences.workEndTime);
+            console.log('Converted workStartTime24h:', workStartTime24h);
+            console.log('Converted workEndTime24h:', workEndTime24h);
+
             // Use normalized preferences (24h times) for validation to avoid regex failures when UI shows 12h
             const normalizedPrefs = {
                 ...preferences,
