@@ -379,12 +379,19 @@ export const Preferences = ({ showToast }) => {
     const savePreferences = async () => {
         setSaving(true);
         try {
-            // Convert work times to 24-hour format before validation
+            // Convert work times to 24-hour format before validation so backend always receives HH:MM
             const workStartTime24h = convertTo24HourFormat(preferences.workStartTime);
             const workEndTime24h = convertTo24HourFormat(preferences.workEndTime);
 
-            // Validate preferences
-            const validation = userPreferencesService.validatePreferences(preferences);
+            // Use normalized preferences (24h times) for validation to avoid regex failures when UI shows 12h
+            const normalizedPrefs = {
+                ...preferences,
+                workStartTime: workStartTime24h,
+                workEndTime: workEndTime24h,
+            };
+
+            // Validate preferences (constraint checks only)
+            const validation = userPreferencesService.validatePreferences(normalizedPrefs);
             if (!validation.isValid) {
                 const firstError = Object.values(validation.errors)[0];
                 showToast(firstError, 'error');
