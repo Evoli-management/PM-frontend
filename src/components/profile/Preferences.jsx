@@ -348,9 +348,41 @@ export const Preferences = ({ showToast }) => {
         }
     };
     
+    // Helper to convert 12-hour time to 24-hour HH:MM format
+    const convertTo24HourFormat = (timeStr) => {
+        if (!timeStr) return null;
+        
+        // Already 24-hour HH:MM format
+        const h24 = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+        const m24 = timeStr.match(h24);
+        if (m24) {
+            // normalize to HH:MM (pad hour)
+            return `${String(m24[1]).padStart(2, '0')}:${m24[2]}`;
+        }
+        
+        // 12-hour format with AM/PM (e.g., "5:00 PM", "2:30 AM")
+        const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+        const m = timeStr.match(ampm);
+        if (m) {
+            let hh = parseInt(m[1], 10);
+            const mm = m[2];
+            const ap = m[3].toUpperCase();
+            if (ap === 'PM' && hh !== 12) hh += 12;
+            if (ap === 'AM' && hh === 12) hh = 0;
+            return `${String(hh).padStart(2, '0')}:${mm}`;
+        }
+        
+        // If it doesn't match either format, return as-is (might be invalid)
+        return timeStr;
+    };
+
     const savePreferences = async () => {
         setSaving(true);
         try {
+            // Convert work times to 24-hour format before validation
+            const workStartTime24h = convertTo24HourFormat(preferences.workStartTime);
+            const workEndTime24h = convertTo24HourFormat(preferences.workEndTime);
+
             // Validate preferences
             const validation = userPreferencesService.validatePreferences(preferences);
             if (!validation.isValid) {
@@ -360,9 +392,9 @@ export const Preferences = ({ showToast }) => {
             }
 
             // Extra client-side validation for working hours ordering
-            if (preferences.workStartTime && preferences.workEndTime) {
-                const startMin = timeToMinutes(preferences.workStartTime);
-                const endMin = timeToMinutes(preferences.workEndTime);
+            if (workStartTime24h && workEndTime24h) {
+                const startMin = timeToMinutes(workStartTime24h);
+                const endMin = timeToMinutes(workEndTime24h);
                 if (!(startMin < endMin)) {
                     showToast('Work start time must be before end time', 'error');
                     return;
@@ -371,11 +403,11 @@ export const Preferences = ({ showToast }) => {
 
             // Validate time format before sending to API
             const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-            if (preferences.workStartTime && !timeRegex.test(preferences.workStartTime)) {
+            if (workStartTime24h && !timeRegex.test(workStartTime24h)) {
                 showToast('Work start time must be in HH:MM format', 'error');
                 return;
             }
-            if (preferences.workEndTime && !timeRegex.test(preferences.workEndTime)) {
+            if (workEndTime24h && !timeRegex.test(workEndTime24h)) {
                 showToast('Work end time must be in HH:MM format', 'error');
                 return;
             }
@@ -383,12 +415,12 @@ export const Preferences = ({ showToast }) => {
             // Prepare API data - only send backend-supported fields
             const apiData = {};
             
-            // Only include time fields if they're properly formatted
-            if (preferences.workStartTime && timeRegex.test(preferences.workStartTime)) {
-                apiData.workStartTime = preferences.workStartTime;
+            // Send 24-hour formatted times to API
+            if (workStartTime24h && timeRegex.test(workStartTime24h)) {
+                apiData.workStartTime = workStartTime24h;
             }
-            if (preferences.workEndTime && timeRegex.test(preferences.workEndTime)) {
-                apiData.workEndTime = preferences.workEndTime;
+            if (workEndTime24h && timeRegex.test(workEndTime24h)) {
+                apiData.workEndTime = workEndTime24h;
             }
             
             // Add other supported fields
