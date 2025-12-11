@@ -4,6 +4,7 @@ import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
 import userProfileService from '../../services/userProfileService';
 import remindersService from '../../services/remindersService';
+import RemindersListModal from '../reminders/RemindersListModal';
 import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
 import { getBrowserTimeZone } from '../../utils/time';
@@ -242,6 +243,7 @@ export const Preferences = ({ showToast }) => {
     
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [showRemindersModal, setShowRemindersModal] = useState(false);
     
     useEffect(() => {
         loadPreferences();
@@ -965,13 +967,7 @@ export const Preferences = ({ showToast }) => {
                         
                         <Field label="Notification Settings">
                             <button
-                                onClick={() => {
-                                    try {
-                                        window.location.hash = '#/reminders';
-                                    } catch (e) {
-                                        window.location.href = '/#/reminders';
-                                    }
-                                }}
+                                onClick={() => setShowRemindersModal(true)}
                                 className="w-full px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-medium transition-colors"
                             >
                                 View & Manage Reminders
@@ -998,6 +994,9 @@ export const Preferences = ({ showToast }) => {
                     Save Preferences
                 </LoadingButton>
             </div>
+            
+            {/* Reminders Modal */}
+            <RemindersListModal isOpen={showRemindersModal} onClose={() => setShowRemindersModal(false)} />
         </div>
     );
 };
