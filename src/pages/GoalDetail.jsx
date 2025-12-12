@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import GoalDetailModal from "../components/goals/GoalDetailModal";
+import * as goalService from "../services/goalService";
 import { FaArrowLeft } from "react-icons/fa";
 
 const GoalDetail = () => {
@@ -11,27 +12,53 @@ const GoalDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [keyAreas, setKeyAreas] = useState([]);
+    const location = useLocation();
 
     useEffect(() => {
         let mounted = true;
-        (async () => {
-            setLoading(true);
-            try {
-                const mod = await import("../services/goalService");
-                const fn = mod.getGoalById || mod.getGoal || (mod.default && (mod.default.getGoalById || mod.default.getGoal));
-                if (typeof fn === "function") {
-                    const g = await fn(goalId);
-                    if (mounted) setGoal(g);
-                } else {
-                    console.warn("No getGoalById/getGoal function exported from goalService");
+
+        // If the list page passed the goal in navigation state, render it immediately
+        // so the page opens instantly. Then perform a background refresh to keep
+        // the data in sync with the server.
+        const initial = location?.state?.goal;
+        if (initial && initial.id && String(initial.id) === String(goalId)) {
+            setGoal(initial);
+            setLoading(false);
+
+            // background refresh
+            (async () => {
+                try {
+                    const mod = await import("../services/goalService");
+                    const fn = mod.getGoalById || mod.getGoal || (mod.default && (mod.default.getGoalById || mod.default.getGoal));
+                    if (typeof fn === "function") {
+                        const g = await fn(goalId);
+                        if (mounted) setGoal(g);
+                    }
+                } catch (e) {
+                    // ignore background refresh errors
+                    console.debug("Background goal refresh failed:", e);
                 }
-            } catch (e) {
-                console.error("Failed to fetch goal:", e);
-                if (mounted) setError("Failed to load goal. Please try again later.");
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        })();
+            })();
+        } else {
+            (async () => {
+                setLoading(true);
+                try {
+                    const mod = await import("../services/goalService");
+                    const fn = mod.getGoalById || mod.getGoal || (mod.default && (mod.default.getGoalById || mod.default.getGoal));
+                    if (typeof fn === "function") {
+                        const g = await fn(goalId);
+                        if (mounted) setGoal(g);
+                    } else {
+                        console.warn("No getGoalById/getGoal function exported from goalService");
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch goal:", e);
+                    if (mounted) setError("Failed to load goal. Please try again later.");
+                } finally {
+                    if (mounted) setLoading(false);
+                }
+            })();
+        }
 
         (async () => {
             try {
@@ -50,15 +77,24 @@ const GoalDetail = () => {
         return () => {
             mounted = false;
         };
-    }, [goalId]);
+    }, [goalId, location]);
 
     const handleClose = () => {
         navigate("/goals");
     };
 
-    const handleUpdate = (id, update) => {
-        // update local copy so UI feels responsive; the service call is done by the child
-        setGoal((g) => (g && g.id === id ? { ...g, ...update } : g));
+    const handleUpdate = async (id, update) => {
+        // Persist update to backend and update local copy.
+        try {
+            const updated = await goalService.updateGoal(id, update);
+            // update local state with returned server representation
+            setGoal((g) => (g && g.id === id ? { ...g, ...updated } : g));
+        } catch (e) {
+            console.error("Failed to persist goal update:", e);
+            // Fallback: still apply optimistic update locally so UI feels responsive
+            setGoal((g) => (g && g.id === id ? { ...g, ...update } : g));
+            throw e;
+        }
     };
 
     const handleDelete = () => {

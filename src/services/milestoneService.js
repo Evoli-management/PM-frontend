@@ -32,12 +32,20 @@ export const createMilestone = async (goalId, milestoneData) => {
             weight: parseFloat(milestoneData.weight) || 1.0,
         };
 
-        // Handle dates properly - backend 'dueDate' is a SQL DATE (no time).
+        // Handle dates properly - backend 'dueDate' and 'startDate' are SQL DATEs (no time).
         if (milestoneData.dueDate) {
             // Normalize to YYYY-MM-DD to avoid DB errors when inserting an ISO datetime
             const d = new Date(milestoneData.dueDate);
             if (!isNaN(d)) {
                 cleanData.dueDate = d.toISOString().slice(0, 10);
+            }
+        }
+
+        // Accept and normalize a startDate if provided by the UI (GoalDetailModal passes startDate)
+        if (milestoneData.startDate) {
+            const s = new Date(milestoneData.startDate);
+            if (!isNaN(s)) {
+                cleanData.startDate = s.toISOString().slice(0, 10);
             }
         }
 
@@ -86,6 +94,15 @@ export const updateMilestone = async (milestoneId, updateData) => {
                 cleanData.dueDate = !isNaN(d) ? d.toISOString().slice(0, 10) : null;
             } else {
                 cleanData.dueDate = null;
+            }
+        }
+        // Support startDate updates as well
+        if (updateData.startDate !== undefined) {
+            if (updateData.startDate) {
+                const s = new Date(updateData.startDate);
+                cleanData.startDate = !isNaN(s) ? s.toISOString().slice(0, 10) : null;
+            } else {
+                cleanData.startDate = null;
             }
         }
 

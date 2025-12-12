@@ -1,5 +1,6 @@
 // src/pages/Goals.jsx
 import React, { useState, useEffect, useCallback, Suspense } from "react";
+import * as goalService from "../services/goalService";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import Toast from "../components/shared/Toast";
@@ -26,7 +27,9 @@ import {
 const Goals = () => {
     const [goals, setGoals] = useState([]);
     const [filteredGoals, setFilteredGoals] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // Start false so the page opens silently; we still set it while fetching
+    // but we won't show the loading spinner UI.
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -44,12 +47,16 @@ const Goals = () => {
         setToast({ type, message });
     };
 
-    const fetchGoals = useCallback(async () => {
+    const fetchGoals = useCallback(async (status = "all") => {
         try {
             setIsLoading(true);
             setError(null);
-            const mod = await import("../services/goalService");
-            const data = await mod.getGoals();
+            let data;
+            // Use the statically imported service to avoid dynamic import overhead on page load
+            // Request milestones inline in the list so the page can render with
+            // complete goal data in a single network round-trip. This avoids the
+            // N+1 requests pattern and speeds up the full page load.
+            data = await goalService.getFilteredGoals({ status, includeMilestones: true });
             setGoals(data);
             setFilteredGoals(data);
         } catch (err) {
@@ -61,7 +68,9 @@ const Goals = () => {
     }, []);
 
     useEffect(() => {
-        fetchGoals();
+        // Fetch initial goals, and refetch when user changes the status filter so
+        // archived (or other status-specific) views request the appropriate data from the backend.
+        fetchGoals(statusFilter);
         (async () => {
             try {
                 const mod = await import("../services/keyAreaService");
@@ -74,7 +83,7 @@ const Goals = () => {
                 console.error(e);
             }
         })();
-    }, [fetchGoals]);
+    }, [fetchGoals, statusFilter]);
 
     // Note: when user navigates to /goals/:goalId we rely on the dedicated GoalDetail page
 
@@ -113,8 +122,7 @@ const Goals = () => {
 
     const handleCreateGoal = async (goalData) => {
         try {
-            const mod = await import("../services/goalService");
-            await mod.createGoal(goalData);
+            await goalService.createGoal(goalData);
             await fetchGoals();
             showToast("success", "Goal created successfully!");
         } catch (error) {
@@ -127,8 +135,7 @@ const Goals = () => {
     const handleUpdateGoal = async (goalId, updateData) => {
         try {
             console.log("Goals.jsx - Updating goal:", goalId, "with:", updateData);
-            const mod = await import("../services/goalService");
-            const updatedGoal = await mod.updateGoal(goalId, updateData);
+            const updatedGoal = await goalService.updateGoal(goalId, updateData);
 
             setGoals((prevGoals) => prevGoals.map((goal) => (goal.id === goalId ? { ...goal, ...updatedGoal } : goal)));
 
@@ -158,11 +165,11 @@ const Goals = () => {
                         try {
                             console.log("Attempting permanent delete for goal:", goalId);
                             // Prefer explicit hard delete when user requested permanent deletion
-                            if (typeof mod.deleteGoalHard === "function") {
-                                await mod.deleteGoalHard(goalId);
+                            if (typeof goalService.deleteGoalHard === "function") {
+                                await goalService.deleteGoalHard(goalId);
                             } else {
                                 // Fallback to existing deleteGoal which may try archive first
-                                await mod.deleteGoal(goalId);
+                                await goalService.deleteGoal(goalId);
                             }
 
                             // Use functional updates to avoid stale-closure issues
@@ -172,7 +179,7 @@ const Goals = () => {
                         } catch (err) {
                             console.error("Failed to permanently delete goal, attempting archive fallback:", err);
                             try {
-                                await mod.archiveGoal(goalId);
+                                await goalService.archiveGoal(goalId);
                                 setGoals((prev) => prev.filter((g) => g.id !== goalId));
                                 setFilteredGoals((prev) => prev.filter((g) => g.id !== goalId));
                                 showToast("success", "Goal has been archived.");
@@ -200,14 +207,9 @@ const Goals = () => {
     };
 
     const renderContent = () => {
-        if (isLoading) {
-            return (
-                <div className="flex flex-col items-center justify-center py-12">
-                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="mt-3 text-slate-600 text-sm">Loading your goals...</p>
-                </div>
-            );
-        }
+        // Silent loading: do not render a blocking spinner. Return empty while
+        // loading so the page doesn't flash a loader on open.
+        if (isLoading) return null;
 
         if (error) {
             return (
@@ -269,8 +271,24 @@ const Goals = () => {
     };
 
     const handleEditGoal = (goal) => {
-        // Open the modal in edit mode for the selected goal
-        setSelectedGoal(goal);
+        // Open the modal in edit mode for the selected goal.
+        // If the passed goal doesn't include milestones (list may be lightweight),
+        // fetch the full goal before opening so the edit form has current milestone data.
+        (async () => {
+            try {
+                if (!goal) return;
+                if (!goal.milestones || goal.milestones.length === 0) {
+                    const detailed = await goalService.getGoalById(goal.id);
+                    // Merge shallow fields from the original goal with detailed milestone list
+                    setSelectedGoal({ ...goal, ...detailed });
+                } else {
+                    setSelectedGoal(goal);
+                }
+            } catch (err) {
+                console.warn('Failed to fetch full goal for edit modal, opening with provided data', err);
+                setSelectedGoal(goal);
+            }
+        })();
     };
 
     const handleOpenGoal = (goal, mode) => {
@@ -281,7 +299,16 @@ const Goals = () => {
         }
         // Navigate to the goal detail route so it opens as a full page
         if (goal && goal.id) {
-            navigate(`/goals/${goal.id}`);
+            // Prefetch and pass current goal in navigation state so detail page
+            // can render instantly and avoid an extra network round-trip.
+            try {
+                if (typeof goalService.prefetchGoal === "function") {
+                    goalService.prefetchGoal(goal.id).catch(() => {});
+                }
+            } catch (e) {
+                // ignore
+            }
+            navigate(`/goals/${goal.id}`, { state: { goal } });
         } else {
             // nothing else to do - detail page will handle fetching
         }
@@ -370,7 +397,9 @@ const Goals = () => {
                                     </div>
 
                                     {/* Combined Stats and Filters in Single Row */}
-                                    {!isLoading && goals.length > 0 && (
+                                    {/* Show stats & filters even when there are no goals for the selected filter
+                                        so the user can change filters or create a new goal. */}
+                                    {!isLoading && (
                                         <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3">
                                             <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
                                                 {/* Compact Stats */}

@@ -10,13 +10,14 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
 
     const handleComplete = async (goalId) => {
         try {
-            // Use the dedicated complete endpoint instead of update
-            console.log("GoalList - Attempting to complete goal:", goalId);
-            const { completeGoal } = await import("../../services/goalService");
-            await completeGoal(goalId);
-
-            // Force a page refresh to get updated data
-            window.location.reload();
+            // Prefer updating via parent handler so UI updates in-place
+            if (onUpdate) {
+                await onUpdate(goalId, { status: "completed" });
+            } else {
+                // Fallback to service call if parent handler not provided
+                const { completeGoal } = await import("../../services/goalService");
+                await completeGoal(goalId);
+            }
         } catch (error) {
             console.error("Failed to complete goal:", error);
             alert(`Failed to complete goal: ${error.message}`);
@@ -29,6 +30,16 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
                 await onUpdate(goalId, { status: "archived" });
             } catch (error) {
                 console.error("Failed to archive goal:", error);
+            }
+        }
+    };
+
+    const handleUnarchive = async (goalId) => {
+        if (onUpdate) {
+            try {
+                await onUpdate(goalId, { status: "active" });
+            } catch (error) {
+                console.error("Failed to unarchive goal:", error);
             }
         }
     };
@@ -59,13 +70,14 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
     return (
         <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {goals.map((goal) => (
-                <GoalCard
+                    <GoalCard
                     key={goal.id}
                     goal={goal}
                     onOpen={onGoalOpen}
                     onEdit={onGoalEdit}
                     onComplete={handleComplete}
-                    onArchive={handleArchive}
+                        onArchive={handleArchive}
+                        onUnarchive={handleUnarchive}
                     onToggleVisibility={handleToggleVisibility}
                     onDelete={handleDelete}
                 />

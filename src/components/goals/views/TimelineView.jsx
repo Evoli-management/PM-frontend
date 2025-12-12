@@ -20,9 +20,12 @@ const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
 
     const handleComplete = async (goalId) => {
         try {
-            const { completeGoal } = await import("../../../services/goalService");
-            await completeGoal(goalId);
-            window.location.reload();
+            if (onUpdate) {
+                await onUpdate(goalId, { status: "completed" });
+            } else {
+                const { completeGoal } = await import("../../../services/goalService");
+                await completeGoal(goalId);
+            }
         } catch (error) {
             console.error("Failed to complete goal:", error);
             alert(`Failed to complete goal: ${error.message}`);
@@ -96,6 +99,12 @@ const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                     const totalMilestones = goal.milestones?.length || 0;
                     const progressPercent = calculateGoalProgress(goal);
 
+                    const displayTotalMilestones = totalMilestones;
+                    const displayCompletedMilestones =
+                        goal.status === "completed" && displayTotalMilestones > 0
+                            ? displayTotalMilestones
+                            : completedMilestones;
+
                     const now = new Date();
                     const dueDate = new Date(goal.dueDate);
                     const startDate = goal.startDate ? new Date(goal.startDate) : null;
@@ -152,7 +161,7 @@ const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                                             <span>{dueDate.toLocaleDateString()}</span>
                                             <span>
-                                                {completedMilestones}/{totalMilestones} milestones
+                                                {displayCompletedMilestones}/{displayTotalMilestones} milestones
                                             </span>
                                             <span>{progressPercent}% complete</span>
                                             {timeProgressPercent !== null && (

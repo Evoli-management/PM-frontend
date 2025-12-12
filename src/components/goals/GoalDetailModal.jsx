@@ -214,7 +214,15 @@ const GoalDetailModal = ({
         try {
             const mod = await import("../../services/milestoneService");
             if (mod && mod.createMilestone) {
-                await mod.createMilestone(goal.id, m);
+                const created = await mod.createMilestone(goal.id, m);
+                // Optimistically append created milestone to local state so UI updates immediately
+                setLocalGoal((prev) => {
+                    if (!prev) return prev;
+                    const next = { ...prev };
+                    next.milestones = [...(next.milestones || []), created];
+                    return next;
+                });
+                return created;
             }
             if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
         } catch (e) {
@@ -282,7 +290,7 @@ const GoalDetailModal = ({
                 }
             >
                 <GoalForm
-                    goal={goal}
+                    goal={localGoal}
                     onClose={() => setIsEditing(false)}
                     onGoalCreated={async (goalData) => {
                         await onUpdate(goal.id, goalData);
@@ -351,7 +359,7 @@ const GoalDetailModal = ({
                                 <div className="md:contents hidden md:block text-xs font-semibold text-gray-500 mb-1">
                                     <div className="px-1">Progress</div>
                                     <div className="px-1">Start date</div>
-                                    <div className="px-1">End date</div>
+                                    <div className="px-1">Deadline</div>
                                     <div className="px-1">Visibility</div>
                                     <div className="px-1">Status</div>
                                 </div>
@@ -393,10 +401,10 @@ const GoalDetailModal = ({
                                     />
                                 </div>
 
-                                {/* End date */}
+                                {/* Deadline */}
                                 <div className="flex items-center md:block">
                                     <span className="md:hidden text-xs mr-2 text-gray-500">
-                                        End
+                                        Deadline
                                     </span>
                                                     <input
                                                         id={`goal-${goal.id}-deadline-input-${goal.id}`}
@@ -485,7 +493,7 @@ const GoalDetailModal = ({
                                     <div className="col-span-3">Score/Progress</div>
                                     <div className="col-span-5">Milestone</div>
                                     <div className="col-span-2">Start date</div>
-                                    <div className="col-span-2">End date</div>
+                                    <div className="col-span-2">Deadline</div>
                                 </div>
 
                                 {/* Milestones list — all milestones inside one shared container */}
@@ -610,45 +618,81 @@ const GoalDetailModal = ({
                                                         <span className="md:hidden text-xs text-gray-500">Start date</span>
                                                         <input type="date" value={m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : ""} onChange={async (e) => {
                                                             const v = e.target.value || null;
+                                                            const prevStart = m.startDate || null;
+                                                            // optimistic UI update
+                                                            setLocalGoal((prev) => {
+                                                                if (!prev) return prev;
+                                                                const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, startDate: v } : mm));
+                                                                return { ...prev, milestones: ms };
+                                                            });
                                                             const mod = await import("../../services/milestoneService");
-                                                            try { await mod.updateMilestone(m.id, { startDate: v }); if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated(); } catch (err) { console.error(err); }
+                                                            try {
+                                                                await mod.updateMilestone(m.id, { startDate: v });
+                                                                if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                // revert optimistic change on error
+                                                                setLocalGoal((prev) => {
+                                                                    if (!prev) return prev;
+                                                                    const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, startDate: prevStart } : mm));
+                                                                    return { ...prev, milestones: ms };
+                                                                });
+                                                            }
                                                         }} className="w-full px-2 py-1 border rounded-md text-sm" />
                                                     </div>
                                                     <div className="md:col-span-2">
-                                                        <span className="md:hidden text-xs text-gray-500">End date</span>
+                                                        <span className="md:hidden text-xs text-gray-500">Deadline</span>
                                                         <input type="date" value={m.dueDate ? new Date(m.dueDate).toISOString().slice(0, 10) : ""} onChange={async (e) => {
                                                             const v = e.target.value || null;
+                                                            const prevDue = m.dueDate || null;
+                                                            setLocalGoal((prev) => {
+                                                                if (!prev) return prev;
+                                                                const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, dueDate: v } : mm));
+                                                                return { ...prev, milestones: ms };
+                                                            });
                                                             const mod = await import("../../services/milestoneService");
-                                                            try { await mod.updateMilestone(m.id, { dueDate: v }); if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated(); } catch (err) { console.error(err); }
+                                                            try {
+                                                                await mod.updateMilestone(m.id, { dueDate: v });
+                                                                if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                setLocalGoal((prev) => {
+                                                                    if (!prev) return prev;
+                                                                    const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, dueDate: prevDue } : mm));
+                                                                    return { ...prev, milestones: ms };
+                                                                });
+                                                            }
                                                         }} className="w-full px-2 py-1 border rounded-md text-sm" />
                                                     </div>
                                                 </div>
                                             );
                                         })}
 
-                                        {/* Add milestone row (inside same container) */}
-                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center mt-0">
-                                            <div className="md:col-span-3 flex items-center gap-3">
-                                                <span className="text-xs md:hidden text-gray-500">Score</span>
-                                                <div className="text-sm w-8 text-right">0</div>
-                                                <input type="range" min={0} max={100} defaultValue={0} className="flex-1" />
+                                        {/* Add milestone row (inside same container) - hidden for completed goals */}
+                                        {localGoal?.status !== "completed" && (
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center mt-0">
+                                                <div className="md:col-span-3 flex items-center gap-3">
+                                                    <span className="text-xs md:hidden text-gray-500">Score</span>
+                                                    <div className="text-sm w-8 text-right">0</div>
+                                                    <input type="range" min={0} max={100} defaultValue={0} className="flex-1" />
+                                                </div>
+                                                <div className="md:col-span-5">
+                                                    <input id={`new-milestone-title-${goal.id}`} placeholder="Add milestone" className="w-full px-3 py-2 rounded-xl text-sm" />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <span className="md:hidden text-xs text-gray-500">Start date</span>
+                                                    <input id={`new-milestone-start-${goal.id}`} type="date" className="w-full px-2 py-1 border rounded-md text-sm" />
+                                                </div>
+                                                <div className="md:col-span-2 flex items-center justify-end">
+                                                    <button onClick={async () => {
+                                                        const title = document.getElementById(`new-milestone-title-${goal.id}`).value;
+                                                        const start = document.getElementById(`new-milestone-start-${goal.id}`).value || null;
+                                                        if (!title) return alert("Please enter a milestone title");
+                                                        try { await handleCreateMilestone({ title, startDate: start }); document.getElementById(`new-milestone-title-${goal.id}`).value = ""; document.getElementById(`new-milestone-start-${goal.id}`).value = ""; } catch (e) { console.error(e); }
+                                                    }} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">✓</button>
+                                                </div>
                                             </div>
-                                            <div className="md:col-span-5">
-                                                <input id={`new-milestone-title-${goal.id}`} placeholder="Add milestone" className="w-full px-3 py-2 rounded-xl text-sm" />
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <span className="md:hidden text-xs text-gray-500">Start date</span>
-                                                <input id={`new-milestone-start-${goal.id}`} type="date" className="w-full px-2 py-1 border rounded-md text-sm" />
-                                            </div>
-                                            <div className="md:col-span-2 flex items-center justify-end">
-                                                <button onClick={async () => {
-                                                    const title = document.getElementById(`new-milestone-title-${goal.id}`).value;
-                                                    const start = document.getElementById(`new-milestone-start-${goal.id}`).value || null;
-                                                    if (!title) return alert("Please enter a milestone title");
-                                                    try { await handleCreateMilestone({ title, startDate: start }); document.getElementById(`new-milestone-title-${goal.id}`).value = ""; document.getElementById(`new-milestone-start-${goal.id}`).value = ""; } catch (e) { console.error(e); }
-                                                }} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">✓</button>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </>

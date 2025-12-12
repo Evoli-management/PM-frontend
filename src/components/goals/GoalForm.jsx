@@ -22,9 +22,11 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           id: m.id,
           title: m.title,
           weight: m.weight || 1.0,
-          dueDate: m.dueDate || "",
+          // Normalize incoming dates to YYYY-MM-DD for <input type="date" />
+          startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
+          dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
         }))
-      : [{ title: "", weight: 1.0, dueDate: "" }]
+      : [{ title: "", weight: 1.0, startDate: "", dueDate: "" }]
   );
 
   const [activeMilestoneIndex, setActiveMilestoneIndex] = useState(0);
@@ -57,7 +59,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     if (milestones.length >= 10) return;
     const updated = [
       ...milestones,
-      { title: "", weight: 1.0, dueDate: "" },
+      { title: "", weight: 1.0, startDate: "", dueDate: "" },
     ];
     setMilestones(updated);
     setActiveMilestoneIndex(updated.length - 1);
@@ -130,6 +132,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           ...(m.id && { id: m.id }),
           title: m.title.trim(),
           weight: parseFloat(m.weight) || 1.0,
+          startDate: m.startDate || null,
           dueDate: m.dueDate || null,
         })),
     };
@@ -149,6 +152,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
   const currentMilestone = milestones[activeMilestoneIndex] || {
     title: "",
     weight: 1,
+    startDate: "",
     dueDate: "",
   };
 
@@ -433,8 +437,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     name="start_date"
                     ref={rightStartRef}
                     type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange("startDate", e.target.value)}
+                    value={currentMilestone.startDate}
+                    onChange={(e) => handleMilestoneChange("startDate", e.target.value)}
                     className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   />
                   <button
