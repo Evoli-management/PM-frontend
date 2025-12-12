@@ -32,9 +32,12 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
 
     const handleComplete = async (goalId) => {
         try {
-            const { completeGoal } = await import("../../../services/goalService");
-            await completeGoal(goalId);
-            window.location.reload();
+            if (onUpdate) {
+                await onUpdate(goalId, { status: "completed" });
+            } else {
+                const { completeGoal } = await import("../../../services/goalService");
+                await completeGoal(goalId);
+            }
         } catch (error) {
             console.error("Failed to complete goal:", error);
             alert(`Failed to complete goal: ${error.message}`);
@@ -47,6 +50,16 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                 await onUpdate(goalId, { status: "archived" });
             } catch (error) {
                 console.error("Failed to archive goal:", error);
+            }
+        }
+    };
+
+    const handleUnarchive = async (goalId) => {
+        if (onUpdate) {
+            try {
+                await onUpdate(goalId, { status: "active" });
+            } catch (error) {
+                console.error("Failed to unarchive goal:", error);
             }
         }
     };
@@ -83,6 +96,12 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
             }).length || 0;
         const totalMilestones = goal.milestones?.length || 0;
         const progressPercent = calculateGoalProgress(goal);
+
+        const displayTotalMilestones = totalMilestones;
+        const displayCompletedMilestones =
+            goal.status === "completed" && displayTotalMilestones > 0
+                ? displayTotalMilestones
+                : completedMilestones;
 
         const now = new Date();
         const dueDate = new Date(goal.dueDate);
@@ -124,7 +143,13 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
 
                         {actionGoal === goal.id && (
                             <>
-                                <div className="fixed inset-0 z-10" onClick={() => setActionGoal(null)} />
+                                <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActionGoal(null);
+                                    }}
+                                />
                                 <div className="absolute right-0 top-6 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
                                     <button
                                         onClick={(e) => {
@@ -161,7 +186,7 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                                         Make {goal.visibility === "public" ? "Private" : "Public"}
                                     </button>
 
-                                    {goal.status !== "archived" && (
+                                    {goal.status !== "archived" ? (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -171,6 +196,17 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                                             className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
                                         >
                                             Archive
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleUnarchive(goal.id);
+                                                setActionGoal(null);
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
+                                        >
+                                            Unarchive
                                         </button>
                                     )}
 
@@ -196,8 +232,8 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                 {/* Progress */}
                 <div className="mb-3">
                     <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-500">
-                            {completedMilestones}/{totalMilestones} milestones
+                            <span className="text-xs text-gray-500">
+                            {displayCompletedMilestones}/{displayTotalMilestones} milestones
                         </span>
                         <span className="text-xs font-medium text-gray-700">{progressPercent}%</span>
                     </div>

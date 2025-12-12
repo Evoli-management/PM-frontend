@@ -1,5 +1,5 @@
 // src/components/goals/GoalCard.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { calculateGoalProgress } from "../../utils/goalUtils";
 import {
     Eye,
@@ -14,20 +14,77 @@ import {
     ChevronRight,
 } from "lucide-react";
 
-const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onToggleVisibility }) => {
+import { getGoalById, prefetchGoal } from "../../services/goalService";
+
+const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUnarchive, onToggleVisibility }) => {
     const [showActions, setShowActions] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [localMilestones, setLocalMilestones] = useState(null);
+    const hoverTimer = useRef(null);
+
+    const milestones = localMilestones ?? goal.milestones ?? [];
 
     const completedMilestones =
-        (goal.milestones || []).filter((m) => {
+        (milestones || []).filter((m) => {
             if (m && m.done) return true;
             if (m && m.score !== undefined && m.score !== null) {
                 return parseFloat(m.score) >= 1;
             }
             return false;
         }).length || 0;
-    const totalMilestones = goal.milestones?.length || 0;
+    const totalMilestones = milestones?.length || 0;
     const progressPercent = calculateGoalProgress(goal);
+
+    // For display purposes: if a goal is marked completed but milestones aren't
+    // individually marked, assume all milestones are completed so the UI shows
+    // "N/N milestones completed" for completed goals.
+    const displayTotalMilestones = totalMilestones;
+    const displayCompletedMilestones =
+        goal.status === "completed" && displayTotalMilestones > 0
+            ? displayTotalMilestones
+            : completedMilestones;
+
+    // Lazy-load milestones if the list endpoint didn't include them
+    useEffect(() => {
+        let mounted = true;
+        if ((goal.milestones === undefined || goal.milestones.length === 0) && !localMilestones) {
+            // fetch details for this goal (includes milestones)
+            (async () => {
+                try {
+                    const detailed = await getGoalById(goal.id);
+                    if (mounted) setLocalMilestones(detailed.milestones || []);
+                } catch (err) {
+                    // ignore - keep localMilestones null so we don't retry aggressively
+                    console.warn(`Failed to lazy-load milestones for goal ${goal.id}:`, err);
+                }
+            })();
+        }
+        return () => {
+            mounted = false;
+        };
+    }, [goal, localMilestones]);
+
+    // Prefetch goal details on hover to reduce perceived delay when opening
+    const handlePointerEnter = () => {
+        // only prefetch if we don't already have milestones
+        if ((goal.milestones === undefined || goal.milestones.length === 0) && !localMilestones) {
+            // small debounce so quick mouse passes don't trigger many requests
+            hoverTimer.current = setTimeout(() => {
+                try {
+                    prefetchGoal(goal.id).catch(() => {});
+                } catch (e) {
+                    // swallow
+                }
+            }, 200);
+        }
+    };
+
+    const handlePointerLeave = () => {
+        if (hoverTimer.current) {
+            clearTimeout(hoverTimer.current);
+            hoverTimer.current = null;
+        }
+    };
 
     // Always calculate time-based information
     const now = new Date();
@@ -126,6 +183,8 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
         <div
             className="group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden cursor-pointer"
             onClick={handleCardClick}
+            onPointerEnter={handlePointerEnter}
+            onPointerLeave={handlePointerLeave}
         >
             {/* Header Section */}
             <div className="p-5">
@@ -205,7 +264,14 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
 
                             {showActions && (
                                 <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
+                                    <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={(e) => {
+                                            // Prevent the click from bubbling to the card which would open the goal
+                                            e.stopPropagation();
+                                            setShowActions(false);
+                                        }}
+                                    />
                                     <div className="absolute right-0 top-10 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
                                         <button
                                             onClick={(e) => {
@@ -222,7 +288,7 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                             Make {goal.visibility === "public" ? "Private" : "Public"}
                                         </button>
 
-                                        {goal.status !== "archived" && (
+                                        {goal.status !== "archived" ? (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -232,6 +298,17 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                                             >
                                                 <Archive className="w-4 h-4" />
                                                 Archive
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAction(onUnarchive, goal.id);
+                                                }}
+                                                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
+                                            >
+                                                <Archive className="w-4 h-4" />
+                                                Unarchive
                                             </button>
                                         )}
 
@@ -257,10 +334,10 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onTog
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-700">
-                                {completedMilestones}/{totalMilestones} milestones completed
-                            </span>
-                        </div>
+                                <span className="text-sm font-medium text-gray-700">
+                                    {displayCompletedMilestones}/{displayTotalMilestones} milestones completed
+                                </span>
+                            </div>
                         <span className="text-sm font-semibold text-gray-900">{progressPercent}%</span>
                     </div>
 

@@ -18,9 +18,12 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
 
     const handleComplete = async (goalId) => {
         try {
-            const { completeGoal } = await import("../../../services/goalService");
-            await completeGoal(goalId);
-            window.location.reload();
+            if (onUpdate) {
+                await onUpdate(goalId, { status: "completed" });
+            } else {
+                const { completeGoal } = await import("../../../services/goalService");
+                await completeGoal(goalId);
+            }
         } catch (error) {
             console.error("Failed to complete goal:", error);
             alert(`Failed to complete goal: ${error.message}`);
@@ -33,6 +36,16 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                 await onUpdate(goalId, { status: "archived" });
             } catch (error) {
                 console.error("Failed to archive goal:", error);
+            }
+        }
+    };
+
+    const handleUnarchive = async (goalId) => {
+        if (onUpdate) {
+            try {
+                await onUpdate(goalId, { status: "active" });
+            } catch (error) {
+                console.error("Failed to unarchive goal:", error);
             }
         }
     };
@@ -104,6 +117,12 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                             return false;
                         }).length || 0;
                     const totalMilestones = goal.milestones?.length || 0;
+
+                    const displayTotalMilestones = totalMilestones;
+                    const displayCompletedMilestones =
+                        goal.status === "completed" && displayTotalMilestones > 0
+                            ? displayTotalMilestones
+                            : completedMilestones;
                     const progressPercent = calculateGoalProgress(goal);
 
                     const now = new Date();
@@ -145,7 +164,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                                     <EyeOff className="w-3 h-3 text-amber-500" />
                                                 )}
                                                 <span className="text-sm text-slate-500">
-                                                    {completedMilestones}/{totalMilestones} milestones
+                                                    {displayCompletedMilestones}/{displayTotalMilestones} milestones
                                                 </span>
                                             </div>
                                         </div>
@@ -237,7 +256,10 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                                 <>
                                                     <div
                                                         className="fixed inset-0 z-10"
-                                                        onClick={() => setActionGoal(null)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActionGoal(null);
+                                                        }}
                                                     />
                                                     <div className="absolute right-0 top-10 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-20">
                                                         <button
@@ -251,7 +273,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                                             Make {goal.visibility === "public" ? "Private" : "Public"}
                                                         </button>
 
-                                                        {goal.status !== "archived" && (
+                                                        {goal.status !== "archived" ? (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
@@ -261,6 +283,17 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                                                 className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm"
                                                             >
                                                                 Archive
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleUnarchive(goal.id);
+                                                                    setActionGoal(null);
+                                                                }}
+                                                                className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm"
+                                                            >
+                                                                Unarchive
                                                             </button>
                                                         )}
 

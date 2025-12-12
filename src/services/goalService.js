@@ -57,21 +57,55 @@ export const getGoals = async () => {
     }
 };
 
+// Simple in-memory cache for prefetched/fetched goals (dev runtime only).
+// Stores promises so callers can await the same request and get instant results
+// if already in-flight or cached.
+const goalCache = new Map();
+
 /**
- * Fetches a single goal by ID, including milestones.
+ * Prefetch a goal and store the promise in cache. Returns the same promise
+ * if called multiple times for the same id.
+ */
+export const prefetchGoal = (goalId) => {
+    if (!goalId) return Promise.resolve(null);
+    if (goalCache.has(goalId)) return goalCache.get(goalId);
+
+    const promise = (async () => {
+        const response = await apiClient.get(`/goals/${goalId}`);
+        const g = response.data;
+        return { ...g, milestones: g.milestones || [] };
+    })();
+
+    // Keep the promise in cache; remove on rejection to allow retries.
+    goalCache.set(goalId, promise);
+    promise.catch(() => goalCache.delete(goalId));
+    return promise;
+};
+
+export const clearGoalCache = () => {
+    goalCache.clear();
+};
+
+/**
+ * Fetches a single goal by ID, including milestones. Uses cache when possible.
  * @param {string} goalId - The ID of the goal to fetch.
  * @returns {Promise<object>} A promise that resolves to the goal with milestones.
  */
 export const getGoalById = async (goalId) => {
     try {
-        const response = await apiClient.get(`/goals/${goalId}`);
-        const goal = response.data;
+        if (!goalId) return null;
+        if (goalCache.has(goalId)) return await goalCache.get(goalId);
 
-        // The backend findOne method already includes milestones
-        return {
-            ...goal,
-            milestones: goal.milestones || [],
-        };
+        // Not cached - fetch and cache the promise so concurrent callers share it
+        const promise = (async () => {
+            const response = await apiClient.get(`/goals/${goalId}`);
+            const goal = response.data;
+            return { ...goal, milestones: goal.milestones || [] };
+        })();
+
+        goalCache.set(goalId, promise);
+        promise.catch(() => goalCache.delete(goalId));
+        return await promise;
     } catch (error) {
         handleError(`fetching goal ${goalId}`, error);
     }
@@ -117,6 +151,7 @@ export const createGoal = async (goalData) => {
                 .map((m) => ({
                     title: m.title.trim(),
                     weight: parseFloat(m.weight) || 1.0,
+                    startDate: m.startDate ? new Date(m.startDate).toISOString() : null,
                     dueDate: m.dueDate ? new Date(m.dueDate).toISOString() : null,
                     // NOTE: 'done' property not allowed in create milestone DTO
                 }));
@@ -213,15 +248,18 @@ export const getFilteredGoals = async (filters = {}) => {
     try {
         const params = new URLSearchParams();
 
-        if (filters.status) params.append("status", filters.status);
+    if (filters.status) params.append("status", filters.status);
         if (filters.keyAreaId) params.append("keyAreaId", filters.keyAreaId);
         if (filters.parentId !== undefined) params.append("parentId", filters.parentId);
         if (filters.q) params.append("q", filters.q);
+    if (filters.includeMilestones) params.append("includeMilestones", "true");
 
         const queryString = params.toString();
         const url = queryString ? `/goals?${queryString}` : "/goals";
 
         const response = await apiClient.get(url);
+        // Return the list immediately. Individual components can lazy-load details
+        // (milestones) if needed to avoid blocking the whole page on many requests.
         return response.data;
     } catch (error) {
         handleError("fetching filtered goals", error);
@@ -317,6 +355,43 @@ export const updateGoal = async (goalId, updateData) => {
             console.log("Status change to archived - using archive endpoint");
             return await archiveGoal(goalId);
         }
+
+            // If this is a status change to active (unarchive), use the unarchive endpoint
+            if (updateData.status === "active") {
+                console.log("Status change to active - attempting reopen endpoint first");
+                // Try to reopen a completed goal first (completed -> active)
+                try {
+                    const resp = await apiClient.patch(`/goals/${goalId}/reopen`);
+                    return resp.data;
+                } catch (reopenErr) {
+                    // If reopen endpoint doesn't exist (404) OR reopen failed because the
+                    // goal wasn't in a completed state (400 with a specific message),
+                    // fall back to unarchive (archived -> active). For other errors rethrow.
+                    const status = reopenErr.response?.status;
+                    const message = (reopenErr.response?.data?.message || "").toString();
+
+                    const shouldTryUnarchive =
+                        status === 404 ||
+                        (status === 400 && /only completed/i.test(message));
+
+                    if (shouldTryUnarchive) {
+                        try {
+                            const response = await apiClient.patch(`/goals/${goalId}/unarchive`);
+                            return response.data;
+                        } catch (unarchiveErr) {
+                            // If unarchive also isn't available, fall back to a PATCH update as last resort
+                            if (unarchiveErr.response?.status === 404) {
+                                const response = await apiClient.patch(`/goals/${goalId}`, { visibility: "public" });
+                                return response.data;
+                            }
+                            throw unarchiveErr;
+                        }
+                    }
+
+                    // Not a recoverable reopen error — rethrow so caller can handle it
+                    throw reopenErr;
+                }
+            }
 
         // If status is the only field being updated and it's not completion or archiving
         if (updateData.status && Object.keys(updateData).length === 1) {
