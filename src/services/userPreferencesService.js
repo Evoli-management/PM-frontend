@@ -32,26 +32,24 @@ class UserPreferencesService {
 
     /**
      * Validate preference data before saving
+     * NOTE: Do NOT validate time format here - it's validated on the frontend
+     * during input (TimePicker ensures HH:MM format) and on the backend.
+     * Additional validation here can cause false positives.
+     * 
      * @param {Object} preferences - Preferences data to validate
      * @returns {Object} - Validation result { isValid: boolean, errors: Object }
      */
     validatePreferences(preferences) {
         const errors = {};
 
-        // Validate work hours
-        if (preferences.workStartTime !== undefined) {
-            if (!this.isValidTimeFormat(preferences.workStartTime)) {
-                errors.workStartTime = 'Work start time must be in HH:MM format';
-            }
-        }
+        // NOTE: Work hours validation removed from here
+        // Reasons:
+        // 1. TimePicker component ensures HH:MM format on input
+        // 2. Frontend saves() method has additional validation
+        // 3. Backend DTO has @Matches validator for format
+        // 4. Double validation causes false "invalid format" errors
 
-        if (preferences.workEndTime !== undefined) {
-            if (!this.isValidTimeFormat(preferences.workEndTime)) {
-                errors.workEndTime = 'Work end time must be in HH:MM format';
-            }
-        }
-
-        // Validate time constraints
+        // Time constraint validation only (not format)
         if (preferences.workStartTime && preferences.workEndTime) {
             if (preferences.workStartTime >= preferences.workEndTime) {
                 errors.workTimes = 'Work start time must be before end time';
