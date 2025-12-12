@@ -9,6 +9,7 @@ import activityService from "../../services/activityService";
 import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
+import ReminderBell from "./ReminderBell";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
@@ -74,6 +75,7 @@ export default function Navbar() {
             { title: "Calendar", route: "/calendar", type: "page", description: "View and manage appointments" },
             { title: "Don't Forget", route: "/tasks?dontforget=1", type: "page", description: "Quick task reminders" },
             { title: "Goals & Tracking", route: "/goals", type: "page", description: "Manage goals and track progress" },
+            { title: "Reminders", route: "/reminders", type: "page", description: "View and manage all reminders" },
             { title: "Key Areas", route: "/key-areas", type: "page", description: "Organize work by key areas" },
             { title: "Ideas", route: "/key-areas?select=ideas", type: "page", description: "Brainstorm and manage ideas" },
             { title: "Team", route: "/teams", type: "page", description: "Team collaboration and management" },
@@ -613,6 +615,10 @@ export default function Navbar() {
                                 </button>
                             </div>
                         )}
+                    </div>
+
+                    <div className="relative" ref={menuRef}>
+                        <ReminderBell />
                     </div>
 
                     <div className="relative" ref={menuRef}>

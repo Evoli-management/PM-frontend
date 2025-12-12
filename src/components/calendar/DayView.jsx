@@ -279,14 +279,12 @@ export default function DayView({
     setCurrentDate(d);
   };
 
-  const headerWeekday =
-    currentDate && currentDate.toLocaleDateString
-      ? currentDate.toLocaleDateString(undefined, { weekday: "long" })
-      : "";
-  const headerDate =
-    currentDate && currentDate.toLocaleDateString
-      ? currentDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-      : "";
+  const headerWeekday = currentDate
+    ? formatDate(currentDate, { includeWeekday: true })
+    : "";
+  const headerDate = currentDate
+    ? formatDate(currentDate, { longMonth: true })
+    : "";
 
   // Load sidebar items (todos/appointments/activities) for the selected day
   useEffect(() => {

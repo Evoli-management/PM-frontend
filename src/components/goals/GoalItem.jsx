@@ -3,15 +3,13 @@ import React from "react";
 import { calculateGoalProgress } from "../../utils/goalUtils";
 import { Link } from "react-router-dom";
 import { FaClock, FaFlag, FaArrowRight, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
+import { useFormattedDate } from "../../hooks/useFormattedDate";
 
 const GoalItem = ({ goal }) => {
     const { id, title, description, dueDate, status, milestones = [] } = goal;
+    const { formatDate } = useFormattedDate();
 
-    const formattedDueDate = new Date(dueDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
+    const formattedDueDate = formatDate(new Date(dueDate));
 
     const isOverdue = status === "active" && new Date(dueDate) < new Date();
     const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));

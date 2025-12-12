@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
 const ListView = ({
     currentDate,
@@ -13,7 +14,8 @@ const ListView = ({
     filterType,
     onChangeFilter,
 }) => {
-    const label = new Date(currentDate || Date.now()).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    const { formatDate, formatTime } = useCalendarPreferences();
+    const label = formatDate(new Date(currentDate || Date.now()), { longMonth: true });
     const [showViewMenu, setShowViewMenu] = useState(false);
 
     // Build a combined list: events from BE + tasks (todos) that fall in the current range
@@ -198,12 +200,7 @@ const ListView = ({
                         title={it.title}
                     >
                         <div className="w-36 text-xs text-blue-700 font-semibold">
-                            {it.start?.toLocaleDateString(undefined, {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                            })}
+                            {formatDate(it.start, { includeWeekday: true })}
                         </div>
                         <div className="flex-1">
                             <div className="font-semibold text-slate-800 flex items-center gap-2">
@@ -225,8 +222,8 @@ const ListView = ({
                             </div>
                             {it.type === "event" && (
                                 <div className="text-xs text-gray-500">
-                                    {it.start?.toLocaleTimeString()}
-                                    {it.end ? ` - ${it.end.toLocaleTimeString()}` : ""}
+                                    {formatTime(`${String(it.start.getHours()).padStart(2,'0')}:${String(it.start.getMinutes()).padStart(2,'0')}`)}
+                                    {it.end ? ` - ${formatTime(`${String(it.end.getHours()).padStart(2,'0')}:${String(it.end.getMinutes()).padStart(2,'0')}`)}` : ""}
                                 </div>
                             )}
                         </div>

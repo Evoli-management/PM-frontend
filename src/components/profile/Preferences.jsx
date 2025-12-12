@@ -3,6 +3,8 @@ import { Section, Field, Toggle, LoadingButton } from './UIComponents';
 import TimePicker from '../ui/TimePicker';
 import userPreferencesService from '../../services/userPreferencesService';
 import userProfileService from '../../services/userProfileService';
+import remindersService from '../../services/remindersService';
+import RemindersListModal from '../reminders/RemindersListModal';
 import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
 import { getBrowserTimeZone } from '../../utils/time';
@@ -241,6 +243,7 @@ export const Preferences = ({ showToast }) => {
     
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [showRemindersModal, setShowRemindersModal] = useState(false);
     
     useEffect(() => {
         loadPreferences();
@@ -951,6 +954,29 @@ export const Preferences = ({ showToast }) => {
                 </div>
             </Section>
             
+            {/* Reminders Health Check */}
+            <Section 
+                title="Reminders & Notifications" 
+                description="Manage your reminders and test notification settings"
+            >
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Field label="Total Reminders">
+                            <RemindersHealthCheck />
+                        </Field>
+                        
+                        <Field label="Notification Settings">
+                            <button
+                                onClick={() => setShowRemindersModal(true)}
+                                className="w-full px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-medium transition-colors"
+                            >
+                                View & Manage Reminders
+                            </button>
+                        </Field>
+                    </div>
+                </div>
+            </Section>
+            
             {/* Actions */}
             <div className="flex justify-between pt-6">
                 <button
@@ -968,6 +994,104 @@ export const Preferences = ({ showToast }) => {
                     Save Preferences
                 </LoadingButton>
             </div>
+            
+            {/* Reminders Modal */}
+            <RemindersListModal isOpen={showRemindersModal} onClose={() => setShowRemindersModal(false)} />
         </div>
     );
 };
+
+// Reminders Health Check Component
+function RemindersHealthCheck() {
+    const [remindersCount, setRemindersCount] = useState(0);
+    const [pendingCount, setPendingCount] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState(null);
+
+    useEffect(() => {
+        loadReminderStats();
+    }, []);
+
+    const loadReminderStats = async () => {
+        try {
+            setLoading(true);
+            const reminders = await remindersService.list();
+            setRemindersCount(reminders.length);
+            setPendingCount(reminders.filter(r => r.status === 'pending').length);
+        } catch (error) {
+            console.error('Failed to load reminders:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const testNotification = async () => {
+        try {
+            setTesting(true);
+            setTestResult(null);
+            
+            // Test push notification
+            try {
+                if (typeof Notification !== 'undefined') {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        new Notification('Test Reminder', {
+                            body: 'This is a test notification from Practical Manager',
+                            tag: 'test-reminder'
+                        });
+                        setTestResult({ success: true, message: 'Test notification sent! Check your notifications.' });
+                    } else {
+                        setTestResult({ success: false, message: 'Notification permission not granted' });
+                    }
+                } else {
+                    setTestResult({ success: false, message: 'This browser does not support notifications' });
+                }
+            } catch (err) {
+                setTestResult({ success: false, message: 'Failed to send test notification' });
+            }
+
+            setTesting(false);
+        } catch (error) {
+            setTestResult({ success: false, message: 'Error testing notifications' });
+            setTesting(false);
+        }
+    };
+
+    if (loading) {
+        return <div className="text-sm text-gray-500">Loading...</div>;
+    }
+
+    return (
+        <div className="space-y-3">
+            <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm font-medium text-blue-900">
+                    📊 Total Reminders: <span className="font-bold">{remindersCount}</span>
+                </p>
+                <p className="text-sm text-blue-700 mt-1">
+                    ⏳ Pending: <span className="font-bold">{pendingCount}</span>
+                </p>
+            </div>
+
+            <button
+                onClick={testNotification}
+                disabled={testing}
+                className="w-full px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+                {testing ? 'Testing...' : '🔔 Test Notification'}
+            </button>
+
+            {testResult && (
+                <div className={`text-sm p-2 rounded ${testResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    {testResult.message}
+                </div>
+            )}
+
+            <p className="text-xs text-gray-500">
+                💡 Tip: Reminders are checked every 60 seconds. You'll receive notifications when a reminder is due.
+            </p>
+        </div>
+    );
+}
+
+export default Preferences;
