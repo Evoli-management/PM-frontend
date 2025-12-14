@@ -97,6 +97,31 @@ const GoalDetail = () => {
         }
     };
 
+    // Called by child components when milestones change so the page can refresh
+    // and reflect updated progress/milestones immediately.
+    const handleMilestoneUpdated = async () => {
+        try {
+            setLoading(true);
+            // Clear any cached goal so we re-fetch the latest server state (milestones may have changed)
+            if (typeof goalService.clearGoalCache === "function") {
+                try { goalService.clearGoalCache(); } catch (e) { /* ignore */ }
+            }
+            const mod = await import("../services/goalService");
+            const fn = mod.getGoalById || mod.getGoal || (mod.default && (mod.default.getGoalById || mod.default.getGoal));
+            if (typeof fn === "function") {
+                const g = await fn(goalId);
+                setGoal(g);
+            } else if (typeof goalService.getGoalById === "function") {
+                const g = await goalService.getGoalById(goalId);
+                setGoal(g);
+            }
+        } catch (e) {
+            console.error("Failed to refresh goal after milestone update:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleDelete = () => {
         // After deletion, navigate back to list
         navigate("/goals");
@@ -122,14 +147,15 @@ const GoalDetail = () => {
                             )}
 
                             {goal && (
-                                <GoalDetailModal
-                                    goal={goal}
-                                    isPage={true}
-                                    onClose={handleClose}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                    keyAreas={keyAreas}
-                                />
+                                    <GoalDetailModal
+                                        goal={goal}
+                                        isPage={true}
+                                        onClose={handleClose}
+                                        onUpdate={handleUpdate}
+                                        onDelete={handleDelete}
+                                        onMilestoneUpdated={handleMilestoneUpdated}
+                                        keyAreas={keyAreas}
+                                    />
                             )}
                         </div>
                     </div>
