@@ -71,6 +71,19 @@ const Goals = () => {
         // Fetch initial goals, and refetch when user changes the status filter so
         // archived (or other status-specific) views request the appropriate data from the backend.
         fetchGoals(statusFilter);
+
+        // Listen for global milestone updates so the list can refresh automatically
+        const onMilestoneUpdated = (e) => {
+            try {
+                // We could use e.detail.goalId to optimize, but reloading the list
+                // is simpler and keeps local aggregates correct.
+                fetchGoals(statusFilter);
+            } catch (err) {
+                console.error("Failed to refresh goals after milestone event:", err);
+            }
+        };
+        window.addEventListener("milestone:updated", onMilestoneUpdated);
+
         (async () => {
             try {
                 const mod = await import("../services/keyAreaService");
@@ -83,6 +96,10 @@ const Goals = () => {
                 console.error(e);
             }
         })();
+
+        return () => {
+            window.removeEventListener("milestone:updated", onMilestoneUpdated);
+        };
     }, [fetchGoals, statusFilter]);
 
     // Note: when user navigates to /goals/:goalId we rely on the dedicated GoalDetail page

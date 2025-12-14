@@ -1,4 +1,4 @@
-import React, { useState, Suspense, useEffect } from "react";
+import React, { useState, Suspense, useEffect, useRef } from "react";
 import {
     FaLock,
     FaEye,
@@ -32,7 +32,8 @@ const GoalDetailModal = ({
 
     const milestonesList = localGoal?.milestones || [];
     const totalMilestones = milestonesList.length || 0;
-    const completedMilestones = milestonesList.filter((m) => m.done).length || 0;
+    const completedMilestones =
+        milestonesList.filter((m) => m.done).length || 0;
 
     const computeProgressPercent = (list) => {
         if (!list || list.length === 0) return 0;
@@ -74,11 +75,23 @@ const GoalDetailModal = ({
             // Try filtering by goalId; backend may accept this. Fall back to empty list if not supported.
             const list = await svc.list({ goalId: goal.id }).catch(async (e) => {
                 // Fallback: try without filter
-                console.debug("activityService.list(goalId) failed, falling back to svc.list():", e?.message || e);
+                console.debug(
+                    "activityService.list(goalId) failed, falling back to svc.list():",
+                    e?.message || e
+                );
                 return (await svc.list()) || [];
             });
             // Keep only activities that reference this goal when backend returned global list
-            const filtered = Array.isArray(list) ? list.filter((a) => !a.taskId && String(a.goalId || a.parentGoalId || a.goal_id) === String(goal.id) || (a.goalId && String(a.goalId) === String(goal.id))) : [];
+            const filtered = Array.isArray(list)
+                ? list.filter(
+                      (a) =>
+                          (!a.taskId &&
+                              String(
+                                  a.goalId || a.parentGoalId || a.goal_id
+                              ) === String(goal.id)) ||
+                          (a.goalId && String(a.goalId) === String(goal.id))
+                  )
+                : [];
             setActivities(filtered);
         } catch (err) {
             console.error("Failed to load activities for goal", err);
@@ -124,7 +137,9 @@ const GoalDetailModal = ({
             const mod = await import("../../services/activityService");
             const svc = mod.default || mod;
             await svc.remove(id);
-            setActivities((prev) => prev.filter((a) => String(a.id) !== String(id)));
+            setActivities((prev) =>
+                prev.filter((a) => String(a.id) !== String(id))
+            );
         } catch (e) {
             console.error("Failed to remove activity", e);
         }
@@ -136,9 +151,15 @@ const GoalDetailModal = ({
         try {
             const mod = await import("../../services/activityService");
             const svc = mod.default || mod;
-            const existing = activities.find((a) => String(a.id) === String(id));
-            const updated = await svc.update(id, { completed: !existing?.completed });
-            setActivities((prev) => prev.map((a) => (String(a.id) === String(id) ? updated : a)));
+            const existing = activities.find(
+                (a) => String(a.id) === String(id)
+            );
+            const updated = await svc.update(id, {
+                completed: !existing?.completed,
+            });
+            setActivities((prev) =>
+                prev.map((a) => (String(a.id) === String(id) ? updated : a))
+            );
         } catch (e) {
             console.error("Failed to toggle activity complete", e);
         } finally {
@@ -224,18 +245,98 @@ const GoalDetailModal = ({
                 });
                 return created;
             }
-            if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
+            if (typeof onMilestoneUpdated === "function")
+                await onMilestoneUpdated();
         } catch (e) {
             console.error("Failed to create milestone:", e);
             throw e;
         }
     };
 
+    // Guarded helper to auto-create a milestone from the temporary "new" inputs.
+    const creatingMilestoneRef = useRef(false);
+    const tryCreateMilestoneFromInputs = async () => {
+        const titleEl = document.getElementById(
+            `new-milestone-title-${goal.id}`
+        );
+        if (!titleEl) return;
+        const startEl = document.getElementById(
+            `new-milestone-start-${goal.id}`
+        );
+        const dueEl = document.getElementById(`new-milestone-due-${goal.id}`);
+
+        const title = (titleEl.value || "").trim();
+        const start = startEl?.value || null;
+        const due = dueEl?.value || null;
+
+        if (!title) return; // nothing to save
+        if (creatingMilestoneRef.current) return; // already creating
+
+        creatingMilestoneRef.current = true;
+        try {
+            const created = await handleCreateMilestone({
+                title,
+                startDate: start,
+                dueDate: due,
+            });
+            // Notify parent pages/components so they can refresh lists/cards immediately
+            if (typeof onMilestoneUpdated === "function") {
+                try {
+                    await onMilestoneUpdated();
+                } catch (e) {
+                    console.error("onMilestoneUpdated failed:", e);
+                }
+            }
+            // Dispatch a global event so other pages (e.g., Goals list) can refresh
+            try {
+                window.dispatchEvent(
+                    new CustomEvent("milestone:updated", {
+                        detail: { goalId: goal.id },
+                    })
+                );
+            } catch (e) {
+                // ignore in environments without window or CustomEvent
+            }
+            // clear inputs after successful create
+            try {
+                titleEl.value = "";
+            } catch (_) {}
+            try {
+                if (startEl) startEl.value = "";
+            } catch (_) {}
+            try {
+                if (dueEl) dueEl.value = "";
+            } catch (_) {}
+        } catch (err) {
+            console.error("Failed to auto-create milestone:", err);
+        } finally {
+            creatingMilestoneRef.current = false;
+        }
+    };
+
+    const openDatePicker = (id) => {
+        try {
+            const el = document.getElementById(id);
+            if (!el) return;
+            // showPicker is supported in some browsers
+            try {
+                el.showPicker && el.showPicker();
+            } catch (e) {}
+            try {
+                el.focus();
+            } catch (e) {}
+        } catch (e) {
+            // ignore
+        }
+    };
+
     const handleDeleteMilestone = async (milestoneId) => {
         try {
             const mod = await import("../../services/milestoneService");
-            if (mod && mod.deleteMilestone) await mod.deleteMilestone(milestoneId);
-            if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
+            if (mod && mod.deleteMilestone)
+                await mod.deleteMilestone(milestoneId);
+            if (typeof onMilestoneUpdated === "function")
+                await onMilestoneUpdated();
         } catch (e) {
             console.error("Failed to delete milestone:", e);
         }
@@ -244,7 +345,10 @@ const GoalDetailModal = ({
     // Save inline-edited milestone title (called on blur or Enter)
     const saveMilestoneTitle = async (milestoneId) => {
         // ensure we're editing this milestone
-        if (!editingMilestoneId || String(editingMilestoneId) !== String(milestoneId)) {
+        if (
+            !editingMilestoneId ||
+            String(editingMilestoneId) !== String(milestoneId)
+        ) {
             setEditingMilestoneId(null);
             return;
         }
@@ -252,7 +356,9 @@ const GoalDetailModal = ({
         const newTitle = (editingMilestoneTitle || "").trim();
 
         // find current milestone to compare
-        const current = (localGoal?.milestones || []).find((mm) => String(mm.id) === String(milestoneId));
+        const current = (localGoal?.milestones || []).find(
+            (mm) => String(mm.id) === String(milestoneId)
+        );
         const currentTitle = current?.title || "";
         if (newTitle === currentTitle) {
             setEditingMilestoneId(null);
@@ -268,11 +374,16 @@ const GoalDetailModal = ({
             // optimistic local update
             setLocalGoal((prev) => {
                 if (!prev) return prev;
-                const ms = (prev.milestones || []).map((mm) => (String(mm.id) === String(milestoneId) ? { ...mm, title: newTitle } : mm));
+                const ms = (prev.milestones || []).map((mm) =>
+                    String(mm.id) === String(milestoneId)
+                        ? { ...mm, title: newTitle }
+                        : mm
+                );
                 return { ...prev, milestones: ms };
             });
 
-            if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
+            if (typeof onMilestoneUpdated === "function")
+                await onMilestoneUpdated();
         } catch (err) {
             console.error("Failed to save milestone title:", err);
         } finally {
@@ -305,25 +416,55 @@ const GoalDetailModal = ({
 
     // Header bar (moved outside the main wrapper so it can render above the content)
     const headerBar = (
-        <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 flex-shrink-0 bg-white mb-4">
+        <div className="flex items-center gap-2 w-full">
+            <button
+                className="md:hidden p-2 rounded-lg bg-white border border-slate-200 mr-2"
+                aria-label="Open menu"
+            >
+                <svg
+                    stroke="currentColor"
+                    fill="currentColor"
+                    strokeWidth="0"
+                    viewBox="0 0 448 512"
+                    height="1em"
+                    width="1em"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path>
+                </svg>
+            </button>
+
             <button
                 onClick={onClose}
                 className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                 aria-label="Back"
                 style={{ minWidth: 36, minHeight: 36 }}
             >
-                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path></svg>
+                <svg
+                    stroke="currentColor"
+                    fill="currentColor"
+                    strokeWidth="0"
+                    viewBox="0 0 320 512"
+                    height="1em"
+                    width="1em"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path d="M34.52 239.03L228.87 44.69c9.37-9.37 24.57-9.37 33.94 0l22.67 22.67c9.36 9.36 9.37 24.52.04 33.9L131.49 256l154.02 154.75c9.34 9.38 9.32 24.54-.04 33.9l-22.67 22.67c-9.37 9.37-24.57 9.37-33.94 0L34.52 272.97c-9.37-9.37-9.37-24.57 0-33.94z"></path>
+                </svg>
             </button>
 
-            <input
-                id={`goal-${goal.id}-goal-input-${goal.id}`}
-                className="text-2xl md:text-3xl font-black text-gray-900 flex-1 border-none focus:ring-0 focus:outline-none"
-                value={localGoal?.title || ""}
-                onChange={(e) =>
-                    setLocalGoal((p) => ({ ...p, title: e.target.value }))
-                }
-                placeholder="Goal name"
-            />
+            <div className="inline-flex items-center gap-1">
+                <img
+                    alt="Goals"
+                    className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
+                    src="/goals.png"
+                />
+                <span
+                    className="relative text-base md:text-lg font-bold text-black truncate px-1"
+                >
+                    {localGoal?.title || "Untitled goal"}
+                </span>
+            </div>
         </div>
     );
 
@@ -342,51 +483,69 @@ const GoalDetailModal = ({
                 .milestone-scroll::-webkit-scrollbar-track { background:#f1f5f9; border-radius:3px; }
                 .milestone-scroll::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
                 .milestone-scroll::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
+                /* Hide native date picker indicator for inputs using .no-calendar */
+                input.no-calendar::-webkit-calendar-picker-indicator {
+                    opacity: 0;
+                    pointer-events: none;
+                    display: block;
+                    width: 0;
+                    height: 0;
+                }
+                input.no-calendar::-webkit-clear-button,
+                input.no-calendar::-webkit-inner-spin-button {
+                    display: none;
+                }
+                input.no-calendar { -webkit-appearance: none; appearance: none; }
             `}</style>
-                {/* SUMMARY CARD – gauge + progress / dates / controls (reduced height) */}
-                <div className="px-6 pt-3 pb-3 border-b border-gray-200 bg-white">
-                    <div className="rounded-2xl border border-gray-200 px-4 py-3 flex items-center gap-6">
-                        {/* Gauge – custom SVG gauge component */}
-                        <div className="flex flex-col items-center justify-center">
-                            <GoalGauge percent={progressPercent} size={80} />
-                            <span className="mt-1 text-xs font-semibold text-gray-700">{progressPercent}%</span>
-                        </div>
+            {/* SUMMARY CARD – gauge + progress / dates / controls (reduced height) */}
+            <div className="px-6 pt-3 pb-3 border-b border-gray-200 bg-white">
+                <div className="rounded-2xl border border-gray-200 px-4 py-3 flex items-center gap-6">
+                    {/* Gauge – custom SVG gauge component */}
+                    <div className="flex flex-col items-center justify-center">
+                        <GoalGauge percent={progressPercent} size={80} />
+                        <span className="mt-1 text-xs font-semibold text-gray-700">
+                            {progressPercent}%
+                        </span>
+                    </div>
 
-                        {/* Right side: Progress / dates / lock / complete / save */}
-                        <div className="flex-1 flex flex-col gap-2">
-                            {/* labels + controls in the same grid so labels line up exactly above their inputs */}
-                            <div className="grid grid-cols-1 gap-3 md:[grid-template-columns:96px_140px_140px_64px_64px] md:ml-auto">
-                                <div className="md:contents hidden md:block text-xs font-semibold text-gray-500 mb-1">
-                                    <div className="px-1">Progress</div>
-                                    <div className="px-1">Start date</div>
-                                    <div className="px-1">Deadline</div>
-                                    <div className="px-1">Visibility</div>
-                                    <div className="px-1">Status</div>
+                    {/* Right side: Progress / dates / lock / complete / save */}
+                    <div className="flex-1 flex flex-col gap-2">
+                        {/* labels + controls in the same grid so labels line up exactly above their inputs */}
+                        <div className="grid grid-cols-1 gap-3 md:[grid-template-columns:96px_140px_140px_64px_64px] md:ml-auto">
+                            <div className="md:contents hidden md:block text-xs font-semibold text-gray-500 mb-1">
+                                <div className="px-1">Progress</div>
+                                <div className="px-1">Start date</div>
+                                <div className="px-1">Deadline</div>
+                                <div className="px-1">Visibility</div>
+                                <div className="px-1">Status</div>
+                            </div>
+                            {/* Progress box */}
+                            <div className="flex items-center md:block">
+                                <span className="md:hidden text-xs mr-2 text-gray-500">
+                                    Progress
+                                </span>
+                                <div
+                                    id={`top-goal-status-${goal.id}`}
+                                    className="inline-flex items-center justify-center px-3 py-2 border border-slate-300 rounded-md bg-white text-sm font-semibold text-gray-700 w-full"
+                                >
+                                    {progressPercent} %
                                 </div>
-                                {/* Progress box */}
-                                <div className="flex items-center md:block">
-                                    <span className="md:hidden text-xs mr-2 text-gray-500">
-                                        Progress
-                                    </span>
-                                    <div
-                                        id={`top-goal-status-${goal.id}`}
-                                        className="inline-flex items-center justify-center px-3 py-2 border rounded-md bg-white text-sm font-semibold w-full"
-                                    >
-                                        {progressPercent} %
-                                    </div>
-                                </div>
+                            </div>
 
-                                {/* Start date */}
-                                <div className="flex items-center md:block">
-                                    <span className="md:hidden text-xs mr-2 text-gray-500">
-                                        Start
-                                    </span>
+                            {/* Start date */}
+                            <div className="flex items-center md:block">
+                                <span className="md:hidden text-xs mr-2 text-gray-500">
+                                    Start
+                                </span>
+                                <div className="relative md:inline-block">
                                     <input
                                         id={`goal-${goal.id}-date_start-input-${goal.id}`}
                                         type="date"
                                         value={
                                             localGoal?.startDate
-                                                ? new Date(localGoal.startDate)
+                                                ? new Date(
+                                                      localGoal.startDate
+                                                  )
                                                       .toISOString()
                                                       .slice(0, 10)
                                                 : ""
@@ -394,355 +553,886 @@ const GoalDetailModal = ({
                                         onChange={(e) =>
                                             setLocalGoal((p) => ({
                                                 ...p,
-                                                startDate: e.target.value || null,
+                                                startDate:
+                                                    e.target.value || null,
                                             }))
                                         }
-                                        className="w-full md:max-w-[140px] px-3 py-2 border rounded-md text-sm bg-white text-gray-700"
+                                        className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
                                     />
-                                </div>
-
-                                {/* Deadline */}
-                                <div className="flex items-center md:block">
-                                    <span className="md:hidden text-xs mr-2 text-gray-500">
-                                        Deadline
-                                    </span>
-                                                    <input
-                                                        id={`goal-${goal.id}-deadline-input-${goal.id}`}
-                                                        type="date"
-                                                        value={
-                                                            localGoal?.dueDate
-                                                                ? new Date(localGoal.dueDate)
-                                                                      .toISOString()
-                                                                      .slice(0, 10)
-                                                                : ""
-                                                        }
-                                                        onChange={(e) =>
-                                                            setLocalGoal((p) => ({
-                                                                ...p,
-                                                                dueDate: e.target.value || null,
-                                                            }))
-                                                        }
-                                                        className="w-full md:max-w-[140px] px-3 py-2 border rounded-md text-sm bg-white text-gray-700"
-                                                    />
-                                </div>
-
-                                {/* Visibility lock */}
-                                <div className="flex items-center">
                                     <button
-                                        id={`goal-public-cb-${goal.id}`}
-                                        onClick={handleToggleVisibility}
-                                        className="w-full flex items-center justify-center px-3 py-2 border rounded-md bg-white hover:bg-gray-100"
-                                        title="Visibility"
+                                        type="button"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                        aria-label="Open date picker"
+                                        onClick={() =>
+                                            openDatePicker(
+                                                `goal-${goal.id}-date_start-input-${goal.id}`
+                                            )
+                                        }
                                     >
-                                        {localGoal?.visibility === "private" ? (
-                                            <FaLock className="w-4 h-4 text-gray-800" />
-                                        ) : (
-                                            <FaEye className="w-4 h-4 text-gray-800" />
-                                        )}
+                                        📅
                                     </button>
                                 </div>
+                            </div>
 
-                                {/* Complete button - align to the left side of the Status column */}
-                                <div className="flex items-center gap-2 justify-start">
+                            {/* Deadline */}
+                            <div className="flex items-center md:block">
+                                <span className="md:hidden text-xs mr-2 text-gray-500">
+                                    Deadline
+                                </span>
+                                <div className="relative md:inline-block">
+                                    <input
+                                        id={`goal-${goal.id}-deadline-input-${goal.id}`}
+                                        type="date"
+                                        value={
+                                            localGoal?.dueDate
+                                                ? new Date(
+                                                      localGoal.dueDate
+                                                  )
+                                                      .toISOString()
+                                                      .slice(0, 10)
+                                                : ""
+                                        }
+                                        onChange={(e) =>
+                                            setLocalGoal((p) => ({
+                                                ...p,
+                                                dueDate:
+                                                    e.target.value || null,
+                                            }))
+                                        }
+                                        className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
+                                    />
                                     <button
-                                        id={`goal-${goal.id}-completed-icon`}
-                                        onClick={handleToggleComplete}
-                                        className={`md:flex-none px-3 py-2 rounded-md flex items-center justify-center gap-2 text-sm ${
-                                            localGoal?.status === "completed"
-                                                ? "bg-emerald-600 text-white"
-                                                : "border border-gray-300 text-gray-800 hover:bg-gray-100"
-                                        }`}
-                                        title="Complete"
+                                        type="button"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                        aria-label="Open date picker"
+                                        onClick={() =>
+                                            openDatePicker(
+                                                `goal-${goal.id}-deadline-input-${goal.id}`
+                                            )
+                                        }
                                     >
-                                        <FaCheckCircle className="w-4 h-4" />
+                                        📅
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Visibility lock */}
+                            <div className="flex items-center">
+                                <button
+                                    id={`goal-public-cb-${goal.id}`}
+                                    onClick={handleToggleVisibility}
+                                    className="w-full flex items-center justify-center px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-gray-100"
+                                    title="Visibility"
+                                >
+                                    {localGoal?.visibility === "private" ? (
+                                        <FaLock className="w-4 h-4 text-gray-800" />
+                                    ) : (
+                                        <FaEye className="w-4 h-4 text-gray-800" />
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Complete button - align to the left side of the Status column */}
+                            <div className="flex items-center gap-2 justify-start">
+                                <button
+                                    id={`goal-${goal.id}-completed-icon`}
+                                    onClick={handleToggleComplete}
+                                    className={`md:flex-none px-3 py-2 rounded-md flex items-center justify-center gap-2 text-sm ${
+                                        localGoal?.status === "completed"
+                                            ? "bg-emerald-600 text-white"
+                                            : "border border-gray-300 text-gray-800 hover:bg-gray-100"
+                                    }`}
+                                    title="Complete"
+                                >
+                                    <FaCheckCircle className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                {/* CONTENT – Tabs: Summary / Milestones / Activities */}
-                <div className="flex-1 overflow-hidden bg-white">
-                    <div className="h-full flex flex-col px-6 py-6">
-                        {/* Tabs removed per user request */}
+            {/* CONTENT – Tabs: Summary / Milestones / Activities */}
+            {/* Use a light-gray background for the surrounding margins so date fields and small bordered controls
+                appear to sit on a subtle gray surface (matches date input/border tones). */}
+            <div className="flex-1 overflow-hidden bg-gray-50">
+                <div className="h-full flex flex-col px-6 py-6">
+                    {/* Tabs removed per user request */}
 
-                        {/* SUMMARY tab - brief summary (gauge already visible above) */}
-                        {activeTab === "summary" && (
-                            <div className="text-sm text-gray-700">
-                                <div className="mb-2">Progress: <strong>{progressPercent}%</strong></div>
-                                <div className="mb-2">Start: {localGoal?.startDate ? new Date(localGoal.startDate).toLocaleDateString() : '—'}</div>
-                                <div className="mb-2">Due: {localGoal?.dueDate ? new Date(localGoal.dueDate).toLocaleDateString() : '—'}</div>
-                                <div className="mb-2">Visibility: {localGoal?.visibility}</div>
-                                <div className="mb-2">Status: {localGoal?.status}</div>
+                    {/* SUMMARY tab - brief summary (gauge already visible above) */}
+                    {activeTab === "summary" && (
+                        <div className="text-sm text-gray-700">
+                            <div className="mb-2">
+                                Progress: <strong>{progressPercent}%</strong>
                             </div>
-                        )}
+                            <div className="mb-2">
+                                Start:{" "}
+                                {localGoal?.startDate
+                                    ? new Date(
+                                          localGoal.startDate
+                                      ).toLocaleDateString()
+                                    : "—"}
+                            </div>
+                            <div className="mb-2">
+                                Due:{" "}
+                                {localGoal?.dueDate
+                                    ? new Date(
+                                          localGoal.dueDate
+                                      ).toLocaleDateString()
+                                    : "—"}
+                            </div>
+                            <div className="mb-2">
+                                Visibility: {localGoal?.visibility}
+                            </div>
+                            <div className="mb-2">
+                                Status: {localGoal?.status}
+                            </div>
+                        </div>
+                    )}
 
-                        {/* MILESTONES tab - existing milestones UI */}
-                        {activeTab === "milestones" && (
-                            <>
-                                {/* Milestones title */}
-                                <div className="mb-4">
-                                    <span className="inline-block border border-gray-900 rounded-lg px-4 py-1.5 text-sm font-semibold">
-                                        Milestones
-                                    </span>
+                    {/* MILESTONES tab - existing milestones UI */}
+                    {activeTab === "milestones" && (
+                        <>
+                            {/* Milestones title */}
+                            <div className="mb-4">
+                                {/* Use a subtle gray border and neutral text to match date inputs */}
+                                <span className="inline-block border border-slate-300 rounded-lg px-4 py-1.5 text-sm font-semibold text-gray-800 bg-white">
+                                    Milestones
+                                </span>
+                            </div>
+
+                            {/* Table header */}
+                            <div className="text-xs font-semibold text-gray-600 mb-2 px-1 hidden md:grid grid-cols-12">
+                                <div className="col-span-3">
+                                    Score/Progress
                                 </div>
+                                <div className="col-span-5">Milestone</div>
+                                <div className="col-span-2">Start date</div>
+                                <div className="col-span-2">Deadline</div>
+                            </div>
 
-                                {/* Table header */}
-                                <div className="text-xs font-semibold text-gray-600 mb-2 px-1 hidden md:grid grid-cols-12">
-                                    <div className="col-span-3">Score/Progress</div>
-                                    <div className="col-span-5">Milestone</div>
-                                    <div className="col-span-2">Start date</div>
-                                    <div className="col-span-2">Deadline</div>
-                                </div>
-
-                                {/* Milestones list — all milestones inside one shared container */}
-                                <div className="flex-1 overflow-y-auto milestone-scroll">
-                                    <div className="p-3 border rounded-xl bg-white space-y-3">
-                                        {milestonesList.map((m, i) => {
-                                            const pct = Math.round((parseFloat(m.score) || 0) * 100);
-                                            return (
-                                                <div key={m.id || i} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                                                    {/* Score/slider */}
-                                                    <div className="md:col-span-3 flex items-center gap-3">
-                                                        <span className="text-xs md:hidden text-gray-500">Score</span>
-                                                        <div className="text-sm w-8 text-right">{pct}</div>
-                                                        <input
-                                                            type="range"
-                                                            min={0}
-                                                            max={100}
-                                                            value={pct}
-                                                            disabled={updatingMilestone === m.id}
-                                                            onChange={(e) => {
-                                                                const val = Number(e.target.value || 0);
-                                                                setLocalGoal((prev) => {
-                                                                    if (!prev) return prev;
-                                                                    const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, score: val / 100 } : mm));
-                                                                    return { ...prev, milestones: ms };
-                                                                });
-                                                            }}
-                                                            onMouseUp={(e) => handleMilestoneScoreChange(m.id, e.target.value)}
-                                                            onTouchEnd={(e) => handleMilestoneScoreChange(m.id, e.target.value)}
-                                                            className="flex-1"
-                                                        />
+                            {/* Milestones list — all milestones inside one shared container */}
+                            <div className="flex-1 overflow-y-auto milestone-scroll">
+                                {/* make the milestone card border explicitly gray to match the date inputs */}
+                                <div className="p-3 border border-slate-300 rounded-xl bg-white space-y-3">
+                                    {milestonesList.map((m, i) => {
+                                        const pct = Math.round(
+                                            (parseFloat(m.score) || 0) * 100
+                                        );
+                                        return (
+                                            <div
+                                                key={m.id || i}
+                                                className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center"
+                                            >
+                                                {/* Score/slider */}
+                                                <div className="md:col-span-3 flex items-center gap-3">
+                                                    <span className="text-xs md:hidden text-gray-500">
+                                                        Score
+                                                    </span>
+                                                    <div className="text-sm w-8 text-right">
+                                                        {pct}
                                                     </div>
+                                                    <input
+                                                        type="range"
+                                                        min={0}
+                                                        max={100}
+                                                        value={pct}
+                                                        disabled={
+                                                            updatingMilestone ===
+                                                            m.id
+                                                        }
+                                                        onChange={(e) => {
+                                                            const val = Number(
+                                                                e.target
+                                                                    .value || 0
+                                                            );
+                                                            setLocalGoal(
+                                                                (prev) => {
+                                                                    if (!prev)
+                                                                        return prev;
+                                                                    const ms = (
+                                                                        prev.milestones ||
+                                                                        []
+                                                                    ).map(
+                                                                        (mm) =>
+                                                                            mm.id ===
+                                                                            m.id
+                                                                                ? {
+                                                                                      ...mm,
+                                                                                      score:
+                                                                                          val /
+                                                                                          100,
+                                                                                  }
+                                                                                : mm
+                                                                    );
+                                                                    return {
+                                                                        ...prev,
+                                                                        milestones:
+                                                                            ms,
+                                                                    };
+                                                                }
+                                                            );
+                                                        }}
+                                                        onMouseUp={(e) =>
+                                                            handleMilestoneScoreChange(
+                                                                m.id,
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        onTouchEnd={(e) =>
+                                                            handleMilestoneScoreChange(
+                                                                m.id,
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="flex-1"
+                                                    />
+                                                </div>
 
-                                                    {/* Milestone title */}
-                                                    <div className="md:col-span-5">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="relative">
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setOpenMilestoneMenuId((prev) => (prev === m.id ? null : m.id));
-                                                                        }}
-                                                                        className="p-1.5 rounded-full border border-gray-300 text-gray-600"
-                                                                        aria-haspopup="menu"
-                                                                        aria-expanded={openMilestoneMenuId === m.id}
-                                                                        aria-label="Milestone menu"
+                                                {/* Milestone title */}
+                                                <div className="md:col-span-5">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={(
+                                                                        e
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        setOpenMilestoneMenuId(
+                                                                            (
+                                                                                prev
+                                                                            ) =>
+                                                                                prev ===
+                                                                                m.id
+                                                                                    ? null
+                                                                                    : m.id
+                                                                        );
+                                                                    }}
+                                                                    className="p-1.5 rounded-full border border-gray-300 text-gray-600"
+                                                                    aria-haspopup="menu"
+                                                                    aria-expanded={
+                                                                        openMilestoneMenuId ===
+                                                                        m.id
+                                                                    }
+                                                                    aria-label="Milestone menu"
+                                                                >
+                                                                    <FaEllipsisV className="w-3 h-3" />
+                                                                </button>
+
+                                                                {openMilestoneMenuId ===
+                                                                    m.id && (
+                                                                    <div
+                                                                        onMouseDown={(
+                                                                            e
+                                                                        ) =>
+                                                                            e.stopPropagation()
+                                                                        }
+                                                                        className="absolute left-full top-1/2 transform -translate-y-1/2 ml-2 w-36 bg-white border rounded shadow z-50"
+                                                                        role="menu"
                                                                     >
-                                                                        <FaEllipsisV className="w-3 h-3" />
-                                                                    </button>
-
-                                                                    {openMilestoneMenuId === m.id && (
-                                                                        <div
-                                                                            onMouseDown={(e) => e.stopPropagation()}
-                                                                            className="absolute left-full top-1/2 transform -translate-y-1/2 ml-2 w-36 bg-white border rounded shadow z-50"
-                                                                            role="menu"
+                                                                        <button
+                                                                            onClick={async (
+                                                                                e
+                                                                            ) => {
+                                                                                e.stopPropagation();
+                                                                                setOpenMilestoneMenuId(
+                                                                                    null
+                                                                                );
+                                                                                await handleDeleteMilestone(
+                                                                                    m.id
+                                                                                );
+                                                                            }}
+                                                                            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                            role="menuitem"
                                                                         >
-                                                                            <button
-                                                                                onClick={async (e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setOpenMilestoneMenuId(null);
-                                                                                    await handleDeleteMilestone(m.id);
-                                                                                }}
-                                                                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                                                                role="menuitem"
+                                                                            <svg
+                                                                                stroke="currentColor"
+                                                                                fill="currentColor"
+                                                                                strokeWidth="0"
+                                                                                viewBox="0 0 448 512"
+                                                                                className="w-4 h-4 inline-block mr-2 align-middle"
+                                                                                height="1em"
+                                                                                width="1em"
+                                                                                xmlns="http://www.w3.org/2000/svg"
                                                                             >
-                                                                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 inline-block mr-2 align-middle" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z"></path></svg>
-                                                                                Delete
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
+                                                                                <path d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z"></path>
+                                                                            </svg>
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
 
-                                                                <div className="flex-1">
-                                                                    {/* Click title to edit inline. Save on blur or Enter, Esc cancels. */}
-                                                                    {editingMilestoneId === m.id ? (
-                                                                        <input
-                                                                            autoFocus
-                                                                            value={editingMilestoneTitle}
-                                                                            onChange={(e) => setEditingMilestoneTitle(e.target.value)}
-                                                                            onKeyDown={async (e) => {
-                                                                                if (e.key === "Enter") {
-                                                                                    e.preventDefault();
-                                                                                    await saveMilestoneTitle(m.id);
-                                                                                }
-                                                                                if (e.key === "Escape") {
-                                                                                    setEditingMilestoneId(null);
-                                                                                }
-                                                                            }}
-                                                                            onBlur={async () => {
-                                                                                await saveMilestoneTitle(m.id);
-                                                                            }}
-                                                                            className="w-full px-2 py-1 border rounded text-sm"
-                                                                        />
-                                                                    ) : (
-                                                                        <div
-                                                                            className={`text-sm font-semibold ${m.done ? "line-through text-gray-500" : "text-gray-900"}`}
-                                                                            onClick={() => {
-                                                                                setEditingMilestoneId(m.id);
-                                                                                setEditingMilestoneTitle(m.title || "");
-                                                                            }}
-                                                                            role="button"
-                                                                            tabIndex={0}
-                                                                            onKeyDown={(e) => {
-                                                                                if (e.key === "Enter") {
-                                                                                    setEditingMilestoneId(m.id);
-                                                                                    setEditingMilestoneTitle(m.title || "");
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            {m.title || "Untitled milestone"}
-                                                                        </div>
-                                                                    )}
-                                                                    {m.description && <div className="text-xs text-gray-500 mt-1">{m.description}</div>}
-                                                                </div>
+                                                            <div className="flex-1">
+                                                                {/* Click title to edit inline. Save on blur or Enter, Esc cancels. */}
+                                                                {editingMilestoneId ===
+                                                                m.id ? (
+                                                                    <input
+                                                                        autoFocus
+                                                                        value={
+                                                                            editingMilestoneTitle
+                                                                        }
+                                                                        onChange={(
+                                                                            e
+                                                                        ) =>
+                                                                            setEditingMilestoneTitle(
+                                                                                e
+                                                                                    .target
+                                                                                    .value
+                                                                            )
+                                                                        }
+                                                                        onKeyDown={async (
+                                                                            e
+                                                                        ) => {
+                                                                            if (
+                                                                                e.key ===
+                                                                                "Enter"
+                                                                            ) {
+                                                                                e.preventDefault();
+                                                                                await saveMilestoneTitle(
+                                                                                    m.id
+                                                                                );
+                                                                            }
+                                                                            if (
+                                                                                e.key ===
+                                                                                "Escape"
+                                                                            ) {
+                                                                                setEditingMilestoneId(
+                                                                                    null
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        onBlur={async () => {
+                                                                            await saveMilestoneTitle(
+                                                                                m.id
+                                                                            );
+                                                                        }}
+                                                                        className="w-full px-2 py-1 border rounded text-sm"
+                                                                    />
+                                                                ) : (
+                                                                    <div
+                                                                        className={`text-sm font-semibold ${
+                                                                            m.done
+                                                                                ? "line-through text-gray-500"
+                                                                                : "text-gray-900"
+                                                                        }`}
+                                                                        onClick={() => {
+                                                                            setEditingMilestoneId(
+                                                                                m.id
+                                                                            );
+                                                                            setEditingMilestoneTitle(
+                                                                                m.title ||
+                                                                                    ""
+                                                                            );
+                                                                        }}
+                                                                        role="button"
+                                                                        tabIndex={
+                                                                            0
+                                                                        }
+                                                                        onKeyDown={(
+                                                                            e
+                                                                        ) => {
+                                                                            if (
+                                                                                e.key ===
+                                                                                "Enter"
+                                                                            ) {
+                                                                                setEditingMilestoneId(
+                                                                                    m.id
+                                                                                );
+                                                                                setEditingMilestoneTitle(
+                                                                                    m.title ||
+                                                                                        ""
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        {m.title ||
+                                                                            "Untitled milestone"}
+                                                                    </div>
+                                                                )}
+                                                                {m.description && (
+                                                                    <div className="text-xs text-gray-500 mt-1">
+                                                                        {
+                                                                            m.description
+                                                                        }
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    {/* Dates */}
-                                                    <div className="md:col-span-2">
-                                                        <span className="md:hidden text-xs text-gray-500">Start date</span>
-                                                        <input type="date" value={m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : ""} onChange={async (e) => {
-                                                            const v = e.target.value || null;
-                                                            const prevStart = m.startDate || null;
-                                                            // optimistic UI update
-                                                            setLocalGoal((prev) => {
-                                                                if (!prev) return prev;
-                                                                const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, startDate: v } : mm));
-                                                                return { ...prev, milestones: ms };
-                                                            });
-                                                            const mod = await import("../../services/milestoneService");
-                                                            try {
-                                                                await mod.updateMilestone(m.id, { startDate: v });
-                                                                if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
-                                                            } catch (err) {
-                                                                console.error(err);
-                                                                // revert optimistic change on error
-                                                                setLocalGoal((prev) => {
-                                                                    if (!prev) return prev;
-                                                                    const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, startDate: prevStart } : mm));
-                                                                    return { ...prev, milestones: ms };
-                                                                });
-                                                            }
-                                                        }} className="w-full px-2 py-1 border rounded-md text-sm" />
-                                                    </div>
-                                                    <div className="md:col-span-2">
-                                                        <span className="md:hidden text-xs text-gray-500">Deadline</span>
-                                                        <input type="date" value={m.dueDate ? new Date(m.dueDate).toISOString().slice(0, 10) : ""} onChange={async (e) => {
-                                                            const v = e.target.value || null;
-                                                            const prevDue = m.dueDate || null;
-                                                            setLocalGoal((prev) => {
-                                                                if (!prev) return prev;
-                                                                const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, dueDate: v } : mm));
-                                                                return { ...prev, milestones: ms };
-                                                            });
-                                                            const mod = await import("../../services/milestoneService");
-                                                            try {
-                                                                await mod.updateMilestone(m.id, { dueDate: v });
-                                                                if (typeof onMilestoneUpdated === "function") await onMilestoneUpdated();
-                                                            } catch (err) {
-                                                                console.error(err);
-                                                                setLocalGoal((prev) => {
-                                                                    if (!prev) return prev;
-                                                                    const ms = (prev.milestones || []).map((mm) => (mm.id === m.id ? { ...mm, dueDate: prevDue } : mm));
-                                                                    return { ...prev, milestones: ms };
-                                                                });
-                                                            }
-                                                        }} className="w-full px-2 py-1 border rounded-md text-sm" />
-                                                    </div>
                                                 </div>
-                                            );
-                                        })}
 
-                                        {/* Add milestone row (inside same container) - hidden for completed goals */}
-                                        {localGoal?.status !== "completed" && (
-                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center mt-0">
-                                                <div className="md:col-span-3 flex items-center gap-3">
-                                                    <span className="text-xs md:hidden text-gray-500">Score</span>
-                                                    <div className="text-sm w-8 text-right">0</div>
-                                                    <input type="range" min={0} max={100} defaultValue={0} className="flex-1" />
-                                                </div>
-                                                <div className="md:col-span-5">
-                                                    <input id={`new-milestone-title-${goal.id}`} placeholder="Add milestone" className="w-full px-3 py-2 rounded-xl text-sm" />
+                                                {/* Dates */}
+                                                <div className="md:col-span-2">
+                                                    <span className="md:hidden text-xs text-gray-500">
+                                                        Start date
+                                                    </span>
+                                                    <div className="relative">
+                                                        <input
+                                                            id={`milestone-start-${m.id || i}-${goal.id}`}
+                                                            type="date"
+                                                            value={
+                                                                m.startDate
+                                                                    ? new Date(
+                                                                          m.startDate
+                                                                      )
+                                                                          .toISOString()
+                                                                          .slice(
+                                                                              0,
+                                                                              10
+                                                                          )
+                                                                    : ""
+                                                            }
+                                                            onChange={async (
+                                                                e
+                                                            ) => {
+                                                                const v =
+                                                                    e.target
+                                                                        .value ||
+                                                                    null;
+                                                                const prevStart =
+                                                                    m.startDate ||
+                                                                    null;
+                                                                // optimistic UI update
+                                                                setLocalGoal(
+                                                                    (prev) => {
+                                                                        if (
+                                                                            !prev
+                                                                        )
+                                                                            return prev;
+                                                                        const ms = (
+                                                                            prev.milestones ||
+                                                                            []
+                                                                        ).map(
+                                                                            (
+                                                                                mm
+                                                                            ) =>
+                                                                                mm.id ===
+                                                                                m.id
+                                                                                    ? {
+                                                                                          ...mm,
+                                                                                          startDate:
+                                                                                              v,
+                                                                                      }
+                                                                                    : mm
+                                                                        );
+                                                                        return {
+                                                                            ...prev,
+                                                                            milestones:
+                                                                                ms,
+                                                                        };
+                                                                    }
+                                                                );
+                                                                const mod =
+                                                                    await import(
+                                                                        "../../services/milestoneService"
+                                                                    );
+                                                                try {
+                                                                    await mod.updateMilestone(
+                                                                        m.id,
+                                                                        {
+                                                                            startDate:
+                                                                                v,
+                                                                        }
+                                                                    );
+                                                                    if (
+                                                                        typeof onMilestoneUpdated ===
+                                                                        "function"
+                                                                    )
+                                                                        await onMilestoneUpdated();
+                                                                } catch (err) {
+                                                                    console.error(
+                                                                        err
+                                                                    );
+                                                                    // revert optimistic change on error
+                                                                    setLocalGoal(
+                                                                        (prev) => {
+                                                                            if (
+                                                                                !prev
+                                                                            )
+                                                                                return prev;
+                                                                            const ms = (
+                                                                                prev.milestones ||
+                                                                                []
+                                                                            ).map(
+                                                                                (
+                                                                                    mm
+                                                                                ) =>
+                                                                                    mm.id ===
+                                                                                    m.id
+                                                                                        ? {
+                                                                                              ...mm,
+                                                                                              startDate:
+                                                                                                  prevStart,
+                                                                                          }
+                                                                                        : mm
+                                                                            );
+                                                                            return {
+                                                                                ...prev,
+                                                                                milestones:
+                                                                                    ms,
+                                                                            };
+                                                                        }
+                                                                    );
+                                                                }
+                                                            }}
+                                                            className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                                            aria-label="Open date picker"
+                                                            onClick={() =>
+                                                                openDatePicker(
+                                                                    `milestone-start-${m.id || i}-${goal.id}`
+                                                                )
+                                                            }
+                                                        >
+                                                            📅
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="md:col-span-2">
-                                                    <span className="md:hidden text-xs text-gray-500">Start date</span>
-                                                    <input id={`new-milestone-start-${goal.id}`} type="date" className="w-full px-2 py-1 border rounded-md text-sm" />
-                                                </div>
-                                                <div className="md:col-span-2 flex items-center justify-end">
-                                                    <button onClick={async () => {
-                                                        const title = document.getElementById(`new-milestone-title-${goal.id}`).value;
-                                                        const start = document.getElementById(`new-milestone-start-${goal.id}`).value || null;
-                                                        if (!title) return alert("Please enter a milestone title");
-                                                        try { await handleCreateMilestone({ title, startDate: start }); document.getElementById(`new-milestone-title-${goal.id}`).value = ""; document.getElementById(`new-milestone-start-${goal.id}`).value = ""; } catch (e) { console.error(e); }
-                                                    }} className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700">✓</button>
+                                                    <span className="md:hidden text-xs text-gray-500">
+                                                        Deadline
+                                                    </span>
+                                                    <div className="relative">
+                                                        <input
+                                                            id={`milestone-due-${m.id || i}-${goal.id}`}
+                                                            type="date"
+                                                            value={
+                                                                m.dueDate
+                                                                    ? new Date(
+                                                                          m.dueDate
+                                                                      )
+                                                                          .toISOString()
+                                                                          .slice(
+                                                                              0,
+                                                                              10
+                                                                          )
+                                                                    : ""
+                                                            }
+                                                            onChange={async (
+                                                                e
+                                                            ) => {
+                                                                const v =
+                                                                    e.target
+                                                                        .value ||
+                                                                    null;
+                                                                const prevDue =
+                                                                    m.dueDate ||
+                                                                    null;
+                                                                setLocalGoal(
+                                                                    (prev) => {
+                                                                        if (
+                                                                            !prev
+                                                                        )
+                                                                            return prev;
+                                                                        const ms = (
+                                                                            prev.milestones ||
+                                                                            []
+                                                                        ).map(
+                                                                            (
+                                                                                mm
+                                                                            ) =>
+                                                                                mm.id ===
+                                                                                m.id
+                                                                                    ? {
+                                                                                          ...mm,
+                                                                                          dueDate:
+                                                                                              v,
+                                                                                      }
+                                                                                    : mm
+                                                                        );
+                                                                        return {
+                                                                            ...prev,
+                                                                            milestones:
+                                                                                ms,
+                                                                        };
+                                                                    }
+                                                                );
+                                                                const mod =
+                                                                    await import(
+                                                                        "../../services/milestoneService"
+                                                                    );
+                                                                try {
+                                                                    await mod.updateMilestone(
+                                                                        m.id,
+                                                                        {
+                                                                            dueDate:
+                                                                                v,
+                                                                        }
+                                                                    );
+                                                                    if (
+                                                                        typeof onMilestoneUpdated ===
+                                                                        "function"
+                                                                    )
+                                                                        await onMilestoneUpdated();
+                                                                } catch (err) {
+                                                                    console.error(
+                                                                        err
+                                                                    );
+                                                                    setLocalGoal(
+                                                                        (prev) => {
+                                                                            if (
+                                                                                !prev
+                                                                            )
+                                                                                return prev;
+                                                                            const ms = (
+                                                                                prev.milestones ||
+                                                                                []
+                                                                            ).map(
+                                                                                (
+                                                                                    mm
+                                                                                ) =>
+                                                                                    mm.id ===
+                                                                                    m.id
+                                                                                        ? {
+                                                                                              ...mm,
+                                                                                              dueDate:
+                                                                                                  prevDue,
+                                                                                          }
+                                                                                        : mm
+                                                                            );
+                                                                            return {
+                                                                                ...prev,
+                                                                                milestones:
+                                                                                    ms,
+                                                                            };
+                                                                        }
+                                                                    );
+                                                                }
+                                                            }}
+                                                            className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                                            aria-label="Open date picker"
+                                                            onClick={() =>
+                                                                openDatePicker(
+                                                                    `milestone-due-${m.id || i}-${goal.id}`
+                                                                )
+                                                            }
+                                                        >
+                                                            📅
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                                        );
+                                    })}
 
-                        {/* ACTIVITIES tab - simple activity list */}
-                        {activeTab === "activities" && (
-                            <div className="flex-1 overflow-y-auto milestone-scroll space-y-3">
-                                <div className="mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <input id={`new-activity-${goal.id}`} placeholder="Add activity" className="flex-1 px-3 py-2 border rounded-md text-sm" />
-                                        <button onClick={async () => { const v = document.getElementById(`new-activity-${goal.id}`).value; if (!v) return; try { await addActivity(v); document.getElementById(`new-activity-${goal.id}`).value = ""; } catch (e) { console.error(e); } }} className="px-3 py-2 bg-blue-600 text-white rounded-md">Add</button>
-                                    </div>
-                                </div>
-
-                                {loadingActivities ? (
-                                    <div className="py-6 text-center text-sm text-gray-500">Loading activities…</div>
-                                ) : activities.length === 0 ? (
-                                    <div className="py-6 text-center text-sm text-gray-500">No activities for this goal yet.</div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {activities.map((a) => (
-                                            <div key={a.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
-                                                <div className="flex items-center gap-3">
-                                                    <input type="checkbox" checked={!!a.completed} onChange={() => toggleActivityComplete(a.id)} disabled={savingActivityIds.has(a.id)} />
-                                                    <div className={`text-sm ${a.completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>{a.text || a.title || 'Untitled activity'}</div>
+                                    {/* Add milestone row (inside same container) - hidden for completed goals */}
+                                    {localGoal?.status !== "completed" && (
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center mt-0">
+                                            <div className="md:col-span-3 flex items-center gap-3">
+                                                <span className="text-xs md:hidden text-gray-500">
+                                                    Score
+                                                </span>
+                                                <div className="text-sm w-8 text-right">
+                                                    0
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => removeActivity(a.id)} className="text-red-600 px-2 py-1 rounded-md">Delete</button>
+                                                <input
+                                                    type="range"
+                                                    min={0}
+                                                    max={100}
+                                                    defaultValue={0}
+                                                    className="flex-1"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-5">
+                                                <input
+                                                    id={`new-milestone-title-${goal.id}`}
+                                                    placeholder="Add milestone"
+                                                    className="w-full px-3 py-2 rounded-xl text-sm border border-gray-300"
+                                                    onKeyDown={async (e) => {
+                                                        if (
+                                                            e.key === "Enter"
+                                                        ) {
+                                                            e.preventDefault();
+                                                            await tryCreateMilestoneFromInputs();
+                                                        }
+                                                    }}
+                                                    onBlur={async () => {
+                                                        // attempt to create when the title loses focus
+                                                        await tryCreateMilestoneFromInputs();
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <span className="md:hidden text-xs text-gray-500">
+                                                    Start date
+                                                </span>
+                                                <div className="relative">
+                                                    <input
+                                                        id={`new-milestone-start-${goal.id}`}
+                                                        type="date"
+                                                        className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        onBlur={async () => {
+                                                            await tryCreateMilestoneFromInputs();
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                                        aria-label="Open date picker"
+                                                        onClick={() =>
+                                                            openDatePicker(
+                                                                `new-milestone-start-${goal.id}`
+                                                            )
+                                                        }
+                                                    >
+                                                        📅
+                                                    </button>
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            <div className="md:col-span-2">
+                                                <span className="md:hidden text-xs text-gray-500">
+                                                    Deadline
+                                                </span>
+                                                <div className="relative">
+                                                    <input
+                                                        id={`new-milestone-due-${goal.id}`}
+                                                        type="date"
+                                                        className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        onBlur={async () => {
+                                                            await tryCreateMilestoneFromInputs();
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                                        aria-label="Open date picker"
+                                                        onClick={() =>
+                                                            openDatePicker(
+                                                                `new-milestone-due-${goal.id}`
+                                                            )
+                                                        }
+                                                    >
+                                                        📅
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
+                        </>
+                    )}
+
+                    {/* ACTIVITIES tab - simple activity list */}
+                    {activeTab === "activities" && (
+                        <div className="flex-1 overflow-y-auto milestone-scroll space-y-3">
+                            <div className="mb-3">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        id={`new-activity-${goal.id}`}
+                                        placeholder="Add activity"
+                                        className="flex-1 px-3 py-2 border rounded-md text-sm"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            const v =
+                                                document.getElementById(
+                                                    `new-activity-${goal.id}`
+                                                ).value;
+                                            if (!v) return;
+                                            try {
+                                                await addActivity(v);
+                                                document.getElementById(
+                                                    `new-activity-${goal.id}`
+                                                ).value = "";
+                                            } catch (e) {
+                                                console.error(e);
+                                            }
+                                        }}
+                                        className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            {loadingActivities ? (
+                                <div className="py-6 text-center text-sm text-gray-500">
+                                    Loading activities…
+                                </div>
+                            ) : activities.length === 0 ? (
+                                <div className="py-6 text-center text-sm text-gray-500">
+                                    No activities for this goal yet.
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {activities.map((a) => (
+                                        <div
+                                            key={a.id}
+                                            className="flex items-center justify-between gap-3 p-3 border rounded-lg"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!a.completed}
+                                                    onChange={() =>
+                                                        toggleActivityComplete(
+                                                            a.id
+                                                        )
+                                                    }
+                                                    disabled={savingActivityIds.has(
+                                                        a.id
+                                                    )}
+                                                />
+                                                <div
+                                                    className={`text-sm ${
+                                                        a.completed
+                                                            ? "line-through text-gray-500"
+                                                            : "text-gray-900"
+                                                    }`}
+                                                >
+                                                    {a.text ||
+                                                        a.title ||
+                                                        "Untitled activity"}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() =>
+                                                        removeActivity(a.id)
+                                                    }
+                                                    className="text-red-600 px-2 py-1 rounded-md"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+// If opened as a full page (via route), render the content inline. Otherwise render inside an overlay.
+if (typeof isPage !== "undefined" && isPage) {
+    return (
+        // Pull the whole goal page block up a bit so it lines up with the sidebar menu
+        <div className="h-full flex flex-col -mt-4">
+            <div className="px-0 mb-4">
+                <div className="flex items-center justify-between gap-3 -mt-2">
+                    <div className="flex items-center gap-2 w-full">
+                        {headerBar}
                     </div>
                 </div>
             </div>
-        );
+            {innerContent}
+        </div>
+    );
+}
 
-    // If opened as a full page (via route), render the content inline. Otherwise render inside an overlay.
-    if (typeof isPage !== "undefined" && isPage) {
-        return (
-            <>
-                {headerBar}
-                {innerContent}
-            </>
-        );
-    }
 
     return (
         <div
@@ -751,7 +1441,13 @@ const GoalDetailModal = ({
             onClick={onClose}
         >
             <div className="w-full max-w-4xl">
-                {headerBar}
+                <div className="px-0">
+                    <div className="flex items-center justify-between gap-3 mb-4 -mt-2">
+                        <div className="flex items-center gap-2 w-full">
+                            {headerBar}
+                        </div>
+                    </div>
+                </div>
                 {innerContent}
             </div>
         </div>
