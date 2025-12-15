@@ -70,6 +70,8 @@ export default function TaskFullView({
     savingActivityIds: savingActivityIdsProp = undefined,
     setSavingActivityIds: setSavingActivityIdsProp = undefined,
 }) {
+    // derive a key-area color to use for inline icons (fallback matches previous hardcoded color)
+    const kaColor = (selectedKA && selectedKA.color) || (task && (task.key_area_color || task.keyAreaColor)) || '#4DC3D8';
     // Small per-activity menu component placed near the activity icon so it's
     // visible and not clipped by table layout. Uses local state and a ref to
     // close on outside click / Escape.
@@ -575,7 +577,7 @@ export default function TaskFullView({
                                     if (isHigh) return (<span className="mt-0.5 inline-block text-sm font-bold text-red-600 mr-2" title={`Priority: High`}>!</span>);
                                     return null;
                                 })()}
-                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px] text-[#4DC3D8]" aria-hidden="true" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path></svg>
+                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[20px]" aria-hidden="true" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: kaColor }}><path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path></svg>
                                 <span className="relative z-10">{task.title || task.name || 'Task'}</span>
                             </div>
                             <div className="relative shrink-0 z-50">
@@ -727,9 +729,9 @@ export default function TaskFullView({
             </div>
 
             <div className="px-2 pt-2 bg-white">
-                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                     {!isDontForget && (
-                        <div className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`} aria-label="Activities"> <span className="inline-flex items-center gap-1"><svg className="w-4 h-4 text-[#4DC3D8]" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></div>
+                        <div className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`} aria-label="Activities"> <span className="inline-flex items-center gap-1"><svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: kaColor }}><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></div>
                     )}
                 </div>
             </div>
@@ -762,7 +764,7 @@ export default function TaskFullView({
                                                 <td className="px-3 py-2 align-top">
                                                     <div className="flex items-center gap-3">
                                                         <ActivityMenu item={a} />
-                                                        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4 text-[#4DC3D8]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
+                                                        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: kaColor }}><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
                                                         <div className="flex flex-col">
                                                             <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text || a.activity_name || 'Untitled activity'}</div>
                                                             <div className="text-xs text-slate-500">{a.note || ''}</div>

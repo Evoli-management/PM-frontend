@@ -1,5 +1,5 @@
 import React, { useState, useRef, useLayoutEffect, useEffect } from "react";
-import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaPlus } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
 function getWeekNumber(date) {
@@ -130,6 +130,8 @@ export default function QuarterView({
     }
 
     const [showViewMenu, setShowViewMenu] = useState(false);
+    const [popup, setPopup] = useState(null);
+    // popup: { iso: 'YYYY-MM-DD', events: [...], todos: [...], rect: DOMRect }
     // refs to allow equalizing row heights across the three month columns
     const rowRefs = useRef([]); // rowRefs.current[mIdx][wIdx][dayIdx] = tr element
     const setRowRef = (mIdx, wIdx, dayIdx, el) => {
@@ -165,6 +167,10 @@ export default function QuarterView({
     // inside a useEffect so the UI can update immediately and the measurements
     // occur right after paint.
     useEffect(() => {
+        // For quarter view we prefer compact rows; skip forcing equal heights to avoid
+        // leaving blank space under dates that don't need it. Other views still
+        // benefit from equalized rows, so only run when not in quarter view.
+        if (view === 'quarter') return;
         if (!rowRefs.current || rowRefs.current.length === 0) return;
         let raf = null;
         const run = () => {
@@ -199,7 +205,7 @@ export default function QuarterView({
         return () => {
             if (raf) cancelAnimationFrame(raf);
         };
-    }, [events, todos]);
+    }, [events, todos, view]);
 
     useEffect(() => {
         const onResize = () => {
@@ -218,6 +224,28 @@ export default function QuarterView({
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
     }, []);
+
+    // Close popup on outside click or Esc
+    useEffect(() => {
+        if (!popup) return;
+        const onDocClick = (e) => {
+            try {
+                // If click inside popup element, keep open
+                const el = document.getElementById(`quarter-popup-${popup.iso}`);
+                if (el && el.contains(e.target)) return;
+            } catch (_) {}
+            setPopup(null);
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') setPopup(null);
+        };
+        document.addEventListener('click', onDocClick);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('click', onDocClick);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [popup]);
     return (
         <>
             <style>{`
@@ -348,66 +376,110 @@ export default function QuarterView({
                                                 return (
                                                     <tr ref={(el) => setRowRef(mIdx, wIdx, dayIdx, el)} key={dayIdx} className="bg-white">
                                                         <td
-                                                            className={`px-3 py-3 text-left align-top cursor-pointer ${!isCurrentMonth ? 'text-gray-300' : ''}`}
+                                                            className={`px-3 py-3 text-left align-top ${!isCurrentMonth ? 'text-gray-300' : ''}`}
                                                             data-date={date.toISOString().slice(0,10)}
-                                                            style={{ minWidth: 80 }}
-                                                            onClick={() => onDayClick && onDayClick(date)}
+                                                            style={{ minWidth: 80, position: 'relative' }}
                                                         >
                                                             {showWeekNum && week.weekNum && (
                                                                 <span className="text-[11px] text-gray-500 bg-white px-1 rounded">
                                                                     {week.weekNum}
                                                                 </span>
                                                             )}
-                                                            <div className={`text-sm font-semibold flex items-center gap-1 ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
-                                                                <span className="w-12 inline-block">{formatDate(date, { includeWeekday: true }).split(',')[0]}</span>
-                                                                <span className="">{date.getDate()}</span>
-                                                            </div>
-                                                            {/* daily chips */}
-                                                            {(() => {
-                                                                const { start: dStart, end: dEnd } = getDayBounds(date);
-                                                                const dayEvents = (events || []).filter((ev) => overlapsDay(ev.start, ev.end, dStart, dEnd));
-                                                                const dayTodos = (todos || []).filter((t) => {
-                                                                    const { s, e } = taskSpan(t);
-                                                                    return overlapsDay(s, e, dStart, dEnd);
-                                                                });
-                                                                const chips = [];
-                                                                for (const ev of dayEvents) {
-                                                                    const color = categories?.[ev.kind]?.color || 'bg-slate-300';
-                                                                    chips.push({ type: 'event', id: ev.id, title: ev.title || '(event)', color, taskId: ev.taskId, data: ev });
-                                                                }
-                                                                const eventTaskIds = new Set(dayEvents.map((e) => String(e.taskId || '')));
-                                                                for (const t of dayTodos) {
-                                                                    if (eventTaskIds.has(String(t.id))) continue;
-                                                                    chips.push({ type: 'task', id: t.id, title: t.title || '(task)', color: '#7ED4E3', data: t });
-                                                                }
-                                                                const maxShow = 3;
-                                                                const show = chips.slice(0, maxShow);
-                                                                const extra = chips.length - show.length;
-                                                                if (chips.length === 0) return null;
-                                                                return (
-                                                                    <div className="mt-2 flex flex-col gap-1 items-start">
-                                                                        {show.map((c) => (
+                                                            <div className={`text-sm font-semibold flex items-center justify-between ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="w-12 inline-block">{formatDate(date, { includeWeekday: true }).split(',')[0]}</span>
+                                                                    <span className="">{date.getDate()}</span>
+                                                                </div>
+                                                                {(() => {
+                                                                    const { start: dStart, end: dEnd } = getDayBounds(date);
+                                                                    const dayEvents = (events || []).filter((ev) => overlapsDay(ev.start, ev.end, dStart, dEnd));
+                                                                    const dayTodos = (todos || []).filter((t) => {
+                                                                        const { s, e } = taskSpan(t);
+                                                                        return overlapsDay(s, e, dStart, dEnd);
+                                                                    });
+                                                                    // For quarter view we don't render chips inline. Instead show a '+' icon
+                                                                    // to the right which opens a popup listing all events and tasks for the date.
+                                                                    const chips = [];
+                                                                    for (const ev of dayEvents) {
+                                                                        const color = categories?.[ev.kind]?.color || 'bg-slate-300';
+                                                                        chips.push({ type: 'event', id: ev.id, title: ev.title || '(event)', color, taskId: ev.taskId, data: ev });
+                                                                    }
+                                                                    const eventTaskIds = new Set(dayEvents.map((e) => String(e.taskId || '')));
+                                                                    for (const t of dayTodos) {
+                                                                        if (eventTaskIds.has(String(t.id))) continue;
+                                                                        chips.push({ type: 'task', id: t.id, title: t.title || '(task)', color: '#7ED4E3', data: t });
+                                                                    }
+                                                                    if (chips.length === 0) return null;
+                                                                    const iso = date.toISOString().slice(0,10);
+                                                                    return (
+                                                                        <div className="ml-2 flex items-center">
                                                                             <button
-                                                                                key={`${c.type}-${c.id}`}
-                                                                                title={c.title}
-                                                                                className={`text-[11px] px-2 py-[2px] rounded hover:opacity-90 truncate w-full`}
-                                                                                style={c.type === 'task' ? { backgroundColor: '#7ED4E3', color: '#0B4A53' } : undefined}
+                                                                                aria-label={`Show items for ${iso}`}
+                                                                                className="text-sm text-blue-700 hover:bg-slate-50 p-0.5 rounded inline-flex items-center"
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    if (c.type === 'event') {
-                                                                                        if (c.taskId && onTaskClick) return onTaskClick(String(c.taskId));
-                                                                                        return onEventClick && onEventClick(c.data);
-                                                                                    }
-                                                                                    if (c.type === 'task') return onTaskClick && onTaskClick(String(c.id));
+                                                                                    setPopup({ iso, events: dayEvents, todos: dayTodos });
                                                                                 }}
                                                                             >
-                                                                                <span className="truncate">{c.title}</span>
+                                                                                <FaPlus size={12} />
                                                                             </button>
-                                                                        ))}
-                                                                        {extra > 0 && <div className="text-[11px] text-blue-700">+{extra} more</div>}
-                                                                    </div>
-                                                                );
-                                                            })()}
+                                                                            {popup && popup.iso === iso && (
+                                                                                <div
+                                                                                    id={`quarter-popup-${popup.iso}`}
+                                                                                    style={{ position: 'absolute', top: '100%', right: 0, width: 320, zIndex: 50 }}
+                                                                                    className="rounded-lg border bg-white shadow-lg p-3 text-sm mt-2"
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                >
+                                                                                    <div className="flex items-center justify-between mb-2">
+                                                                                        <div className="font-semibold">Items on {popup.iso}</div>
+                                                                                        <button className="text-gray-500 hover:text-gray-700" onClick={() => setPopup(null)} aria-label="Close">✕</button>
+                                                                                    </div>
+                                                                                    <div className="max-h-64 overflow-auto">
+                                                                                        {popup.events && popup.events.length > 0 && (
+                                                                                            <div className="mb-2">
+                                                                                                <div className="text-xs text-gray-500 mb-1">Events</div>
+                                                                                                {popup.events.map((ev) => (
+                                                                                                    <button
+                                                                                                        key={`ev-${ev.id}`}
+                                                                                                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50"
+                                                                                                        onClick={() => {
+                                                                                                            setPopup(null);
+                                                                                                            if (ev.taskId && onTaskClick) return onTaskClick(String(ev.taskId));
+                                                                                                            return onEventClick && onEventClick(ev);
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        <div className="truncate">{ev.title || '(event)'}</div>
+                                                                                                    </button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {popup.todos && popup.todos.length > 0 && (
+                                                                                            <div>
+                                                                                                <div className="text-xs text-gray-500 mb-1">Tasks</div>
+                                                                                                {popup.todos.map((t) => (
+                                                                                                    <button
+                                                                                                        key={`t-${t.id}`}
+                                                                                                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50"
+                                                                                                        onClick={() => {
+                                                                                                            setPopup(null);
+                                                                                                            return onTaskClick && onTaskClick(String(t.id));
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        <div className="truncate">{t.title || '(task)'}</div>
+                                                                                                    </button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {(!popup.events || popup.events.length === 0) && (!popup.todos || popup.todos.length === 0) && (
+                                                                                            <div className="text-gray-500">No items</div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -436,6 +508,8 @@ export default function QuarterView({
                     );
                 })}
             </div>
+
+            
         </>
     );
 }

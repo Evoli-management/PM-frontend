@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
+// keep rendering inline (match KeyAreas behavior)
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar.jsx";
 import { getPriorityLevel } from "../utils/keyareasHelpers";
@@ -189,23 +190,33 @@ export default function DontForget() {
     });
     const [showColumnsMenu, setShowColumnsMenu] = useState(false);
     const columnsMenuRef = useRef(null);
-    useEffect(() => {
-        try { window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns)); } catch (e) {}
-    }, [visibleColumns]);
-
-    // force header re-mount when visibleColumns changes to ensure <thead> layout updates
+    const columnsButtonRef = useRef(null);
+    const columnsMenuPopupRef = useRef(null);
+    useEffect(() => { try { window.localStorage.setItem('keyareas.visibleColumns', JSON.stringify(visibleColumns)); } catch (e) {} }, [visibleColumns]);
     const [headerKey, setHeaderKey] = useState(0);
     useEffect(() => { try { setHeaderKey((k) => k + 1); } catch (e) {} }, [visibleColumns]);
     useEffect(() => { try { window.localStorage.setItem('keyareas.showCompleted', String(!!showCompleted)); } catch (e) {} }, [showCompleted]);
     // close columns menu on outside click / Escape
     useEffect(() => {
         if (!showColumnsMenu) return;
-        const handleClick = (e) => { if (!columnsMenuRef.current) return; if (!columnsMenuRef.current.contains(e.target)) setShowColumnsMenu(false); };
+        const handleClick = (e) => {
+            // if click is inside the original wrapper, or inside the floating popup, keep it open
+            if (columnsMenuRef.current && columnsMenuRef.current.contains(e.target)) return;
+            if (columnsMenuPopupRef.current && columnsMenuPopupRef.current.contains(e.target)) return;
+            setShowColumnsMenu(false);
+        };
         const handleKey = (e) => { if (e.key === 'Escape') setShowColumnsMenu(false); };
         document.addEventListener('mousedown', handleClick);
         document.addEventListener('keydown', handleKey);
         return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
     }, [showColumnsMenu]);
+
+    // Recompute popup anchor on scroll/resize so the popup follows the gear button.
+    // Listen to scroll on any scrollable ancestor (not just window) and also
+    // observe the button size/position so the popup stays anchored when inner
+    // containers are scrolled or resized.
+    // The columns popup is rendered as an absolutely-positioned element inside
+    // the relative header wrapper so it scrolls with the main content (match KeyAreas).
 
     
 
@@ -1517,6 +1528,7 @@ export default function DontForget() {
                                         </div>
                                         <div className="relative ml-1" ref={columnsMenuRef}>
                                             <button
+                                                ref={columnsButtonRef}
                                                 type="button"
                                                 aria-haspopup="menu"
                                                 aria-expanded={showColumnsMenu ? "true" : "false"}
@@ -1527,7 +1539,11 @@ export default function DontForget() {
                                                 <FaCog />
                                             </button>
                                             {showColumnsMenu && (
-                                                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
+                                                <div
+                                                    ref={columnsMenuPopupRef}
+                                                    role="menu"
+                                                    className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow z-50 p-3 text-sm"
+                                                >
                                                     <div className="font-medium mb-2">Columns</div>
                                                     <label className="flex items-center gap-2 py-1">
                                                         <input
@@ -1815,7 +1831,6 @@ export default function DontForget() {
                                             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             aria-label="Add task"
                                         >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                             Add Task
                                         </button>
                                     </div>
