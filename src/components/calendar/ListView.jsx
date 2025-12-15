@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 
@@ -17,6 +18,31 @@ const ListView = ({
     const { formatDate, formatTime } = useCalendarPreferences();
     const label = formatDate(new Date(currentDate || Date.now()), { longMonth: true });
     const [showViewMenu, setShowViewMenu] = useState(false);
+    const [keyAreasMap, setKeyAreasMap] = useState({});
+    const navigate = useNavigate();
+
+    // Load key areas once so we can reflect their colors for tasks
+    React.useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const mod = await import('../../services/keyAreaService');
+                const svc = mod && (mod.default || mod);
+                let list = [];
+                try {
+                    list = svc && typeof svc.list === 'function' ? await svc.list({ includeTaskCount: false }) : [];
+                } catch (e) {
+                    list = [];
+                }
+                if (!mounted) return;
+                const map = (list || []).reduce((acc, k) => { acc[String(k.id)] = k; return acc; }, {});
+                setKeyAreasMap(map);
+            } catch (e) {
+                // ignore
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
 
     // Build a combined list: events from BE + tasks (todos) that fall in the current range
     const showTasks = filterType === "all" || filterType === "task";
@@ -191,11 +217,30 @@ const ListView = ({
                         key={`${it.type}-${it.id}`}
                         className="bg-white rounded-lg border border-blue-100 p-3 flex flex-col md:flex-row md:items-center gap-2 cursor-pointer hover:bg-blue-50"
                         onClick={() => {
-                            if (it.type === "event") {
+                            // If this is a task that belongs to a Key Area, navigate to that Key Area view
+                            if (it.type === 'task') {
+                                const kaId = it.data?.key_area_id || it.data?.keyAreaId || it.data?.key_area || it.data?.keyArea || null;
+                                if (kaId) {
+                                    try {
+                                        navigate({ pathname: '/key-areas', search: `?ka=${kaId}&openKA=1&task=${it.id}` });
+                                    } catch (_) {}
+                                    return;
+                                }
+                                // If task has no Key Area, treat it as a Don't Forget item and show the DontForget task list
+                                try {
+                                    // Navigate to DontForget list view but do NOT open the task full view
+                                    navigate(`/tasks?dontforget=1`);
+                                } catch (_) {
+                                    // Fallback: do not open the full task view here
+                                    return;
+                                }
+                                return;
+                            }
+                            // Events preserve existing behavior
+                            if (it.type === 'event') {
                                 if (it.taskId && onTaskClick) return onTaskClick(String(it.taskId));
                                 return onEventClick && onEventClick(it.data);
                             }
-                            if (it.type === "task") return onTaskClick && onTaskClick(String(it.id));
                         }}
                         title={it.title}
                     >
@@ -205,19 +250,45 @@ const ListView = ({
                         <div className="flex-1">
                             <div className="font-semibold text-slate-800 flex items-center gap-2">
                                 {it.type === "event" && <span>Event:</span>}
-                                {it.type === "task" && (
-                                    <svg
-                                        stroke="currentColor"
-                                        fill="currentColor"
-                                        strokeWidth="0"
-                                        viewBox="0 0 448 512"
-                                        className="w-4 h-4 text-[#4DC3D8]"
-                                        aria-hidden="true"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                    >
-                                        <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
-                                    </svg>
-                                )}
+                                {it.type === "task" && (() => {
+                                    const kaId = it.data?.key_area_id || it.data?.keyAreaId || it.data?.key_area || it.data?.keyArea || null;
+                                    if (kaId) {
+                                        const ka = keyAreasMap[String(kaId)];
+                                        const color = (ka && ka.color) || '#4DC3D8';
+                                        return (
+                                            <button
+                                                type="button"
+                                                aria-label={`Open Key Area ${ka?.title || ''}`}
+                                                className="p-0 m-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // navigate to Key Areas page and open the specific KA/task
+                                                    try {
+                                                        navigate({ pathname: '/key-areas', search: `?ka=${kaId}&openKA=1&task=${it.id}` });
+                                                    } catch (err) {}
+                                                }}
+                                                style={{ lineHeight: 0 }}
+                                            >
+                                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" style={{ color }}>
+                                                    <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+                                                </svg>
+                                            </button>
+                                        );
+                                    }
+                                    return (
+                                        <svg
+                                            stroke="currentColor"
+                                            fill="currentColor"
+                                            strokeWidth="0"
+                                            viewBox="0 0 448 512"
+                                            className="w-4 h-4 text-[#4DC3D8]"
+                                            aria-hidden="true"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
+                                        </svg>
+                                    );
+                                })()}
                                 <span className="text-blue-700">{it.title}</span>
                             </div>
                             {it.type === "event" && (

@@ -601,6 +601,9 @@ export default function KeyAreas() {
     const viewMenuRef = useRef(null);
     const [showColumnsMenu, setShowColumnsMenu] = useState(false);
     const columnsMenuRef = useRef(null);
+    const columnsButtonRef = useRef(null);
+    const columnsMenuPopupRef = useRef(null);
+    const [columnsAnchor, setColumnsAnchor] = useState(null);
     const [openListMenu, setOpenListMenu] = useState(null); // list number for context menu
     const [listMenuPos, setListMenuPos] = useState({ top: 0, left: 0 }); // popup menu position
     const composerModalRef = useRef(null);
@@ -1325,8 +1328,9 @@ export default function KeyAreas() {
     useEffect(() => {
         if (!showColumnsMenu) return;
         const handleClick = (e) => {
-            if (!columnsMenuRef.current) return;
-            if (!columnsMenuRef.current.contains(e.target)) setShowColumnsMenu(false);
+            if (columnsMenuRef.current && columnsMenuRef.current.contains(e.target)) return;
+            if (columnsMenuPopupRef.current && columnsMenuPopupRef.current.contains(e.target)) return;
+            setShowColumnsMenu(false);
         };
         const handleKey = (e) => {
             if (e.key === "Escape") setShowColumnsMenu(false);
@@ -1336,6 +1340,35 @@ export default function KeyAreas() {
         return () => {
             document.removeEventListener("mousedown", handleClick);
             document.removeEventListener("keydown", handleKey);
+        };
+    }, [showColumnsMenu]);
+
+    // When columns menu is open, reposition it on scroll/resize so it follows the gear button
+    useEffect(() => {
+        if (!showColumnsMenu) return;
+        let raf = null;
+        const updateAnchor = () => {
+            if (!columnsButtonRef.current) return;
+            try {
+                const rect = columnsButtonRef.current.getBoundingClientRect();
+                const menuWidth = 224; // matches w-56
+                const left = Math.max(8, rect.right - menuWidth + window.scrollX);
+                const top = rect.bottom + window.scrollY + 6;
+                setColumnsAnchor({ left, top });
+            } catch (e) {}
+        };
+        const onScrollOrResize = () => {
+            if (raf) cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(updateAnchor);
+        };
+        window.addEventListener('scroll', onScrollOrResize, { passive: true });
+        window.addEventListener('resize', onScrollOrResize);
+        // update immediately
+        updateAnchor();
+        return () => {
+            if (raf) cancelAnimationFrame(raf);
+            window.removeEventListener('scroll', onScrollOrResize);
+            window.removeEventListener('resize', onScrollOrResize);
         };
     }, [showColumnsMenu]);
 
@@ -2428,44 +2461,8 @@ export default function KeyAreas() {
                                                         : "Limit reached: You can have up to 9 custom Key Areas (Ideas is fixed as the 10th)."
                                                 }
                                             >
-                                                <FaPlus /> New Key Area
+                                               New Key Area
                                             </button>
-                                            {/* Gear beside header when no KA is selected */}
-                                            <div className="relative">
-                                                <button
-                                                    type="button"
-                                                    aria-haspopup="menu"
-                                                    aria-expanded={showColumnsMenu ? "true" : "false"}
-                                                    className="ml-2 px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                                                    onClick={() => setShowColumnsMenu((s) => !s)}
-                                                    title="Columns"
-                                                >
-                                                    <FaCog />
-                                                </button>
-                                                {showColumnsMenu && (
-                                                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
-                                                        <div className="font-medium mb-2">Columns</div>
-                                                        <label className="flex items-center gap-2 py-1">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={!!showCompleted}
-                                                                onChange={() => setShowCompleted((s) => !s)}
-                                                            />
-                                                            <span className="capitalize">Show completed items</span>
-                                                        </label>
-                                                        {Object.keys(visibleColumns).map((key) => (
-                                                            <label key={key} className="flex items-center gap-2 py-1">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={!!visibleColumns[key]}
-                                                                    onChange={() => setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }))}
-                                                                />
-                                                                <span className="capitalize">{key.replace('_', ' ')}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -3288,9 +3285,6 @@ export default function KeyAreas() {
                                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 aria-label="Add task"
                                             >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                                </svg>
                                                 Add Task
                                             </button>
                                         </div>
