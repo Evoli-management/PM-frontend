@@ -1,5 +1,5 @@
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
 import ModalManager from "./components/shared/ModalManager.jsx";
 import PrivateRoute from "./components/shared/PrivateRoute.jsx";
@@ -46,13 +46,20 @@ export default function App() {
         "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
         "/verify-email", "/verify-password-change", "/verify-email-change"
     ];
-    const currentPath = window.location.hash.replace(/^#\/?/, "/");
+    const [currentPath, setCurrentPath] = useState(() => window.location.hash.replace(/^#\/?/, "/"));
+
+    useEffect(() => {
+        const onHashChange = () => setCurrentPath(window.location.hash.replace(/^#\/?/, "/"));
+        window.addEventListener('hashchange', onHashChange);
+        return () => window.removeEventListener('hashchange', onHashChange);
+    }, []);
+    const isPublicRoute = publicFooterRoutes.includes(currentPath);
     return (
         <Router>
             <div className="page-bg">
                 <Navbar />
                 <ModalManager />
-                <main className="flex-grow">
+                <main className={isPublicRoute ? "flex-grow" : "flex-grow pt-[72px] md:pt-[72px] md:ml-64"}>
                     <Suspense
                         fallback={
                             <div className="w-full py-10 flex items-center justify-center text-gray-600">

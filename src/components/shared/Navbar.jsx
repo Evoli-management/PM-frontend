@@ -308,6 +308,17 @@ export default function Navbar() {
         return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
     }, []);
 
+    // Listen for global auth changes (login/logout) to refresh auth state immediately
+    useEffect(() => {
+        const onAuthChanged = () => {
+            const token = localStorage.getItem("access_token");
+            setIsAuthenticated(!!token);
+            if (token) fetchUserProfile();
+        };
+        window.addEventListener('authChanged', onAuthChanged);
+        return () => window.removeEventListener('authChanged', onAuthChanged);
+    }, []);
+
     const fetchUserProfile = async () => {
         try {
             const profile = await userProfileService.getProfile();
@@ -406,18 +417,18 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative h-10 layout-panel-gap-bottom-match"
+            className="bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
         >
             <div className="w-full px-2 md:px-4 h-full flex items-center justify-between">
-                    <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
+                    <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
-                            className="hidden md:block h-5 object-contain"
-                            style={{ maxHeight: '24px' }}
+                            className="hidden md:block h-7 object-contain"
+                                style={{ maxHeight: '32px' }}
                         />
                         <span className="sr-only">Practical Manager</span>
                     </Link>
