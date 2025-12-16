@@ -43,6 +43,11 @@ const LoginPage = () => {
                 console.log("Storing token in localStorage");
                 localStorage.setItem("access_token", token);
 
+                // Notify other parts of the app that auth state changed
+                try {
+                    window.dispatchEvent(new Event('authChanged'));
+                } catch (e) {}
+
                 // Verify the token works by testing an authenticated endpoint
                 try {
                     const testRes = await authService.verifyToken();

@@ -308,6 +308,17 @@ export default function Navbar() {
         return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
     }, []);
 
+    // Listen for global auth changes (login/logout) to refresh auth state immediately
+    useEffect(() => {
+        const onAuthChanged = () => {
+            const token = localStorage.getItem("access_token");
+            setIsAuthenticated(!!token);
+            if (token) fetchUserProfile();
+        };
+        window.addEventListener('authChanged', onAuthChanged);
+        return () => window.removeEventListener('authChanged', onAuthChanged);
+    }, []);
+
     const fetchUserProfile = async () => {
         try {
             const profile = await userProfileService.getProfile();
