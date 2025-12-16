@@ -47,12 +47,13 @@ export default function App() {
         "/verify-email", "/verify-password-change", "/verify-email-change"
     ];
     const currentPath = window.location.hash.replace(/^#\/?/, "/");
+    const isPublicRoute = publicFooterRoutes.includes(currentPath);
     return (
         <Router>
             <div className="page-bg">
                 <Navbar />
                 <ModalManager />
-                <main className="flex-grow pt-[72px] md:pt-[72px] md:ml-64">
+                <main className={isPublicRoute ? "flex-grow" : "flex-grow pt-[72px] md:pt-[72px] md:ml-64"}>
                     <Suspense
                         fallback={
                             <div className="w-full py-10 flex items-center justify-center text-gray-600">
