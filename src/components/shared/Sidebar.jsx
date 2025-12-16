@@ -274,7 +274,7 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`bg-white ${collapsed ? "w-20" : "w-64"} shadow-sm border border-gray-200 border-t-0 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-14 left-0 z-40 md:fixed md:top-14 md:left-0 md:translate-x-0 layout-panel-gap-right h-[calc(100vh-56px)]`}
+            className={`bg-white ${collapsed ? "w-20" : "w-64"} shadow-sm border border-gray-200 border-t-0 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-16 left-0 z-40 md:fixed md:top-16 md:left-0 md:translate-x-0 layout-panel-gap-right h-[calc(100vh-64px)]`}
             aria-label="Sidebar"
         >
             <div className="flex-1 overflow-y-visible pb-2">
