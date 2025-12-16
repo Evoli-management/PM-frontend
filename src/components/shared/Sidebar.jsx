@@ -274,10 +274,10 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`bg-white ${collapsed ? "w-20" : "w-64"} min-h-screen shadow-sm border border-gray-200 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-14 left-0 z-40 md:sticky md:top-14 md:translate-x-0 md:ml-1 layout-panel-gap-right hidden-mobile`}
+            className={`bg-white ${collapsed ? "w-20" : "w-64"} shadow-sm border border-gray-200 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-14 left-0 z-40 md:sticky md:top-14 md:translate-x-0 md:ml-1 layout-panel-gap-right hidden-mobile h-[calc(100vh-56px)]`}
             aria-label="Sidebar"
         >
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-2">
+            <div className="flex-1 overflow-y-visible pb-2">
                 <div className="mb-6 flex items-center gap-2 px-2">
                     <div className="ml-auto flex items-center gap-2">
                         {mobileOpen && (
