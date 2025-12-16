@@ -412,7 +412,7 @@ export default function Navbar() {
             // }}
         >
             <div className="w-full px-2 md:px-4 h-full flex items-center justify-between">
-                    <Link to="/" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
+                    <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
