@@ -52,7 +52,7 @@ export default function App() {
             <div className="page-bg">
                 <Navbar />
                 <ModalManager />
-                <main className="flex-grow pt-[64px] md:pt-[64px]">
+                <main className="flex-grow pt-3 md:pt-4">
                     <Suspense
                         fallback={
                             <div className="w-full py-10 flex items-center justify-center text-gray-600">
