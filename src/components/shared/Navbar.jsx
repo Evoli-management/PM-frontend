@@ -406,7 +406,7 @@ export default function Navbar() {
 
     return (
         <header
-            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative h-10 layout-panel-gap-bottom-match"
+            className="bg-white text-black shadow-sm z-[100] border-b border-gray-200 relative h-14"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
@@ -416,8 +416,8 @@ export default function Navbar() {
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
-                            className="hidden md:block h-5 object-contain"
-                            style={{ maxHeight: '24px' }}
+                            className="hidden md:block h-7 object-contain"
+                                style={{ maxHeight: '32px' }}
                         />
                         <span className="sr-only">Practical Manager</span>
                     </Link>
