@@ -109,6 +109,22 @@ const keyAreaService = {
         await apiClient.delete(`/key-areas/${id}`);
         return true;
     },
+
+    /**
+     * Get another user's key areas (within same organization)
+     * @param {string} userId - The ID of the user whose key areas to fetch
+     * @returns {Promise<Array>} A promise that resolves to an array of key areas
+     */
+    async getMemberKeyAreas(userId) {
+        const res = await apiClient.get(`/key-areas/user/${userId}`);
+        const items = Array.isArray(res.data) ? res.data.map(toFE) : [];
+        return items.sort((a, b) => {
+            const ap = Number.isFinite(a.position) ? a.position : 0;
+            const bp = Number.isFinite(b.position) ? b.position : 0;
+            if (ap !== bp) return ap - bp;
+            return String(a.title || "").localeCompare(String(b.title || ""));
+        });
+    },
 };
 
 export default keyAreaService;

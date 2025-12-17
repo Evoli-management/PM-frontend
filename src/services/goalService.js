@@ -605,3 +605,32 @@ export const deleteGoalHard = async (goalId) => {
         handleError("hard deleting goal", error);
     }
 };
+
+/**
+ * Get another user's goals (public only for regular users, all for admin)
+ * @param {string} userId - The ID of the user whose goals to fetch
+ * @returns {Promise<Array>} A promise that resolves to an array of goals
+ */
+export const getUserGoals = async (userId) => {
+    try {
+        const response = await apiClient.get(`/goals/user/${userId}`);
+        return response.data;
+    } catch (error) {
+        handleError(`fetching goals for user ${userId}`, error);
+    }
+};
+
+/**
+ * Admin: Update any user's goal
+ * @param {string} goalId - The ID of the goal to update
+ * @param {object} updateData - The goal update data
+ * @returns {Promise<object>} A promise that resolves to the updated goal
+ */
+export const adminUpdateGoal = async (goalId, updateData) => {
+    try {
+        const response = await apiClient.put(`/goals/admin/${goalId}`, updateData);
+        return response.data;
+    } catch (error) {
+        handleError(`admin updating goal ${goalId}`, error);
+    }
+};
