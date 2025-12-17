@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
+import { FaTrash } from "react-icons/fa";
 import TimePicker from "../ui/TimePicker.jsx";
 import useCalendarPreferences from "../../hooks/useCalendarPreferences";
 
@@ -261,14 +262,35 @@ const buildRecurringPattern = ({
         defaultDurationMinutes = 60,
         onClose,
         onCreated,
-        onUpdated,
+    onUpdated,
         users = [],
         goals = [],
         keyAreas = [],
+        // when true, render a Delete button (used by MonthView to surface delete)
+        showDelete = false,
+        // callback to invoke when Delete is clicked
+        onDelete = null,
+        // callback invoked after modal performs a delete (deleted id)
+        onDeleted = null,
     }) => {
 
     // Derived flags and initial date values
     const isEdit = Boolean(event && (event.id || event.start || event.startAt || event.start_at));
+
+    // Determine if this event is part of a recurring series. We check several
+    // shapes because different API responses may include recurrence info under
+    // different keys (recurringPattern, recurrence, seriesId) or the UI may
+    // represent generated occurrences as "<base>_<iso>" or exception ids
+    // prefixed with "ex_". Treat any of these as recurring.
+    const isRecurring = Boolean(
+        event && (
+            event.recurringPattern ||
+            event.recurrence ||
+            event.seriesId ||
+            event.occurrenceStart ||
+            (typeof event.id === 'string' && (event.id.includes('_') || event.id.startsWith('ex_')))
+        )
+    );
 
     // If a startDate prop is provided (e.g. when creating from a calendar slot), prefer it.
     // Otherwise, when editing prefer the event's start fields. Fall back to `now`.
@@ -327,6 +349,9 @@ const buildRecurringPattern = ({
     const [endDateStr, setEndDateStr] = useState(toYMD(initialEnd));
     const [endTimeStr, setEndTimeStr] = useState(toHM(initialEnd));
     const [saving, setSaving] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteScopeChoice, setDeleteScopeChoice] = useState('occurrence');
+    const [deleting, setDeleting] = useState(false);
 
     /* ------------------------- Recurrence state/UI -------------------------- */
 
@@ -368,6 +393,11 @@ const buildRecurringPattern = ({
         parsed.until || endDateStr
     );
     const [recurrenceCount, setRecurrenceCount] = useState(parsed.count || 1);
+    // Track whether the user interacted with recurrence controls. If false when
+    // saving an edit of an existing recurring event, we won't send the
+    // recurringPattern field which prevents accidentally clearing recurrence
+    // when the user only edits time/title/etc.
+    const [recurrenceTouched, setRecurrenceTouched] = useState(false);
 
     /**
      * Edit scope for recurring series:
@@ -478,7 +508,22 @@ const buildRecurringPattern = ({
         setRecurrenceEndType(p.endType || "none");
         setRecurrenceUntilDate(p.until || toYMD(end));
         setRecurrenceCount(p.count || 1);
-        setEditScope("occurrence");
+        // Default edit scope for recurring items:
+        // - If this appears to be a generated occurrence (id contains an underscore)
+        //   or the event explicitly looks like an occurrence, default to "occurrence".
+        // - If the event is the series master (has a seriesId and is not a generated
+        //   occurrence), default to "series" so edits apply to the whole series by default.
+        try {
+            let defaultScope = "occurrence";
+            if (isRecurringInstance) {
+                const appearsToBeOccurrence = Boolean(generatedOccurrenceId || event?.occurrenceStart || event?.isOccurrence);
+                if (appearsToBeOccurrence) defaultScope = "occurrence";
+                else if (event?.seriesId) defaultScope = "series";
+            }
+            setEditScope(defaultScope);
+        } catch (__) {
+            setEditScope("occurrence");
+        }
         // Prefill goal select using multiple possible shapes
         try {
             const g = event?.goal || event?.goalId || event?.goal_id || null;
@@ -509,6 +554,7 @@ const buildRecurringPattern = ({
         setRecurrenceWeeklyDays((prev) =>
             prev.includes(k) ? prev.filter((p) => p !== k) : [...prev, k]
         );
+        setRecurrenceTouched(true);
     };
 
     /* ------------------------------ Save handler ---------------------------- */
@@ -569,20 +615,52 @@ const buildRecurringPattern = ({
             const timezone =
                 Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
-            const recurringPattern = buildRecurringPattern({
-                type: recurrenceType,
-                weeklyDays: recurrenceWeeklyDays,
-                monthlyDay: recurrenceMonthlyDay,
-                yearlyMonth: recurrenceYearlyMonth,
-                yearlyDay: recurrenceYearlyDay,
-                endType: recurrenceEndType,
-                untilDate: recurrenceUntilDate,
-                count: recurrenceCount,
-            });
+            // Build recurringPattern only when creating, or when the user has
+            // interacted with recurrence controls while editing. This avoids
+            // clearing an existing recurrence when the user only changed time
+            // or other unrelated fields.
+            let recurringPattern = null;
+            if (!isEdit) {
+                recurringPattern = buildRecurringPattern({
+                    type: recurrenceType,
+                    weeklyDays: recurrenceWeeklyDays,
+                    monthlyDay: recurrenceMonthlyDay,
+                    yearlyMonth: recurrenceYearlyMonth,
+                    yearlyDay: recurrenceYearlyDay,
+                    endType: recurrenceEndType,
+                    untilDate: recurrenceUntilDate,
+                    count: recurrenceCount,
+                });
+            } else {
+                // Editing an existing event: only compute/send recurringPattern if
+                // the user actually touched recurrence controls. If they did not,
+                // leave it undefined so the API does not modify recurrence.
+                if (recurrenceTouched) {
+                    recurringPattern = buildRecurringPattern({
+                        type: recurrenceType,
+                        weeklyDays: recurrenceWeeklyDays,
+                        monthlyDay: recurrenceMonthlyDay,
+                        yearlyMonth: recurrenceYearlyMonth,
+                        yearlyDay: recurrenceYearlyDay,
+                        endType: recurrenceEndType,
+                        untilDate: recurrenceUntilDate,
+                        count: recurrenceCount,
+                    });
+                } else {
+                    recurringPattern = undefined; // signal to omit from payload
+                }
+            }
 
-                if (isEdit) {
+            if (isEdit) {
+                    // Prefer the appointment update path when the event explicitly
+                    // identifies as an appointment or when the id appears to be a
+                    // generated occurrence id ("<base>_<ISO>"). The appointment
+                    // updater knows how to split generated ids and add occurrence
+                    // context (editScope/occurrenceStart) for the backend. Using
+                    // the wrong updater can produce a 400 from the API.
+                    const looksLikeGeneratedOccurrence = typeof event?.id === 'string' && event.id.includes('_');
                     const updater =
-                        event?.kind === "appointment"
+                        event?.kind === "appointment" || looksLikeGeneratedOccurrence
                             ? calendarService.updateAppointment
                             : calendarService.updateEvent;
 
@@ -593,10 +671,15 @@ const buildRecurringPattern = ({
                         start: toOffsetISO(s),
                         end: toOffsetISO(e),
                         timezone,
-                        recurringPattern: recurringPattern || null,
                         goalId: goalId || null,
                         keyAreaId: keyAreaId || null,
                     };
+
+                    // Only include recurringPattern when we have an explicit value
+                    // (string or null) — undefined means "don't change".
+                    if (recurringPattern !== undefined) {
+                        payload.recurringPattern = recurringPattern;
+                    }
 
                     if (isRecurringInstance) {
                         // Provide the chosen edit scope and context for the server
@@ -626,9 +709,22 @@ const buildRecurringPattern = ({
                     // Use base appointment id for updates: when the UI sends a generated
                     // occurrence id ("baseId_iso"), call the API with the baseId so the
                     // backend (which stores UUID ids) doesn't receive an invalid UUID.
-                    const appointmentIdToUse = isEdit && typeof event?.id === 'string' && event.id.includes('_')
-                        ? event.id.split('_')[0]
-                        : event.id;
+                    let appointmentIdToUse;
+                    if (isEdit && typeof event?.id === 'string' && event.id.includes('_')) {
+                        // Two different underscore id formats exist:
+                        // - generated occurrence: "<baseId>_<ISO>" (baseId is a UUID)
+                        // - exception id returned by backend: "ex_<exceptionUuid>"
+                        // For exception ids we must use the series/base appointment id
+                        // (available on event.seriesId) when calling the appointments
+                        // update endpoint. For generated occurrences use the prefix.
+                        if (event.id.startsWith('ex_')) {
+                            appointmentIdToUse = event?.seriesId || event.id.split('_')[1] || event.id;
+                        } else {
+                            appointmentIdToUse = event.id.split('_')[0];
+                        }
+                    } else {
+                        appointmentIdToUse = event?.id;
+                    }
 
                     // In development you can enable detailed logging above the network call
                     // but avoid logging large objects on the main thread in production.
@@ -1049,7 +1145,10 @@ const buildRecurringPattern = ({
                                         <select
                                             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                             value={recurrenceType}
-                                            onChange={(e) => setRecurrenceType(e.target.value)}
+                                            onChange={(e) => {
+                                                setRecurrenceType(e.target.value);
+                                                setRecurrenceTouched(true);
+                                            }}
                                         >
                                             <option value="none">Does not repeat</option>
                                             <option value="daily">Daily</option>
@@ -1100,12 +1199,13 @@ const buildRecurringPattern = ({
                                                         aria-label="Repeat appointment on day of month (1-31)"
                                                         title="Enter a day number between 1 and 31. Use 31 to indicate the last day in some months if supported by backend."
                                                         className="w-20 rounded-md border border-slate-300 px-2 py-1"
-                                                        value={recurrenceMonthlyDay}
-                                                        onChange={(e) =>
-                                                            setRecurrenceMonthlyDay(
-                                                                Number(e.target.value || 1)
-                                                            )
-                                                        }
+                                                            value={recurrenceMonthlyDay}
+                                                            onChange={(e) => {
+                                                                setRecurrenceMonthlyDay(
+                                                                    Number(e.target.value || 1)
+                                                                );
+                                                                setRecurrenceTouched(true);
+                                                            }}
                                                     />
                                                 </div>
 
@@ -1123,11 +1223,12 @@ const buildRecurringPattern = ({
                                                 <select
                                                     className="rounded-md border border-slate-300 px-2 py-1"
                                                     value={recurrenceYearlyMonth}
-                                                    onChange={(e) =>
+                                                    onChange={(e) => {
                                                         setRecurrenceYearlyMonth(
                                                             Number(e.target.value)
-                                                        )
-                                                    }
+                                                        );
+                                                        setRecurrenceTouched(true);
+                                                    }}
                                                 >
                                                     {Array.from({ length: 12 }).map((_, i) => (
                                                         <option key={i} value={i + 1}>
@@ -1143,12 +1244,13 @@ const buildRecurringPattern = ({
                                                     min="1"
                                                     max="31"
                                                     className="w-20 rounded-md border border-slate-300 px-2 py-1"
-                                                    value={recurrenceYearlyDay}
-                                                    onChange={(e) =>
-                                                        setRecurrenceYearlyDay(
-                                                            Number(e.target.value || 1)
-                                                        )
-                                                    }
+                                                        value={recurrenceYearlyDay}
+                                                        onChange={(e) => {
+                                                            setRecurrenceYearlyDay(
+                                                                Number(e.target.value || 1)
+                                                            );
+                                                            setRecurrenceTouched(true);
+                                                        }}
                                                 />
                                             </div>
                                         )}
@@ -1169,6 +1271,7 @@ const buildRecurringPattern = ({
                                                                 setRecurrenceEndType("none");
                                                                 // Clear any previously set 'until' date when not using 'until'
                                                                 setRecurrenceUntilDate("");
+                                                                setRecurrenceTouched(true);
                                                             }}
                                                         />
                                                         <span>No end date</span>
@@ -1186,6 +1289,7 @@ const buildRecurringPattern = ({
                                                                 if (!recurrenceUntilDate) {
                                                                     setRecurrenceUntilDate(endDateStr || "");
                                                                 }
+                                                                setRecurrenceTouched(true);
                                                             }}
                                                         />
                                                         <span>End by</span>
@@ -1193,11 +1297,12 @@ const buildRecurringPattern = ({
                                                             type="date"
                                                             className="ml-2 rounded-md border border-slate-300 px-2 py-1"
                                                             value={recurrenceEndType === "until" ? (recurrenceUntilDate || "") : ""}
-                                                            onChange={(e) =>
+                                                            onChange={(e) => {
                                                                 setRecurrenceUntilDate(
                                                                     e.target.value
-                                                                )
-                                                            }
+                                                                );
+                                                                setRecurrenceTouched(true);
+                                                            }}
                                                         />
                                                     </label>
 
@@ -1211,6 +1316,7 @@ const buildRecurringPattern = ({
                                                                 setRecurrenceEndType("count");
                                                                 // Clear until date when switching to count
                                                                 setRecurrenceUntilDate("");
+                                                                setRecurrenceTouched(true);
                                                             }}
                                                         />
                                                         <span>End after</span>
@@ -1219,11 +1325,12 @@ const buildRecurringPattern = ({
                                                             min="1"
                                                             className="ml-2 w-20 rounded-md border border-slate-300 px-2 py-1"
                                                             value={recurrenceCount}
-                                                            onChange={(e) =>
+                                                            onChange={(e) => {
                                                                 setRecurrenceCount(
                                                                     Number(e.target.value || 1)
-                                                                )
-                                                            }
+                                                                );
+                                                                setRecurrenceTouched(true);
+                                                            }}
                                                         />
                                                         <span>occurrences</span>
                                                     </label>
@@ -1249,7 +1356,7 @@ const buildRecurringPattern = ({
                                         name="edit-scope"
                                         value="occurrence"
                                         checked={editScope === "occurrence"}
-                                        onChange={() => setEditScope("occurrence")}
+                                        onChange={(e) => setEditScope(e.target.value)}
                                     />
                                     <span>Edit this occurrence only</span>
                                 </label>
@@ -1260,7 +1367,7 @@ const buildRecurringPattern = ({
                                         name="edit-scope"
                                         value="future"
                                         checked={editScope === "future"}
-                                        onChange={() => setEditScope("future")}
+                                        onChange={(e) => setEditScope(e.target.value)}
                                     />
                                     <span>Edit this and all future occurrences</span>
                                 </label>
@@ -1271,7 +1378,7 @@ const buildRecurringPattern = ({
                                         name="edit-scope"
                                         value="series"
                                         checked={editScope === "series"}
-                                        onChange={() => setEditScope("series")}
+                                        onChange={(e) => setEditScope(e.target.value)}
                                     />
                                     <span>Edit the entire series</span>
                                 </label>
@@ -1317,6 +1424,130 @@ const buildRecurringPattern = ({
                                 {saving ? "Saving..." : "Save"}
                             </button>
                             {/* Delete is handled from the appointment bar delete icon; removed modal Delete button */}
+                            {isEdit ? (
+                                <div className="flex items-center gap-2">
+                                    {!showDeleteConfirm ? (
+                                        <button
+                                            type="button"
+                                            aria-label="Delete appointment"
+                                            title="Delete"
+                                            className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center justify-center"
+                                            onClick={() => {
+                                                try {
+                                                    // If this appears to be a recurring appointment,
+                                                    // show inline scoped delete options. Otherwise
+                                                    // delegate to parent handler (which may show
+                                                    // a global popover).
+                                                    const isRecurring = Boolean(event?.recurringPattern || event?.recurrence || event?.seriesId);
+                                                    if (isRecurring) {
+                                                        setShowDeleteConfirm(true);
+                                                        setDeleteScopeChoice('occurrence');
+                                                    } else {
+                                                        if (typeof onDelete === 'function') onDelete();
+                                                    }
+                                                } catch (e) {}
+                                            }}
+                                        >
+                                            <FaTrash aria-hidden />
+                                        </button>
+                                    ) : null}
+
+                                    {showDeleteConfirm ? (
+                                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                                            <div className="font-semibold text-sm mb-2">Delete recurring appointment</div>
+                                            <div className="flex flex-col gap-2 text-sm">
+                                                <label className="inline-flex items-center gap-2">
+                                                    <input
+                                                        type="radio"
+                                                        name="delete-scope-modal"
+                                                        value="occurrence"
+                                                        checked={deleteScopeChoice === 'occurrence'}
+                                                        onChange={() => setDeleteScopeChoice('occurrence')}
+                                                    />
+                                                    <span>Delete this occurrence only</span>
+                                                </label>
+
+                                                <label className="inline-flex items-center gap-2">
+                                                    <input
+                                                        type="radio"
+                                                        name="delete-scope-modal"
+                                                        value="future"
+                                                        checked={deleteScopeChoice === 'future'}
+                                                        onChange={() => setDeleteScopeChoice('future')}
+                                                    />
+                                                    <span>Delete this and all future occurrences</span>
+                                                </label>
+
+                                                <label className="inline-flex items-center gap-2">
+                                                    <input
+                                                        type="radio"
+                                                        name="delete-scope-modal"
+                                                        value="series"
+                                                        checked={deleteScopeChoice === 'series'}
+                                                        onChange={() => setDeleteScopeChoice('series')}
+                                                    />
+                                                    <span>Delete the entire series</span>
+                                                </label>
+
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-md bg-red-600 px-3 py-1 text-sm font-medium text-white hover:bg-red-700"
+                                                        onClick={async () => {
+                                                            try {
+                                                                setDeleting(true);
+                                                                const opts = {};
+                                                                if (deleteScopeChoice === 'occurrence') {
+                                                                    opts.editScope = 'occurrence';
+                                                                    opts.occurrenceStart = event?.start || null;
+                                                                } else if (deleteScopeChoice === 'future') {
+                                                                    opts.editScope = 'future';
+                                                                    opts.occurrenceStart = event?.start || null;
+                                                                } else if (deleteScopeChoice === 'series') {
+                                                                    opts.editScope = 'series';
+                                                                }
+
+                                                                if (event?.kind === 'appointment') {
+                                                                    await calendarService.deleteAppointment(event.id, opts);
+                                                                } else {
+                                                                    await calendarService.deleteEvent(event.id);
+                                                                }
+
+                                                                // Notify parent that deletion completed. Pass an object
+                                                                // with details so the parent can remove any matching
+                                                                // representations (generated id, exception id, series rows).
+                                                                if (typeof onDeleted === 'function') onDeleted({
+                                                                    id: event.id,
+                                                                    scope: deleteScopeChoice,
+                                                                    seriesId: event?.seriesId || null,
+                                                                    occurrenceStart: opts.occurrenceStart || null,
+                                                                });
+                                                                setShowDeleteConfirm(false);
+                                                            } catch (err) {
+                                                                try { console.error('Delete failed', err); } catch (_) {}
+                                                            } finally {
+                                                                setDeleting(false);
+                                                            }
+                                                        }}
+                                                        disabled={deleting}
+                                                    >
+                                                        {deleting ? 'Deleting...' : 'Confirm delete'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+                                                        onClick={() => setShowDeleteConfirm(false)}
+                                                        disabled={deleting}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+
                             <button
                                 type="button"
                                 className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"

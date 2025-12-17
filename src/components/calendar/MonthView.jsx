@@ -20,9 +20,9 @@ const EventOverlayItem = React.memo(function EventOverlayItem({ o, categories, t
         const styleBg = resolved ? { backgroundColor: resolved, border: `1px solid ${resolved}`, color: getContrastTextColor(resolved) } : {};
         const classForBg = isTailwind ? color : '';
         return (
-            <div
+                <div
                 title={ev.title}
-                onClick={(e) => { e.stopPropagation(); onEventClick && onEventClick(ev, 'edit'); }}
+                onClick={(e) => { e.stopPropagation(); onEventClick && onEventClick(ev, 'edit-month'); }}
                 style={{
                     position: 'absolute',
                     left: o.left,

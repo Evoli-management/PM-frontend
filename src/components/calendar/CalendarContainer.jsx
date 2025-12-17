@@ -97,6 +97,8 @@ const CalendarContainer = () => {
     const [weekActivities, setWeekActivities] = useState([]); // Flat list of activities for Week view
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
+    // Track where the modal was opened from so child modals can enable view-specific actions
+    const [modalOpenSource, setModalOpenSource] = useState(null); // e.g. 'month', 'week', 'day'
     const [addModalOpen, setAddModalOpen] = useState(false);
     const [addDate, setAddDate] = useState(null);
     const [editModalOpen, setEditModalOpen] = useState(false);
@@ -685,15 +687,18 @@ const CalendarContainer = () => {
 
     // Event modal logic
     // Event modal logic
-    const openModal = (event = null, action = null) => {
+    const openModal = (event = null, action = null, meta = null) => {
         if (import.meta.env.DEV) {
             try { console.debug('openModal called with event', event, 'action', action); } catch (_) {}
         }
         if (action === 'delete') {
             handleDeleteEvent(event);
-        } else if (action === 'edit') {
+        } else if (action === 'edit' || action === 'edit-month') {
             setSelectedEvent(event);
             setModalOpen(true);
+            // mark source for month-specific behavior
+            if (action === 'edit-month') setModalOpenSource('month');
+            else setModalOpenSource(null);
         } else {
             // Default behavior (legacy support)
             setSelectedEvent(event);
@@ -722,7 +727,18 @@ const CalendarContainer = () => {
         if (!event) return;
 
         // If the appointment is NOT recurring, show the custom top-center confirmation UI
-        const isRecurring = Boolean(event.recurringPattern || event.recurrence);
+        // Use a robust check similar to the modal: recurrence info may be present
+        // under several keys (recurringPattern, recurrence, seriesId) or the UI
+        // may use generated ids like `<base>_<iso>` or `ex_<uuid>` for exceptions.
+        const isRecurring = Boolean(
+            event && (
+                event.recurringPattern ||
+                event.recurrence ||
+                event.seriesId ||
+                event.occurrenceStart ||
+                (typeof event.id === 'string' && (event.id.includes('_') || event.id.startsWith('ex_')))
+            )
+        );
         if (!isRecurring) {
             setSimpleConfirmTarget(event);
             setSimpleConfirmVisible(true);
@@ -749,7 +765,16 @@ const CalendarContainer = () => {
             } else {
                 await calendarService.deleteEvent(event.id);
             }
-            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            // Remove any matching representations (exact id or series/occurrence)
+            setEvents((prev) => prev.filter((e) => {
+                try {
+                    if (e.id === event.id) return false;
+                    if (event.seriesId && e.seriesId === event.seriesId) return false;
+                    if (event.start && e.occurrenceStart === event.start) return false;
+                    if (event.seriesId && event.start && typeof e.id === 'string' && e.id === `${event.seriesId}_${event.start}`) return false;
+                } catch (__) {}
+                return true;
+            }));
             addToast({ title: 'Appointment deleted', variant: 'success' });
             setSimpleConfirmVisible(false);
             setSimpleConfirmTarget(null);
@@ -786,7 +811,24 @@ const CalendarContainer = () => {
             } else {
                 await calendarService.deleteEvent(event.id);
             }
-            setEvents((prev) => prev.filter((e) => e.id !== event.id));
+            // Remove matching representations from local state. The server may
+            // delete an exception row (ex_<uuid>) while the UI stores a generated
+            // occurrence id (`<seriesId>_<occurrenceStart>`). Remove both exact
+            // id matches and matches by seriesId+occurrenceStart when available.
+            setEvents((prev) => prev.filter((e) => {
+                try {
+                    // If series delete, remove all with same seriesId
+                    if (deleteScopeChoice === 'series' && event.seriesId && e.seriesId === event.seriesId) return false;
+                    // If occurrence/future, remove occurrence matches
+                    if ((deleteScopeChoice === 'occurrence' || deleteScopeChoice === 'future') && event.seriesId && event.start) {
+                        if (e.seriesId === event.seriesId && (e.occurrenceStart === event.start || e.start === event.start)) return false;
+                        if (typeof e.id === 'string' && e.id === `${event.seriesId}_${event.start}`) return false;
+                    }
+                    // Remove exact id match (covers non-recurring deletes)
+                    if (e.id === event.id) return false;
+                } catch (__) {}
+                return true;
+            }));
             addToast({ title: 'Appointment deleted', variant: 'success' });
             setDeletePopoverVisible(false);
         } catch (err) {
@@ -821,7 +863,29 @@ const CalendarContainer = () => {
             };
 
             const updated = await calendarService.updateAppointment(event.id, payload);
-            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+            setEvents((prev) => {
+                // Remove the original occurrence representation if the backend
+                // returned a new exception row for the same series/occurrence.
+                const filtered = prev.filter((e) => {
+                    try {
+                        if (updated.seriesId && updated.occurrenceStart) {
+                            if (e.seriesId === updated.seriesId && (e.occurrenceStart === updated.occurrenceStart || e.start === updated.occurrenceStart)) {
+                                return false;
+                            }
+                            if (typeof e.id === 'string' && e.id === `${updated.seriesId}_${updated.occurrenceStart}`) {
+                                return false;
+                            }
+                        }
+                        if (event && event.id && event.id !== updated.id && e.id === event.id) {
+                            return false;
+                        }
+                    } catch (__) {}
+                    return true;
+                });
+
+                const found = filtered.some((e) => e.id === updated.id);
+                return found ? filtered.map((e) => (e.id === updated.id ? updated : e)) : [...filtered, updated];
+            });
             addToast({ title: 'Appointment updated', variant: 'success' });
             setUpdatePopoverVisible(false);
             setUpdateTargetEvent(null);
@@ -1177,7 +1241,29 @@ const CalendarContainer = () => {
             const updated = await (isAppointment
                 ? calendarService.updateAppointment(eventId, payload)
                 : calendarService.updateEvent(eventId, payload));
-            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+            setEvents((prev) => {
+                // Remove prior representation of the occurrence if the server
+                // returned a new exception id for the same series/occurrence.
+                const filtered = prev.filter((e) => {
+                    try {
+                        if (updated.seriesId && updated.occurrenceStart) {
+                            if (e.seriesId === updated.seriesId && (e.occurrenceStart === updated.occurrenceStart || e.start === updated.occurrenceStart)) {
+                                return false;
+                            }
+                            if (typeof e.id === 'string' && e.id === `${updated.seriesId}_${updated.occurrenceStart}`) {
+                                return false;
+                            }
+                        }
+                        if (current && current.id && current.id !== updated.id && e.id === current.id) {
+                            return false;
+                        }
+                    } catch (__) {}
+                    return true;
+                });
+
+                const found = filtered.some((e) => e.id === updated.id);
+                return found ? filtered.map((e) => (e.id === updated.id ? updated : e)) : [...filtered, updated];
+            });
             addToast({
                 title: "Event updated",
                 description: `Moved to ${formatDate(newStartDate)} ${formatTime(`${String(newStartDate.getHours()).padStart(2,'0')}:${String(newStartDate.getMinutes()).padStart(2,'0')}`)}${targetEnd ? ` - ${formatTime(`${String(targetEnd.getHours()).padStart(2,'0')}:${String(targetEnd.getMinutes()).padStart(2,'0')}`)}` : ""}`,
@@ -1654,17 +1740,90 @@ const CalendarContainer = () => {
                     onClose={() => {
                         setModalOpen(false);
                         setSelectedEvent(null);
+                        setModalOpenSource(null);
                     }}
                     onUpdated={(updated) => {
                         if (updated && updated.id) {
-                            setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+                            setEvents((prev) => {
+                                // Remove the previous occurrence representation when the
+                                // server returned a new exception row (new id). Match by
+                                // seriesId + occurrenceStart (preferred) or by the
+                                // modal's selectedEvent id as a fallback.
+                                const filtered = prev.filter((e) => {
+                                    try {
+                                        // If updated contains seriesId and occurrenceStart,
+                                        // filter out any event that represents that same
+                                        // occurrence (either stored as occurrenceStart or
+                                        // as a generated id like `${seriesId}_${occurrenceStart}`).
+                                        if (updated.seriesId && updated.occurrenceStart) {
+                                            if (e.seriesId === updated.seriesId && (e.occurrenceStart === updated.occurrenceStart || e.start === updated.occurrenceStart)) {
+                                                return false;
+                                            }
+                                            if (typeof e.id === 'string' && e.id === `${updated.seriesId}_${updated.occurrenceStart}`) {
+                                                return false;
+                                            }
+                                        }
+
+                                        // If the modal was opened for `selectedEvent`, remove
+                                        // that original id when it's different from the
+                                        // returned updated.id to avoid duplicate bars.
+                                        if (selectedEvent && selectedEvent.id && selectedEvent.id !== updated.id && e.id === selectedEvent.id) {
+                                            return false;
+                                        }
+                                    } catch (__) {}
+                                    return true;
+                                });
+
+                                const found = filtered.some((e) => e.id === updated.id);
+                                return found ? filtered.map((e) => (e.id === updated.id ? updated : e)) : [...filtered, updated];
+                            });
                         }
                         setModalOpen(false);
                         setSelectedEvent(null);
+                        setModalOpenSource(null);
                         addToast({ title: "Appointment updated", variant: "success" });
                     }}
                     
                     defaultDurationMinutes={30}
+                    // Show a delete action when the modal was opened from Month view
+                    showDelete={modalOpenSource === 'month'}
+                    onDelete={() => { if (selectedEvent) handleDeleteEvent(selectedEvent); }}
+                    // Allow modal to directly notify that an item was deleted
+                    onDeleted={(deleted) => {
+                        // `deleted` may be a string id or an object with details
+                        // { id, scope, seriesId, occurrenceStart }
+                        setEvents((prev) => {
+                            try {
+                                const info = typeof deleted === 'string' ? { id: deleted } : (deleted || {});
+                                const sid = info.seriesId || (selectedEvent && selectedEvent.seriesId) || null;
+                                const occ = info.occurrenceStart || (selectedEvent && selectedEvent.start) || null;
+                                const scope = info.scope || null;
+
+                                return prev.filter((e) => {
+                                    try {
+                                        // If deleting entire series, remove all events with same seriesId
+                                        if (scope === 'series' && sid) {
+                                            if (e.seriesId === sid) return false;
+                                        }
+                                        // If deleting occurrence/future, remove matches for the specific occurrence
+                                        if ((scope === 'occurrence' || scope === 'future') && sid && occ) {
+                                            if (e.seriesId === sid && (e.occurrenceStart === occ || e.start === occ)) return false;
+                                            if (typeof e.id === 'string' && e.id === `${sid}_${occ}`) return false;
+                                        }
+                                        // Always remove any exact id matches
+                                        if (info.id && e.id === info.id) return false;
+                                    } catch (__) {}
+                                    return true;
+                                });
+                            } catch (__) {
+                                return prev;
+                            }
+                        });
+                        setModalOpen(false);
+                        setSelectedEvent(null);
+                        setModalOpenSource(null);
+                        addToast({ title: 'Appointment deleted', variant: 'success' });
+                    }}
                 />
             )}
             {editModalOpen && editItem && editItem.type === "task" && (
