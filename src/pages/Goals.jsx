@@ -422,14 +422,20 @@ const Goals = () => {
                                                 {/* Compact Stats */}
                                                 <div className="flex gap-3">
                                                     <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                                                        <FaBullseye className="w-3.5 h-3.5 text-gray-600" />
+                                                        {/* Use provided goals image for Total stat */}
+                                                        <img
+                                                            alt="Goals"
+                                                            src={`${import.meta.env.BASE_URL}goals.png`}
+                                                            className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
+                                                        />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-gray-900">{stats.total}</span>
                                                             <span className="text-xs text-gray-500">Total</span>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                                                        <FaRocket className="w-3.5 h-3.5 text-blue-600" />
+                                                        {/* Small blue dot for Active */}
+                                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-blue-600">{stats.active}</span>
                                                             <span className="text-xs text-gray-500">Active</span>

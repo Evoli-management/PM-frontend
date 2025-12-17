@@ -1,5 +1,5 @@
 // src/components/goals/views/ListView.jsx - Modern list view for goals
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
     Pencil,
@@ -15,6 +15,32 @@ import {
 
 const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
+    const [localGoals, setLocalGoals] = useState(goals || []);
+
+    useEffect(() => {
+        let mounted = true;
+        // If incoming goals already include milestones, use them directly.
+        // Otherwise batch-fetch missing goal details to enrich with milestones.
+        (async () => {
+            try {
+                setLocalGoals(goals || []);
+                const missing = (goals || []).filter((g) => !g || !Array.isArray(g.milestones) || g.milestones.length === 0).map((g) => g && g.id).filter(Boolean);
+                if (missing.length === 0) return;
+                const { getGoalsByIds } = await import("../../../services/goalService");
+                const detailed = await getGoalsByIds(missing);
+                if (!mounted) return;
+                // Merge detailed goals into localGoals by id
+                const byId = new Map((detailed || []).filter(Boolean).map((d) => [String(d.id), d]));
+                setLocalGoals((prev) => (prev || []).map((g) => (g && byId.has(String(g.id)) ? { ...g, ...(byId.get(String(g.id)) || {}) } : g)));
+            } catch (e) {
+                // non-fatal
+                console.warn("Failed to bulk-enrich goals with milestones:", e);
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [goals]);
 
     const handleComplete = async (goalId) => {
         try {
@@ -109,7 +135,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
 
             {/* Goals List */}
             <div className="divide-y divide-slate-200">
-                {goals.map((goal) => {
+                {(localGoals || goals).map((goal) => {
                     const completedMilestones =
                         (goal.milestones || []).filter((m) => {
                             if (m && m.done) return true;
@@ -150,7 +176,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                         <div
                             key={goal.id}
                             className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
-                            onClick={() => onGoalClick(goal)}
+                                onClick={() => onGoalClick(goal)}
                         >
                             <div className="grid grid-cols-12 gap-4 items-center">
                                 {/* Goal Info */}
