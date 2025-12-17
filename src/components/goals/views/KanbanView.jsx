@@ -1,5 +1,5 @@
 // src/components/goals/views/KanbanView.jsx - Professional Kanban Board
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
     FaEdit,
@@ -16,12 +16,35 @@ import {
 
 const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
+    const [localGoals, setLocalGoals] = useState(goals || []);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                setLocalGoals(goals || []);
+                const missing = (goals || []).filter((g) => !g || !Array.isArray(g.milestones) || g.milestones.length === 0).map((g) => g && g.id).filter(Boolean);
+                if (missing.length === 0) return;
+                const { getGoalsByIds } = await import("../../../services/goalService");
+                const detailed = await getGoalsByIds(missing);
+                if (!mounted) return;
+                const byId = new Map((detailed || []).filter(Boolean).map((d) => [String(d.id), d]));
+                setLocalGoals((prev) => (prev || []).map((g) => (g && byId.has(String(g.id)) ? { ...g, ...(byId.get(String(g.id)) || {}) } : g)));
+            } catch (e) {
+                console.warn("Failed to bulk-enrich goals for Kanban:", e);
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [goals]);
 
     // Group goals by status
+    const source = localGoals || goals;
     const groupedGoals = {
-        active: goals.filter((goal) => goal.status === "active") || [],
-        completed: goals.filter((goal) => goal.status === "completed") || [],
-        archived: goals.filter((goal) => goal.status === "archived") || [],
+        active: (source || []).filter((goal) => goal.status === "active") || [],
+        completed: (source || []).filter((goal) => goal.status === "completed") || [],
+        archived: (source || []).filter((goal) => goal.status === "archived") || [],
     };
 
     const columns = [

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
     FaEdit,
@@ -14,9 +14,31 @@ import {
 
 const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
+    const [localGoals, setLocalGoals] = useState(goals || []);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                setLocalGoals(goals || []);
+                const missing = (goals || []).filter((g) => !g || !Array.isArray(g.milestones) || g.milestones.length === 0).map((g) => g && g.id).filter(Boolean);
+                if (missing.length === 0) return;
+                const { getGoalsByIds } = await import("../../../services/goalService");
+                const detailed = await getGoalsByIds(missing);
+                if (!mounted) return;
+                const byId = new Map((detailed || []).filter(Boolean).map((d) => [String(d.id), d]));
+                setLocalGoals((prev) => (prev || []).map((g) => (g && byId.has(String(g.id)) ? { ...g, ...(byId.get(String(g.id)) || {}) } : g)));
+            } catch (e) {
+                console.warn("Failed to bulk-enrich goals for Timeline:", e);
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [goals]);
 
     // Sort goals by due date
-    const sortedGoals = [...goals].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    const sortedGoals = [...(localGoals || goals)].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
     const handleComplete = async (goalId) => {
         try {

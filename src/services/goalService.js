@@ -112,6 +112,31 @@ export const getGoalById = async (goalId) => {
 };
 
 /**
+ * Fetch multiple goals by their IDs, using the cached getGoalById when possible.
+ * Returns an array of goal objects (in the same order as ids) where each goal
+ * includes its milestones. If a fetch fails for a given id, the original id's
+ * placeholder (null) will be returned in that slot.
+ */
+export const getGoalsByIds = async (ids = []) => {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    try {
+        const results = await Promise.all(
+            ids.map(async (id) => {
+                try {
+                    return await getGoalById(id);
+                } catch (err) {
+                    console.warn(`Failed to fetch goal ${id}:`, err);
+                    return null;
+                }
+            })
+        );
+        return results;
+    } catch (error) {
+        handleError("fetching multiple goals", error);
+    }
+};
+
+/**
  * Creates a new goal.
  * @param {object} goalData - The goal data to create.
  * @returns {Promise<object>} A promise that resolves to the created goal.
