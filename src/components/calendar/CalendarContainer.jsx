@@ -1397,6 +1397,7 @@ const CalendarContainer = () => {
                         onTaskClick={openEditTask}
                         onTaskDrop={handleTaskDrop}
                         onQuickCreate={handleQuickCreate}
+                        enableQuickCreate={false}
                     />
                 )}
                 {view === "week" && (

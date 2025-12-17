@@ -3,11 +3,114 @@ import React, {
     useLayoutEffect,
     useRef,
     useState,
+    useMemo,
 } from "react";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { FaChevronLeft, FaChevronRight, FaChevronDown } from "react-icons/fa";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
+// Memoized small renderers to avoid re-renders during MonthView updates
+const EventOverlayItem = React.memo(function EventOverlayItem({ o, categories, tailwindColorCache, getContrastTextColor, onEventClick }) {
+    try {
+        const ev = o.ev;
+        const color = categories?.[ev.kind]?.color || 'bg-gray-200';
+        const isTailwind = typeof color === 'string' && color.startsWith('bg-');
+        const resolvedTailwind = isTailwind ? tailwindColorCache[color] : null;
+        const resolved = !isTailwind ? color : resolvedTailwind;
+        const styleBg = resolved ? { backgroundColor: resolved, border: `1px solid ${resolved}`, color: getContrastTextColor(resolved) } : {};
+        const classForBg = isTailwind ? color : '';
+        return (
+            <div
+                title={ev.title}
+                onClick={(e) => { e.stopPropagation(); onEventClick && onEventClick(ev, 'edit'); }}
+                style={{
+                    position: 'absolute',
+                    left: o.left,
+                    top: o.top,
+                    width: o.width,
+                    height: o.height,
+                    zIndex: 160,
+                    pointerEvents: 'auto',
+                    borderRadius: 6,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                    ...styleBg,
+                }}
+                className={`${classForBg} text-xs truncate whitespace-nowrap`}
+            >
+                <span className="shrink-0 text-xs" style={{ pointerEvents: 'none' }}>{categories?.[ev.kind]?.icon || ''}</span>
+                <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1" style={{ pointerEvents: 'none' }}>{ev.title}</span>
+            </div>
+        );
+    } catch (e) { return null; }
+});
+
+const RangeTaskBar = React.memo(function RangeTaskBar({ r, overlayMetrics, LANE_WIDTH, LANE_GAP, LANE_HEIGHT, CENTERED_BAR_WIDTH, ALL_DAY_COL_WIDTH, month, categories, keyAreaMap, tailwindColorCache, getContrastTextColor, onTaskClick }) {
+    try {
+        if (r.lane == null) return null;
+        const startIdx = Math.max(0, r.start.getMonth() === month ? r.start.getDate() - 1 : 0);
+        const endIdx = Math.min(overlayMetrics.rows.length - 1, r.end.getMonth() === month ? r.end.getDate() - 1 : overlayMetrics.rows.length - 1);
+        if (startIdx > endIdx) return null;
+        const top = overlayMetrics.rows[startIdx]?.top ?? 0;
+        const bottom = overlayMetrics.rows[endIdx]?.bottom ?? top;
+        const heightRaw = Math.max(2, bottom - top);
+        const laneHeight = LANE_HEIGHT;
+        const laneOffset = r.lane * (laneHeight + LANE_GAP);
+        const topShifted = top + laneOffset;
+        const bottomShifted = bottom + laneOffset;
+        const height = Math.max(2, bottomShifted - topShifted);
+        const barWidth = Math.max(20, Math.min(overlayMetrics.colWidth - 12, CENTERED_BAR_WIDTH));
+        const left = Math.round(Math.max(4, (overlayMetrics.colWidth - barWidth) / 2));
+
+        const ka = keyAreaMap?.[String(r.task?.keyAreaId || r.task?.key_area_id)];
+        let categoryColor = ka?.color || categories?.[r.task?.kind]?.color;
+        const isTailwind = typeof categoryColor === 'string' && categoryColor.startsWith('bg-');
+        const isColorStr = typeof categoryColor === 'string' && !isTailwind;
+        const classForBg = isTailwind ? categoryColor : '';
+        const classForBgFinal = classForBg || 'bg-gray-200';
+        const resolvedTailwind = isTailwind ? tailwindColorCache[categoryColor] : null;
+        const resolved = isColorStr ? categoryColor : resolvedTailwind;
+
+        let textClass = 'text-slate-800';
+        if (isTailwind && classForBg.match(/-(50|100|200|300)(\b|$)/)) textClass = 'text-slate-800';
+        else if (!isTailwind && resolved) textClass = 'text-white';
+
+        const styleBg = resolved ? { backgroundColor: resolved, border: `1px solid ${resolved}`, color: getContrastTextColor(resolved) } : {};
+
+        return (
+            <div
+                key={`ov-${r.task?.id || String(Math.random())}`}
+                className={`${classForBgFinal} ${!resolved ? textClass : ''}`}
+                style={{
+                    position: 'absolute',
+                    top,
+                    left,
+                    width: barWidth,
+                    height,
+                    overflow: 'hidden',
+                    zIndex: 150,
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    borderRadius: 6,
+                    pointerEvents: 'auto',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                    ...styleBg,
+                }}
+                title={r.task?.title}
+                onClick={(e) => { e.stopPropagation(); if (typeof onTaskClick === 'function') onTaskClick(r.task); }}
+            >
+                <span className="shrink-0 text-xs" style={{ pointerEvents: 'none' }}>{categories?.[r.task?.kind]?.icon || ''}</span>
+                <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1" style={{ pointerEvents: 'none' }}>{r.task?.title}</span>
+            </div>
+        );
+    } catch (e) { return null; }
+});
 export default function MonthView({
     currentDate,
     onShiftDate,
@@ -21,6 +124,7 @@ export default function MonthView({
     filterType,
     onChangeFilter,
     onQuickCreate, // open appointment creation modal
+    enableQuickCreate = true, // when false, clicking a time slot won't trigger quick-create
     onTaskDrop,
 }) {
     // Get user's timezone
@@ -34,22 +138,24 @@ export default function MonthView({
         isWorkingTime,
     } = useCalendarPreferences(30);
 
-    const ALL_HOURS = Array.from({ length: 48 }, (_, i) => {
-        const h = Math.floor(i / 2);
-        const m = i % 2 === 0 ? "00" : "30";
-        return `${h.toString().padStart(2, "0")}:${m}`;
-    });
+    // Precompute full-day slots (memoized to avoid recreating on every render)
+    const ALL_HOURS = useMemo(() =>
+        Array.from({ length: 48 }, (_, i) => {
+            const h = Math.floor(i / 2);
+            const m = i % 2 === 0 ? "00" : "30";
+            return `${h.toString().padStart(2, "0")}:${m}`;
+        }),
+    []);
 
     // Use slots from preferences — fall back to ALL_HOURS.
     // Normalize slots to remove a trailing "24:00" boundary which can
     // duplicate midnight/noon labels when formatted (e.g. "24:00" -> "12:00 PM").
-    const rawSlots = timeSlots.length > 0 ? timeSlots : ALL_HOURS;
-    const SLOTS = rawSlots.filter((s) => String(s) !== "24:00");
+    const rawSlots = (timeSlots && timeSlots.length > 0) ? timeSlots : ALL_HOURS;
+    const SLOTS = useMemo(() => rawSlots.filter((s) => String(s) !== "24:00"), [rawSlots]);
     // For month view we only want one column per hour (no half-hour columns)
-    const HOUR_SLOTS = SLOTS.filter((s) => String(s).endsWith(":00"));
-
+    const HOUR_SLOTS = useMemo(() => SLOTS.filter((s) => String(s).endsWith(":00")), [SLOTS]);
     // Layout constants - adjust these to change column / lane sizing
-    const ALL_DAY_COL_WIDTH = 120; // was 80px
+    const ALL_DAY_COL_WIDTH = 120; // width of the all-day column (left side)
     const HOUR_COL_WIDTH = 80; // per-hour column width fallback
     const LANE_WIDTH = 72; // was 36px for all-day range lanes
     const LANE_GAP = 6; // gap between lanes
@@ -72,6 +178,14 @@ export default function MonthView({
         { short: "Dec", long: "December", index: 11 },
     ];
 
+    // Debug flag: enabled in dev builds. Gate expensive console.debug calls behind this.
+    let DEBUG = false;
+    try {
+        DEBUG = !!(import.meta && import.meta.env && import.meta.env.DEV);
+    } catch (_) {
+        DEBUG = false;
+    }
+
     // Resolve public URL base in a way that works for CRA and Vite.
     // Use try/catch to avoid referencing `process` at parse time in environments
     // (like Vite) where `process` is not defined.
@@ -89,6 +203,17 @@ export default function MonthView({
     } catch (e) {
         // ignore
     }
+
+    // Normalize PUBLIC_URL and provide a safe calendar image src that won't
+    // accidentally become a protocol-relative URL (e.g. "//calendar.png").
+    const calendarSrc = (() => {
+        try {
+            const base = String(PUBLIC_URL || "").replace(/\/+$/g, "");
+            return base ? `${base}/calendar.png` : "/calendar.png";
+        } catch (e) {
+            return "/calendar.png";
+        }
+    })();
 
     // Determine working-hours numeric bounds (hours) from preferences, fallback to full day
     const WORK_START = workingHours?.startTime
@@ -108,10 +233,9 @@ export default function MonthView({
     const year = baseDate.getFullYear();
     const month = baseDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const monthDays = Array.from(
-        { length: daysInMonth },
-        (_, i) => new Date(year, month, i + 1),
-    );
+    const monthDays = useMemo(() =>
+        Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+    [year, month, daysInMonth]);
 
 // Helper: ISO week number (weeks start on Monday, week 1 = week with Jan 4th)
 const isoWeekNumber = (date) => {
@@ -143,27 +267,21 @@ const isoWeekNumber = (date) => {
     // We use strict "label on Monday" logic: only rows where the date is
     // a Monday will receive a week label. This means leading partial weeks
     // whose Monday falls in the previous month will not be labeled here.
-    const weekCells = {};
-    for (let i = 0; i < monthDays.length; i++) {
-        const d = monthDays[i];
-        const isMonday = d.getDay() === 1; // 1 = Monday in local time
-
-        // Only label rows that are Mondays (strict Monday labeling).
-        if (!isMonday) continue;
-
-        // Compute how many rows (days) this week spans in this month,
-        // i.e., until the next Monday or end of the month.
-        let span = 1;
-        for (let j = i + 1; j < monthDays.length; j++) {
-            if (monthDays[j].getDay() === 1) break; // next Monday
-            span += 1;
+    const weekCells = useMemo(() => {
+        const out = {};
+        for (let i = 0; i < monthDays.length; i++) {
+            const d = monthDays[i];
+            const isMonday = d.getDay() === 1; // 1 = Monday in local time
+            if (!isMonday) continue;
+            let span = 1;
+            for (let j = i + 1; j < monthDays.length; j++) {
+                if (monthDays[j].getDay() === 1) break;
+                span += 1;
+            }
+            out[i] = { weekNumber: isoWeekNumber(d), rowSpan: span };
         }
-
-        weekCells[i] = {
-            weekNumber: isoWeekNumber(d),
-            rowSpan: span,
-        };
-    }
+        return out;
+    }, [monthDays]);
 
 
     // Helper: Parse date string to Date.
@@ -280,64 +398,37 @@ const isoWeekNumber = (date) => {
     }, [categories, keyAreaMap]);
 
 
-    // Build a map of appointments for each day and slot
-    const appointmentsByDaySlot = {};
-    (Array.isArray(events) ? events : []).forEach((ev) => {
-        if (ev.taskId || !ev.start) return;
-        const startLocal = toLocal(ev.start);
-        const endLocal = ev.end
-            ? toLocal(ev.end)
-            : new Date(startLocal.getTime() + 30 * 60000);
-
-        const dayStart = new Date(
-            startLocal.getFullYear(),
-            startLocal.getMonth(),
-            startLocal.getDate(),
-            WORK_START,
-            0,
-            0,
-            0,
-        );
-        const dayEnd = new Date(
-            startLocal.getFullYear(),
-            startLocal.getMonth(),
-            startLocal.getDate(),
-            WORK_END,
-            0,
-            0,
-            0,
-        );
-
-        const clampedStart = new Date(
-            Math.max(startLocal.getTime(), dayStart.getTime()),
-        );
-        const clampedEnd = new Date(
-            Math.min(endLocal.getTime(), dayEnd.getTime()),
-        );
-
-        if (clampedEnd <= clampedStart) return;
-
-        let cur = new Date(clampedStart);
-        cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
-        while (cur < clampedEnd) {
-            const dayKey = `${cur.getFullYear()}-${String(
-                cur.getMonth() + 1,
-            ).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
-            if (!appointmentsByDaySlot[dayKey])
-                appointmentsByDaySlot[dayKey] = {};
-            const slotKey = `${cur
-                .getHours()
-                .toString()
-                .padStart(2, "0")}:${cur
-                .getMinutes()
-                .toString()
-                .padStart(2, "0")}`;
-            if (!appointmentsByDaySlot[dayKey][slotKey])
-                appointmentsByDaySlot[dayKey][slotKey] = [];
-            appointmentsByDaySlot[dayKey][slotKey].push(ev);
-            cur = new Date(cur.getTime() + 30 * 60000);
+    // Build a memoized map of appointments for each day and slot — heavy work, so memoize.
+    const appointmentsByDaySlot = useMemo(() => {
+        const map = {};
+        const src = Array.isArray(events) ? events : [];
+        for (let ei = 0; ei < src.length; ei++) {
+            const ev = src[ei];
+            if (ev.taskId || !ev.start) continue;
+            try {
+                const startLocal = toLocal(ev.start);
+                const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
+                const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_START, 0, 0, 0);
+                const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_END, 0, 0, 0);
+                const clampedStart = new Date(Math.max(startLocal.getTime(), dayStart.getTime()));
+                const clampedEnd = new Date(Math.min(endLocal.getTime(), dayEnd.getTime()));
+                if (clampedEnd <= clampedStart) continue;
+                let cur = new Date(clampedStart);
+                cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
+                while (cur < clampedEnd) {
+                    const dayKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+                    if (!map[dayKey]) map[dayKey] = {};
+                    const slotKey = `${cur.getHours().toString().padStart(2, "0")}:${cur.getMinutes().toString().padStart(2, "0")}`;
+                    if (!map[dayKey][slotKey]) map[dayKey][slotKey] = [];
+                    map[dayKey][slotKey].push(ev);
+                    cur = new Date(cur.getTime() + 30 * 60000);
+                }
+            } catch (e) {
+                // ignore problematic event
+            }
         }
-    });
+        return map;
+    }, [events, WORK_START, WORK_END]);
 
     // Helpers for date-only comparisons
     const parseDateOnly = (iso) => {
@@ -366,8 +457,8 @@ const isoWeekNumber = (date) => {
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     };
 
-    // Build range tasks for all-day / multi-day
-    const buildRangeTasks = () => {
+    // Build range tasks for all-day / multi-day (memoized)
+    const buildRangeTasks = useMemo(() => {
         const ranges = [];
         (Array.isArray(todos) ? todos : []).forEach((t) => {
             const sIso = t.startDate || t.dueDate || t.endDate || null;
@@ -385,15 +476,8 @@ const isoWeekNumber = (date) => {
             const isSingleDay = s.getTime() === e.getTime();
             const hasStartTime = !!t.startDate;
             if (isSingleDay && hasStartTime) return;
-            const spanDays = Math.max(
-                1,
-                Math.round(
-                    (e - s) / (24 * 60 * 60 * 1000),
-                ) + 1,
-            );
-            const startKey = `${s.getFullYear()}-${String(
-                s.getMonth() + 1,
-            ).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
+            const spanDays = Math.max(1, Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1);
+            const startKey = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
             ranges.push({ task: t, start: s, end: e, spanDays, startKey });
         });
 
@@ -403,17 +487,11 @@ const isoWeekNumber = (date) => {
             groupsMap.get(r.startKey).push(r);
         }
         const groups = Array.from(groupsMap.values()).map((items) => {
-            const maxSpan = items.reduce(
-                (m, it) => Math.max(m, it.spanDays),
-                1,
-            );
+            const maxSpan = items.reduce((m, it) => Math.max(m, it.spanDays), 1);
             const startDate = items[0].start;
             items.sort((a, b) => {
-                if (b.spanDays !== a.spanDays)
-                    return b.spanDays - a.spanDays;
-                return String(a.task.title || "").localeCompare(
-                    String(b.task.title || ""),
-                );
+                if (b.spanDays !== a.spanDays) return b.spanDays - a.spanDays;
+                return String(a.task.title || "").localeCompare(String(b.task.title || ""));
             });
             return { items, maxSpan, startDate };
         });
@@ -430,14 +508,14 @@ const isoWeekNumber = (date) => {
             }
         }
         return out;
-    };
+    }, [todos, month, year]);
 
-    const rangeTasks = buildRangeTasks();
-    const lanesCount = Math.min(rangeTasks.length, 20);
+    const rangeTasks = buildRangeTasks;
+    const lanesCount = useMemo(() => Math.min(rangeTasks.length, 20), [rangeTasks.length]);
 
     useEffect(() => {
         try {
-            console.debug("[MonthView] rangeTasks computed", { count: rangeTasks.length, rangeTasks: rangeTasks.slice(0, 50), todosCount: (todos || []).length });
+            DEBUG && console.debug("[MonthView] rangeTasks computed", { count: rangeTasks.length, rangeTasks: rangeTasks.slice(0, 50), todosCount: (todos || []).length });
         } catch (e) {}
     }, [rangeTasks, todos]);
 
@@ -449,6 +527,7 @@ const isoWeekNumber = (date) => {
     const rightScrollRef = useRef(null);
     const lastRightScrollLeft = useRef(0);
     const [rowOverlay, setRowOverlay] = useState(null);
+    const heightSyncTimerRef = useRef(null);
 
     // All-day overlay metrics (still based on left all-day cells)
     const allDayRefs = useRef([]);
@@ -457,6 +536,320 @@ const isoWeekNumber = (date) => {
         colWidth: 0,
         rows: [],
     });
+
+    // Overlay for timed appointments (positioned absolutely over the hours table)
+    const [eventOverlays, setEventOverlays] = useState([]);
+    // Cached helpers to reduce DOM reads and schedule background work
+    const cachedThRef = useRef(null);
+    const lastTableWidthRef = useRef(0);
+    const idleHandleRef = useRef(null);
+    const chunkTimerRef = useRef(null);
+    const FAST_EVENT_THRESHOLD = 300; // above this, show compact month badges instead of full overlays
+
+    const fastMode = (Array.isArray(events) ? events.length : 0) > FAST_EVENT_THRESHOLD;
+
+    // compute quick per-day timed-event counts (fast path) using the appointmentsByDaySlot map
+    const dayEventCounts = React.useMemo(() => {
+        const out = {};
+        try {
+            (monthDays || []).forEach((d) => {
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const m = appointmentsByDaySlot[key] || {};
+                let c = 0;
+                Object.values(m).forEach((arr) => (c += Array.isArray(arr) ? arr.length : 0));
+                out[key] = c;
+            });
+        } catch (_) {}
+        return out;
+    }, [appointmentsByDaySlot, monthDays]);
+
+    // Compute absolute positions for timed events so they can be rendered as
+    // single bars that span across hour column boundaries (avoid per-cell
+    // duplicate rendering which splits bars at column borders).
+    // Use idle scheduling + chunked processing to avoid blocking the main thread
+    useEffect(() => {
+        const table = tableRef.current;
+        const wrap = rightScrollRef.current;
+        if (!table || !wrap) {
+            setEventOverlays([]);
+            return () => {};
+        }
+
+        // Prepare a filtered event list (visible month) to minimize work
+        const visibleEvents = (Array.isArray(events) ? events : []).filter((ev) => {
+            try {
+                if (ev.taskId || !ev.start) return false;
+                const s = toLocal(ev.start);
+                return s.getFullYear() === year && s.getMonth() === month;
+            } catch (_) {
+                return false;
+            }
+        });
+
+        // Th offsets cache: only recompute when table width changes
+        const computeThOffsets = () => {
+            const ths = Array.from(table.querySelectorAll('thead th'));
+            const off = ths.map((th) => ({ left: th.offsetLeft, width: th.offsetWidth }));
+            cachedThRef.current = off;
+            lastTableWidthRef.current = table.offsetWidth || 0;
+            return off;
+        };
+
+        const getThOffsets = () => {
+            const curW = table.offsetWidth || 0;
+            if (!cachedThRef.current || lastTableWidthRef.current !== curW) return computeThOffsets();
+            return cachedThRef.current;
+        };
+
+    // Process events in small chunks to avoid blocking the main thread.
+    // Use a smaller chunk size and prioritize visible-day events so the
+    // month grid appears responsive and overlays for visible rows render fast.
+    const chunkSize = 30;
+        let cancelled = false;
+    const overlaysOut = [];
+    const overlaysSeen = new Set();
+    // profiling counters for batch processing (help identify bottlenecks)
+    let profStart = 0;
+    let profBatches = 0;
+    let profProcessed = 0;
+
+        const processBatch = (startIndex, sourceEvents) => {
+            if (cancelled) return;
+            const thOffsets = getThOffsets();
+            const wrapRect = wrap.getBoundingClientRect();
+            // Precompute row rects to avoid calling getBoundingClientRect repeatedly per event
+            const rowRects = (dayRowRefs.current || []).map((el) => (el ? el.getBoundingClientRect() : null));
+
+            const tableWidth = table.offsetWidth || Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
+
+            const end = Math.min(sourceEvents.length, startIndex + chunkSize);
+            // initialize profiling on first batch
+            if (!profStart) profStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            profBatches += 1;
+            for (let i = startIndex; i < end; i++) {
+                const ev = sourceEvents[i];
+                try {
+                    const startLocal = toLocal(ev.start);
+                    const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
+                    const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_START, 0, 0, 0);
+                    const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_END, 0, 0, 0);
+                    const clampedStart = new Date(Math.max(startLocal.getTime(), dayStart.getTime()));
+                    const clampedEnd = new Date(Math.min(endLocal.getTime(), dayEnd.getTime()));
+                    if (clampedEnd <= clampedStart) continue;
+
+                    const dayIdx = clampedStart.getDate() - 1;
+                    const rect = rowRects[dayIdx];
+                    if (!rect) continue;
+                    const rowTop = rect.top - wrapRect.top + (wrap.scrollTop || 0);
+                    const rowHeight = rect.height;
+
+                    const startHour = String(clampedStart.getHours()).padStart(2, '0') + ':00';
+                    const endHour = String(clampedEnd.getHours()).padStart(2, '0') + ':00';
+                    const startIdx = HOUR_SLOTS.findIndex((h) => h.startsWith(startHour.slice(0,2)) || h === startHour);
+                    const endIdx = HOUR_SLOTS.findIndex((h) => h.startsWith(endHour.slice(0,2)) || h === endHour);
+                    const sIdx = Math.max(0, startIdx === -1 ? 0 : startIdx);
+                    const eIdx = Math.min(Math.max(0, thOffsets.length - 1), endIdx === -1 ? (sIdx) : endIdx);
+
+                    const startTh = thOffsets[sIdx] || { left: 0, width: HOUR_COL_WIDTH };
+                    const endTh = thOffsets[eIdx] || thOffsets[thOffsets.length - 1] || { left: 0, width: HOUR_COL_WIDTH };
+                    const startFraction = (clampedStart.getMinutes() + clampedStart.getSeconds() / 60) / 60;
+                    const endFraction = (clampedEnd.getMinutes() + clampedEnd.getSeconds() / 60) / 60;
+                    const startLeft = startTh.left + startFraction * startTh.width;
+                    const endLeft = endTh.left + endFraction * endTh.width;
+                    const leftClamped = Math.max(0, Math.min(tableWidth, startLeft));
+                    const rightClamped = Math.max(0, Math.min(tableWidth, endLeft));
+                    const width = Math.max(6, rightClamped - leftClamped);
+                    const uniqKey = `${String(ev.id || '')}_${leftClamped}_${Math.round(rowTop)}_${Math.round(width)}`;
+                    if (!overlaysSeen.has(uniqKey)) {
+                        overlaysSeen.add(uniqKey);
+                        overlaysOut.push({ ev, left: leftClamped, top: rowTop + 4, width, height: Math.max(18, rowHeight - 8) });
+                    }
+                } catch (e) {
+                    // ignore
+                }
+                // count processed in this batch
+            }
+            const batchCount = Math.max(0, end - startIndex);
+            profProcessed += batchCount;
+
+            if (end < sourceEvents.length) {
+                // yield to the event loop to keep UI responsive
+                chunkTimerRef.current = setTimeout(() => processBatch(end, sourceEvents), 0);
+            } else {
+                // Append overlays built from this source batch to global overlays.
+                setEventOverlays((prev) => {
+                    // merge prev and overlaysOut (they are already deduped per-run)
+                    return [...(prev || []), ...overlaysOut];
+                });
+                // profiling: report totals for this schedule run
+                    try {
+                    const totalMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - profStart;
+                    DEBUG && console.debug('[MonthView][overlay-profiler]', { batches: profBatches, processed: profProcessed, totalMs, overlaysBuilt: overlaysOut.length });
+                } catch (_) {}
+                // reset profiling counters
+                profStart = 0; profBatches = 0; profProcessed = 0;
+            }
+        };
+
+        const scheduleIdle = (evs) => {
+            // if no event array provided, default to visibleEvents to avoid undefined
+            const source = Array.isArray(evs) ? evs : visibleEvents;
+            // cancel previous
+            if (idleHandleRef.current) {
+                try { cancelIdleCallback(idleHandleRef.current); } catch (_) { clearTimeout(idleHandleRef.current); }
+                idleHandleRef.current = null;
+            }
+            // use requestIdleCallback if available
+            if (typeof requestIdleCallback !== 'undefined') {
+                // reset profiling start for this schedule
+                profStart = 0; profBatches = 0; profProcessed = 0;
+                idleHandleRef.current = requestIdleCallback(() => {
+                    processBatch(0, source);
+                }, { timeout: 200 });
+            } else {
+                // fallback to setTimeout
+                profStart = 0; profBatches = 0; profProcessed = 0;
+                idleHandleRef.current = setTimeout(() => processBatch(0, source), 50);
+            }
+        };
+
+        // Determine which day rows are visible in the right-side wrapper viewport
+        // so we can prioritize computing overlays for those events immediately.
+        const wrapRect = wrap.getBoundingClientRect();
+        const rowRects = (dayRowRefs.current || []).map((el) => (el ? el.getBoundingClientRect() : null));
+        const visibleRowIdx = [];
+        for (let i = 0; i < rowRects.length; i++) {
+            const r = rowRects[i];
+            if (!r) continue;
+            // Consider a row visible if it intersects the wrapper viewport
+            if (r.bottom >= wrapRect.top && r.top <= wrapRect.bottom) visibleRowIdx.push(i);
+        }
+
+        // Partition events: those that fall on currently visible rows get higher priority
+        const priorityEvents = [];
+        const backgroundEvents = [];
+        for (const ev of visibleEvents) {
+            try {
+                const s = toLocal(ev.start);
+                const dayIdx = s.getDate() - 1;
+                if (visibleRowIdx.includes(dayIdx)) priorityEvents.push(ev);
+                else backgroundEvents.push(ev);
+            } catch (_) {
+                backgroundEvents.push(ev);
+            }
+        }
+
+        // Process priority events, but avoid blocking the main thread.
+        // Instead of doing a potentially large synchronous DOM-measurement loop
+        // on the interaction path, schedule a small immediate build via
+        // requestIdleCallback (or a short setTimeout fallback) and cap the
+        // number of priority items processed synchronously. This reduces
+        // INP by keeping the interaction handler responsive.
+        if (priorityEvents.length > 0) {
+            const cap = 12; // max number of priority events to eagerly compute
+            const toCompute = priorityEvents.slice(0, cap);
+            const buildImmediate = () => {
+                try {
+                    const thOffsets = getThOffsets();
+                    const wrapRectInner = wrap.getBoundingClientRect();
+                    const rects = (dayRowRefs.current || []).map((el) => (el ? el.getBoundingClientRect() : null));
+                    const immediateOverlays = [];
+                    const seenImmediate = new Set();
+                    for (let i = 0; i < toCompute.length; i++) {
+                        const ev = toCompute[i];
+                        try {
+                            const startLocal = toLocal(ev.start);
+                            const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
+                            const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_START, 0, 0, 0);
+                            const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_END, 0, 0, 0);
+                            const clampedStart = new Date(Math.max(startLocal.getTime(), dayStart.getTime()));
+                            const clampedEnd = new Date(Math.min(endLocal.getTime(), dayEnd.getTime()));
+                            if (clampedEnd <= clampedStart) continue;
+                            const dayIdx = clampedStart.getDate() - 1;
+                            const rect = rects[dayIdx];
+                            if (!rect) continue;
+                            const rowTop = rect.top - wrapRectInner.top + (wrap.scrollTop || 0);
+                            const rowHeight = rect.height;
+                            const startHour = String(clampedStart.getHours()).padStart(2, '0') + ':00';
+                            const endHour = String(clampedEnd.getHours()).padStart(2, '0') + ':00';
+                            const startIdx = HOUR_SLOTS.findIndex((h) => h.startsWith(startHour.slice(0,2)) || h === startHour);
+                            const endIdx = HOUR_SLOTS.findIndex((h) => h.startsWith(endHour.slice(0,2)) || h === endHour);
+                            const sIdx = Math.max(0, startIdx === -1 ? 0 : startIdx);
+                            const eIdx = Math.min(Math.max(0, thOffsets.length - 1), endIdx === -1 ? (sIdx) : endIdx);
+                            const startTh = thOffsets[sIdx] || { left: 0, width: HOUR_COL_WIDTH };
+                            const endTh = thOffsets[eIdx] || thOffsets[thOffsets.length - 1] || { left: 0, width: HOUR_COL_WIDTH };
+                            const startFraction = (clampedStart.getMinutes() + clampedStart.getSeconds() / 60) / 60;
+                            const endFraction = (clampedEnd.getMinutes() + clampedEnd.getSeconds() / 60) / 60;
+                            const startLeft = startTh.left + startFraction * startTh.width;
+                            const endLeft = endTh.left + endFraction * endTh.width;
+                            const tableWidth2 = table.offsetWidth || Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
+                            const leftClamped = Math.max(0, Math.min(tableWidth2, startLeft));
+                            const rightClamped = Math.max(0, Math.min(tableWidth2, endLeft));
+                            const width = Math.max(6, rightClamped - leftClamped);
+                            const uniqKey = `${String(ev.id || '')}_${leftClamped}_${Math.round(rowTop)}_${Math.round(width)}`;
+                            if (!seenImmediate.has(uniqKey)) {
+                                seenImmediate.add(uniqKey);
+                                immediateOverlays.push({ ev, left: leftClamped, top: rowTop + 4, width, height: Math.max(18, rowHeight - 8) });
+                            }
+                        } catch (_) {}
+                    }
+                    if (immediateOverlays.length > 0) {
+                        // replace overlays with immediate ones first for responsiveness
+                        setEventOverlays(immediateOverlays);
+                    }
+                } catch (_) {}
+            };
+
+            // schedule via requestIdleCallback if available, otherwise setTimeout
+            if (typeof requestIdleCallback !== 'undefined') {
+                try {
+                    const h = requestIdleCallback(() => buildImmediate(), { timeout: 100 });
+                    // keep a handle so cleanup can cancel it
+                    idleHandleRef.current = h;
+                } catch (e) {
+                    idleHandleRef.current = setTimeout(buildImmediate, 50);
+                }
+            } else {
+                idleHandleRef.current = setTimeout(buildImmediate, 50);
+            }
+        }
+
+        // Schedule background processing for remaining events
+        scheduleIdle(backgroundEvents.length ? backgroundEvents : visibleEvents);
+
+        // Debounced resize/scroll handler
+        let resizeTimer = null;
+        const onResizeDebounced = () => {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // reset caches so offsets are recomputed
+                cachedThRef.current = null;
+                lastTableWidthRef.current = 0;
+                if (chunkTimerRef.current) { clearTimeout(chunkTimerRef.current); chunkTimerRef.current = null; }
+                scheduleIdle();
+            }, 120);
+        };
+
+        window.addEventListener('resize', onResizeDebounced);
+        const wrapEl = rightScrollRef.current;
+        wrapEl?.addEventListener('scroll', onResizeDebounced);
+        const outer = gridRef.current;
+        outer?.addEventListener('scroll', onResizeDebounced);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('resize', onResizeDebounced);
+            wrapEl?.removeEventListener('scroll', onResizeDebounced);
+            outer?.removeEventListener('scroll', onResizeDebounced);
+            if (idleHandleRef.current) {
+                try { cancelIdleCallback(idleHandleRef.current); } catch (_) { clearTimeout(idleHandleRef.current); }
+                idleHandleRef.current = null;
+            }
+            if (chunkTimerRef.current) { clearTimeout(chunkTimerRef.current); chunkTimerRef.current = null; }
+            if (resizeTimer) clearTimeout(resizeTimer);
+        };
+    // Recompute when relevant layout/state changes
+    }, [events, HOUR_SLOTS, year, month, daysInMonth, WORK_START, WORK_END, tailwindColorCache]);
 
     useLayoutEffect(() => {
         const container = gridRef.current;
@@ -516,12 +909,12 @@ const isoWeekNumber = (date) => {
     }, []);
 
     useEffect(() => {
-        try {
-            console.debug("[MonthView debug]", {
-                overlayMetrics,
-                rangeCount: (rangeTasks || []).length,
-            });
-        } catch (e) {}
+            try {
+                DEBUG && console.debug("[MonthView debug]", {
+                    overlayMetrics,
+                    rangeCount: (rangeTasks || []).length,
+                });
+            } catch (e) {}
     }, [overlayMetrics, rangeTasks.length]);
 
     useEffect(() => {
@@ -581,7 +974,7 @@ const isoWeekNumber = (date) => {
                     visibleInMonth: !(startIdx > endIdx),
                 };
             });
-            console.debug("[MonthView ranges]", {
+            DEBUG && console.debug("[MonthView ranges]", {
                 overlayMetricsSummary: {
                     colLeft: overlayMetrics.colLeft,
                     colWidth: overlayMetrics.colWidth,
@@ -591,7 +984,7 @@ const isoWeekNumber = (date) => {
             });
         } catch (e) {
             try {
-                console.debug("[MonthView ranges] error", e);
+                DEBUG && console.debug("[MonthView ranges] error", e);
             } catch (_) {}
         }
     }, [overlayMetrics, rangeTasks]);
@@ -635,6 +1028,23 @@ const isoWeekNumber = (date) => {
                 });
             } catch (e) {}
         });
+    };
+
+    // Debounced scheduler for row-count/height sync to keep ResizeObserver callbacks tiny
+    const scheduleSyncHeights = (delay = 120) => {
+        try {
+            if (heightSyncTimerRef.current) clearTimeout(heightSyncTimerRef.current);
+        } catch (_) {}
+        heightSyncTimerRef.current = setTimeout(() => {
+            try {
+                ensureRowCountMatches();
+                syncRowHeights();
+            } catch (e) {
+                try { DEBUG && console.debug('[MonthView] scheduleSyncHeights error', e); } catch (_) {}
+            } finally {
+                heightSyncTimerRef.current = null;
+            }
+        }, delay);
     };
 
     // Ensure the DOM has the same number of left and right rows. In some
@@ -710,7 +1120,7 @@ const isoWeekNumber = (date) => {
                 for (let i = 0; i < missing; i++) leftTbody.appendChild(createLeftPlaceholder());
             }
         } catch (e) {
-            try { console.debug('[MonthView] ensureRowCountMatches error', e); } catch (_) {}
+            try { DEBUG && console.debug('[MonthView] ensureRowCountMatches error', e); } catch (_) {}
         }
     };
 
@@ -723,28 +1133,28 @@ const isoWeekNumber = (date) => {
         const container = gridRef.current;
         if (container && "ResizeObserver" in window) {
             const ro = new ResizeObserver(() => {
-                ensureRowCountMatches();
-                syncRowHeights();
+                // Keep ResizeObserver callback tiny — schedule the heavy work
+                scheduleSyncHeights();
             });
             ro.observe(container);
 
             const onWin = () => {
-                ensureRowCountMatches();
-                syncRowHeights();
+                scheduleSyncHeights();
             };
             window.addEventListener("resize", onWin);
             return () => {
                 ro.disconnect();
                 window.removeEventListener("resize", onWin);
+                try { if (heightSyncTimerRef.current) { clearTimeout(heightSyncTimerRef.current); heightSyncTimerRef.current = null; } } catch(_){}
             };
         } else {
             const onWin = () => {
-                ensureRowCountMatches();
-                syncRowHeights();
+                scheduleSyncHeights();
             };
             window.addEventListener("resize", onWin);
             return () => {
                 window.removeEventListener("resize", onWin);
+                try { if (heightSyncTimerRef.current) { clearTimeout(heightSyncTimerRef.current); heightSyncTimerRef.current = null; } } catch(_){}
             };
         }
     }, [monthDays.length]);
@@ -757,8 +1167,8 @@ const isoWeekNumber = (date) => {
         const el = rightScrollRef.current;
         if (!el || typeof ResizeObserver === 'undefined') return;
         const ro = new ResizeObserver(() => {
-            ensureRowCountMatches();
-            syncRowHeights();
+            // keep callback tiny
+            scheduleSyncHeights();
         });
         ro.observe(el);
         // Listen for horizontal scrolling so we can re-run the height sync
@@ -769,11 +1179,10 @@ const isoWeekNumber = (date) => {
                 const sl = (e && e.target && typeof e.target.scrollLeft === 'number') ? e.target.scrollLeft : el.scrollLeft;
                 if (lastRightScrollLeft.current !== sl) {
                     lastRightScrollLeft.current = sl;
-                    ensureRowCountMatches();
-                    syncRowHeights();
+                    scheduleSyncHeights();
                 }
             } catch (err) {
-                try { console.debug('[MonthView] right scroll handler error', err); } catch (_) {}
+                try { DEBUG && console.debug('[MonthView] right scroll handler error', err); } catch (_) {}
             }
         };
         el.addEventListener('scroll', onRightScroll, { passive: true });
@@ -986,7 +1395,7 @@ const isoWeekNumber = (date) => {
         const height = Math.max(0, rowRect.height - inset * 2);
 
         try {
-            console.debug("[MonthView] today overlay coords", {
+            DEBUG && console.debug("[MonthView] today overlay coords", {
                 left,
                 top,
                 width,
@@ -1122,7 +1531,7 @@ const isoWeekNumber = (date) => {
                                 setShowMonthPicker((s) => !s);
                             }}
                         >
-                            <img src={PUBLIC_URL + '/calendar.png'} alt="Calendar" style={{ width: 18, height: 18 }} />
+                            <img src={calendarSrc} alt="Calendar" style={{ width: 18, height: 18 }} />
                         </button>
 
                         {showMonthPicker && (
@@ -1191,7 +1600,7 @@ const isoWeekNumber = (date) => {
                             </div>
                         )}
                     </div>
-                    {formatDate(baseDate, { longMonth: true })}
+                    {new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: userTimeZone }).format(baseDate)}
                     {prefsLoading && (
                         <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
                             Loading
@@ -1543,7 +1952,7 @@ const isoWeekNumber = (date) => {
                                                     return (
                                                         <td
                                                             key={hIdx}
-                                                            className="relative px-1 py-2 text-center align-top w-16 cursor-pointer"
+                                                            className={`relative px-1 py-2 text-center align-top w-16 ${enableQuickCreate ? 'cursor-pointer' : ''}`}
                                                             style={{
                                                                 minWidth: 40,
                                                                 borderLeft:
@@ -1566,42 +1975,27 @@ const isoWeekNumber = (date) => {
                                                                 try {
                                                                     e.stopPropagation();
                                                                 } catch {}
-                                                                if (onEventClick)
+                                                                // Only trigger the slot click callback when quick-create is enabled.
+                                                                if (enableQuickCreate && onEventClick)
                                                                     onEventClick(
                                                                         {
                                                                             day: date,
                                                                             hour: h,
                                                                         },
                                                                     );
-                                                                if (
-                                                                    typeof onQuickCreate ===
-                                                                    "function"
-                                                                ) {
-                                                                    const [
-                                                                        hr,
-                                                                        min,
-                                                                    ] = h.split(
-                                                                        ":",
+                                                                // Only invoke quick-create when explicitly enabled
+                                                                if (enableQuickCreate && typeof onQuickCreate === "function") {
+                                                                    const [hr, min] = h.split(":" );
+                                                                    const dt = new Date(
+                                                                        date.getFullYear(),
+                                                                        date.getMonth(),
+                                                                        date.getDate(),
+                                                                        parseInt(hr, 10) || 0,
+                                                                        parseInt(min, 10) || 0,
+                                                                        0,
+                                                                        0,
                                                                     );
-                                                                    const dt =
-                                                                        new Date(
-                                                                            date.getFullYear(),
-                                                                            date.getMonth(),
-                                                                            date.getDate(),
-                                                                            parseInt(
-                                                                                hr,
-                                                                                10,
-                                                                            ) || 0,
-                                                                            parseInt(
-                                                                                min,
-                                                                                10,
-                                                                            ) || 0,
-                                                                            0,
-                                                                            0,
-                                                                        );
-                                                                    onQuickCreate(
-                                                                        dt,
-                                                                    );
+                                                                    onQuickCreate(dt);
                                                                 }
                                                             }}
                                                             onDragOver={(e) => {
@@ -1631,59 +2025,9 @@ const isoWeekNumber = (date) => {
                                                                     if (task) onTaskDrop(task, dt, dropEffect);
                                                                 } catch {}
                                                             }}
-                                                            title="Click to add appointment"
+                                                            title={enableQuickCreate ? "Click to add appointment" : undefined}
                                                         >
-                                                            {evs.map(
-                                                                (ev, appIdx) => {
-                                                                    const color =
-                                                                        categories?.[
-                                                                            ev.kind
-                                                                        ]
-                                                                            ?.color ||
-                                                                        "bg-gray-200";
-                                                                    const icon =
-                                                                        categories?.[
-                                                                            ev.kind
-                                                                        ]
-                                                                            ?.icon ||
-                                                                        "";
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                appIdx
-                                                                            }
-                                                                            className={`absolute inset-0 mx-1 my-1 px-2 py-1 rounded cursor-pointer flex items-center gap-1 overflow-hidden group ${color}`}
-                                                                            style={{
-                                                                                zIndex: 10,
-                                                                            }}
-                                                                            title={
-                                                                                ev.title
-                                                                            }
-                                                                            onClick={(
-                                                                                e,
-                                                                            ) => {
-                                                                                e.stopPropagation();
-                                                                                onEventClick &&
-                                                                                    onEventClick(
-                                                                                        ev,
-                                                                                        "edit",
-                                                                                    );
-                                                                            }}
-                                                                        >
-                                                                            <span className="shrink-0 text-xs">
-                                                                                {
-                                                                                    icon
-                                                                                }
-                                                                            </span>
-                                                                            <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1">
-                                                                                {
-                                                                                    ev.title
-                                                                                }
-                                                                            </span>
-                                                                        </div>
-                                                                    );
-                                                                },
-                                                            )}
+                                                            {/* timed events rendered as absolute overlays (see eventOverlays) */}
                                                         </td>
                                                     );
                                                 })}
@@ -1692,6 +2036,22 @@ const isoWeekNumber = (date) => {
                                     })}
                                 </tbody>
                             </table>
+
+                            {/* Timed event overlays: absolute bars positioned over the hours table */}
+                            {eventOverlays.length > 0 && (
+                                <div aria-hidden style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+                                            {eventOverlays.map((o, idx) => (
+                                                <EventOverlayItem
+                                                    key={`evov-${idx}-${String(o.ev?.id || '')}`}
+                                                    o={o}
+                                                    categories={categories}
+                                                    tailwindColorCache={tailwindColorCache}
+                                                    getContrastTextColor={getContrastTextColor}
+                                                    onEventClick={onEventClick}
+                                                />
+                                            ))}
+                                </div>
+                            )}
 
                                 {/* Red line (rendered inside the right hours wrapper so it scrolls horizontally with the table
                                     and avoids layout jitter while the left container handles vertical scrolling) */}
@@ -1755,100 +2115,24 @@ const isoWeekNumber = (date) => {
                                 pointerEvents: "none",
                             }}
                         >
-                            {rangeTasks.map((r) => {
-                                try {
-                                    if (r.lane >= lanesCount) return null;
-                                    const laneWidth = LANE_WIDTH;
-                                    const gap = LANE_GAP;
-                                    const startIdx = Math.max(
-                                        0,
-                                        r.start.getMonth() === month ? r.start.getDate() - 1 : 0,
-                                    );
-                                    const endIdx = Math.min(
-                                        overlayMetrics.rows.length - 1,
-                                        r.end.getMonth() === month ? r.end.getDate() - 1 : overlayMetrics.rows.length - 1,
-                                    );
-                                    if (startIdx > endIdx) return null;
-                                    const top = overlayMetrics.rows[startIdx]?.top ?? 0;
-                                    const bottom = overlayMetrics.rows[endIdx]?.bottom ?? top;
-                                    // Base top/bottom for the range (span across days)
-                                    const heightRaw = Math.max(2, bottom - top);
-                                    // Use a fixed lane height for stacking and offset each lane vertically
-                                    const laneHeight = LANE_HEIGHT;
-                                    const laneOffset = r.lane * (laneHeight + LANE_GAP);
-                                    const topShifted = top + laneOffset;
-                                    const bottomShifted = bottom + laneOffset;
-                                    const height = Math.max(2, bottomShifted - topShifted);
-                                    // Bar width: use most of the all-day column with small padding
-                                    const barWidth = Math.max(20, Math.min(overlayMetrics.colWidth - 12, CENTERED_BAR_WIDTH));
-                                    const left = Math.round(Math.max(4, (overlayMetrics.colWidth - barWidth) / 2));
-
-                                    // Determine color: prefer key-area color first, then category color.
-                                    const ka = keyAreaMap?.[String(r.task?.keyAreaId || r.task?.key_area_id)];
-                                    let categoryColor = ka?.color || categories?.[r.task?.kind]?.color;
-                                    const isTailwind = typeof categoryColor === "string" && categoryColor.startsWith("bg-");
-                                    const isColorStr = typeof categoryColor === "string" && !isTailwind;
-                                    const classForBg = isTailwind ? categoryColor : "";
-                                    const classForBgFinal = classForBg || "bg-gray-200";
-                                    const resolvedTailwind = isTailwind ? tailwindColorCache[categoryColor] : null;
-                                    const resolved = isColorStr ? categoryColor : resolvedTailwind;
-
-                                    // Text color heuristic / computed contrast
-                                    let textClass = "text-slate-800"; // default darker text for light fallback
-                                    if (isTailwind && classForBg.match(/-(50|100|200|300)(\b|$)/)) textClass = "text-slate-800";
-                                    else if (!isTailwind && resolved) {
-                                        // resolved explicit color -> compute contrast
-                                        // textClass will be applied only when no resolved color
-                                        textClass = "text-white";
-                                    }
-
-                                    const styleBg = resolved
-                                        ? {
-                                              backgroundColor: resolved,
-                                              border: `1px solid ${resolved}`,
-                                              color: getContrastTextColor(resolved),
-                                          }
-                                        : {};
-
-                                    return (
-                                        <div
-                                            key={`ov-${r.task?.id || String(Math.random())}`}
-                                            className={`${classForBgFinal} ${!resolved ? textClass : ''}`}
-                                            style={{
-                                                position: "absolute",
-                                                top,
-                                                left,
-                                                width: barWidth,
-                                                height,
-                                                overflow: "hidden",
-                                                zIndex: 150,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                paddingLeft: 8,
-                                                paddingRight: 8,
-                                                borderRadius: 6,
-                                                pointerEvents: "auto",
-                                                boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                                                ...styleBg,
-                                            }}
-                                            title={r.task?.title}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (typeof onTaskClick === "function") onTaskClick(r.task);
-                                            }}
-                                        >
-                                            <span className="shrink-0 text-xs" style={{ pointerEvents: "none" }}>
-                                                {categories?.[r.task?.kind]?.icon || ""}
-                                            </span>
-                                            <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1" style={{ pointerEvents: "none" }}>
-                                                {r.task?.title}
-                                            </span>
-                                        </div>
-                                    );
-                                } catch (e) {
-                                    return null;
-                                }
-                            })}
+                            {rangeTasks.map((r) => (
+                                <RangeTaskBar
+                                    key={`ov-${r.task?.id || String(Math.random())}`}
+                                    r={r}
+                                    overlayMetrics={overlayMetrics}
+                                    LANE_WIDTH={LANE_WIDTH}
+                                    LANE_GAP={LANE_GAP}
+                                    LANE_HEIGHT={LANE_HEIGHT}
+                                    CENTERED_BAR_WIDTH={CENTERED_BAR_WIDTH}
+                                    ALL_DAY_COL_WIDTH={ALL_DAY_COL_WIDTH}
+                                    month={month}
+                                    categories={categories}
+                                    keyAreaMap={keyAreaMap}
+                                    tailwindColorCache={tailwindColorCache}
+                                    getContrastTextColor={getContrastTextColor}
+                                    onTaskClick={onTaskClick}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>

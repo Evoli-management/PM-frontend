@@ -1,16 +1,22 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 
 const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
+  // default new-goal dates to today. The validation allows deadline to be
+  // today or in the future for new goals, so prefill to today's date which
+  // feels more natural to users.
+  const today = new Date();
+  const defaultDate = today.toISOString().split("T")[0];
+
   const [formData, setFormData] = useState({
     title: goal?.title || "",
     description: goal?.description || "",
     startDate: goal?.startDate
       ? new Date(goal.startDate).toISOString().split("T")[0]
-      : "",
+      : defaultDate,
     dueDate: goal?.dueDate
       ? new Date(goal.dueDate).toISOString().split("T")[0]
-      : "",
+      : defaultDate,
     keyAreaId: goal?.keyAreaId || "",
     status: goal?.status || "active",
     visibility: goal?.visibility || "public",
@@ -26,12 +32,17 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
           dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
         }))
-      : [{ title: "", weight: 1.0, startDate: "", dueDate: "" }]
+      : [{ title: "", weight: 1.0, startDate: defaultDate, dueDate: defaultDate }]
   );
 
   const [activeMilestoneIndex, setActiveMilestoneIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // Keep track of previous start date so we only auto-sync dueDate while
+  // the user hasn't manually changed it. If dueDate equals the previous
+  // start date (or is empty) we will copy new startDate into dueDate.
+  const prevStartRef = useRef(formData.startDate);
 
   // date input refs so we can open native picker when clicking the calendar icon
   const startRef = useRef(null);
@@ -46,12 +57,61 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     }
   };
 
+  // Auto-sync dueDate to startDate for new goals while the user hasn't
+  // explicitly modified the dueDate. Do not run for editing mode.
+  useEffect(() => {
+    if (isEditing) {
+      prevStartRef.current = formData.startDate;
+      return;
+    }
+
+    const prev = prevStartRef.current;
+    const current = formData.startDate;
+
+    // If dueDate is empty or was previously equal to the previous start
+    // date, update it to match the new start date.
+    setFormData((prevState) => {
+      if (!prevState.dueDate || prevState.dueDate === prev) {
+        return { ...prevState, dueDate: current };
+      }
+      return prevState;
+    });
+
+    // Also propagate the goal start date to milestones for new goals. For
+    // each milestone, if its startDate is empty or equals the previous
+    // goal start date, update it to the new goal start date. Same for
+    // milestone dueDate so they remain in sync until the user edits them.
+    setMilestones((prevMilestones) =>
+      prevMilestones.map((m) => {
+        const updated = { ...m };
+        if (!updated.startDate || updated.startDate === prev) {
+          updated.startDate = current;
+        }
+        if (!updated.dueDate || updated.dueDate === prev) {
+          updated.dueDate = current;
+        }
+        return updated;
+      }),
+    );
+
+    prevStartRef.current = current;
+  }, [formData.startDate, isEditing]);
+
   const handleMilestoneChange = (field, value) => {
     const updated = [...milestones];
-    updated[activeMilestoneIndex] = {
-      ...updated[activeMilestoneIndex],
-      [field]: value,
-    };
+    const prev = updated[activeMilestoneIndex]?.startDate;
+    const current = { ...updated[activeMilestoneIndex], [field]: value };
+
+    // If the user changed the milestone's startDate, and the milestone's
+    // dueDate is empty or still matched the previous start, copy the new
+    // start into the dueDate so it's prefilled and easy to accept.
+    if (field === "startDate") {
+      if (!updated[activeMilestoneIndex].dueDate || updated[activeMilestoneIndex].dueDate === prev) {
+        current.dueDate = value;
+      }
+    }
+
+    updated[activeMilestoneIndex] = current;
     setMilestones(updated);
   };
 
@@ -104,8 +164,9 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      if (dueDate <= today && !isEditing) {
-        newErrors.dueDate = "Deadline must be in the future";
+      // allow deadline to be today or in the future for new goals
+      if (dueDate < today && !isEditing) {
+        newErrors.dueDate = "Deadline must be today or in the future";
       }
     }
 
