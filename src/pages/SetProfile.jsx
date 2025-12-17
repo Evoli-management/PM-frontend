@@ -6,44 +6,55 @@ import { SecuritySettings } from '../components/profile/SecuritySettings';
 import { Preferences } from '../components/profile/Preferences';
 import { Integrations } from '../components/profile/Integrations';
 import { Toast } from '../components/profile/UIComponents';
-import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations } from '../components/profile';
+import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations, ManageTeams, ManageMembers, CultureAndValues, OrganizationSettings } from '../components/profile';
 import { FaBars } from 'react-icons/fa';
 
 const OrganizationTab = ({ showToast }) => {
-    const [inviteOpen, setInviteOpen] = React.useState(false);
+    const [activeSubTab, setActiveSubTab] = React.useState("teams");
 
-    const handleInvite = async (email) => {
-        try {
-            const { inviteUrl } = await (await import('../services/organizationService')).default.inviteUser(email);
-            showToast?.('Invite link generated');
-            return { inviteUrl };
-        } catch (e) {
-            showToast?.(e?.response?.data?.message || e.message || 'Failed to invite', 'error');
-            throw e;
+    const subTabs = [
+        { id: "teams", label: "Manage Teams" },
+        { id: "members", label: "Manage Members" },
+        { id: "culture", label: "Culture and Values" },
+        { id: "settings", label: "Settings" },
+    ];
+
+    const renderSubTabContent = () => {
+        switch (activeSubTab) {
+            case "teams":
+                return <ManageTeams showToast={showToast} />;
+            case "members":
+                return <ManageMembers showToast={showToast} />;
+            case "culture":
+                return <CultureAndValues showToast={showToast} />;
+            case "settings":
+                return <OrganizationSettings showToast={showToast} />;
+            default:
+                return <ManageTeams showToast={showToast} />;
         }
     };
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Organization</h3>
-                <button
-                    onClick={() => setInviteOpen(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                    Invite Member
-                </button>
+            {/* Sub-navigation */}
+            <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
+                {subTabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveSubTab(tab.id)}
+                        className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                            activeSubTab === tab.id
+                                ? "border-blue-600 text-blue-600"
+                                : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
-            <OrganizationOverview showToast={showToast} />
-            <OrganizationMembers showToast={showToast} />
-            <OrganizationInvitations showToast={showToast} />
-
-            <InviteModal
-                open={inviteOpen}
-                onClose={() => setInviteOpen(false)}
-                onInvite={handleInvite}
-            />
+            {/* Sub-tab content */}
+            <div>{renderSubTabContent()}</div>
         </div>
     );
 };

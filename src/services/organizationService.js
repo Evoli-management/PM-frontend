@@ -134,6 +134,62 @@ class OrganizationService {
       throw error;
     }
   }
+
+  /**
+   * Update member details
+   * @param {string} memberId - User ID
+   * @param {object} data - { firstName, lastName, role, teamIds }
+   */
+  async updateMember(memberId, data) {
+    try {
+      const res = await apiClient.patch(`/organizations/current/members/${memberId}`, data);
+      return res.data;
+    } catch (error) {
+      console.error("Failed to update member:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove member from organization
+   * @param {string} memberId - User ID
+   */
+  async removeMember(memberId) {
+    try {
+      const res = await apiClient.delete(`/organizations/current/members/${memberId}`);
+      return res.data;
+    } catch (error) {
+      console.error("Failed to remove member:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get organization settings
+   */
+  async getOrganizationSettings() {
+    try {
+      const res = await apiClient.get("/organizations/current/settings");
+      return res.data;
+    } catch (error) {
+      console.error("Failed to fetch organization settings:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update organization settings
+   * @param {object} data - Settings data
+   */
+  async updateOrganizationSettings(data) {
+    try {
+      const res = await apiClient.patch("/organizations/current/settings", data);
+      return res.data;
+    } catch (error) {
+      console.error("Failed to update organization settings:", error);
+      throw error;
+    }
+  }
 }
 
 export default new OrganizationService();

@@ -18,3 +18,7 @@ export { OrganizationOverview } from './OrganizationOverview';
 export { OrganizationMembers } from './OrganizationMembers';
 export { InviteModal } from './InviteModal';
 export { OrganizationInvitations } from './OrganizationInvitations';
+export { ManageTeams } from './ManageTeams';
+export { ManageMembers } from './ManageMembers';
+export { CultureAndValues } from './CultureAndValues';
+export { OrganizationSettings } from './OrganizationSettings';
