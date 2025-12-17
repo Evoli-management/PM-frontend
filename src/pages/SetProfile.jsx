@@ -6,39 +6,55 @@ import { SecuritySettings } from '../components/profile/SecuritySettings';
 import { Preferences } from '../components/profile/Preferences';
 import { Integrations } from '../components/profile/Integrations';
 import { Toast } from '../components/profile/UIComponents';
+import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations, ManageTeams, ManageMembers, CultureAndValues, OrganizationSettings } from '../components/profile';
 import { FaBars } from 'react-icons/fa';
 
-// Teams Component (simplified for now)
-const TeamsTab = ({ showToast }) => {
+const OrganizationTab = ({ showToast }) => {
+    const [activeSubTab, setActiveSubTab] = React.useState("teams");
+
+    const subTabs = [
+        { id: "teams", label: "Manage Teams" },
+        { id: "members", label: "Manage Members" },
+        { id: "culture", label: "Culture and Values" },
+        { id: "settings", label: "Settings" },
+    ];
+
+    const renderSubTabContent = () => {
+        switch (activeSubTab) {
+            case "teams":
+                return <ManageTeams showToast={showToast} />;
+            case "members":
+                return <ManageMembers showToast={showToast} />;
+            case "culture":
+                return <CultureAndValues showToast={showToast} />;
+            case "settings":
+                return <OrganizationSettings showToast={showToast} />;
+            default:
+                return <ManageTeams showToast={showToast} />;
+        }
+    };
+
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Teams & Members</h3>
-            <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-                <div className="flex flex-col items-center space-y-4">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-2xl">👥</span>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                            Teams & Members Management
-                        </h3>
-                        <p className="text-sm text-gray-600 max-w-md">
-                            Manage your teams, invite members, assign leaders, and organize your workspace in the dedicated Teams section.
-                        </p>
-                    </div>
-                    
-                    <a
-                        href="#/teams"
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
+            {/* Sub-navigation */}
+            <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
+                {subTabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveSubTab(tab.id)}
+                        className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                            activeSubTab === tab.id
+                                ? "border-blue-600 text-blue-600"
+                                : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                        }`}
                     >
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        Go to Teams Section
-                    </a>
-                </div>
+                        {tab.label}
+                    </button>
+                ))}
             </div>
+
+            {/* Sub-tab content */}
+            <div>{renderSubTabContent()}</div>
         </div>
     );
 };
@@ -80,8 +96,8 @@ export default function ProfileSetting() {
                 return <Preferences showToast={showToast} />;
             case "Integrations":
                 return <Integrations showToast={showToast} />;
-            case "Teams & Members":
-                return <TeamsTab showToast={showToast} />;
+            case "Organization":
+                return <OrganizationTab showToast={showToast} />;
             default:
                 return <PersonalInformation showToast={showToast} />;
         }

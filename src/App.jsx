@@ -33,12 +33,13 @@ import DontForget from "./pages/DontForget.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import MyFocus from "./pages/MyFocus.jsx";
 import Teams from "./pages/Teams.jsx";
+import GiveStrokes from "./pages/GiveStrokes.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import VerifyPasswordChange from "./pages/VerifyPasswordChange.jsx";
 import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
 import Pricing from "./pages/Pricing.jsx";
 import Reminders from "./pages/Reminders.jsx";
-
+import JoinOrganization from "./pages/JoinOrganization.jsx";
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
     // Only show footer on public/auth pages
@@ -81,6 +82,7 @@ export default function App() {
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/verify-password-change" element={<VerifyPasswordChange />} />
+                            <Route path="/join" element={<JoinOrganization />} />
                             <Route path="/verify-email-change" element={<VerifyEmailChange />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
@@ -95,6 +97,7 @@ export default function App() {
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/teams" element={<Teams />} />
+                            <Route path="/give-strokes" element={<GiveStrokes />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
                             {/* Private routes below */}

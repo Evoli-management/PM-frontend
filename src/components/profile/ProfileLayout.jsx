@@ -6,7 +6,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         "Security",
         "Preferences",
         "Integrations",
-        // "Teams & Members" // Hidden for now until Teams feature is implemented
+        "Organization",
     ];
 
     // Allow deep-linking: #/profile-settings?tab=preferences selects the Preferences tab
@@ -23,8 +23,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                     "security": "Security",
                     "preferences": "Preferences",
                     "integrations": "Integrations",
-                    "teams": "Teams & Members",
-                    "teams-members": "Teams & Members",
+                    "organization": "Organization",
                 };
                 if (map[tab]) setActiveTab(map[tab]);
             } catch (_) {
