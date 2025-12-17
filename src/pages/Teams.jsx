@@ -1,207 +1,145 @@
 import React, { useState, useRef, useEffect } from "react";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars } from "react-icons/fa";
+import teamsService from "../services/teamsService";
 
 export default function Teams() {
-    // ---------------- Teams & Members UI state (local only) ----------------
-    const [teamsUI, setTeamsUI] = useState({
-        mainTeam: {
-            id: "main-001",
-            name: "Product Development",
-            leaderId: "u1",
-            members: [
-                { id: "u1", name: "John Smith", role: "Lead Developer" },
-                { id: "u2", name: "Sarah Connor", role: "Designer" },
-                { id: "u3", name: "Mike Johnson", role: "QA Engineer" },
-            ],
-            invites: [],
-        },
-        otherTeams: [
-            {
-                id: "other-001",
-                name: "Marketing Team",
-                leaderId: "u4",
-                members: [
-                    { id: "u4", name: "Lisa Park", role: "Leader" },
-                    { id: "u5", name: "David Lee", role: "Content Writer" },
-                ],
-                invites: [
-                    { id: "inv1", contact: "new.marketer@company.com", status: "Pending" },
-                ],
-                joinRequests: [],
-            },
-            {
-                id: "other-002",
-                name: "Design System",
-                leaderId: "u6",
-                members: [
-                    { id: "u6", name: "Emma Wilson", role: "Leader" },
-                    { id: "u7", name: "Tom Brown", role: "UI Designer" },
-                    { id: "u8", name: "Anna Davis", role: "UX Researcher" },
-                ],
-                invites: [],
-                joinRequests: [
-                    { id: "jr1", user: "You", status: "Pending" },
-                ],
-            },
-        ],
-    });
+    // ============ API STATE ============
+    const [teamsData, setTeamsData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [saving, setSaving] = useState(false);
+
+    // ============ UI STATE ============
     const [teamsSearch, setTeamsSearch] = useState("");
-    const [joinMenuOpen, setJoinMenuOpen] = useState(false);
-    const [joinMenuFilter, setJoinMenuFilter] = useState("");
-    const [draggingMember, setDraggingMember] = useState(null); // { memberId, fromTeamId }
+    const [draggingMember, setDraggingMember] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
 
-    // Derived team permissions
-    const canCreateTeams = true;
-    const canJoinTeams = true;
-    const canManageTeams = true;
+    // ============ TOAST/NOTIFICATIONS ============
+    const [toast, setToast] = useState({ message: '', visible: false });
+    const showToast = (message, type = 'success') => {
+        setToast({ message, visible: true, type });
+        setTimeout(() => setToast({ visible: false }), 3000);
+    };
 
-    // Teams management functions
-    const createTeam = (name) => {
+    // ============ LOAD INITIAL DATA ============
+    useEffect(() => {
+        loadTeams();
+    }, []);
+
+    const loadTeams = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const teams = await teamsService.getTeams();
+            setTeamsData(teams || []);
+        } catch (err) {
+            const message = err?.response?.data?.message || err?.message || 'Failed to load teams';
+            setError(message);
+            showToast(message, 'error');
+            setTeamsData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ============ TEAM OPERATIONS ============
+    const createTeam = async (name) => {
         if (!name || !name.trim()) return;
-        const newTeam = {
-            id: `team-${Date.now()}`,
-            name: name.trim(),
-            leaderId: null,
-            members: [{ id: "you", name: "You", role: "Leader" }],
-            invites: [],
-            joinRequests: [],
-        };
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam: s.mainTeam || newTeam,
-            otherTeams: s.mainTeam ? [...s.otherTeams, newTeam] : s.otherTeams,
-        }));
+        setSaving(true);
+        try {
+            const newTeam = await teamsService.createTeam({
+                name: name.trim(),
+            });
+            setTeamsData([...teamsData, newTeam]);
+            showToast('Team created successfully');
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to create team';
+            showToast(message, 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const renameTeam = (teamId, newName) => {
+    const renameTeam = async (teamId, newName) => {
         if (!newName || !newName.trim()) return;
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam: s.mainTeam?.id === teamId ? { ...s.mainTeam, name: newName.trim() } : s.mainTeam,
-            otherTeams: s.otherTeams.map((t) => (t.id === teamId ? { ...t, name: newName.trim() } : t)),
-        }));
+        setSaving(true);
+        try {
+            const updated = await teamsService.updateTeam(teamId, {
+                name: newName.trim(),
+            });
+            setTeamsData(teamsData.map(t => t.id === teamId ? updated : t));
+            showToast('Team renamed successfully');
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to rename team';
+            showToast(message, 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const addMember = (teamId, memberName) => {
-        const member = { id: `m-${Date.now()}`, name: memberName.trim() || "New Member", role: "Member" };
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam:
-                s.mainTeam?.id === teamId ? { ...s.mainTeam, members: [...s.mainTeam.members, member] } : s.mainTeam,
-            otherTeams: s.otherTeams.map((t) =>
-                t.id === teamId ? { ...t, members: [...t.members, member] } : t
-            ),
-        }));
+    const deleteTeam = async (teamId) => {
+        if (!confirm('Are you sure you want to delete this team?')) return;
+        setSaving(true);
+        try {
+            await teamsService.deleteTeam(teamId);
+            setTeamsData(teamsData.filter(t => t.id !== teamId));
+            showToast('Team deleted successfully');
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to delete team';
+            showToast(message, 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const removeMember = (teamId, memberId) => {
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam:
-                s.mainTeam?.id === teamId
-                    ? { ...s.mainTeam, members: s.mainTeam.members.filter((m) => m.id !== memberId) }
-                    : s.mainTeam,
-            otherTeams: s.otherTeams.map((t) =>
-                t.id === teamId ? { ...t, members: t.members.filter((m) => m.id !== memberId) } : t
-            ),
-        }));
+    const addMemberToTeam = async (teamId, userId) => {
+        if (!userId) return;
+        setSaving(true);
+        try {
+            await teamsService.addTeamMember(teamId, userId, 'member');
+            await loadTeams();
+            showToast('Member added successfully');
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to add member';
+            showToast(message, 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const moveMember = (fromTeamId, toTeamId, memberId) => {
-        if (fromTeamId === toTeamId) return;
-        setTeamsUI((s) => {
-            let memberToMove = null;
-            // Find and remove from source
-            if (s.mainTeam?.id === fromTeamId) {
-                memberToMove = s.mainTeam.members.find((m) => m.id === memberId);
-            } else {
-                const sourceTeam = s.otherTeams.find((t) => t.id === fromTeamId);
-                memberToMove = sourceTeam?.members.find((m) => m.id === memberId);
-            }
-            if (!memberToMove) return s;
-            
-            // Remove from source and add to target
-            return {
-                ...s,
-                mainTeam:
-                    s.mainTeam?.id === fromTeamId
-                        ? { ...s.mainTeam, members: s.mainTeam.members.filter((m) => m.id !== memberId) }
-                        : s.mainTeam?.id === toTeamId
-                            ? { ...s.mainTeam, members: [...s.mainTeam.members, memberToMove] }
-                            : s.mainTeam,
-                otherTeams: s.otherTeams.map((t) => {
-                    if (t.id === fromTeamId) {
-                        return { ...t, members: t.members.filter((m) => m.id !== memberId) };
-                    }
-                    if (t.id === toTeamId) {
-                        return { ...t, members: [...t.members, memberToMove] };
-                    }
-                    return t;
-                }),
-            };
-        });
+    const removeMemberFromTeam = async (teamId, userId) => {
+        if (!confirm('Remove this member from the team?')) return;
+        setSaving(true);
+        try {
+            await teamsService.removeTeamMember(teamId, userId);
+            await loadTeams();
+            showToast('Member removed successfully');
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to remove member';
+            showToast(message, 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const sendInvite = (teamId, contact) => {
-        if (!contact || !contact.trim()) return;
-        const invite = { id: `inv-${Date.now()}`, contact: contact.trim(), status: "Pending" };
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam:
-                s.mainTeam?.id === teamId
-                    ? { ...s.mainTeam, invites: [...(s.mainTeam.invites || []), invite] }
-                    : s.mainTeam,
-            otherTeams: s.otherTeams.map((t) =>
-                t.id === teamId ? { ...t, invites: [...(t.invites || []), invite] } : t
-            ),
-        }));
+    const setTeamLead = async (teamId, userId) => {
+        setSaving(true);
+        try {
+            await teamsService.updateTeam(teamId, {
+                leadId: userId,
+            });
+            await loadTeams();
+            showToast('Team leader updated successfully');
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to update team leader';
+            showToast(message, 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const cancelInvite = (teamId, inviteId) => {
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam:
-                s.mainTeam?.id === teamId
-                    ? { ...s.mainTeam, invites: (s.mainTeam.invites || []).filter((i) => i.id !== inviteId) }
-                    : s.mainTeam,
-            otherTeams: s.otherTeams.map((t) =>
-                t.id === teamId ? { ...t, invites: (t.invites || []).filter((i) => i.id !== inviteId) } : t
-            ),
-        }));
-    };
-
-    const requestJoin = (teamId) => {
-        const request = { id: `jr-${Date.now()}`, user: "You", status: "Pending" };
-        setTeamsUI((s) => ({
-            ...s,
-            otherTeams: s.otherTeams.map((t) =>
-                t.id === teamId ? { ...t, joinRequests: [...(t.joinRequests || []), request] } : t
-            ),
-        }));
-    };
-
-    const cancelJoinRequest = (teamId, requestId) => {
-        setTeamsUI((s) => ({
-            ...s,
-            otherTeams: s.otherTeams.map((t) =>
-                t.id === teamId
-                    ? { ...t, joinRequests: (t.joinRequests || []).filter((r) => r.id !== requestId) }
-                    : t
-            ),
-        }));
-    };
-
-    const setLeader = (teamId, memberId) => {
-        setTeamsUI((s) => ({
-            ...s,
-            mainTeam: s.mainTeam?.id === teamId ? { ...s.mainTeam, leaderId: memberId } : s.mainTeam,
-            otherTeams: s.otherTeams.map((t) => (t.id === teamId ? { ...t, leaderId: memberId } : t)),
-        }));
-    };
-
-    // Enhanced Section Component
     const Section = ({ title, children, divider = true }) => (
         <section className={divider ? "mt-5 border-t border-gray-200 pt-5" : "mt-5 pt-5"}>
             {title ? <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2> : null}
@@ -238,370 +176,193 @@ export default function Teams() {
                         </div>
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
-                        <div className="space-y-4">
-                            <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
-                            <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                TEAM MANAGEMENT
-                            </div>
-                            <Section title="Teams & Members">
                                 <div className="space-y-4">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                        <input
-                                            value={teamsSearch}
-                                            onChange={(e) => setTeamsSearch(e.target.value)}
-                                            placeholder="Search members or teams..."
-                                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                        />
-                                        {canCreateTeams && (
-                                            <div className="flex gap-2">
-                                                <input id="newTeamName" placeholder="Enter new team name" className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" />
-                                                <button
-                                                    onClick={() => {
-                                                        const el = document.getElementById('newTeamName');
-                                                        const val = el?.value?.trim();
-                                                        if (!val) return;
-                                                        createTeam(val);
-                                                        if (el) el.value = '';
-                                                    }}
-                                                    className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                                                >
-                                                    Create Team
-                                                </button>
-                                            </div>
-                                        )}
+                                    <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
+                                    <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                        TEAM MANAGEMENT
                                     </div>
 
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        {/* Main Team Card */}
-                                        <div
-                                            className="rounded border border-blue-200 bg-blue-50 p-3"
-                                            onDragOver={(e) => e.preventDefault()}
-                                            onDrop={(e) => {
-                                                const payload = draggingMember;
-                                                setDraggingMember(null);
-                                                if (teamsUI.mainTeam && payload) moveMember(payload.fromTeamId, teamsUI.mainTeam.id, payload.memberId);
-                                            }}
-                                        >
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h4 className="text-sm font-semibold text-gray-800">Main Team</h4>
-                                                {teamsUI.mainTeam && (
-                                                    <span className="px-2 py-0.5 rounded-full text-xs bg-blue-600 text-white">Primary</span>
-                                                )}
-                                            </div>
-                                            {teamsUI.mainTeam ? (
-                                                <div>
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                                                            {teamsUI.mainTeam.name.charAt(0)}
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-sm font-semibold text-gray-800">{teamsUI.mainTeam.name}</div>
-                                                            <div className="text-xs text-gray-600">{teamsUI.mainTeam.members.length} members</div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        {teamsUI.mainTeam.members
-                                                            .filter((m) => m.name.toLowerCase().includes(teamsSearch.toLowerCase()))
-                                                            .map((m) => (
-                                                                <div
-                                                                    key={m.id}
-                                                                    className="flex items-center justify-between rounded border bg-white px-2 py-1"
-                                                                    draggable
-                                                                    onDragStart={() => setDraggingMember({ memberId: m.id, fromTeamId: teamsUI.mainTeam.id })}
-                                                                >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-6 h-6 rounded-full bg-blue-400 text-white text-xs flex items-center justify-center">
-                                                                            {m.name.charAt(0)}
-                                                                        </div>
-                                                                        <div className="text-sm text-gray-800">{m.name}</div>
-                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${teamsUI.mainTeam.leaderId === m.id || m.role === 'Leader' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                                                                            {teamsUI.mainTeam.leaderId === m.id || m.role === 'Leader' ? 'Leader' : 'Member'}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex gap-1">
-                                                                        {canManageTeams && (
-                                                                            <button onClick={() => setLeader(teamsUI.mainTeam.id, m.id)} className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50">Set Leader</button>
-                                                                        )}
-                                                                        {canManageTeams && (
-                                                                            <button onClick={() => removeMember(teamsUI.mainTeam.id, m.id)} className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50">Remove</button>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                    </div>
-                                                    {canManageTeams && (
-                                                        <div className="mt-2 flex gap-2">
-                                                            <input id="addMainMember" placeholder="Add member name" className="flex-1 px-2 py-1 text-sm border rounded" />
-                                                            <button
-                                                                className="text-xs px-2 py-1 bg-blue-600 text-white rounded"
-                                                                onClick={() => {
-                                                                    const el = document.getElementById('addMainMember');
-                                                                    addMember(teamsUI.mainTeam.id, el?.value || 'New Member');
-                                                                    if (el) el.value = '';
-                                                                }}
-                                                            >
-                                                                Add Member
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                    {canManageTeams && (
-                                                        <div className="mt-2">
-                                                            <div className="text-xs font-semibold text-gray-700 mb-1">Invite members</div>
-                                                            <div className="flex gap-2">
-                                                                <input id="inviteMain" placeholder="Email or username" className="flex-1 px-2 py-1 text-sm border rounded" />
-                                                                <button
-                                                                    className="text-xs px-2 py-1 bg-green-600 text-white rounded"
-                                                                    onClick={() => {
-                                                                        const el = document.getElementById('inviteMain');
-                                                                        sendInvite(teamsUI.mainTeam.id, el?.value || 'someone@example.com');
-                                                                        if (el) el.value = '';
-                                                                    }}
-                                                                >
-                                                                    Send Invite
-                                                                </button>
-                                                            </div>
-                                                            {(teamsUI.mainTeam.invites || []).length > 0 && (
-                                                                <div className="mt-2 space-y-1">
-                                                                    {(teamsUI.mainTeam.invites || []).map((iv) => (
-                                                                        <div key={iv.id} className="flex items-center justify-between text-xs border rounded px-2 py-1 bg-white">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800">Pending</span>
-                                                                                <span className="text-gray-800">{iv.contact}</span>
-                                                                            </div>
-                                                                            <button className="px-2 py-0.5 border rounded hover:bg-gray-50" onClick={() => cancelInvite(teamsUI.mainTeam.id, iv.id)}>Cancel</button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="text-center py-6 text-gray-500">
-                                                    <div className="text-4xl mb-2">👥</div>
-                                                    <p className="text-sm">No main team assigned</p>
-                                                    {canCreateTeams && (
-                                                        <button className="mt-3 px-4 py-2 bg-blue-500 text-white text-xs rounded hover:bg-blue-600" onClick={() => createTeam('My Team')}>
-                                                            Create Team
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
+                                    {toast.visible && (
+                                        <div className={`p-3 rounded text-sm ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                            {toast.message}
                                         </div>
+                                    )}
 
-                                        {/* Other Teams Cards */}
-                                        <div className="rounded border p-3">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h4 className="text-sm font-semibold text-gray-800">Other Teams</h4>
-                                                {canJoinTeams && (
-                                                    <div className="relative">
+                                    {loading ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <div className="text-4xl mb-2">⏳</div>
+                                            <p>Loading teams...</p>
+                                        </div>
+                                    ) : error ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <div className="text-4xl mb-2">❌</div>
+                                            <p>{error}</p>
+                                            <button
+                                                onClick={loadTeams}
+                                                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                            >
+                                                Retry
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <Section title="Teams & Members">
+                                            <div className="space-y-4">
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                    <input
+                                                        value={teamsSearch}
+                                                        onChange={(e) => setTeamsSearch(e.target.value)}
+                                                        placeholder="Search members or teams..."
+                                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            id="newTeamName" 
+                                                            placeholder="Enter new team name" 
+                                                            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
+                                                        />
                                                         <button
-                                                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                                                            onClick={() => setJoinMenuOpen((v) => {
-                                                                const next = !v;
-                                                                if (next) setJoinMenuFilter("");
-                                                                return next;
-                                                            })}
-                                                        >
-                                                            Join Team
-                                                        </button>
-                                                        {joinMenuOpen && (
-                                                            <div className="absolute right-0 mt-1 w-64 rounded border bg-white shadow z-10">
-                                                                <div className="p-2 border-b">
-                                                                    <input
-                                                                        autoFocus
-                                                                        value={joinMenuFilter}
-                                                                        onChange={(e) => setJoinMenuFilter(e.target.value)}
-                                                                        placeholder="Search teams..."
-                                                                        className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:border-blue-500"
-                                                                    />
-                                                                </div>
-                                                                <div className="max-h-56 overflow-auto py-1">
-                                                                    {(() => {
-                                                                        const banned = /^(new team|team)$/i;
-                                                                        const q = joinMenuFilter.trim().toLowerCase();
-                                                                        const items = (teamsUI.otherTeams || [])
-                                                                            .filter((t) => !banned.test(t.name))
-                                                                            .filter((t) => !(t.members || []).some((m) => m.name === 'You'))
-                                                                            .filter((t) => !q || t.name.toLowerCase().includes(q))
-                                                                            .slice(0, 12);
-                                                                        return items.length ? items.map((t) => (
-                                                                            <button
-                                                                                key={t.id}
-                                                                                className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
-                                                                                onClick={() => {
-                                                                                    requestJoin(t.id);
-                                                                                    setJoinMenuOpen(false);
-                                                                                }}
-                                                                            >
-                                                                                {t.name}
-                                                                            </button>
-                                                                        )) : (
-                                                                            <div className="px-3 py-2 text-xs text-gray-500">No teams found</div>
-                                                                        );
-                                                                    })()}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="space-y-3">
-                                                {teamsUI.otherTeams
-                                                    .filter((t) => t.name.toLowerCase().includes(teamsSearch.toLowerCase()) || t.members.some((m) => m.name.toLowerCase().includes(teamsSearch.toLowerCase())))
-                                                    .map((t) => (
-                                                        <div
-                                                            key={t.id}
-                                                            className="border rounded p-2 bg-white"
-                                                            onDragOver={(e) => e.preventDefault()}
-                                                            onDrop={() => {
-                                                                const payload = draggingMember;
-                                                                setDraggingMember(null);
-                                                                if (payload) moveMember(payload.fromTeamId, t.id, payload.memberId);
+                                                            onClick={() => {
+                                                                const el = document.getElementById('newTeamName');
+                                                                const val = el?.value?.trim();
+                                                                if (!val) return;
+                                                                createTeam(val);
+                                                                if (el) el.value = '';
                                                             }}
+                                                            disabled={saving}
+                                                            className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
                                                         >
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="w-7 h-7 bg-gray-500 rounded-full text-white text-xs flex items-center justify-center">
-                                                                        {t.name.charAt(0)}
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="text-sm font-semibold text-gray-800">{t.name}</div>
-                                                                        <div className="text-xs text-gray-600">{t.members.length} members</div>
-                                                                    </div>
-                                                                </div>
-                                                                {canManageTeams && (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <input id={`rn-${t.id}`} placeholder="Rename" className="px-2 py-1 text-xs border rounded" />
-                                                                        <button className="text-xs px-2 py-1 border rounded hover:bg-gray-50" onClick={() => {
-                                                                            const el = document.getElementById(`rn-${t.id}`);
-                                                                            renameTeam(t.id, el?.value || t.name);
-                                                                            if (el) el.value = '';
-                                                                        }}>Rename</button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                {t.members
-                                                                    .filter((m) => m.name.toLowerCase().includes(teamsSearch.toLowerCase()))
-                                                                    .map((m) => (
-                                                                        <div
-                                                                            key={m.id}
-                                                                            className="flex items-center justify-between rounded border px-2 py-1"
-                                                                            draggable
-                                                                            onDragStart={() => setDraggingMember({ memberId: m.id, fromTeamId: t.id })}
-                                                                        >
-                                                                            <div className="flex items-center gap-2">
-                                                                                <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
-                                                                                    {m.name.charAt(0)}
-                                                                                </div>
-                                                                                <div className="text-sm text-gray-800">{m.name}</div>
-                                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.leaderId === m.id || m.role === 'Leader' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                                                                                    {t.leaderId === m.id || m.role === 'Leader' ? 'Leader' : 'Member'}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="flex gap-1">
-                                                                                {canManageTeams && (
-                                                                                    <button onClick={() => setLeader(t.id, m.id)} className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50">Set Leader</button>
-                                                                                )}
-                                                                                {canManageTeams && (
-                                                                                    <button onClick={() => removeMember(t.id, m.id)} className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50">Remove</button>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                            </div>
-                                                            {canJoinTeams && !t.members.some((m) => m.name === 'You') && (
-                                                                <div className="mt-2">
-                                                                    <button
-                                                                        className="text-xs px-2 py-1 bg-green-600 text-white rounded"
-                                                                        onClick={() => requestJoin(t.id)}
-                                                                    >
-                                                                        Request to Join
-                                                                    </button>
-                                                                    {(t.joinRequests || []).some((r) => r.user === 'You' && r.status === 'Pending') && (
-                                                                        <span className="ml-2 text-xs text-yellow-700">Pending approval…</span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            {(t.joinRequests || []).length > 0 && (
-                                                                <div className="mt-2 space-y-1">
-                                                                    {(t.joinRequests || []).map((r) => (
-                                                                        <div key={r.id} className="flex items-center justify-between text-xs border rounded px-2 py-1 bg-white">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className={`px-1.5 py-0.5 rounded ${r.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-700'}`}>{r.status}</span>
-                                                                                <span className="text-gray-800">{r.user}</span>
-                                                                            </div>
-                                                                            {r.user === 'You' && r.status === 'Pending' && (
-                                                                                <button className="px-2 py-0.5 border rounded hover:bg-gray-50" onClick={() => cancelJoinRequest(t.id, r.id)}>Cancel</button>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                            {canManageTeams && (
-                                                                <div className="mt-2 flex gap-2">
-                                                                    <input id={`add-${t.id}`} placeholder="Add member name" className="flex-1 px-2 py-1 text-sm border rounded" />
-                                                                    <button
-                                                                        className="text-xs px-2 py-1 bg-blue-600 text-white rounded"
-                                                                        onClick={() => {
-                                                                            const el = document.getElementById(`add-${t.id}`);
-                                                                            addMember(t.id, el?.value || 'New Member');
-                                                                            if (el) el.value = '';
-                                                                        }}
-                                                                    >
-                                                                        Add Member
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                            {canManageTeams && (
-                                                                <div className="mt-2">
-                                                                    <div className="text-xs font-semibold text-gray-700 mb-1">Invite members</div>
-                                                                    <div className="flex gap-2">
-                                                                        <input id={`invite-${t.id}`} placeholder="Email or username" className="flex-1 px-2 py-1 text-sm border rounded" />
-                                                                        <button
-                                                                            className="text-xs px-2 py-1 bg-green-600 text-white rounded"
-                                                                            onClick={() => {
-                                                                                const el = document.getElementById(`invite-${t.id}`);
-                                                                                sendInvite(t.id, el?.value || 'someone@example.com');
-                                                                                if (el) el.value = '';
-                                                                            }}
-                                                                        >
-                                                                            Send Invite
-                                                                        </button>
-                                                                    </div>
-                                                                    {(t.invites || []).length > 0 && (
-                                                                        <div className="mt-2 space-y-1">
-                                                                            {(t.invites || []).map((iv) => (
-                                                                                <div key={iv.id} className="flex items-center justify-between text-xs border rounded px-2 py-1">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800">Pending</span>
-                                                                                        <span className="text-gray-800">{iv.contact}</span>
-                                                                                    </div>
-                                                                                    <button className="px-2 py-0.5 border rounded hover:bg-gray-50" onClick={() => cancelInvite(t.id, iv.id)}>Cancel</button>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                {teamsUI.otherTeams.length === 0 && (
-                                                    <div className="text-center py-4 text-gray-500 border border-gray-200 rounded-lg">
-                                                        <p className="text-sm">No additional teams</p>
+                                                            {saving ? 'Creating...' : 'Create Team'}
+                                                        </button>
                                                     </div>
-                                                )}
+                                                </div>
+
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    {teamsData.length === 0 ? (
+                                                        <div className="col-span-full text-center py-12 text-gray-500 border border-gray-200 rounded">
+                                                            <div className="text-4xl mb-2">👥</div>
+                                                            <p>No teams yet. Create your first team!</p>
+                                                        </div>
+                                                    ) : (
+                                                        teamsData
+                                                            .filter(t => t.name.toLowerCase().includes(teamsSearch.toLowerCase()))
+                                                            .map((team) => (
+                                                                <TeamCard
+                                                                    key={team.id}
+                                                                    team={team}
+                                                                    onRename={renameTeam}
+                                                                    onDelete={deleteTeam}
+                                                                    onAddMember={addMemberToTeam}
+                                                                    onRemoveMember={removeMemberFromTeam}
+                                                                    onSetLead={setTeamLead}
+                                                                    saving={saving}
+                                                                />
+                                                            ))
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                        </Section>
+                                    )}
                                 </div>
-                            </Section>
                             </div>
                         </div>
                     </div>
-                    </div>
                 </main>
+            </div>
+        </div>
+    );
+}
+
+function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving }) {
+    const [showRenameInput, setShowRenameInput] = useState(false);
+    const [renameValue, setRenameValue] = useState(team.name);
+
+    return (
+        <div className="rounded border p-3 bg-white hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                        {team.name.charAt(0)}
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-900">{team.name}</h3>
+                        <p className="text-xs text-gray-600">{team.memberCount || 0} members</p>
+                    </div>
+                </div>
+                <div className="flex gap-1">
+                    <button
+                        onClick={() => setShowRenameInput(!showRenameInput)}
+                        className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                    >
+                        Rename
+                    </button>
+                    <button
+                        onClick={() => onDelete(team.id)}
+                        disabled={saving}
+                        className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+
+            {showRenameInput && (
+                <div className="flex gap-2 mb-3">
+                    <input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        className="flex-1 px-2 py-1 text-sm border rounded"
+                    />
+                    <button
+                        onClick={() => {
+                            onRename(team.id, renameValue);
+                            setShowRenameInput(false);
+                        }}
+                        disabled={saving}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
+                    >
+                        Save
+                    </button>
+                </div>
+            )}
+
+            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                {team.members && team.members.length > 0 ? (
+                    team.members.map((member) => (
+                        <div key={member.id} className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
+                                    {member.firstName?.charAt(0) || 'U'}
+                                </div>
+                                <div className="text-sm text-gray-800">
+                                    {member.firstName} {member.lastName}
+                                </div>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${member.role === 'lead' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                                    {member.role === 'lead' ? 'Lead' : 'Member'}
+                                </span>
+                            </div>
+                            <div className="flex gap-1">
+                                {member.role !== 'lead' && (
+                                    <button
+                                        onClick={() => onSetLead(team.id, member.id)}
+                                        disabled={saving}
+                                        className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50 disabled:opacity-60"
+                                    >
+                                        Set Lead
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => onRemoveMember(team.id, member.id)}
+                                    disabled={saving}
+                                    className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-xs text-gray-500">No members yet</p>
+                )}
             </div>
         </div>
     );
