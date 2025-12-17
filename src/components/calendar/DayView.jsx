@@ -279,8 +279,13 @@ export default function DayView({
     setCurrentDate(d);
   };
 
+  // headerWeekday should be the weekday name only (e.g. 'Wed')
+  // formatDate(...) with includeWeekday returns the weekday *and* the date
+  // which led to duplication like "Wed, 12/17/2025, 12/17/2025". Use
+  // toLocaleDateString to get weekday-only and keep headerDate for the
+  // formatted date portion.
   const headerWeekday = currentDate
-    ? formatDate(currentDate, { includeWeekday: true })
+    ? new Date(currentDate).toLocaleDateString('en-US', { weekday: 'short' })
     : "";
   const headerDate = currentDate
     ? formatDate(currentDate, { longMonth: true })
