@@ -23,6 +23,9 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
     const [localMilestones, setLocalMilestones] = useState(null);
     const hoverTimer = useRef(null);
 
+    // Date formatting helpers from hook
+    const { formatDate } = useFormattedDate();
+
     const milestones = localMilestones ?? goal.milestones ?? [];
 
     const completedMilestones =

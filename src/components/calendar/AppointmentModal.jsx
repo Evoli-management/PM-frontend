@@ -1165,9 +1165,11 @@ const buildRecurringPattern = ({
                                                             name="rec-end"
                                                             value="none"
                                                             checked={recurrenceEndType === "none"}
-                                                            onChange={() =>
-                                                                setRecurrenceEndType("none")
-                                                            }
+                                                            onChange={() => {
+                                                                setRecurrenceEndType("none");
+                                                                // Clear any previously set 'until' date when not using 'until'
+                                                                setRecurrenceUntilDate("");
+                                                            }}
                                                         />
                                                         <span>No end date</span>
                                                     </label>
@@ -1178,15 +1180,19 @@ const buildRecurringPattern = ({
                                                             name="rec-end"
                                                             value="until"
                                                             checked={recurrenceEndType === "until"}
-                                                            onChange={() =>
-                                                                setRecurrenceEndType("until")
-                                                            }
+                                                            onChange={() => {
+                                                                setRecurrenceEndType("until");
+                                                                // If there's no until date yet, default it to the current end date
+                                                                if (!recurrenceUntilDate) {
+                                                                    setRecurrenceUntilDate(endDateStr || "");
+                                                                }
+                                                            }}
                                                         />
                                                         <span>End by</span>
                                                         <input
                                                             type="date"
                                                             className="ml-2 rounded-md border border-slate-300 px-2 py-1"
-                                                            value={recurrenceUntilDate || ""}
+                                                            value={recurrenceEndType === "until" ? (recurrenceUntilDate || "") : ""}
                                                             onChange={(e) =>
                                                                 setRecurrenceUntilDate(
                                                                     e.target.value
@@ -1201,9 +1207,11 @@ const buildRecurringPattern = ({
                                                             name="rec-end"
                                                             value="count"
                                                             checked={recurrenceEndType === "count"}
-                                                            onChange={() =>
-                                                                setRecurrenceEndType("count")
-                                                            }
+                                                            onChange={() => {
+                                                                setRecurrenceEndType("count");
+                                                                // Clear until date when switching to count
+                                                                setRecurrenceUntilDate("");
+                                                            }}
                                                         />
                                                         <span>End after</span>
                                                         <input
