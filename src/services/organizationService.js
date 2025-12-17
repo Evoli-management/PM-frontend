@@ -110,6 +110,19 @@ class OrganizationService {
   }
 
   /**
+   * Create a personal organization for users without one
+   */
+  async createSelfOrganization() {
+    try {
+      const res = await apiClient.post("/organizations/create-self");
+      return res.data;
+    } catch (error) {
+      console.error("Failed to create organization:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Leave current organization (creates new single-user org)
    */
   async leaveOrganization() {
