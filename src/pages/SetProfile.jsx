@@ -6,39 +6,44 @@ import { SecuritySettings } from '../components/profile/SecuritySettings';
 import { Preferences } from '../components/profile/Preferences';
 import { Integrations } from '../components/profile/Integrations';
 import { Toast } from '../components/profile/UIComponents';
+import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations } from '../components/profile';
 import { FaBars } from 'react-icons/fa';
 
-// Teams Component (simplified for now)
-const TeamsTab = ({ showToast }) => {
+const OrganizationTab = ({ showToast }) => {
+    const [inviteOpen, setInviteOpen] = React.useState(false);
+
+    const handleInvite = async (email) => {
+        try {
+            const { inviteUrl } = await (await import('../services/organizationService')).default.inviteUser(email);
+            showToast?.('Invite link generated');
+            return { inviteUrl };
+        } catch (e) {
+            showToast?.(e?.response?.data?.message || e.message || 'Failed to invite', 'error');
+            throw e;
+        }
+    };
+
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Teams & Members</h3>
-            <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-                <div className="flex flex-col items-center space-y-4">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-2xl">👥</span>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                            Teams & Members Management
-                        </h3>
-                        <p className="text-sm text-gray-600 max-w-md">
-                            Manage your teams, invite members, assign leaders, and organize your workspace in the dedicated Teams section.
-                        </p>
-                    </div>
-                    
-                    <a
-                        href="#/teams"
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
-                    >
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        Go to Teams Section
-                    </a>
-                </div>
+            <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Organization</h3>
+                <button
+                    onClick={() => setInviteOpen(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                    Invite Member
+                </button>
             </div>
+
+            <OrganizationOverview showToast={showToast} />
+            <OrganizationMembers showToast={showToast} />
+            <OrganizationInvitations showToast={showToast} />
+
+            <InviteModal
+                open={inviteOpen}
+                onClose={() => setInviteOpen(false)}
+                onInvite={handleInvite}
+            />
         </div>
     );
 };
@@ -80,8 +85,8 @@ export default function ProfileSetting() {
                 return <Preferences showToast={showToast} />;
             case "Integrations":
                 return <Integrations showToast={showToast} />;
-            case "Teams & Members":
-                return <TeamsTab showToast={showToast} />;
+            case "Organization":
+                return <OrganizationTab showToast={showToast} />;
             default:
                 return <PersonalInformation showToast={showToast} />;
         }
