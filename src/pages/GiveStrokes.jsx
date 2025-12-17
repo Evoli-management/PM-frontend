@@ -165,21 +165,21 @@ export default function GiveStrokes() {
                         </div>
 
                         <div className="rounded-lg bg-white p-6 shadow-sm">
-                            <h1 className="text-2xl font-semibold text-cyan-500 text-center mb-8">
+                            <h1 className="text-2xl font-semibold text-gray-600 text-center mb-8">
                                 Whom do you wish to recognise?
                             </h1>
 
                             <div className="grid md:grid-cols-2 gap-8">
                                 {/* Members Section */}
                                 <div>
-                                    <h2 className="text-cyan-500 text-lg font-semibold mb-4">Members:</h2>
+                                    <h2 className="text-gray-600 text-lg font-semibold mb-4">Members:</h2>
                                     <div className="relative mb-4">
                                         <FaSearch className="absolute left-3 top-3 text-gray-400" />
                                         <input
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             placeholder="Search..."
-                                            className="w-full pl-10 pr-4 py-2 border-b-2 border-cyan-400 focus:outline-none focus:border-cyan-600"
+                                            className="w-full pl-10 pr-4 py-2 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500"
                                         />
                                     </div>
                                     <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -192,7 +192,7 @@ export default function GiveStrokes() {
                                                 <button
                                                     key={member.id}
                                                     onClick={() => handleMemberSelect(member)}
-                                                    className="w-full text-left px-3 py-2 hover:bg-cyan-50 rounded text-cyan-600 transition"
+                                                    className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-gray-700 transition"
                                                 >
                                                     {member.firstName} {member.lastName}
                                                 </button>
@@ -203,7 +203,7 @@ export default function GiveStrokes() {
 
                                 {/* External People Section */}
                                 <div>
-                                    <h2 className="text-cyan-500 text-lg font-semibold mb-4">
+                                    <h2 className="text-gray-600 text-lg font-semibold mb-4">
                                         People outside your company:
                                     </h2>
                                     <div className="space-y-4">
@@ -211,13 +211,13 @@ export default function GiveStrokes() {
                                             value={externalName}
                                             onChange={(e) => setExternalName(e.target.value)}
                                             placeholder="Name"
-                                            className="w-full px-4 py-2 border-b-2 border-cyan-400 focus:outline-none focus:border-cyan-600"
+                                            className="w-full px-4 py-2 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500"
                                         />
                                         <input
                                             value={externalEmail}
                                             onChange={(e) => setExternalEmail(e.target.value)}
                                             placeholder="Email"
-                                            className="w-full px-4 py-2 border-b-2 border-cyan-400 focus:outline-none focus:border-cyan-600"
+                                            className="w-full px-4 py-2 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500"
                                         />
                                         <button
                                             onClick={handleExternalRecipient}
@@ -306,10 +306,10 @@ function TypeSelectionModal({ onSelect, onClose }) {
                         <button
                             key={type.id}
                             onClick={() => onSelect(type.id)}
-                            className="flex flex-col items-center p-6 border-2 border-gray-200 rounded-lg hover:border-cyan-500 hover:shadow-lg transition"
+                            className="flex flex-col items-center p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-lg transition"
                         >
                             <div className="text-6xl mb-4">{type.icon}</div>
-                            <span className="text-lg font-medium text-cyan-600">{type.label}</span>
+                            <span className="text-lg font-medium text-gray-700">{type.label}</span>
                         </button>
                     ))}
                 </div>
@@ -331,7 +331,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
-                <h2 className="text-2xl font-semibold text-cyan-500 text-center mb-6">Employeeship Strokes</h2>
+                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Employeeship Strokes</h2>
                 
                 {!selectedValue ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
@@ -339,12 +339,12 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                             <button
                                 key={value.id}
                                 onClick={() => onSelectValue(value)}
-                                className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-cyan-500 transition"
+                                className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition"
                             >
                                 {value.imageUrl && (
                                     <img src={value.imageUrl} alt={value.heading} className="w-16 h-16 mb-2" />
                                 )}
-                                <span className="text-sm text-cyan-600 font-medium text-center">{value.heading}</span>
+                                <span className="text-sm text-gray-700 font-medium text-center">{value.heading}</span>
                             </button>
                         ))}
                     </div>
@@ -355,7 +355,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                                 <img src={selectedValue.imageUrl} alt={selectedValue.heading} className="w-24 h-24" />
                             )}
                             <div className="flex-1">
-                                <h3 className="text-xl font-semibold text-cyan-600 mb-2">{selectedValue.heading}</h3>
+                                <h3 className="text-xl font-semibold text-gray-700 mb-2">{selectedValue.heading}</h3>
                                 <div className="space-y-2">
                                     {selectedValue.behaviors?.map((behavior, idx) => (
                                         <label key={idx} className="flex items-center gap-2 cursor-pointer">
@@ -377,14 +377,14 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                         </div>
 
                         <div className="mb-6">
-                            <label className="block text-cyan-600 font-medium mb-2">
+                            <label className="block text-gray-700 font-medium mb-2">
                                 Select a "+" mark and add your personal note:
                             </label>
                             <textarea
                                 value={personalNote}
                                 onChange={(e) => onPersonalNoteChange(e.target.value)}
                                 placeholder={`${recipientName}, I think you did a very good job...`}
-                                className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-cyan-500"
+                                className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                 rows={4}
                             />
                         </div>
@@ -413,7 +413,7 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
-                <h2 className="text-2xl font-semibold text-cyan-500 text-center mb-6">Performance Strokes</h2>
+                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Performance Strokes</h2>
                 
                 <div className="mb-6">
                     <p className="text-gray-600 mb-4">Select a key area to recognize:</p>
@@ -427,8 +427,8 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
                                     onClick={() => onSelectKeyArea(area)}
                                     className={`w-full text-left px-4 py-3 rounded border-2 transition ${
                                         selectedKeyArea?.id === area.id
-                                            ? 'border-cyan-500 bg-cyan-50'
-                                            : 'border-gray-200 hover:border-cyan-300'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-200 hover:border-blue-300'
                                     }`}
                                 >
                                     {area.name}
@@ -440,14 +440,14 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
 
                 {selectedKeyArea && (
                     <div className="mb-6">
-                        <label className="block text-cyan-600 font-medium mb-2">
+                        <label className="block text-gray-700 font-medium mb-2">
                             Add your personal note:
                         </label>
                         <textarea
                             value={personalNote}
                             onChange={(e) => onPersonalNoteChange(e.target.value)}
                             placeholder={`${recipientName}, I think you did a very good job...`}
-                            className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-cyan-500"
+                            className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                             rows={4}
                         />
                     </div>
@@ -477,7 +477,7 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
-                <h2 className="text-2xl font-semibold text-cyan-500 text-center mb-6">Achievement Strokes</h2>
+                <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Achievement Strokes</h2>
                 
                 {!hasAchievements ? (
                     <div className="text-center py-8">
@@ -500,8 +500,8 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
                                             onClick={() => { onSelectGoal(goal); onSelectMilestone(null); }}
                                             className={`w-full text-left px-4 py-3 rounded border-2 transition ${
                                                 selectedGoal?.id === goal.id
-                                                    ? 'border-cyan-500 bg-cyan-50'
-                                                    : 'border-gray-200 hover:border-cyan-300'
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : 'border-gray-200 hover:border-blue-300'
                                             }`}
                                         >
                                             {goal.title}
@@ -521,8 +521,8 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
                                             onClick={() => { onSelectMilestone(milestone); onSelectGoal(null); }}
                                             className={`w-full text-left px-4 py-3 rounded border-2 transition ${
                                                 selectedMilestone?.id === milestone.id
-                                                    ? 'border-cyan-500 bg-cyan-50'
-                                                    : 'border-gray-200 hover:border-cyan-300'
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : 'border-gray-200 hover:border-blue-300'
                                             }`}
                                         >
                                             {milestone.title}
@@ -534,14 +534,14 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
 
                         {(selectedGoal || selectedMilestone) && (
                             <div className="mb-6">
-                                <label className="block text-cyan-600 font-medium mb-2">
+                                <label className="block text-gray-700 font-medium mb-2">
                                     Add your personal note:
                                 </label>
                                 <textarea
                                     value={personalNote}
                                     onChange={(e) => onPersonalNoteChange(e.target.value)}
                                     placeholder={`${recipientName}, I think you did a very good job...`}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-cyan-500"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                     rows={4}
                                 />
                             </div>
