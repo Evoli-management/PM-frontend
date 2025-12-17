@@ -49,6 +49,12 @@ const navItems = [
         ],
     },
     {
+        label: "Give Strokes",
+        icon: <img src={`${import.meta.env.BASE_URL}give-strokes.png`} alt="Give Strokes" className="w-6 h-6 object-contain" />,
+        to: "/give-strokes",
+        section: "Main",
+    },
+    {
         label: "Team",
         icon: <img src={`${import.meta.env.BASE_URL}team.png`} alt="Team" className="w-6 h-6 object-contain" />,
         to: "/teams",

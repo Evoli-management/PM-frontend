@@ -33,6 +33,7 @@ import DontForget from "./pages/DontForget.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import MyFocus from "./pages/MyFocus.jsx";
 import Teams from "./pages/Teams.jsx";
+import GiveStrokes from "./pages/GiveStrokes.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import VerifyPasswordChange from "./pages/VerifyPasswordChange.jsx";
 import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
@@ -96,6 +97,7 @@ export default function App() {
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/teams" element={<Teams />} />
+                            <Route path="/give-strokes" element={<GiveStrokes />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
                             {/* Private routes below */}
