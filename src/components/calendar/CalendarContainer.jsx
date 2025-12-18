@@ -109,6 +109,8 @@ const CalendarContainer = () => {
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
+    const deletePopoverRef = React.useRef(null);
+    const simpleConfirmRef = React.useRef(null);
     // 5-day vs 7-day week preference (persisted)
     const [workWeek, setWorkWeek] = useState(() => {
         try {
@@ -725,6 +727,22 @@ const CalendarContainer = () => {
 
     const handleDeleteRequest = (event, mouseEvent) => {
         if (!event) return;
+
+        // If an appointment modal is open (for example the month edit modal), close it
+        // when we open the delete confirmation/popover so the UI doesn't show both.
+        try {
+            if (modalOpen) {
+                setModalOpen(false);
+                setSelectedEvent(null);
+                setModalOpenSource(null);
+            }
+            if (appointmentModalOpen) {
+                setAppointmentModalOpen(false);
+                setAppointmentInitialStart(null);
+            }
+        } catch (e) {
+            // swallow any state errors
+        }
 
         // If the appointment is NOT recurring, show the custom top-center confirmation UI
         // Use a robust check similar to the modal: recurrence info may be present
@@ -1381,6 +1399,39 @@ const CalendarContainer = () => {
             document.removeEventListener("keydown", handleKey);
         };
     }, []);
+
+    // Close delete popover when clicking outside of it
+    React.useEffect(() => {
+        function handleOutside(e) {
+            try {
+                if (!deletePopoverVisible) return;
+                const root = deletePopoverRef.current;
+                if (!root) return;
+                if (!root.contains(e.target)) {
+                    setDeletePopoverVisible(false);
+                }
+            } catch (__) {}
+        }
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [deletePopoverVisible]);
+
+    // Close simple top-center confirm when clicking outside it
+    React.useEffect(() => {
+        function handleOutsideSimple(e) {
+            try {
+                if (!simpleConfirmVisible) return;
+                const root = simpleConfirmRef.current;
+                if (!root) return;
+                if (!root.contains(e.target)) {
+                    setSimpleConfirmVisible(false);
+                    setSimpleConfirmTarget(null);
+                }
+            } catch (__) {}
+        }
+        document.addEventListener('mousedown', handleOutsideSimple);
+        return () => document.removeEventListener('mousedown', handleOutsideSimple);
+    }, [simpleConfirmVisible]);
 
     // Helper function to get date range for current view
     const getCurrentViewDateRange = () => {
@@ -2066,6 +2117,7 @@ const CalendarContainer = () => {
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="simple-delete-title"
+                    ref={simpleConfirmRef}
                     className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-80"
                 >
                     <div id="simple-delete-title" className="font-semibold">Delete appointment</div>
@@ -2097,6 +2149,7 @@ const CalendarContainer = () => {
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="delete-popover-title"
+                    ref={deletePopoverRef}
                     className="fixed top-4 left-1/2 transform -translate-x-1/2 rounded-md border border-slate-200 bg-white shadow-lg p-3 text-sm z-[9999] w-100"
                 >
                     <div className="font-semibold">Delete recurring appointment</div>
