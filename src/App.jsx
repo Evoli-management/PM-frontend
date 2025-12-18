@@ -34,6 +34,7 @@ import KeyAreas from "./pages/KeyAreas.jsx";
 import MyFocus from "./pages/MyFocus.jsx";
 import Teams from "./pages/Teams.jsx";
 import GiveStrokes from "./pages/GiveStrokes.jsx";
+import MemberProfile from "./pages/MemberProfile.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import VerifyPasswordChange from "./pages/VerifyPasswordChange.jsx";
 import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
@@ -98,6 +99,7 @@ export default function App() {
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/teams" element={<Teams />} />
                             <Route path="/give-strokes" element={<GiveStrokes />} />
+                            <Route path="/member/:userId" element={<MemberProfile />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
                             {/* Private routes below */}
@@ -114,6 +116,7 @@ export default function App() {
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
                             <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
+                            <Route path="/member/:userId" element={<PrivateRoute><MemberProfile /></PrivateRoute>} />
                             <Route path="/reminders" element={<PrivateRoute><Reminders /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
