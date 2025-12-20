@@ -25,8 +25,21 @@ const GoalDetailModal = ({
     const [updatingMilestone, setUpdatingMilestone] = useState(null);
 
     React.useEffect(() => {
-        setLocalGoal(goal);
-    }, [goal]);
+        // Initialize localGoal from prop when modal opens or goal changes,
+        // but avoid overwriting any in-progress edits in the modal.
+        try {
+            if (!goal) return;
+            setLocalGoal((prev) => {
+                // If user is currently editing, preserve their unsaved changes.
+                if (isEditing) return prev || goal;
+                // Otherwise update local copy from incoming prop.
+                return goal;
+            });
+        } catch (e) {
+            // fallback to direct assignment
+            if (!isEditing) setLocalGoal(goal);
+        }
+    }, [goal, isEditing]);
 
     if (!goal) return null;
 
@@ -457,13 +470,35 @@ const GoalDetailModal = ({
                 <img
                     alt="Goals"
                     className="w-6 h-6 object-contain block w-6 h-6 min-w-[24px] min-h-[24px]"
-                    src="/goals.png"
+                    src={`${import.meta.env.BASE_URL || '/'}goals.png`}
                 />
                 <span
                     className="relative text-base md:text-lg font-bold text-black truncate px-1"
                 >
                     {localGoal?.title || "Untitled goal"}
                 </span>
+            </div>
+            {/* Action buttons: align right */}
+            <div className="ml-auto flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                    className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+                    aria-label="Edit goal"
+                >
+                    Edit
+                </button>
+                {typeof onDelete === 'function' && (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this goal?')) onDelete(goal.id); }}
+                        className="px-3 py-1 rounded-md border border-red-600 text-red-600 text-sm bg-white hover:bg-red-50"
+                        aria-label="Delete goal"
+                    >
+                        Delete
+                    </button>
+                )}
+                
             </div>
         </div>
     );

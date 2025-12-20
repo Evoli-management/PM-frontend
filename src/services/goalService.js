@@ -381,40 +381,88 @@ export const updateGoal = async (goalId, updateData) => {
             return await archiveGoal(goalId);
         }
 
-            // If this is a status change to active (unarchive), use the unarchive endpoint
+            // If this is a status change to active (unarchive), inspect the current
+            // goal status first and only call the reopen endpoint when the goal is
+            // actually completed. If the goal is archived, call unarchive directly.
             if (updateData.status === "active") {
-                console.log("Status change to active - attempting reopen endpoint first");
-                // Try to reopen a completed goal first (completed -> active)
+                console.log("Status change to active - checking current goal status before reopen/unarchive");
                 try {
-                    const resp = await apiClient.patch(`/goals/${goalId}/reopen`);
-                    return resp.data;
-                } catch (reopenErr) {
-                    // If reopen endpoint doesn't exist (404) OR reopen failed because the
-                    // goal wasn't in a completed state (400 with a specific message),
-                    // fall back to unarchive (archived -> active). For other errors rethrow.
-                    const status = reopenErr.response?.status;
-                    const message = (reopenErr.response?.data?.message || "").toString();
+                    const current = await getGoalById(goalId);
+                    const currentStatus = current?.status;
 
-                    const shouldTryUnarchive =
-                        status === 404 ||
-                        (status === 400 && /only completed/i.test(message));
+                    if (currentStatus === "completed") {
+                        // Only attempt reopen for completed goals
+                        try {
+                            const resp = await apiClient.patch(`/goals/${goalId}/reopen`);
+                            return resp.data;
+                        } catch (reopenErr) {
+                            const status = reopenErr.response?.status;
+                            const message = (reopenErr.response?.data?.message || "").toString();
+                            const shouldTryUnarchive =
+                                status === 404 ||
+                                (status === 400 && /only completed/i.test(message));
 
-                    if (shouldTryUnarchive) {
+                            if (shouldTryUnarchive) {
+                                try {
+                                    const response = await apiClient.patch(`/goals/${goalId}/unarchive`);
+                                    return response.data;
+                                } catch (unarchiveErr) {
+                                    if (unarchiveErr.response?.status === 404) {
+                                        const response = await apiClient.patch(`/goals/${goalId}`, { visibility: "public" });
+                                        return response.data;
+                                    }
+                                    throw unarchiveErr;
+                                }
+                            }
+
+                            throw reopenErr;
+                        }
+                    } else if (currentStatus === "archived") {
+                        // Goal is archived — unarchive directly
                         try {
                             const response = await apiClient.patch(`/goals/${goalId}/unarchive`);
                             return response.data;
                         } catch (unarchiveErr) {
-                            // If unarchive also isn't available, fall back to a PATCH update as last resort
                             if (unarchiveErr.response?.status === 404) {
                                 const response = await apiClient.patch(`/goals/${goalId}`, { visibility: "public" });
                                 return response.data;
                             }
                             throw unarchiveErr;
                         }
+                    } else {
+                        // Current status is neither completed nor archived (e.g., active)
+                        // Nothing to reopen/unarchive — proceed with normal update below.
+                        console.debug("Current goal status is", currentStatus, "- skipping reopen/unarchive and continuing with normal update");
                     }
+                } catch (err) {
+                    // If we couldn't fetch the current goal for some reason, fall back
+                    // to the previous behavior of trying reopen first and then unarchive.
+                    console.warn("Failed to fetch current goal status, falling back to reopen attempt", err);
+                    try {
+                        const resp = await apiClient.patch(`/goals/${goalId}/reopen`);
+                        return resp.data;
+                    } catch (reopenErr) {
+                        const status = reopenErr.response?.status;
+                        const message = (reopenErr.response?.data?.message || "").toString();
+                        const shouldTryUnarchive =
+                            status === 404 ||
+                            (status === 400 && /only completed/i.test(message));
 
-                    // Not a recoverable reopen error — rethrow so caller can handle it
-                    throw reopenErr;
+                        if (shouldTryUnarchive) {
+                            try {
+                                const response = await apiClient.patch(`/goals/${goalId}/unarchive`);
+                                return response.data;
+                            } catch (unarchiveErr) {
+                                if (unarchiveErr.response?.status === 404) {
+                                    const response = await apiClient.patch(`/goals/${goalId}`, { visibility: "public" });
+                                    return response.data;
+                                }
+                                throw unarchiveErr;
+                            }
+                        }
+
+                        throw reopenErr;
+                    }
                 }
             }
 
@@ -527,8 +575,9 @@ export const updateGoal = async (goalId, updateData) => {
             const dueDate = new Date(cleanUpdateData.dueDate);
             const startDate = new Date(cleanUpdateData.startDate);
 
-            if (dueDate <= startDate) {
-                throw new Error("Due date must be after start date");
+            // Allow dueDate to be the same day as startDate. Only block if dueDate is before startDate.
+            if (dueDate < startDate) {
+                throw new Error("Due date must be on or after start date");
             }
         }
 

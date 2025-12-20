@@ -35,6 +35,45 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       : [{ title: "", weight: 1.0, startDate: defaultDate, dueDate: defaultDate }]
   );
 
+  // If the parent passes a different `goal` prop (for example when entering
+  // edit mode after lazy-loading this component) make sure our local form
+  // state reflects that incoming goal. This ensures inputs populate correctly
+  // when the form mounts or when the prop changes.
+  useEffect(() => {
+    if (!goal) return;
+    setFormData({
+      title: goal?.title || "",
+      description: goal?.description || "",
+      startDate: goal?.startDate
+        ? new Date(goal.startDate).toISOString().split("T")[0]
+        : defaultDate,
+      dueDate: goal?.dueDate
+        ? new Date(goal.dueDate).toISOString().split("T")[0]
+        : defaultDate,
+      keyAreaId: goal?.keyAreaId || "",
+      status: goal?.status || "active",
+      visibility: goal?.visibility || "public",
+    });
+
+    setMilestones(
+      goal?.milestones?.length > 0
+        ? goal.milestones.map((m) => ({
+            id: m.id,
+            title: m.title,
+            weight: m.weight || 1.0,
+            startDate: m.startDate ? new Date(m.startDate).toISOString().split("T")[0] : "",
+            dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
+          }))
+        : [{ title: "", weight: 1.0, startDate: defaultDate, dueDate: defaultDate }]
+    );
+    // reset milestone index when loading a new goal
+    setActiveMilestoneIndex(0);
+    // update prevStartRef so due-date auto-sync behavior remains consistent
+    prevStartRef.current = goal?.startDate
+      ? new Date(goal.startDate).toISOString().split("T")[0]
+      : defaultDate;
+  }, [goal]);
+
   const [activeMilestoneIndex, setActiveMilestoneIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
