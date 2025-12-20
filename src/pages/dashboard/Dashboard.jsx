@@ -42,6 +42,7 @@ const getActivityService = async () => {
     return _activityService;
 };
 import calendarService from "../../services/calendarService";
+import { getEnpsTrend } from "../../services/enpsService";
 
 // Fallback data for when API is unavailable
 const fallbackActivity = [
@@ -229,6 +230,8 @@ function SortableWidget({ id, children }) {
 export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+        const [enpsData, setEnpsData] = useState([]);
+        const [enpsLabels, setEnpsLabels] = useState([]);
     
     // Enhanced drag and drop sensors
     const sensors = useSensors(
@@ -246,8 +249,23 @@ export default function Dashboard() {
         const timer = setTimeout(() => setLoading(false), 400);
         return () => clearTimeout(timer);
     }, []);
-
-    const enpsData = [10, 12, 8, 15, 18, 20, 22, 20, 19, 21, 23, 22];
+    
+    // Fetch eNPS trend data
+    useEffect(() => {
+        const fetchEnpsTrend = async () => {
+            try {
+                const trendData = await getEnpsTrend(12);
+                setEnpsData(trendData.scores);
+                setEnpsLabels(trendData.periods);
+            } catch (error) {
+                console.error('Error loading eNPS trend:', error);
+                // Fallback to empty arrays if API fails
+                setEnpsData([]);
+                setEnpsLabels([]);
+            }
+        };
+        fetchEnpsTrend();
+    }, []);
 
     const defaultPrefs = {
         widgets: {
@@ -805,7 +823,7 @@ export default function Dashboard() {
                             </div>
                         </div>
                         <a href="#/enps">
-                            <EnpsChart data={enpsData} labels={enpsData.map((_, i) => `W${i + 1}`)} />
+                            <EnpsChart data={enpsData} labels={enpsLabels} />
                         </a>
                     </div>
                 </div>
