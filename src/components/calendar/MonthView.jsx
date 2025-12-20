@@ -138,6 +138,10 @@ export default function MonthView({
         isWorkingTime,
     } = useCalendarPreferences(30);
 
+    // Visual constants for non-working hour styling — keep consistent with WeekView
+    const NON_WORK_BG = "#f8fafc";
+    const NON_WORK_OPACITY = 0.75;
+
     // Precompute full-day slots (memoized to avoid recreating on every render)
     const ALL_HOURS = useMemo(() =>
         Array.from({ length: 48 }, (_, i) => {
@@ -408,11 +412,12 @@ const isoWeekNumber = (date) => {
             try {
                 const startLocal = toLocal(ev.start);
                 const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
-                const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_START, 0, 0, 0);
-                const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_END, 0, 0, 0);
-                const clampedStart = new Date(Math.max(startLocal.getTime(), dayStart.getTime()));
-                const clampedEnd = new Date(Math.min(endLocal.getTime(), dayEnd.getTime()));
-                if (clampedEnd <= clampedStart) continue;
+                // Do not clamp month-view slots to working hours — show full-day events
+                const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), 0, 0, 0);
+                const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate() + 1, 0, 0, 0);
+                const clampedStart = startLocal;
+                const clampedEnd = endLocal;
+                if (!clampedStart || !clampedEnd || clampedEnd <= clampedStart) continue;
                 let cur = new Date(clampedStart);
                 cur.setMinutes(Math.floor(cur.getMinutes() / 30) * 30, 0, 0);
                 while (cur < clampedEnd) {
@@ -631,11 +636,14 @@ const isoWeekNumber = (date) => {
                 try {
                     const startLocal = toLocal(ev.start);
                     const endLocal = ev.end ? toLocal(ev.end) : new Date(startLocal.getTime() + 30 * 60000);
-                    const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_START, 0, 0, 0);
-                    const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), WORK_END, 0, 0, 0);
-                    const clampedStart = new Date(Math.max(startLocal.getTime(), dayStart.getTime()));
-                    const clampedEnd = new Date(Math.min(endLocal.getTime(), dayEnd.getTime()));
-                    if (clampedEnd <= clampedStart) continue;
+
+                    // For month view don't clamp to working hours so that events
+                    // outside of work hours are still visible. Use full-day bounds.
+                    const dayStart = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate(), 0, 0, 0);
+                    const dayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate() + 1, 0, 0, 0);
+                    const clampedStart = startLocal;
+                    const clampedEnd = endLocal;
+                    if (!clampedStart || !clampedEnd || clampedEnd <= clampedStart) continue;
 
                     const dayIdx = clampedStart.getDate() - 1;
                     const rect = rowRects[dayIdx];
@@ -1871,24 +1879,22 @@ const isoWeekNumber = (date) => {
                                                     className="text-center px-1 py-2 text-xs font-semibold text-gray-400 w-16"
                                                     style={{
                                                         minWidth: 40,
-                                                        backgroundColor:
-                                                            slotIsWorking
-                                                                ? undefined
-                                                                : "#f8fafc",
-                                                        opacity: slotIsWorking
-                                                            ? 1
-                                                            : 0.75,
+                                                        backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
+                                                        opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
                                                         borderLeft:
                                                             "1px solid rgba(226,232,240,0.4)",
                                                         borderRight:
                                                             "1px solid rgba(226,232,240,0.4)",
                                                     }}
                                                 >
-                                                    {showLabel
-                                                        ? formatTime
-                                                            ? formatTime(h)
-                                                            : h
-                                                        : ""}
+                                                    <div style={{ position: 'relative' }}>
+                                                        {/* non-working hour indicator removed (keep pale background only) */}
+                                                        {showLabel
+                                                            ? formatTime
+                                                                ? formatTime(h)
+                                                                : h
+                                                            : ""}
+                                                    </div>
                                                 </th>
                                             );
                                         })}
@@ -1963,29 +1969,16 @@ const isoWeekNumber = (date) => {
                                                                     "1px solid rgba(226,232,240,0.35)",
                                                                 borderBottom:
                                                                     "1px solid rgba(226,232,240,0.35)",
-                                                                backgroundColor:
-                                                                    isWorking
-                                                                        ? undefined
-                                                                        : "#f8fafc",
-                                                                opacity: isWorking
-                                                                    ? 1
-                                                                    : 0.75,
+                                                                backgroundColor: isWorking ? undefined : NON_WORK_BG,
+                                                                opacity: isWorking ? 1 : NON_WORK_OPACITY,
                                                             }}
                                                             onClick={(e) => {
-                                                                try {
-                                                                    e.stopPropagation();
-                                                                } catch {}
+                                                                try { e.stopPropagation(); } catch {}
                                                                 // Only trigger the slot click callback when quick-create is enabled.
-                                                                if (enableQuickCreate && onEventClick)
-                                                                    onEventClick(
-                                                                        {
-                                                                            day: date,
-                                                                            hour: h,
-                                                                        },
-                                                                    );
+                                                                if (enableQuickCreate && onEventClick) onEventClick({ day: date, hour: h });
                                                                 // Only invoke quick-create when explicitly enabled
                                                                 if (enableQuickCreate && typeof onQuickCreate === "function") {
-                                                                    const [hr, min] = h.split(":" );
+                                                                    const [hr, min] = h.split(":");
                                                                     const dt = new Date(
                                                                         date.getFullYear(),
                                                                         date.getMonth(),
@@ -1993,17 +1986,10 @@ const isoWeekNumber = (date) => {
                                                                         parseInt(hr, 10) || 0,
                                                                         parseInt(min, 10) || 0,
                                                                         0,
-                                                                        0,
+                                                                        0
                                                                     );
-                                                                    onQuickCreate(dt);
+                                                                    try { onQuickCreate(dt); } catch (_) {}
                                                                 }
-                                                            }}
-                                                            onDragOver={(e) => {
-                                                                try {
-                                                                    e.preventDefault();
-                                                                    e.dataTransfer.dropEffect =
-                                                                        "copy";
-                                                                } catch {}
                                                             }}
                                                             onDrop={(e) => {
                                                                 try {
@@ -2027,6 +2013,7 @@ const isoWeekNumber = (date) => {
                                                             }}
                                                             title={enableQuickCreate ? "Click to add appointment" : undefined}
                                                         >
+                                                            {/* non-working hour indicator removed (keep pale background only) */}
                                                             {/* timed events rendered as absolute overlays (see eventOverlays) */}
                                                         </td>
                                                     );

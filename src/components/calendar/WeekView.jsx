@@ -49,6 +49,10 @@ const WeekView = ({
         isWorkingTime,
     } = useCalendarPreferences(slotSize);
 
+    // Visual constants for non-working hour styling — keep consistent with MonthView
+    const NON_WORK_BG = "#f8fafc";
+    const NON_WORK_OPACITY = 0.75;
+
     const [elephantTask, setElephantTask] = useState("");
     const [showViewMenu, setShowViewMenu] = useState(false);
     // workWeek is controlled by parent (CalendarContainer)
@@ -1051,16 +1055,10 @@ const WeekView = ({
                                                     style={{
                                                         width: TIME_COL_PX + "px",
                                                         height: ITEM_SIZE,
-                                                        backgroundColor: slotIsWorking ? undefined : "#f8fafc",
+                                                        backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
                                                     }}
                                                 >
-                                                    {isWorkingTime &&
-                                                        !isWorkingTime(slot) && (
-                                                            <span
-                                                                className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300/40 rounded-r-md"
-                                                                aria-hidden="true"
-                                                            ></span>
-                                                        )}
+                                                    {/* non-working hour indicator removed (keep pale background only) */}
 
                                                     <span className="pl-2">
                                                         {isHourBoundary
@@ -1093,7 +1091,8 @@ const WeekView = ({
                                                                 boxSizing:
                                                                     "border-box",
                                                                 cursor: "pointer",
-                                                                backgroundColor: slotIsWorking ? undefined : "#f8fafc",
+                                                                backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
+                                                                opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
                                                                 ...cellTopBorderStyle,
                                                             }}
                                                             onDragOver={(e) =>

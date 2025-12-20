@@ -349,6 +349,7 @@ const buildRecurringPattern = ({
     const [endDateStr, setEndDateStr] = useState(toYMD(initialEnd));
     const [endTimeStr, setEndTimeStr] = useState(toHM(initialEnd));
     const [saving, setSaving] = useState(false);
+    const [clientConflict, setClientConflict] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteScopeChoice, setDeleteScopeChoice] = useState('occurrence');
     const [deleting, setDeleting] = useState(false);
@@ -610,6 +611,28 @@ const buildRecurringPattern = ({
                 }
             }
 
+            // Client-side pre-check for overlapping appointments to avoid
+            // an immediate 400 and provide a friendlier inline message.
+            try {
+                const fromISO = new Date(s.getTime() - 1 * 60 * 1000).toISOString();
+                const toISO = new Date(e.getTime() + 1 * 60 * 1000).toISOString();
+                const existing = await calendarService.listAppointments({ from: fromISO, to: toISO });
+                const conflict = (Array.isArray(existing) ? existing : []).find((row) => {
+                    try {
+                        const rs = new Date(row.start).getTime();
+                        const re = new Date(row.end).getTime();
+                        return rs < e.getTime() && re > s.getTime();
+                    } catch { return false; }
+                });
+                if (conflict) {
+                    setClientConflict(conflict);
+                    addToast({ title: 'Time conflict', description: `Conflicts with "${conflict.title || 'appointment'}" ${conflict.start ? 'at ' + new Date(conflict.start).toLocaleString() : ''}`, variant: 'error' });
+                    return;
+                }
+            } catch (__) {
+                // If pre-check fails for any reason, proceed to attempt save and let server validate.
+            }
+
             setSaving(true);
 
             const timezone =
@@ -769,6 +792,8 @@ const buildRecurringPattern = ({
                         ...created,
                         recurringPattern: created.recurringPattern ?? recurringPattern,
                     });
+                // Clear any prior client-side conflict after successful create
+                setClientConflict(null);
             }
         } catch (err) {
             console.warn(
@@ -778,16 +803,29 @@ const buildRecurringPattern = ({
 
             const serverData = err?.response?.data;
             if (serverData) {
-                const message =
-                    serverData.message ||
-                    serverData.error ||
-                    serverData.detail ||
-                    JSON.stringify(serverData);
+                // Prefer human-friendly message but include structured detail
+                // (e.g. conflicting appointment) when available.
+                const primary = serverData.message || serverData.error || null;
+                let extra = null;
+                if (serverData.detail) {
+                    try {
+                        extra = typeof serverData.detail === 'string' ? serverData.detail : JSON.stringify(serverData.detail);
+                    } catch (__) {
+                        extra = String(serverData.detail);
+                    }
+                }
+                const composed = primary ? (extra ? `${primary} — ${extra}` : primary) : (extra || JSON.stringify(serverData));
                 addToast({
                     title: isEdit ? "Update failed" : "Create failed",
-                    description: String(message),
+                    description: String(composed),
                     variant: "error",
                 });
+                // If server returned a conflict payload, mirror it into the modal so user can act
+                try {
+                    if (serverData.detail && serverData.detail.conflict) {
+                        setClientConflict(serverData.detail.conflict);
+                    }
+                } catch (__) {}
             } else {
                 addToast({
                     title: isEdit ? "Update failed" : "Create failed",
@@ -1385,6 +1423,25 @@ const buildRecurringPattern = ({
                             </div>
                         </fieldset>
                     )}
+                    {clientConflict ? (
+                        <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
+                            <div className="font-semibold text-sm text-red-800">Conflicting appointment</div>
+                            <div className="text-sm text-red-700 mt-1">
+                                <div><strong>{clientConflict.title || 'Untitled'}</strong></div>
+                                <div>{clientConflict.start ? new Date(clientConflict.start).toLocaleString() : ''} — {clientConflict.end ? new Date(clientConflict.end).toLocaleString() : ''}</div>
+                                <div className="text-xs text-red-600 mt-1">This time conflicts with an existing appointment. Please change the time or remove the conflicting appointment before saving.</div>
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                                <button
+                                    type="button"
+                                    className="rounded-md border border-slate-300 px-3 py-1 text-sm"
+                                    onClick={() => setClientConflict(null)}
+                                >
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
 
                     
 
@@ -1423,8 +1480,8 @@ const buildRecurringPattern = ({
                                 </svg>
                                 {saving ? "Saving..." : "Save"}
                             </button>
-                            {/* Delete is handled from the appointment bar delete icon; removed modal Delete button */}
-                            {isEdit ? (
+                            {/* Delete is handled from the appointment bar delete icon; show modal Delete button only when opened from Month view */}
+                            {isEdit && showDelete ? (
                                 <div className="flex items-center gap-2">
                                     {!showDeleteConfirm ? (
                                         <button
