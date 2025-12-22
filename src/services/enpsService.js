@@ -69,3 +69,30 @@ export const getMyEnpsResponse = async () => {
     throw error;
   }
 };
+/**
+ * Get reminder status for the current user
+ */
+export const getReminderStatus = async () => {
+  try {
+    const response = await apiClient.get('/enps/reminder-status');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching reminder status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send a manual reminder to a user (admin only)
+ */
+export const sendManualReminder = async (userId) => {
+  try {
+    const response = await apiClient.post('/enps/send-manual-reminder', {
+      userId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending manual reminder:', error);
+    throw error;
+  }
+};
