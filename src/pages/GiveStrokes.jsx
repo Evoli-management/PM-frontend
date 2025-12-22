@@ -34,7 +34,6 @@ export default function GiveStrokes() {
     const [selectedMilestone, setSelectedMilestone] = useState(null);
     const [selectedBehaviors, setSelectedBehaviors] = useState([]);
     const [personalNote, setPersonalNote] = useState("");
-    const [isAnonymous, setIsAnonymous] = useState(false);
 
     useEffect(() => {
         loadMembers();
@@ -95,7 +94,7 @@ export default function GiveStrokes() {
             const data = {
                 type: selectedType,
                 personalNote,
-                isAnonymous,
+                isAnonymous: true, // Strokes are always anonymous
             };
 
             if (selectedRecipient.type === 'member') {
@@ -127,7 +126,6 @@ export default function GiveStrokes() {
             setSelectedMilestone(null);
             setSelectedBehaviors([]);
             setPersonalNote("");
-            setIsAnonymous(false);
             setExternalName("");
             setExternalEmail("");
             
@@ -255,8 +253,6 @@ export default function GiveStrokes() {
                     onToggleBehavior={toggleBehavior}
                     personalNote={personalNote}
                     onPersonalNoteChange={setPersonalNote}
-                    isAnonymous={isAnonymous}
-                    onToggleAnonymous={setIsAnonymous}
                     recipientName={selectedRecipient?.name}
                     onSubmit={handleSubmit}
                     onBack={() => { setShowDetailsModal(false); setShowTypeModal(true); }}
@@ -270,8 +266,6 @@ export default function GiveStrokes() {
                     onSelectKeyArea={setSelectedKeyArea}
                     personalNote={personalNote}
                     onPersonalNoteChange={setPersonalNote}
-                    isAnonymous={isAnonymous}
-                    onToggleAnonymous={setIsAnonymous}
                     recipientName={selectedRecipient?.name}
                     onSubmit={handleSubmit}
                     onBack={() => { setShowDetailsModal(false); setShowTypeModal(true); }}
@@ -287,8 +281,6 @@ export default function GiveStrokes() {
                     onSelectMilestone={setSelectedMilestone}
                     personalNote={personalNote}
                     onPersonalNoteChange={setPersonalNote}
-                    isAnonymous={isAnonymous}
-                    onToggleAnonymous={setIsAnonymous}
                     recipientName={selectedRecipient?.name}
                     onSubmit={handleSubmit}
                     onBack={() => { setShowDetailsModal(false); setShowTypeModal(true); }}
@@ -336,7 +328,7 @@ function TypeSelectionModal({ onSelect, onClose }) {
 }
 
 // Employeeship Modal Component
-function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehaviors, onToggleBehavior, personalNote, onPersonalNoteChange, isAnonymous, onToggleAnonymous, recipientName, onSubmit, onBack }) {
+function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehaviors, onToggleBehavior, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
@@ -398,19 +390,6 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                             />
                         </div>
 
-                        <div className="mb-6 flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                id="anonymous"
-                                checked={isAnonymous}
-                                onChange={(e) => onToggleAnonymous(e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 accent-blue-500"
-                            />
-                            <label htmlFor="anonymous" className="text-gray-700 font-medium cursor-pointer">
-                                Send this stroke anonymously (only recipient will see your name)
-                            </label>
-                        </div>
-
                         <div className="flex justify-end gap-3">
                             <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
                                 Back
@@ -431,7 +410,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
 }
 
 // Performance Modal Component
-function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personalNote, onPersonalNoteChange, isAnonymous, onToggleAnonymous, recipientName, onSubmit, onBack }) {
+function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
@@ -472,19 +451,6 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
                             className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                             rows={4}
                         />
-
-                        <div className="mt-6 mb-6 flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                id="anonymous-perf"
-                                checked={isAnonymous}
-                                onChange={(e) => onToggleAnonymous(e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 accent-blue-500"
-                            />
-                            <label htmlFor="anonymous-perf" className="text-gray-700 font-medium cursor-pointer">
-                                Send this stroke anonymously (only recipient will see your name)
-                            </label>
-                        </div>
                     </div>
                 )}
 
@@ -506,7 +472,7 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
 }
 
 // Achievement Modal Component
-function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSelectGoal, onSelectMilestone, personalNote, onPersonalNoteChange, isAnonymous, onToggleAnonymous, recipientName, onSubmit, onBack }) {
+function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSelectGoal, onSelectMilestone, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
     const hasAchievements = achievements.goals.length > 0 || achievements.milestones.length > 0;
 
     return (
@@ -579,19 +545,6 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
                                     className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                     rows={4}
                                 />
-
-                                <div className="mt-6 mb-6 flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        id="anonymous-ach"
-                                        checked={isAnonymous}
-                                        onChange={(e) => onToggleAnonymous(e.target.checked)}
-                                        className="w-4 h-4 rounded border-gray-300 accent-blue-500"
-                                    />
-                                    <label htmlFor="anonymous-ach" className="text-gray-700 font-medium cursor-pointer">
-                                        Send this stroke anonymously (only recipient will see your name)
-                                    </label>
-                                </div>
                             </div>
                         )}
 
