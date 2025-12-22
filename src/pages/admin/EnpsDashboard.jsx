@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../../components/shared/Sidebar';
 import { FaBars } from 'react-icons/fa';
-import { getCurrentEnpsScore, getEnpsTrend } from '../../services/enpsService';
+import { getCurrentEnpsScore, getEnpsTrend, getEnpsTeamBreakdown } from '../../services/enpsService';
+import teamsService from '../../services/teamsService';
 import apiClient from '../../services/apiClient';
 
 export default function EnpsDashboard() {
@@ -10,24 +11,42 @@ export default function EnpsDashboard() {
   const [trend, setTrend] = useState([]);
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [periods, setPeriods] = useState(12);
+  const [selectedPeriod, setSelectedPeriod] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [allTeams, setAllTeams] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         const cur = await getCurrentEnpsScore();
-        const tr = await getEnpsTrend(12);
-        const tb = await apiClient.get('/enps/team-breakdown');
+        const tr = await getEnpsTrend(periods);
+        const teamList = await teamsService.getTeams();
+        const tb = await getEnpsTeamBreakdown({ period: selectedPeriod || undefined, teamId: selectedTeamId || undefined });
         setCurrent(cur);
         setTrend(tr.trend || []);
-        setTeams(tb.data.teams || []);
+        setAllTeams(teamList || []);
+        setTeams(tb.teams || []);
       } catch (e) {
         console.error('Failed to load ENPS dashboard', e);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [periods, selectedPeriod, selectedTeamId]);
+
+  const handleApplyFilters = async () => {
+    setLoading(true);
+    try {
+      const tr = await getEnpsTrend(periods);
+      const tb = await getEnpsTeamBreakdown({ period: selectedPeriod || undefined, teamId: selectedTeamId || undefined });
+      setTrend(tr.trend || []);
+      setTeams(tb.teams || []);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const ScoreBadge = ({ score }) => (
     <span className={`px-3 py-1 rounded-full text-sm ${
@@ -62,6 +81,32 @@ export default function EnpsDashboard() {
         </div>
         <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400 mb-2">eNPS Admin Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-300">Organization eNPS overview, trend, and team breakdown.</p>
+
+        {/* Filters */}
+        <div className="mt-4 bg-white border rounded-2xl p-4 shadow">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Trend periods</label>
+              <input type="number" min={1} max={52} value={periods} onChange={(e) => setPeriods(parseInt(e.target.value || '12'))} className="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Team</label>
+              <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full border rounded px-3 py-2">
+                <option value="">All teams</option>
+                {allTeams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Period (e.g., 2025-W52)</label>
+              <input value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} placeholder="Leave blank for current" className="w-full border rounded px-3 py-2" />
+            </div>
+            <div className="flex items-end">
+              <button onClick={handleApplyFilters} className="px-4 py-2 bg-blue-600 text-white rounded">Apply</button>
+            </div>
+          </div>
+        </div>
 
         {loading ? (
           <div className="mt-6 p-6 bg-white rounded-2xl shadow">Loading…</div>

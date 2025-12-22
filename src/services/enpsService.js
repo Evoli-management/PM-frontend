@@ -47,9 +47,11 @@ export const getEnpsTrend = async (periods = 12) => {
 /**
  * Get team breakdown
  */
-export const getEnpsTeamBreakdown = async () => {
+export const getEnpsTeamBreakdown = async ({ period, teamId } = {}) => {
   try {
-    const response = await apiClient.get('/enps/team-breakdown');
+    const response = await apiClient.get('/enps/team-breakdown', {
+      params: { period, teamId },
+    });
     return response.data;
   } catch (error) {
     console.error('Error fetching eNPS team breakdown:', error);
