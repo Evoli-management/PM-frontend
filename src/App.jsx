@@ -1,5 +1,5 @@
-import { HashRouter as Router, Routes, Route } from "react-router-dom";
-import { Suspense, useEffect, useState } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { Suspense } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
 import ModalManager from "./components/shared/ModalManager.jsx";
 import PrivateRoute from "./components/shared/PrivateRoute.jsx";
@@ -48,16 +48,13 @@ export default function App() {
         "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
         "/verify-email", "/verify-password-change", "/verify-email-change"
     ];
-    const [currentPath, setCurrentPath] = useState(() => window.location.hash.replace(/^#\/?/, "/"));
-
-    useEffect(() => {
-        const onHashChange = () => setCurrentPath(window.location.hash.replace(/^#\/?/, "/"));
-        window.addEventListener('hashchange', onHashChange);
-        return () => window.removeEventListener('hashchange', onHashChange);
-    }, []);
-    const isPublicRoute = publicFooterRoutes.includes(currentPath);
+    // Use react-router location so route changes (including client-side navigation)
+    // update layout immediately. This prevents the main content from rendering
+    // without the left margin when navigating (e.g. after login) which caused
+    // dashboard tiles to appear beneath the fixed sidebar until a full refresh.
+    const location = useLocation();
+    const isPublicRoute = publicFooterRoutes.includes(location.pathname);
     return (
-        <Router>
             <div className="page-bg">
                 <Navbar />
                 <ModalManager />
@@ -121,8 +118,7 @@ export default function App() {
                         </Routes>
                     </Suspense>
                 </main>
-                {publicFooterRoutes.includes(currentPath) && <Footer />}
+                {isPublicRoute && <Footer />}
             </div>
-        </Router>
     );
 }
