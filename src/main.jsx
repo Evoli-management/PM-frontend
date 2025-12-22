@@ -1,5 +1,6 @@
 import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { HashRouter as Router } from "react-router-dom";
 import "./index.css";
 import App from "./App";
 import ToastProvider from "./components/shared/ToastProvider.jsx";
@@ -19,9 +20,11 @@ try {
 preloadTzLib().finally(() => {
     createRoot(document.getElementById("root")).render(
         <StrictMode>
-            <ToastProvider>
-                <App />
-            </ToastProvider>
+            <Router>
+                <ToastProvider>
+                    <App />
+                </ToastProvider>
+            </Router>
         </StrictMode>,
     );
     // Initialize reminder manager (poll /reminders/due)

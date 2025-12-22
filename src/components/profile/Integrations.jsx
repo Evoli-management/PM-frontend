@@ -168,11 +168,13 @@ export const Integrations = ({ showToast }) => {
     }) => (
         <div className="bg-white rounded-lg p-6">
             <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                    <div className="text-2xl">{icon}</div>
-                    <div>
-                        <h3 className="font-semibold text-gray-900">{name}</h3>
-                        <p className="text-sm text-gray-600">{description}</p>
+                <div className="flex-1">
+                    <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                            <span className="w-6 h-6 flex items-center justify-center">{icon}</span>
+                            <span className="truncate">{name}</span>
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">{description}</p>
                         {config.connected && config.email && (
                             <p className="text-xs text-blue-600 mt-1">{config.email}</p>
                         )}
@@ -245,7 +247,7 @@ export const Integrations = ({ showToast }) => {
                     <IntegrationCard
                         name="Google Calendar"
                         type="googleCalendar"
-                        icon="📅"
+                        icon={<img src={`${import.meta.env.BASE_URL}google.svg`} alt="Google" className="w-6 h-6 object-contain" />}
                         description="Sync tasks and deadlines with Google Calendar"
                         config={integrations.googleCalendar}
                         settings={[
@@ -255,7 +257,7 @@ export const Integrations = ({ showToast }) => {
                     <IntegrationCard
                         name="Outlook Calendar"
                         type="outlookCalendar"
-                        icon="📆"
+                        icon={<img src={`${import.meta.env.BASE_URL}microsoft.svg`} alt="Microsoft" className="w-6 h-6 object-contain" />}
                         description="Sync with Microsoft Outlook Calendar"
                         config={integrations.outlookCalendar}
                         settings={[
