@@ -45,6 +45,19 @@ export const getEnpsTrend = async (periods = 12) => {
 };
 
 /**
+ * Get team breakdown
+ */
+export const getEnpsTeamBreakdown = async () => {
+  try {
+    const response = await apiClient.get('/enps/team-breakdown');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching eNPS team breakdown:', error);
+    throw error;
+  }
+};
+
+/**
  * Check if the current user has responded in the current period
  */
 export const hasUserResponded = async () => {
