@@ -255,8 +255,14 @@ export default function Dashboard() {
         const fetchEnpsTrend = async () => {
             try {
                 const trendData = await getEnpsTrend(12);
-                setEnpsData(trendData.scores);
-                setEnpsLabels(trendData.periods);
+                // Backend returns { trend: [{score, period, ...}], current: {...} }
+                if (trendData && trendData.trend) {
+                    setEnpsData(trendData.trend.map(t => t.score));
+                    setEnpsLabels(trendData.trend.map(t => t.period));
+                } else {
+                    setEnpsData([]);
+                    setEnpsLabels([]);
+                }
             } catch (error) {
                 console.error('Error loading eNPS trend:', error);
                 // Fallback to empty arrays if API fails
