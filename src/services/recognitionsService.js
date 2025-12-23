@@ -8,7 +8,7 @@ const recognitionsService = {
    */
   async createRecognition(data) {
     const response = await axios.post(`${API_URL}/recognitions`, data, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
@@ -24,7 +24,7 @@ const recognitionsService = {
     if (filters.limit) params.append('limit', filters.limit.toString());
 
     const response = await axios.get(`${API_URL}/recognitions?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
@@ -34,7 +34,7 @@ const recognitionsService = {
    */
   async getMyScore() {
     const response = await axios.get(`${API_URL}/recognitions/my-score`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
@@ -44,7 +44,7 @@ const recognitionsService = {
    */
   async getUserScore(userId) {
     const response = await axios.get(`${API_URL}/recognitions/user/${userId}/score`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
@@ -54,7 +54,7 @@ const recognitionsService = {
    */
   async getRecentAchievements(userId) {
     const response = await axios.get(`${API_URL}/recognitions/recent-achievements/${userId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
@@ -64,7 +64,7 @@ const recognitionsService = {
    */
   async getRecognition(id) {
     const response = await axios.get(`${API_URL}/recognitions/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },

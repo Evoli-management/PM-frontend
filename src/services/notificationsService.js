@@ -11,7 +11,7 @@ const notificationsService = {
     if (limit) params.append('limit', limit.toString());
 
     const response = await axios.get(`${API_URL}/notifications?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
@@ -21,7 +21,7 @@ const notificationsService = {
    */
   async getUnreadCount() {
     const response = await axios.get(`${API_URL}/notifications/unread-count`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data.count;
   },
@@ -34,7 +34,7 @@ const notificationsService = {
       `${API_URL}/notifications/mark-read`,
       { notificationIds },
       {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       }
     );
     return response.data;
@@ -48,7 +48,7 @@ const notificationsService = {
       `${API_URL}/notifications/mark-all-read`,
       {},
       {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       }
     );
     return response.data;
@@ -59,7 +59,7 @@ const notificationsService = {
    */
   async deleteNotification(notificationId) {
     const response = await axios.delete(`${API_URL}/notifications/${notificationId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
     });
     return response.data;
   },
