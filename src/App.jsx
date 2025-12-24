@@ -24,6 +24,7 @@ import ENPS from "./pages/dashboard/ENPS.jsx";
 import Recognition from "./pages/dashboard/Recognition.jsx";
 import Notifications from "./pages/dashboard/Notifications.jsx";
 import TeamDashboard from "./pages/dashboard/TeamDashboard.jsx";
+import EnpsDashboard from "./pages/admin/EnpsDashboard.jsx";
 
 // Main feature pages
 import Calendar from "./pages/Calendar.jsx";
@@ -34,6 +35,7 @@ import KeyAreas from "./pages/KeyAreas.jsx";
 import MyFocus from "./pages/MyFocus.jsx";
 import Teams from "./pages/Teams.jsx";
 import GiveStrokes from "./pages/GiveStrokes.jsx";
+import ViewStrokes from "./pages/ViewStrokes.jsx";
 import MemberProfile from "./pages/MemberProfile.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import VerifyPasswordChange from "./pages/VerifyPasswordChange.jsx";
@@ -94,8 +96,10 @@ export default function App() {
                             <Route path="/recognition" element={<Recognition />} />
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
+                            <Route path="/admin/enps" element={<EnpsDashboard />} />
                             <Route path="/teams" element={<Teams />} />
                             <Route path="/give-strokes" element={<GiveStrokes />} />
+                            <Route path="/view-strokes" element={<ViewStrokes />} />
                             <Route path="/member/:userId" element={<MemberProfile />} />
                             <Route path="/key-areas" element={<KeyAreas />} />
                             <Route path="/connection-test" element={<ConnectionTest />} />
@@ -112,8 +116,11 @@ export default function App() {
                             <Route path="/recognition" element={<PrivateRoute><Recognition /></PrivateRoute>} />
                             <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
                             <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
+                            <Route path="/admin/enps" element={<PrivateRoute><EnpsDashboard /></PrivateRoute>} />
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
                             <Route path="/member/:userId" element={<PrivateRoute><MemberProfile /></PrivateRoute>} />
+                            <Route path="/give-strokes" element={<PrivateRoute><GiveStrokes /></PrivateRoute>} />
+                            <Route path="/view-strokes" element={<PrivateRoute><ViewStrokes /></PrivateRoute>} />
                             <Route path="/reminders" element={<PrivateRoute><Reminders /></PrivateRoute>} />
                         </Routes>
                     </Suspense>

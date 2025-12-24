@@ -20,7 +20,12 @@ export function ManageMembers({ showToast }) {
       const data = await orgService.default.getOrganizationMembers();
       setMembers(data);
     } catch (e) {
-      showToast?.(e?.response?.data?.message || "Failed to load members", "error");
+      const errorMsg = e?.response?.data?.message || "Failed to load members";
+      if (errorMsg.includes("not part of any organization")) {
+        showToast?.("You're not part of an organization. Visit the Overview tab to create or join one.", "error");
+      } else {
+        showToast?.(errorMsg, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -32,7 +37,13 @@ export function ManageMembers({ showToast }) {
       const data = await teamsService.default.getTeams();
       setTeams(data);
     } catch (e) {
-      console.error("Failed to load teams:", e);
+      const errorMsg = e?.response?.data?.message || "";
+      if (errorMsg.includes("not part of any organization")) {
+        // Suppress toast for teams load - members error is enough
+        console.log("User not in organization");
+      } else {
+        console.error("Failed to load teams:", e);
+      }
     }
   };
 

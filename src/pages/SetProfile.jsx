@@ -10,9 +10,10 @@ import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInv
 import { FaBars } from 'react-icons/fa';
 
 const OrganizationTab = ({ showToast }) => {
-    const [activeSubTab, setActiveSubTab] = React.useState("teams");
+    const [activeSubTab, setActiveSubTab] = React.useState("overview");
 
     const subTabs = [
+        { id: "overview", label: "Overview" },
         { id: "teams", label: "Manage Teams" },
         { id: "members", label: "Manage Members" },
         { id: "culture", label: "Culture and Values" },
@@ -21,6 +22,8 @@ const OrganizationTab = ({ showToast }) => {
 
     const renderSubTabContent = () => {
         switch (activeSubTab) {
+            case "overview":
+                return <OrganizationOverview showToast={showToast} />;
             case "teams":
                 return <ManageTeams showToast={showToast} />;
             case "members":
@@ -30,7 +33,7 @@ const OrganizationTab = ({ showToast }) => {
             case "settings":
                 return <OrganizationSettings showToast={showToast} />;
             default:
-                return <ManageTeams showToast={showToast} />;
+                return <OrganizationOverview showToast={showToast} />;
         }
     };
 

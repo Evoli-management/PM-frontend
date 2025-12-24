@@ -45,6 +45,21 @@ export const getEnpsTrend = async (periods = 12) => {
 };
 
 /**
+ * Get team breakdown
+ */
+export const getEnpsTeamBreakdown = async ({ period, teamId } = {}) => {
+  try {
+    const response = await apiClient.get('/enps/team-breakdown', {
+      params: { period, teamId },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching eNPS team breakdown:', error);
+    throw error;
+  }
+};
+
+/**
  * Check if the current user has responded in the current period
  */
 export const hasUserResponded = async () => {
@@ -66,6 +81,33 @@ export const getMyEnpsResponse = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching my eNPS response:', error);
+    throw error;
+  }
+};
+/**
+ * Get reminder status for the current user
+ */
+export const getReminderStatus = async () => {
+  try {
+    const response = await apiClient.get('/enps/reminder-status');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching reminder status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send a manual reminder to a user (admin only)
+ */
+export const sendManualReminder = async (userId) => {
+  try {
+    const response = await apiClient.post('/enps/send-manual-reminder', {
+      userId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending manual reminder:', error);
     throw error;
   }
 };

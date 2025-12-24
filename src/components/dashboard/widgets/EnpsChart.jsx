@@ -6,6 +6,16 @@ export default function EnpsChart({ data = [], labels = [] }) {
     const margin = { top: 8, right: 12, bottom: 26, left: 36 };
     const width = 680 - margin.left - margin.right;
     const height = 180 - margin.top - margin.bottom;
+    
+    // Guard against empty or invalid data
+    if (!data || data.length === 0) {
+        return (
+            <div className="relative w-full h-32 flex items-center justify-center text-sm text-gray-500">
+                No trend data available
+            </div>
+        );
+    }
+    
     const max = Math.max(...data, 10);
     const min = Math.min(...data, 0);
     const yRange = max - min || 1;

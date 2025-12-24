@@ -119,6 +119,9 @@ const CalendarContainer = () => {
             return false;
         }
     });
+    // Real-time refresh support (polling when external sync is enabled)
+    const [syncActive, setSyncActive] = useState(false);
+    const [refreshTick, setRefreshTick] = useState(0);
 
     // Load persisted view/date on mount
     useEffect(() => {
@@ -205,6 +208,28 @@ const CalendarContainer = () => {
             try { localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false'); } catch (_) {}
         } catch {}
     }, [view, currentDate]);
+    // Check if external sync is enabled to start auto-refresh
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const status = await calendarService.getSyncStatus();
+                if (!ignore) setSyncActive(!!(status?.syncToGoogle || status?.syncToOutlook));
+            } catch (_) {
+                if (!ignore) setSyncActive(false);
+            }
+        })();
+        return () => { ignore = true; };
+    }, []);
+
+    // Auto-refresh interval when sync is active
+    useEffect(() => {
+        if (!syncActive) return;
+        const id = setInterval(() => {
+            setRefreshTick((t) => t + 1);
+        }, 10000); // refresh every 10s
+        return () => clearInterval(id);
+    }, [syncActive]);
 
     // persist workWeek preference when changed
     useEffect(() => {
@@ -365,7 +390,7 @@ const CalendarContainer = () => {
         };
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [view, timezone, currentDate]);
+    }, [view, timezone, currentDate, refreshTick]);
 
     const refreshTodosForRange = async () => {
         // Reuse the same range logic as above for listTodos only
