@@ -52,8 +52,8 @@ export default function ReminderBell() {
         )}
       </button>
 
-      {/* Reminders Modal */}
-      <RemindersListModal isOpen={showModal} onClose={() => setShowModal(false)} />
+      {/* Reminders Modal: render inline dropdown when used in navbar to avoid full-screen black backdrop */}
+      <RemindersListModal isOpen={showModal} onClose={() => setShowModal(false)} inline={true} />
     </>
   );
 }
