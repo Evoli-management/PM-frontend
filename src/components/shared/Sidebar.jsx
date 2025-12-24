@@ -50,6 +50,13 @@ const navItems = [
     },
     {
         label: "Give Strokes",
+        icon: (
+            <img
+                src={`${import.meta.env.BASE_URL}strokes.png`}
+                alt="Give Strokes"
+                className="w-6 h-6 object-contain"
+            />
+        ),
         to: "/give-strokes",
         section: "Main",
     },

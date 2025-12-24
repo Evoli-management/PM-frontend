@@ -10,6 +10,7 @@ import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
 import ReminderBell from "./ReminderBell";
+import ReminderModal from "../reminders/ReminderModal";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
@@ -57,6 +58,9 @@ export default function Navbar() {
         }
     });
     const [search, setSearch] = useState("");
+    // Global inline reminder modal state (listens for events)
+    const [globalReminderOpen, setGlobalReminderOpen] = useState(false);
+    const [globalReminderObj, setGlobalReminderObj] = useState(null);
 
     // Handle global search functionality across entire system
     const handleSearch = async (searchTerm) => {
@@ -307,6 +311,29 @@ export default function Navbar() {
         window.addEventListener('profileUpdated', handleProfileUpdate);
         return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
     }, []);
+
+    // Listen for global open-reminder-inline events
+    useEffect(() => {
+        const handler = (e) => {
+            const reminder = e?.detail?.reminder || null;
+            setGlobalReminderObj(reminder);
+            setGlobalReminderOpen(true);
+        };
+
+        window.addEventListener('open-reminder-inline', handler);
+        return () => window.removeEventListener('open-reminder-inline', handler);
+    }, []);
+
+    const handleGlobalReminderClose = () => {
+        setGlobalReminderOpen(false);
+        setGlobalReminderObj(null);
+    };
+
+    const handleGlobalReminderSave = (saved) => {
+        // Notify any listeners (e.g., reminders lists) to reload
+        try { window.dispatchEvent(new CustomEvent('reminder-saved', { detail: { reminder: saved } })); } catch (err) {}
+        handleGlobalReminderClose();
+    };
 
     // Listen for global auth changes (login/logout) to refresh auth state immediately
     useEffect(() => {
@@ -631,6 +658,15 @@ export default function Navbar() {
                     <div className="relative" ref={menuRef}>
                         <ReminderBell />
                     </div>
+
+                    {/* Global inline ReminderModal — renders at navbar level so it survives closing the reminders panel */}
+                    <ReminderModal
+                        isOpen={globalReminderOpen}
+                        inline={true}
+                        reminder={globalReminderObj}
+                        onClose={handleGlobalReminderClose}
+                        onSave={handleGlobalReminderSave}
+                    />
 
                     <div className="relative" ref={menuRef}>
                         <button
