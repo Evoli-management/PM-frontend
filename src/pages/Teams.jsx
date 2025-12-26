@@ -26,6 +26,8 @@ export default function Teams() {
     const [selectedItems, setSelectedItems] = useState([]);
     const [matrixData, setMatrixData] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
+    const [employeeshipMetrics, setEmployeeshipMetrics] = useState([]);
+    const [performanceMetrics, setPerformanceMetrics] = useState([]);
 
     // ============ TOAST/NOTIFICATIONS ============
     const [toast, setToast] = useState({ message: '', visible: false });
@@ -174,65 +176,99 @@ export default function Teams() {
     };
 
     // ============ REPORT FUNCTIONS ============
-    const generateMockScores = () => {
-        // Mock data generator - replace with real API calls
-        const mockData = [];
-        
-        if (reportLevel === 'organization') {
-            // Show all teams
-            teamsData.forEach((team, idx) => {
-                mockData.push({
+    const loadReportData = async () => {
+        try {
+            setLoading(true);
+            let data = [];
+            
+            if (reportLevel === 'organization') {
+                const report = await teamsService.getOrganizationReport();
+                data = report.teams.map(team => ({
                     id: team.id,
                     name: team.name,
                     type: 'team',
-                    canScore: 45 + Math.random() * 50,
-                    willScore: 45 + Math.random() * 50,
-                    score: 60 + Math.random() * 30,
-                });
-            });
-        } else if (reportLevel === 'myteams') {
-            // Show users in my main team
-            const myTeam = teamsData.find(t => t.members?.some(m => m.id === userProfile?.id));
-            if (myTeam?.members) {
-                myTeam.members.forEach((member) => {
-                    mockData.push({
-                        id: member.id,
-                        name: `${member.firstName} ${member.lastName}`,
+                    canScore: team.canScore,
+                    willScore: team.willScore,
+                    score: team.overallScore,
+                }));
+            } else if (reportLevel === 'myteams') {
+                const report = await teamsService.getMyTeamsReport();
+                data = report.users.map(user => ({
+                    id: user.id,
+                    name: user.name,
+                    type: 'user',
+                    canScore: user.canScore,
+                    willScore: user.willScore,
+                    score: user.overallScore,
+                }));
+            } else if (reportLevel === 'myself') {
+                const report = await teamsService.getMySelfReport();
+                data = [
+                    {
+                        id: report.user.id,
+                        name: report.user.name,
                         type: 'user',
-                        canScore: 40 + Math.random() * 55,
-                        willScore: 40 + Math.random() * 55,
-                        score: 55 + Math.random() * 35,
-                    });
-                });
+                        canScore: report.user.canScore,
+                        willScore: report.user.willScore,
+                        score: report.user.overallScore,
+                    },
+                    {
+                        id: 'team-avg',
+                        name: report.teamAverage.name,
+                        type: 'team',
+                        canScore: report.teamAverage.canScore,
+                        willScore: report.teamAverage.willScore,
+                        score: report.teamAverage.overallScore,
+                    }
+                ];
             }
-        } else if (reportLevel === 'myself') {
-            // Show my position vs team average
-            mockData.push({
-                id: 'me',
-                name: 'Me',
-                type: 'user',
-                canScore: 65 + Math.random() * 20,
-                willScore: 70 + Math.random() * 20,
-                score: 75,
-            });
-            mockData.push({
-                id: 'team-avg',
-                name: 'Team Average',
-                type: 'team',
-                canScore: 60,
-                willScore: 65,
-                score: 70,
-            });
+            
+            setMatrixData(data);
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to load report data';
+            showToast(message, 'error');
+            setMatrixData([]);
+        } finally {
+            setLoading(false);
         }
-        
-        setMatrixData(mockData);
     };
 
     useEffect(() => {
         if (view === 'reports' && teamsData.length > 0) {
-            generateMockScores();
+            loadReportData();
+            loadMetrics();
         }
     }, [view, reportLevel, teamsData]);
+
+    const loadMetrics = async () => {
+        try {
+            const empMetrics = await teamsService.getEmployeeshipMetrics(reportLevel, null);
+            const perfMetrics = await teamsService.getPerformanceMetrics(reportLevel, null);
+            
+            setEmployeeshipMetrics([
+                { key: 'commitment', label: 'Commitment', value: empMetrics.commitment },
+                { key: 'responsibility', label: 'Responsibility', value: empMetrics.responsibility },
+                { key: 'loyalty', label: 'Loyalty', value: empMetrics.loyalty },
+                { key: 'initiative', label: 'Initiative', value: empMetrics.initiative },
+                { key: 'productivity', label: 'Productivity', value: empMetrics.productivity },
+                { key: 'relations', label: 'Relations', value: empMetrics.relations },
+                { key: 'quality', label: 'Quality', value: empMetrics.quality },
+                { key: 'competence', label: 'Professional Competence', value: empMetrics.competence },
+                { key: 'flexibility', label: 'Flexibility', value: empMetrics.flexibility },
+                { key: 'implementation', label: 'Implementation', value: empMetrics.implementation },
+                { key: 'energy', label: 'Energy', value: empMetrics.energy },
+            ]);
+            
+            setPerformanceMetrics([
+                { key: 'overall', label: 'Overall Performance', value: perfMetrics.overall },
+            ]);
+        } catch (err) {
+            console.error('Failed to load metrics:', err);
+            // Use default/fallback values
+            setEmployeeshipMetrics(getDefaultEmployeeshipMetrics());
+            setPerformanceMetrics(getDefaultPerformanceMetrics());
+        }
+    };
 
     const handleItemSelect = (itemId) => {
         if (!canManage && reportLevel !== 'myself') return;
@@ -245,7 +281,7 @@ export default function Teams() {
         });
     };
 
-    const getEmployeeshipMetrics = () => {
+    const getDefaultEmployeeshipMetrics = () => {
         return [
             { key: 'commitment', label: 'Commitment', value: 75 },
             { key: 'responsibility', label: 'Responsibility', value: 68 },
@@ -261,7 +297,7 @@ export default function Teams() {
         ];
     };
 
-    const getPerformanceMetrics = () => {
+    const getDefaultPerformanceMetrics = () => {
         return [
             { key: 'overall', label: 'Overall Performance', value: 76 },
         ];
@@ -491,12 +527,12 @@ export default function Teams() {
                                                 <div className="space-y-4">
                                                     <IndexPanel
                                                         title="Employeeship Index"
-                                                        metrics={getEmployeeshipMetrics()}
+                                                        metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
                                                     />
                                                     
                                                     <IndexPanel
                                                         title="Performance Index"
-                                                        metrics={getPerformanceMetrics()}
+                                                        metrics={performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics()}
                                                         highlightedMetric="overall"
                                                     />
                                                 </div>

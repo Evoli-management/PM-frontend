@@ -73,6 +73,48 @@ const teamsService = {
     );
     return response.data;
   },
+
+  // CAN-WILL Reports
+  async getOrganizationReport() {
+    const response = await axios.get(`${API_URL}/teams/reports/organization`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
+  async getMyTeamsReport() {
+    const response = await axios.get(`${API_URL}/teams/reports/my-teams`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
+  async getMySelfReport() {
+    const response = await axios.get(`${API_URL}/teams/reports/myself`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
+  async getEmployeeshipMetrics(level, entityId) {
+    const params = new URLSearchParams({ level });
+    if (entityId) params.append('entityId', entityId);
+    
+    const response = await axios.get(`${API_URL}/teams/reports/employeeship-metrics?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
+  async getPerformanceMetrics(level, entityId) {
+    const params = new URLSearchParams({ level });
+    if (entityId) params.append('entityId', entityId);
+    
+    const response = await axios.get(`${API_URL}/teams/reports/performance-metrics?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
 };
 
 export default teamsService;
