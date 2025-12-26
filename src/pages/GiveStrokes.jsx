@@ -357,7 +357,15 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
             <div className="bg-white rounded-lg p-8 max-w-2xl w-full my-8">
                 <h2 className="text-2xl font-semibold text-gray-600 text-center mb-6">Employeeship Strokes</h2>
                 
-                {!selectedValue ? (
+                {values.length === 0 ? (
+                    <div className="text-center py-8">
+                        <p className="text-gray-600 mb-4">No culture values have been defined yet.</p>
+                        <p className="text-gray-500 text-sm mb-6">Please ask your organization admin to add culture values in the Organization Settings.</p>
+                        <button onClick={onBack} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                            Back
+                        </button>
+                    </div>
+                ) : !selectedValue ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                         {values.map((value) => (
                             <button
