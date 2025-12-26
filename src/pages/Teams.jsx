@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars } from "react-icons/fa";
 import teamsService from "../services/teamsService";
+import userProfileService from "../services/userProfileService";
+import organizationService from "../services/organizationService";
 
 export default function Teams() {
     // ============ API STATE ============
@@ -15,6 +17,7 @@ export default function Teams() {
     const [draggingMember, setDraggingMember] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
+    const [canManage, setCanManage] = useState(false);
 
     // ============ TOAST/NOTIFICATIONS ============
     const [toast, setToast] = useState({ message: '', visible: false });
@@ -23,9 +26,24 @@ export default function Teams() {
         setTimeout(() => setToast({ visible: false }), 3000);
     };
 
+    const checkPermissions = async () => {
+        try {
+            const profile = await userProfileService.getProfile();
+            const org = await organizationService.getCurrentOrganization();
+            const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
+            const isOwner = org?.contactEmail === profile?.email;
+            setCanManage(isAdmin || isOwner);
+        } catch (e) {
+            setCanManage(false);
+        }
+    };
+
     // ============ LOAD INITIAL DATA ============
     useEffect(() => {
-        loadTeams();
+        const init = async () => {
+            await Promise.all([checkPermissions(), loadTeams()]);
+        };
+        init();
     }, []);
 
     const loadTeams = async () => {
@@ -46,6 +64,7 @@ export default function Teams() {
 
     // ============ TEAM OPERATIONS ============
     const createTeam = async (name) => {
+        if (!canManage) return;
         if (!name || !name.trim()) return;
         setSaving(true);
         try {
@@ -63,6 +82,7 @@ export default function Teams() {
     };
 
     const renameTeam = async (teamId, newName) => {
+        if (!canManage) return;
         if (!newName || !newName.trim()) return;
         setSaving(true);
         try {
@@ -80,6 +100,7 @@ export default function Teams() {
     };
 
     const deleteTeam = async (teamId) => {
+        if (!canManage) return;
         if (!confirm('Are you sure you want to delete this team?')) return;
         setSaving(true);
         try {
@@ -95,6 +116,7 @@ export default function Teams() {
     };
 
     const addMemberToTeam = async (teamId, userId) => {
+        if (!canManage) return;
         if (!userId) return;
         setSaving(true);
         try {
@@ -110,6 +132,7 @@ export default function Teams() {
     };
 
     const removeMemberFromTeam = async (teamId, userId) => {
+        if (!canManage) return;
         if (!confirm('Remove this member from the team?')) return;
         setSaving(true);
         try {
@@ -125,6 +148,7 @@ export default function Teams() {
     };
 
     const setTeamLead = async (teamId, userId) => {
+        if (!canManage) return;
         setSaving(true);
         try {
             await teamsService.updateTeam(teamId, {
@@ -177,9 +201,9 @@ export default function Teams() {
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                                 <div className="space-y-4">
-                                    <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
+                                    <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
                                     <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                        TEAM MANAGEMENT
+                                        {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
                                     </div>
 
                                     {toast.visible && (
@@ -214,26 +238,28 @@ export default function Teams() {
                                                         placeholder="Search members or teams..."
                                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                                     />
-                                                    <div className="flex gap-2">
-                                                        <input 
-                                                            id="newTeamName" 
-                                                            placeholder="Enter new team name" 
-                                                            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
-                                                        />
-                                                        <button
-                                                            onClick={() => {
-                                                                const el = document.getElementById('newTeamName');
-                                                                const val = el?.value?.trim();
-                                                                if (!val) return;
-                                                                createTeam(val);
-                                                                if (el) el.value = '';
-                                                            }}
-                                                            disabled={saving}
-                                                            className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
-                                                        >
-                                                            {saving ? 'Creating...' : 'Create Team'}
-                                                        </button>
-                                                    </div>
+                                                    {canManage && (
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                id="newTeamName" 
+                                                                placeholder="Enter new team name" 
+                                                                className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
+                                                            />
+                                                            <button
+                                                                onClick={() => {
+                                                                    const el = document.getElementById('newTeamName');
+                                                                    const val = el?.value?.trim();
+                                                                    if (!val) return;
+                                                                    createTeam(val);
+                                                                    if (el) el.value = '';
+                                                                }}
+                                                                disabled={saving}
+                                                                className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
+                                                            >
+                                                                {saving ? 'Creating...' : 'Create Team'}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="grid md:grid-cols-2 gap-4">
@@ -255,6 +281,7 @@ export default function Teams() {
                                                                     onRemoveMember={removeMemberFromTeam}
                                                                     onSetLead={setTeamLead}
                                                                     saving={saving}
+                                                                    canManage={canManage}
                                                                 />
                                                             ))
                                                     )}
@@ -272,7 +299,7 @@ export default function Teams() {
     );
 }
 
-function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving }) {
+function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage }) {
     const [showRenameInput, setShowRenameInput] = useState(false);
     const [renameValue, setRenameValue] = useState(team.name);
 
@@ -288,24 +315,26 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                         <p className="text-xs text-gray-600">{team.memberCount || 0} members</p>
                     </div>
                 </div>
-                <div className="flex gap-1">
-                    <button
-                        onClick={() => setShowRenameInput(!showRenameInput)}
-                        className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
-                    >
-                        Rename
-                    </button>
-                    <button
-                        onClick={() => onDelete(team.id)}
-                        disabled={saving}
-                        className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
-                    >
-                        Delete
-                    </button>
-                </div>
+                {canManage && (
+                    <div className="flex gap-1">
+                        <button
+                            onClick={() => setShowRenameInput(!showRenameInput)}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                        >
+                            Rename
+                        </button>
+                        <button
+                            onClick={() => onDelete(team.id)}
+                            disabled={saving}
+                            className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {showRenameInput && (
+            {canManage && showRenameInput && (
                 <div className="flex gap-2 mb-3">
                     <input
                         value={renameValue}
@@ -340,24 +369,26 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                                     {member.role === 'lead' ? 'Lead' : 'Member'}
                                 </span>
                             </div>
-                            <div className="flex gap-1">
-                                {member.role !== 'lead' && (
+                            {canManage && (
+                                <div className="flex gap-1">
+                                    {member.role !== 'lead' && (
+                                        <button
+                                            onClick={() => onSetLead(team.id, member.id)}
+                                            disabled={saving}
+                                            className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50 disabled:opacity-60"
+                                        >
+                                            Set Lead
+                                        </button>
+                                    )}
                                     <button
-                                        onClick={() => onSetLead(team.id, member.id)}
+                                        onClick={() => onRemoveMember(team.id, member.id)}
                                         disabled={saving}
-                                        className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50 disabled:opacity-60"
+                                        className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
                                     >
-                                        Set Lead
+                                        Remove
                                     </button>
-                                )}
-                                <button
-                                    onClick={() => onRemoveMember(team.id, member.id)}
-                                    disabled={saving}
-                                    className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
-                                >
-                                    Remove
-                                </button>
-                            </div>
+                                </div>
+                            )}
                         </div>
                     ))
                 ) : (
