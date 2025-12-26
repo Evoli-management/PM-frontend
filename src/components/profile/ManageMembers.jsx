@@ -18,7 +18,9 @@ export function ManageMembers({ showToast }) {
     try {
       const orgService = await import("../../services/organizationService");
       const data = await orgService.default.getOrganizationMembers();
-      setMembers(data);
+      // API may return either an array or an object with a members property
+      const normalized = Array.isArray(data) ? data : (data?.members || []);
+      setMembers(normalized);
     } catch (e) {
       const errorMsg = e?.response?.data?.message || "Failed to load members";
       if (errorMsg.includes("not part of any organization")) {
