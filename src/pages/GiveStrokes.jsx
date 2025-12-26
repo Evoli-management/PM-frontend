@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaSearch } from "react-icons/fa";
 import organizationService from "../services/organizationService";
@@ -18,6 +18,7 @@ export default function GiveStrokes() {
     
     // Selected recipient
     const [selectedRecipient, setSelectedRecipient] = useState(null);
+    const recipientRef = useRef(null);
     
     // Modal states
     const [showTypeModal, setShowTypeModal] = useState(false);
@@ -52,32 +53,54 @@ export default function GiveStrokes() {
     };
 
     const handleMemberSelect = (member) => {
-        setSelectedRecipient({ id: member.id, name: `${member.firstName} ${member.lastName}`, type: 'member' });
+        const recipient = { id: member.id, name: `${member.firstName} ${member.lastName}`, type: 'member' };
+        recipientRef.current = member.id;
+        setSelectedRecipient(recipient);
         setShowTypeModal(true);
     };
 
     const handleExternalRecipient = () => {
         if (!externalName || !externalEmail) return;
-        setSelectedRecipient({ name: externalName, email: externalEmail, type: 'external' });
+        const recipient = { name: externalName, email: externalEmail, type: 'external' };
+        recipientRef.current = null;
+        setSelectedRecipient(recipient);
         setShowTypeModal(true);
     };
 
     const handleTypeSelect = async (type) => {
         setSelectedType(type);
         setShowTypeModal(false);
-        
-        // Load data based on type
-        if (type === 'employeeship') {
-            const values = await cultureService.getValues();
-            setCultureValues(values || []);
-        } else if (type === 'performance') {
-            const areas = await keyAreaService.getKeyAreas(selectedRecipient.id);
-            setKeyAreas(areas || []);
-        } else if (type === 'achievement') {
-            const achievements = await recognitionsService.getRecentAchievements(selectedRecipient.id);
-            setRecentAchievements(achievements);
+        // Load data based on type. Use recipientRef to avoid race with state updates.
+        try {
+            if (type === 'employeeship') {
+                const values = await cultureService.getValues();
+                setCultureValues(values || []);
+            } else if (type === 'performance') {
+                const recipientId = recipientRef.current;
+                if (!recipientId) {
+                    alert('Please select a company member for performance strokes');
+                    setSelectedType(null);
+                    return;
+                }
+                const areas = await keyAreaService.getKeyAreas(recipientId);
+                setKeyAreas(areas || []);
+            } else if (type === 'achievement') {
+                const recipientId = recipientRef.current;
+                if (!recipientId) {
+                    alert('Please select a company member for achievement strokes');
+                    setSelectedType(null);
+                    return;
+                }
+                const achievements = await recognitionsService.getRecentAchievements(recipientId);
+                setRecentAchievements(achievements);
+            }
+        } catch (err) {
+            console.error('Failed to load type data:', err);
+            alert('Failed to load recognition data');
+            setSelectedType(null);
+            return;
         }
-        
+
         setShowDetailsModal(true);
     };
 
