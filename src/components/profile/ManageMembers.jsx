@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes } from "react-icons/fa";
+import userProfileService from "../../services/userProfileService";
 
 export function ManageMembers({ showToast }) {
   const [members, setMembers] = useState([]);
@@ -8,11 +9,29 @@ export function ManageMembers({ showToast }) {
   const [selectedMember, setSelectedMember] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [teams, setTeams] = useState([]);
+  const [canManage, setCanManage] = useState(false);
 
   useEffect(() => {
+    checkPermissions();
     loadMembers();
     loadTeams();
   }, []);
+
+  const checkPermissions = async () => {
+    try {
+      const profile = await userProfileService.getProfile();
+      const orgService = await import("../../services/organizationService");
+      const org = await orgService.default.getCurrentOrganization();
+      
+      // User can manage members if they are admin, superuser, or organization owner
+      const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
+      const isOwner = org?.contactEmail === profile?.email;
+      setCanManage(isAdmin || isOwner);
+    } catch (e) {
+      console.log("Could not check permissions:", e);
+      setCanManage(false);
+    }
+  };
 
   const loadMembers = async () => {
     try {
@@ -83,12 +102,14 @@ export function ManageMembers({ showToast }) {
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b flex items-center justify-between">
         <h3 className="text-lg font-semibold">Manage Members/Users</h3>
-        <button
-          onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
-        >
-          <FaUserPlus /> Invite new user
-        </button>
+          {canManage && (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+            >
+              <FaUserPlus /> Invite new user
+            </button>
+          )}
       </div>
 
       {loading ? (
@@ -108,22 +129,24 @@ export function ManageMembers({ showToast }) {
                   Role: {member.role} • Status: {member.status}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleEditMember(member)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                  title="Edit member"
-                >
-                  <FaEdit />
-                </button>
-                <button
-                  onClick={() => handleDeleteMember(member.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  title="Remove member"
-                >
-                  <FaTrash />
-                </button>
-              </div>
+                {canManage && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEditMember(member)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Edit member"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteMember(member.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      title="Remove member"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                )}
             </div>
           ))}
         </div>

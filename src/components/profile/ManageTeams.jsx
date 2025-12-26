@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash, FaPlus, FaTimes } from "react-icons/fa";
+import userProfileService from "../../services/userProfileService";
 
 export function ManageTeams({ showToast }) {
   const [teams, setTeams] = useState([]);
@@ -8,11 +9,29 @@ export function ManageTeams({ showToast }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [members, setMembers] = useState([]);
+  const [canManage, setCanManage] = useState(false);
 
   useEffect(() => {
+    checkPermissions();
     loadTeams();
     loadOrgMembers();
   }, []);
+
+  const checkPermissions = async () => {
+    try {
+      const profile = await userProfileService.getProfile();
+      const orgService = await import("../../services/organizationService");
+      const org = await orgService.default.getCurrentOrganization();
+      
+      // User can manage teams if they are admin, superuser, or organization owner
+      const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
+      const isOwner = org?.contactEmail === profile?.email;
+      setCanManage(isAdmin || isOwner);
+    } catch (e) {
+      console.log("Could not check permissions:", e);
+      setCanManage(false);
+    }
+  };
 
   const loadTeams = async () => {
     try {
@@ -76,12 +95,14 @@ export function ManageTeams({ showToast }) {
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b flex items-center justify-between">
         <h3 className="text-lg font-semibold">Manage Teams</h3>
-        <button
-          onClick={handleCreateTeam}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
-        >
-          <FaPlus /> Create new team
-        </button>
+          {canManage && (
+            <button
+              onClick={handleCreateTeam}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
+            >
+              <FaPlus /> Create new team
+            </button>
+          )}
       </div>
 
       {loading ? (
@@ -101,22 +122,24 @@ export function ManageTeams({ showToast }) {
                   {team.leadName && <span className="ml-3">Lead: {team.leadName}</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleEditTeam(team)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                  title="Edit team"
-                >
-                  <FaEdit />
-                </button>
-                <button
-                  onClick={() => handleDeleteTeam(team.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  title="Delete team"
-                >
-                  <FaTrash />
-                </button>
-              </div>
+                {canManage && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEditTeam(team)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Edit team"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTeam(team.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      title="Delete team"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                )}
             </div>
           ))}
         </div>
