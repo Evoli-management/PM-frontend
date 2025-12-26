@@ -4,6 +4,9 @@ import { FaBars } from "react-icons/fa";
 import teamsService from "../services/teamsService";
 import userProfileService from "../services/userProfileService";
 import organizationService from "../services/organizationService";
+import { CanWillMatrix } from "../components/teams/CanWillMatrix";
+import { SelectionPane } from "../components/teams/SelectionPane";
+import { IndexPanel } from "../components/teams/IndexPanel";
 
 export default function Teams() {
     // ============ API STATE ============
@@ -18,6 +21,11 @@ export default function Teams() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
     const [canManage, setCanManage] = useState(false);
+    const [view, setView] = useState('list'); // 'list' or 'reports'
+    const [reportLevel, setReportLevel] = useState('organization'); // 'organization', 'myteams', 'myself'
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [matrixData, setMatrixData] = useState([]);
+    const [userProfile, setUserProfile] = useState(null);
 
     // ============ TOAST/NOTIFICATIONS ============
     const [toast, setToast] = useState({ message: '', visible: false });
@@ -33,6 +41,7 @@ export default function Teams() {
             const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
             const isOwner = org?.contactEmail === profile?.email;
             setCanManage(isAdmin || isOwner);
+            setUserProfile(profile);
         } catch (e) {
             setCanManage(false);
         }
@@ -164,6 +173,100 @@ export default function Teams() {
         }
     };
 
+    // ============ REPORT FUNCTIONS ============
+    const generateMockScores = () => {
+        // Mock data generator - replace with real API calls
+        const mockData = [];
+        
+        if (reportLevel === 'organization') {
+            // Show all teams
+            teamsData.forEach((team, idx) => {
+                mockData.push({
+                    id: team.id,
+                    name: team.name,
+                    type: 'team',
+                    canScore: 45 + Math.random() * 50,
+                    willScore: 45 + Math.random() * 50,
+                    score: 60 + Math.random() * 30,
+                });
+            });
+        } else if (reportLevel === 'myteams') {
+            // Show users in my main team
+            const myTeam = teamsData.find(t => t.members?.some(m => m.id === userProfile?.id));
+            if (myTeam?.members) {
+                myTeam.members.forEach((member) => {
+                    mockData.push({
+                        id: member.id,
+                        name: `${member.firstName} ${member.lastName}`,
+                        type: 'user',
+                        canScore: 40 + Math.random() * 55,
+                        willScore: 40 + Math.random() * 55,
+                        score: 55 + Math.random() * 35,
+                    });
+                });
+            }
+        } else if (reportLevel === 'myself') {
+            // Show my position vs team average
+            mockData.push({
+                id: 'me',
+                name: 'Me',
+                type: 'user',
+                canScore: 65 + Math.random() * 20,
+                willScore: 70 + Math.random() * 20,
+                score: 75,
+            });
+            mockData.push({
+                id: 'team-avg',
+                name: 'Team Average',
+                type: 'team',
+                canScore: 60,
+                willScore: 65,
+                score: 70,
+            });
+        }
+        
+        setMatrixData(mockData);
+    };
+
+    useEffect(() => {
+        if (view === 'reports' && teamsData.length > 0) {
+            generateMockScores();
+        }
+    }, [view, reportLevel, teamsData]);
+
+    const handleItemSelect = (itemId) => {
+        if (!canManage && reportLevel !== 'myself') return;
+        
+        setSelectedItems(prev => {
+            if (prev.includes(itemId)) {
+                return prev.filter(id => id !== itemId);
+            }
+            return [...prev, itemId];
+        });
+    };
+
+    const getEmployeeshipMetrics = () => {
+        return [
+            { key: 'commitment', label: 'Commitment', value: 75 },
+            { key: 'responsibility', label: 'Responsibility', value: 68 },
+            { key: 'loyalty', label: 'Loyalty', value: 82 },
+            { key: 'initiative', label: 'Initiative', value: 71 },
+            { key: 'productivity', label: 'Productivity', value: 79 },
+            { key: 'relations', label: 'Relations', value: 73 },
+            { key: 'quality', label: 'Quality', value: 85 },
+            { key: 'competence', label: 'Professional Competence', value: 77 },
+            { key: 'flexibility', label: 'Flexibility', value: 69 },
+            { key: 'implementation', label: 'Implementation', value: 74 },
+            { key: 'energy', label: 'Energy', value: 80 },
+        ];
+    };
+
+    const getPerformanceMetrics = () => {
+        return [
+            { key: 'overall', label: 'Overall Performance', value: 76 },
+        ];
+    };
+
     const Section = ({ title, children, divider = true }) => (
         <section className={divider ? "mt-5 border-t border-gray-200 pt-5" : "mt-5 pt-5"}>
             {title ? <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2> : null}
@@ -201,10 +304,39 @@ export default function Teams() {
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                                 <div className="space-y-4">
-                                    <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
-                                    <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                        {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
+                                        
+                                        {/* View Toggle */}
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setView('list')}
+                                                className={`px-4 py-2 text-sm rounded ${
+                                                    view === 'list'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                Team List
+                                            </button>
+                                            <button
+                                                onClick={() => setView('reports')}
+                                                className={`px-4 py-2 text-sm rounded ${
+                                                    view === 'reports'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                CAN-WILL Reports
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {view === 'list' ? (
+                                        <>
+                                            <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                                {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
+                                            </div>
 
                                     {toast.visible && (
                                         <div className={`p-3 rounded text-sm ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
@@ -288,6 +420,88 @@ export default function Teams() {
                                                 </div>
                                             </div>
                                         </Section>
+                                    )}
+                                        </>
+                                    ) : (
+                                        // Reports View
+                                        <>
+                                            {/* Report Level Selector */}
+                                            <div className="flex gap-2 mb-4">
+                                                <button
+                                                    onClick={() => setReportLevel('organization')}
+                                                    className={`px-4 py-2 text-sm rounded ${
+                                                        reportLevel === 'organization'
+                                                            ? 'bg-green-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    Organization
+                                                </button>
+                                                <button
+                                                    onClick={() => setReportLevel('myteams')}
+                                                    className={`px-4 py-2 text-sm rounded ${
+                                                        reportLevel === 'myteams'
+                                                            ? 'bg-green-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    My Teams
+                                                </button>
+                                                <button
+                                                    onClick={() => setReportLevel('myself')}
+                                                    className={`px-4 py-2 text-sm rounded ${
+                                                        reportLevel === 'myself'
+                                                            ? 'bg-green-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    My Self
+                                                </button>
+                                            </div>
+
+                                            {/* Report Description */}
+                                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                                                {reportLevel === 'organization' && "Viewing organization-wide summary: all teams' scores in the CAN-WILL matrix"}
+                                                {reportLevel === 'myteams' && "Viewing your main team: scores of users in your team"}
+                                                {reportLevel === 'myself' && "Viewing your personal position compared to your team's average score"}
+                                            </div>
+
+                                            {/* Reports Grid */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                {/* Left column: Matrix + Selection */}
+                                                <div className="lg:col-span-2 space-y-4">
+                                                    <CanWillMatrix
+                                                        data={matrixData}
+                                                        selectedItems={selectedItems}
+                                                        onItemClick={(item) => handleItemSelect(item.id)}
+                                                    />
+                                                    
+                                                    {(canManage || reportLevel === 'myself') && (
+                                                        <SelectionPane
+                                                            title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
+                                                            items={matrixData}
+                                                            selectedItems={selectedItems}
+                                                            onSelect={handleItemSelect}
+                                                            canSelect={canManage || reportLevel === 'myself'}
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {/* Right column: Indices */}
+                                                <div className="space-y-4">
+                                                    <IndexPanel
+                                                        title="Employeeship Index"
+                                                        metrics={getEmployeeshipMetrics()}
+                                                    />
+                                                    
+                                                    <IndexPanel
+                                                        title="Performance Index"
+                                                        metrics={getPerformanceMetrics()}
+                                                        highlightedMetric="overall"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </div>
