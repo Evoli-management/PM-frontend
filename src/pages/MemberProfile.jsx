@@ -31,9 +31,10 @@ export default function MemberProfile() {
             setError(null);
 
             // Get current user info to check if admin
-            const userInfo = await authService.me();
-            setCurrentUser(userInfo);
-            setIsAdmin(userInfo?.role === 'admin');
+            const meResp = await authService.verifyToken();
+            const meUser = meResp?.user || meResp; // some routes return { user }
+            setCurrentUser(meUser);
+            setIsAdmin(meUser?.role === 'admin' || meUser?.isSuperUser === true);
 
             // Load member details
             const memberData = await usersService.getUser(userId);

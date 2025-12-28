@@ -14,6 +14,25 @@ const usersService = {
             return [];
         }
     },
+
+    async getUser(userId) {
+        if (!userId) return null;
+        // Try dedicated endpoint first if available
+        try {
+            const res = await apiClient.get(`/organizations/current/members/${userId}`);
+            return res.data;
+        } catch (err) {
+            // Fallback: list all members and find by id
+            try {
+                const listRes = await apiClient.get("/organizations/current/members");
+                const members = Array.isArray(listRes.data) ? listRes.data : [];
+                const found = members.find(m => m.id === userId || m.userId === userId);
+                if (found) return found;
+            } catch {}
+            // As a last resort, return a minimal stub
+            return { id: userId, firstName: "User", lastName: "", email: "" };
+        }
+    },
 };
 
 export default usersService;
