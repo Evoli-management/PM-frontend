@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
-import { FaBars } from "react-icons/fa";
+import { FaBars, FaEdit, FaTrash, FaEye } from "react-icons/fa";
 import teamsService from "../services/teamsService";
 import userProfileService from "../services/userProfileService";
 import organizationService from "../services/organizationService";
@@ -589,23 +589,30 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     <div className="flex gap-1">
                         <button
                             onClick={() => setShowRenameInput(!showRenameInput)}
-                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
+                            title="Rename"
+                            aria-label="Rename team"
                         >
-                            Rename
+                            <FaEdit size={12} />
+                            <span>Rename</span>
                         </button>
                         <button
                             onClick={() => onDelete(team.id)}
                             disabled={saving}
-                            className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
+                            className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60 flex items-center gap-1"
+                            title="Delete"
+                            aria-label="Delete team"
                         >
-                            Delete
+                            <FaTrash size={12} />
+                            <span>Delete</span>
                         </button>
                         <button
                             onClick={() => navigate(`/teams/${team.id}`)}
-                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
                             aria-label="View team details"
                         >
-                            View
+                            <FaEye size={12} />
+                            <span>View</span>
                         </button>
                     </div>
                 )}
@@ -613,10 +620,12 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     <div className="flex gap-1">
                         <button
                             onClick={() => navigate(`/teams/${team.id}`)}
-                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
                             aria-label="View team details"
+                            title="View"
                         >
-                            View
+                            <FaEye size={12} />
+                            <span>View</span>
                         </button>
                     </div>
                 )}
