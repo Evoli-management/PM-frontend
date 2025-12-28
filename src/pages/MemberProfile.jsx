@@ -6,6 +6,8 @@ import { getUserGoals, adminUpdateGoal } from "../services/goalService";
 import keyAreaService from "../services/keyAreaService";
 import usersService from "../services/usersService";
 import authService from "../services/authService";
+import teamsService from "../services/teamsService";
+import recognitionsService from "../services/recognitionsService";
 
 export default function MemberProfile() {
     const { userId } = useParams();
@@ -20,6 +22,11 @@ export default function MemberProfile() {
     const [editingGoal, setEditingGoal] = useState(null);
     const [editForm, setEditForm] = useState({});
     const [error, setError] = useState(null);
+    const [memberTeams, setMemberTeams] = useState([]);
+    const [receivedStrokes, setReceivedStrokes] = useState([]);
+    const [givenStrokes, setGivenStrokes] = useState([]);
+    const [recognitionScore, setRecognitionScore] = useState(null);
+    const [recentAchievements, setRecentAchievements] = useState([]);
 
     useEffect(() => {
         loadData();
@@ -47,6 +54,36 @@ export default function MemberProfile() {
             // Load member's key areas
             const areasData = await keyAreaService.getMemberKeyAreas(userId);
             setKeyAreas(areasData || []);
+
+            // Load teams and filter by membership of this user
+            try {
+                const allTeams = await teamsService.getTeams();
+                const teams = (Array.isArray(allTeams) ? allTeams : []).filter(t => {
+                    const members = Array.isArray(t.members) ? t.members : [];
+                    return members.some(m => (m.id === userId) || (m.userId === userId));
+                });
+                setMemberTeams(teams);
+            } catch {}
+
+            // Load recognitions (strokes)
+            try {
+                const [recv, sent] = await Promise.all([
+                    recognitionsService.getRecognitions({ recipientId: userId, limit: 10 }),
+                    recognitionsService.getRecognitions({ senderId: userId, limit: 10 }),
+                ]);
+                setReceivedStrokes(Array.isArray(recv) ? recv : []);
+                setGivenStrokes(Array.isArray(sent) ? sent : []);
+            } catch {}
+
+            // Load recognition score and recent achievements
+            try {
+                const [score, achievements] = await Promise.all([
+                    recognitionsService.getUserScore(userId),
+                    recognitionsService.getRecentAchievements(userId),
+                ]);
+                setRecognitionScore(score || null);
+                setRecentAchievements(Array.isArray(achievements) ? achievements : []);
+            } catch {}
         } catch (err) {
             const message = err?.response?.data?.message || err?.message || 'Failed to load member profile';
             setError(message);
@@ -217,6 +254,121 @@ export default function MemberProfile() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Teams */}
+                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                            <h2 className="text-lg font-semibold mb-4">Teams</h2>
+                            {memberTeams.length === 0 ? (
+                                <p className="text-gray-600">No team memberships.</p>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {memberTeams.map(team => (
+                                        <div key={team.id} className="p-3 border rounded hover:border-blue-300 transition">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 bg-blue-500 rounded-full text-white flex items-center justify-center font-bold">
+                                                    {team.name?.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium">{team.name}</p>
+                                                    <p className="text-xs text-gray-600">{team.memberCount || (Array.isArray(team.members) ? team.members.length : 0)} members</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Recognitions / Strokes */}
+                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold">Recognitions</h2>
+                            </div>
+                            {/* Score Summary */}
+                            {recognitionScore ? (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                    <div className="p-3 border rounded">
+                                        <p className="text-sm text-gray-600">Employeeship</p>
+                                        <p className="text-xl font-semibold">{recognitionScore.employeeshipScore}</p>
+                                    </div>
+                                    <div className="p-3 border rounded">
+                                        <p className="text-sm text-gray-600">Performance</p>
+                                        <p className="text-xl font-semibold">{recognitionScore.performanceScore}</p>
+                                    </div>
+                                    <div className="p-3 border rounded">
+                                        <p className="text-sm text-gray-600">Total</p>
+                                        <p className="text-xl font-semibold">{recognitionScore.totalScore}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-gray-600 mb-4">No recognition score yet.</p>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <h3 className="font-semibold mb-2">Received (latest)</h3>
+                                    {receivedStrokes.length === 0 ? (
+                                        <p className="text-gray-600">No recognitions received.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {receivedStrokes.map(r => (
+                                                <div key={r.id} className="p-2 border rounded">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium">{r.type || 'Recognition'}</span>
+                                                        <span className="text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</span>
+                                                    </div>
+                                                    {r.personalNote && (
+                                                        <p className="text-sm text-gray-700 mt-1">{r.personalNote}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold mb-2">Given (latest)</h3>
+                                    {givenStrokes.length === 0 ? (
+                                        <p className="text-gray-600">No recognitions given.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {givenStrokes.map(r => (
+                                                <div key={r.id} className="p-2 border rounded">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium">{r.type || 'Recognition'}</span>
+                                                        <span className="text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</span>
+                                                    </div>
+                                                    {r.personalNote && (
+                                                        <p className="text-sm text-gray-700 mt-1">{r.personalNote}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Recent Achievements */}
+                            <div className="mt-6">
+                                <h3 className="font-semibold mb-2">Recent Achievements</h3>
+                                {recentAchievements.length === 0 ? (
+                                    <p className="text-gray-600">No recent achievements.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {recentAchievements.map(a => (
+                                            <div key={a.id || `${a.type}-${a.createdAt}`} className="p-2 border rounded">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium">{a.title || a.type || 'Achievement'}</span>
+                                                    <span className="text-xs text-gray-500">{new Date(a.createdAt).toLocaleString()}</span>
+                                                </div>
+                                                {a.description && (
+                                                    <p className="text-sm text-gray-700 mt-1">{a.description}</p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                         {/* Goals */}
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
