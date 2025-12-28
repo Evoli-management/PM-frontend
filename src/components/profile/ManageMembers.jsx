@@ -648,7 +648,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                         <div>
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h5 className="font-medium text-gray-900">{ka.name}</h5>
+                              <h5 className="font-medium text-gray-900">{ka.title}</h5>
                               {ka.description && (
                                 <p className="text-sm text-gray-600 mt-1">{ka.description}</p>
                               )}
@@ -781,22 +781,22 @@ function EditGoalForm({ goal, onSave, onCancel }) {
 }
 
 function EditKeyAreaForm({ keyArea, onSave, onCancel }) {
-  const [name, setName] = useState(keyArea.name || '');
+  const [title, setTitle] = useState(keyArea.title || '');
   const [description, setDescription] = useState(keyArea.description || '');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ name, description });
+    onSave({ title, description });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
         <input
           type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
           required
         />

@@ -463,7 +463,7 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
                                             : 'border-gray-200 hover:border-blue-300'
                                     }`}
                                 >
-                                    {area.name}
+                                    {area.title}
                                 </button>
                             ))}
                         </div>

@@ -207,7 +207,7 @@ export default function MemberProfile() {
                                             className="p-3 border rounded-lg hover:border-blue-300 transition"
                                             style={{ borderLeftColor: area.color, borderLeftWidth: '4px' }}
                                         >
-                                            <p className="font-medium">{area.name}</p>
+                                            <p className="font-medium">{area.title}</p>
                                             {area.description && (
                                                 <p className="text-sm text-gray-600 mt-1">{area.description}</p>
                                             )}
