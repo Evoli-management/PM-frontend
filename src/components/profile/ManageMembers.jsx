@@ -356,10 +356,25 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
     try {
       const teamsService = await import("../../services/teamsService");
       const allTeams = await teamsService.default.getTeams();
-      // Filter teams where this user is a member
-      const memberTeams = allTeams.filter(team => 
-        team.members?.some(m => m.userId === member.id)
-      );
+      
+      // For each team, check if this user is a member by fetching team details
+      const memberTeams = [];
+      for (const team of allTeams) {
+        try {
+          const teamDetail = await teamsService.default.getTeam(team.id);
+          // Check if user is in the members array
+          const isMember = teamDetail.members?.some(m => m.id === member.id);
+          if (isMember) {
+            memberTeams.push({
+              ...teamDetail,
+              userRole: teamDetail.members?.find(m => m.id === member.id)?.role
+            });
+          }
+        } catch (e) {
+          console.error(`Failed to fetch team ${team.id}:`, e);
+        }
+      }
+      
       setUserTeams(memberTeams);
     } catch (e) {
       console.error("Failed to load user teams:", e);
@@ -370,7 +385,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
     setLoading(true);
     try {
       const goalService = await import("../../services/goalService");
-      const goals = await goalService.default.getUserGoals(member.id);
+      const goals = await goalService.getUserGoals(member.id);
       // Filter to only public goals unless current user is admin
       const filteredGoals = isAdmin 
         ? goals 
@@ -388,7 +403,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
     setLoading(true);
     try {
       const keyAreaService = await import("../../services/keyAreaService");
-      const keyAreas = await keyAreaService.default.getUserKeyAreas(member.id);
+      const keyAreas = await keyAreaService.default.getMemberKeyAreas(member.id);
       setUserKeyAreas(keyAreas);
     } catch (e) {
       console.error("Failed to load user key areas:", e);
@@ -406,7 +421,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
 
     try {
       const goalService = await import("../../services/goalService");
-      await goalService.default.updateGoal(goalId, updates);
+      await goalService.updateGoal(goalId, updates);
       showToast?.("Goal updated successfully");
       setEditingGoal(null);
       loadUserGoals();
@@ -423,7 +438,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
 
     try {
       const keyAreaService = await import("../../services/keyAreaService");
-      await keyAreaService.default.updateKeyArea(keyAreaId, updates);
+      await keyAreaService.default.update(keyAreaId, updates);
       showToast?.("Key area updated successfully");
       setEditingKeyArea(null);
       loadUserKeyAreas();
@@ -511,7 +526,7 @@ function UserDetailModal({ member, teams, isAdmin, currentUserProfile, onClose, 
                             {team.leadName && ` • Lead: ${team.leadName}`}
                           </p>
                         </div>
-                        {team.members?.find(m => m.userId === member.id)?.role === 'lead' && (
+                        {team.userRole === 'lead' && (
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
                             Team Lead
                           </span>
