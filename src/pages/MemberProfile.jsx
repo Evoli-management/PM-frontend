@@ -55,14 +55,25 @@ export default function MemberProfile() {
             const areasData = await keyAreaService.getMemberKeyAreas(userId);
             setKeyAreas(areasData || []);
 
-            // Load teams and filter by membership of this user
+            // Load teams and verify membership by fetching members per team (robust across APIs)
             try {
                 const allTeams = await teamsService.getTeams();
-                const teams = (Array.isArray(allTeams) ? allTeams : []).filter(t => {
-                    const members = Array.isArray(t.members) ? t.members : [];
-                    return members.some(m => (m.id === userId) || (m.userId === userId));
-                });
-                setMemberTeams(teams);
+                const teamsArr = Array.isArray(allTeams) ? allTeams : [];
+                const membershipChecks = await Promise.all(
+                    teamsArr.map(async (t) => {
+                        try {
+                            const members = await teamsService.getTeamMembers(t.id);
+                            const isMember = Array.isArray(members) && members.some((m) => {
+                                const mid = String(m.id || m.userId);
+                                return mid === String(userId);
+                            });
+                            return isMember ? { ...t, members } : null;
+                        } catch (e) {
+                            return null;
+                        }
+                    })
+                );
+                setMemberTeams(membershipChecks.filter(Boolean));
             } catch {}
 
             // Load recognitions (strokes)
