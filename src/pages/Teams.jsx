@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars } from "react-icons/fa";
 import teamsService from "../services/teamsService";
@@ -552,6 +553,25 @@ export default function Teams() {
 function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage }) {
     const [showRenameInput, setShowRenameInput] = useState(false);
     const [renameValue, setRenameValue] = useState(team.name);
+    const navigate = useNavigate();
+    const [showDetails, setShowDetails] = useState(false);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [teamDetail, setTeamDetail] = useState(null);
+    const [teamMembers, setTeamMembers] = useState([]);
+
+    const loadTeamDetails = async () => {
+        try {
+            setDetailsLoading(true);
+            const detail = await teamsService.getTeam(team.id);
+            setTeamDetail(detail || null);
+            const members = await teamsService.getTeamMembers(team.id);
+            setTeamMembers(members || []);
+        } catch (e) {
+            // Silent failure in card; page-level toast already exists
+        } finally {
+            setDetailsLoading(false);
+        }
+    };
 
     return (
         <div className="rounded border p-3 bg-white hover:shadow-md transition-shadow">
@@ -580,6 +600,30 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                         >
                             Delete
                         </button>
+                        <button
+                            onClick={async () => {
+                                if (!showDetails) await loadTeamDetails();
+                                setShowDetails((prev) => !prev);
+                            }}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                            aria-label="View team details"
+                        >
+                            {showDetails ? 'Hide' : 'View'}
+                        </button>
+                    </div>
+                )}
+                {!canManage && (
+                    <div className="flex gap-1">
+                        <button
+                            onClick={async () => {
+                                if (!showDetails) await loadTeamDetails();
+                                setShowDetails((prev) => !prev);
+                            }}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                            aria-label="View team details"
+                        >
+                            {showDetails ? 'Hide' : 'View'}
+                        </button>
                     </div>
                 )}
             </div>
@@ -607,7 +651,12 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
             <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
                 {team.members && team.members.length > 0 ? (
                     team.members.map((member) => (
-                        <div key={member.id} className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1">
+                        <div
+                            key={member.id}
+                            className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1 cursor-pointer hover:bg-gray-100"
+                            onClick={() => navigate(`/member/${member.id}`)}
+                            aria-label={`View profile of ${member.firstName} ${member.lastName}`}
+                        >
                             <div className="flex items-center gap-2">
                                 <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
                                     {member.firstName?.charAt(0) || 'U'}
@@ -645,6 +694,58 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     <p className="text-xs text-gray-500">No members yet</p>
                 )}
             </div>
+
+            {showDetails && (
+                <div className="mt-3 border-t pt-3">
+                    {detailsLoading ? (
+                        <div className="text-xs text-gray-500">Loading team details…</div>
+                    ) : (
+                        <>
+                            <div className="mb-2">
+                                <h4 className="text-sm font-semibold text-gray-900">Description</h4>
+                                <p className="text-sm text-gray-700">{teamDetail?.description || 'No description provided.'}</p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-900 mb-2">Members</h4>
+                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                    {(teamMembers && teamMembers.length > 0) ? (
+                                        teamMembers.map((m) => (
+                                            <div
+                                                key={m.id || m.userId}
+                                                className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1 cursor-pointer hover:bg-gray-100"
+                                                onClick={() => navigate(`/member/${m.id || m.userId}`)}
+                                                aria-label={`View profile of ${m.firstName} ${m.lastName}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
+                                                        {(m.firstName || m.name)?.charAt(0) || 'U'}
+                                                    </div>
+                                                    <div className="text-sm text-gray-800">
+                                                        {m.firstName ? `${m.firstName} ${m.lastName}` : m.name}
+                                                    </div>
+                                                    {m.role && (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${m.role === 'lead' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                                                            {m.role === 'lead' ? 'Lead' : 'Member'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); navigate(`/member/${m.id || m.userId}`); }}
+                                                    className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50"
+                                                >
+                                                    View Profile
+                                                </button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs text-gray-500">No members to display.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
