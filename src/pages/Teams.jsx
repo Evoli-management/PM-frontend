@@ -582,37 +582,41 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     </div>
                     <div>
                         <h3 className="font-semibold text-gray-900">{team.name}</h3>
-                        <p className="text-xs text-gray-600">{team.memberCount || 0} members</p>
+                        <p className="text-xs text-gray-600">
+                            {(() => {
+                                const count = Number.isFinite(team.memberCount)
+                                    ? team.memberCount
+                                    : (Array.isArray(team.members) ? team.members.length : 0);
+                                return `${count} ${count === 1 ? 'member' : 'members'}`;
+                            })()}
+                        </p>
                     </div>
                 </div>
                 {canManage && (
                     <div className="flex gap-1">
                         <button
                             onClick={() => setShowRenameInput(!showRenameInput)}
-                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center justify-center"
                             title="Rename"
                             aria-label="Rename team"
                         >
                             <FaEdit size={12} />
-                            <span>Rename</span>
                         </button>
                         <button
                             onClick={() => onDelete(team.id)}
                             disabled={saving}
-                            className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60 flex items-center gap-1"
+                            className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60 flex items-center justify-center"
                             title="Delete"
                             aria-label="Delete team"
                         >
                             <FaTrash size={12} />
-                            <span>Delete</span>
                         </button>
                         <button
                             onClick={() => navigate(`/teams/${team.id}`)}
-                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center justify-center"
                             aria-label="View team details"
                         >
                             <FaEye size={12} />
-                            <span>View</span>
                         </button>
                     </div>
                 )}
@@ -620,12 +624,11 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     <div className="flex gap-1">
                         <button
                             onClick={() => navigate(`/teams/${team.id}`)}
-                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center gap-1"
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center justify-center"
                             aria-label="View team details"
                             title="View"
                         >
                             <FaEye size={12} />
-                            <span>View</span>
                         </button>
                     </div>
                 )}
@@ -651,52 +654,7 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                 </div>
             )}
 
-            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                {team.members && team.members.length > 0 ? (
-                    team.members.map((member) => (
-                        <div
-                            key={member.id}
-                            className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1 cursor-pointer hover:bg-gray-100"
-                            onClick={() => navigate(`/member/${member.id}`)}
-                            aria-label={`View profile of ${member.firstName} ${member.lastName}`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
-                                    {member.firstName?.charAt(0) || 'U'}
-                                </div>
-                                <div className="text-sm text-gray-800">
-                                    {member.firstName} {member.lastName}
-                                </div>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${member.role === 'lead' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                                    {member.role === 'lead' ? 'Lead' : 'Member'}
-                                </span>
-                            </div>
-                            {canManage && (
-                                <div className="flex gap-1">
-                                    {member.role !== 'lead' && (
-                                        <button
-                                            onClick={() => onSetLead(team.id, member.id)}
-                                            disabled={saving}
-                                            className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50 disabled:opacity-60"
-                                        >
-                                            Set Lead
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => onRemoveMember(team.id, member.id)}
-                                        disabled={saving}
-                                        className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-xs text-gray-500">No members yet</p>
-                )}
-            </div>
+            {/* Members preview removed to avoid mismatch; see details page */}
 
             {showDetails && (
                 <div className="mt-3 border-t pt-3">

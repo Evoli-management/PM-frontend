@@ -270,7 +270,14 @@ export default function MemberProfile() {
                                                 </div>
                                                 <div>
                                                     <p className="font-medium">{team.name}</p>
-                                                    <p className="text-xs text-gray-600">{team.memberCount || (Array.isArray(team.members) ? team.members.length : 0)} members</p>
+                                                    <p className="text-xs text-gray-600">
+                                                        {(() => {
+                                                            const count = Number.isFinite(team.memberCount)
+                                                                ? team.memberCount
+                                                                : (Array.isArray(team.members) ? team.members.length : 0);
+                                                            return `${count} ${count === 1 ? 'member' : 'members'}`;
+                                                        })()}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>

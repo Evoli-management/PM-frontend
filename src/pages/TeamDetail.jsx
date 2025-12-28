@@ -92,7 +92,14 @@ export default function TeamDetail() {
                       </div>
                       <div>
                         <h1 className="text-lg font-semibold text-gray-900">{team?.name}</h1>
-                        <p className="text-xs text-gray-600">{members?.length || team?.memberCount || 0} members</p>
+                        <p className="text-xs text-gray-600">
+                          {(() => {
+                            const cnt = Array.isArray(members)
+                              ? members.length
+                              : (Number.isFinite(team?.memberCount) ? team.memberCount : 0);
+                            return `${cnt} ${cnt === 1 ? 'member' : 'members'}`;
+                          })()}
+                        </p>
                       </div>
                     </div>
                   </header>
