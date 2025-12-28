@@ -601,28 +601,22 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                             Delete
                         </button>
                         <button
-                            onClick={async () => {
-                                if (!showDetails) await loadTeamDetails();
-                                setShowDetails((prev) => !prev);
-                            }}
+                            onClick={() => navigate(`/teams/${team.id}`)}
                             className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
                             aria-label="View team details"
                         >
-                            {showDetails ? 'Hide' : 'View'}
+                            View
                         </button>
                     </div>
                 )}
                 {!canManage && (
                     <div className="flex gap-1">
                         <button
-                            onClick={async () => {
-                                if (!showDetails) await loadTeamDetails();
-                                setShowDetails((prev) => !prev);
-                            }}
+                            onClick={() => navigate(`/teams/${team.id}`)}
                             className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
                             aria-label="View team details"
                         >
-                            {showDetails ? 'Hide' : 'View'}
+                            View
                         </button>
                     </div>
                 )}
