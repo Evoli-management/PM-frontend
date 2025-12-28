@@ -134,6 +134,15 @@ const keyAreaService = {
     async getKeyAreas(userId) {
         return this.getMemberKeyAreas(userId);
     },
+
+    /**
+     * Get a user's key areas (alias for getMemberKeyAreas)
+     * @param {string} userId - The ID of the user whose key areas to fetch
+     * @returns {Promise<Array>} A promise that resolves to an array of key areas
+     */
+    async getUserKeyAreas(userId) {
+        return this.getMemberKeyAreas(userId);
+    },
 };
 
 export default keyAreaService;
