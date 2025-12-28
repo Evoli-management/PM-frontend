@@ -117,7 +117,6 @@ export default function GiveStrokes() {
             const data = {
                 type: selectedType,
                 personalNote,
-                isAnonymous: true, // Strokes are always anonymous
             };
 
             if (selectedRecipient.type === 'member') {
