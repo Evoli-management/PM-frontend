@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import organizationService from "../../services/organizationService";
+import userProfileService from "../../services/userProfileService";
 
 export function OrganizationInvitations({ showToast }) {
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(null);
+  const [canManage, setCanManage] = useState(false);
 
   const load = async () => {
     try {
@@ -17,7 +19,23 @@ export function OrganizationInvitations({ showToast }) {
     }
   };
 
+  const checkPermissions = async () => {
+    try {
+      const profile = await userProfileService.getProfile();
+      const org = await organizationService.getCurrentOrganization();
+      
+      // User can manage invitations if they are admin, superuser, or organization owner
+      const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
+      const isOwner = org?.contactEmail === profile?.email;
+      setCanManage(isAdmin || isOwner);
+    } catch (e) {
+      console.log("Could not check permissions:", e);
+      setCanManage(false);
+    }
+  };
+
   useEffect(() => {
+    checkPermissions();
     load();
   }, []);
 
@@ -34,6 +52,14 @@ export function OrganizationInvitations({ showToast }) {
       setCancelling(null);
     }
   };
+
+    if (!canManage) {
+      return (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <p className="text-gray-600">You don't have permission to view invitations.</p>
+        </div>
+      );
+    }
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">

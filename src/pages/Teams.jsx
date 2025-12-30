@@ -1,7 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
-import { FaBars } from "react-icons/fa";
+import { FaBars, FaEdit, FaTrash, FaEye } from "react-icons/fa";
 import teamsService from "../services/teamsService";
+import userProfileService from "../services/userProfileService";
+import organizationService from "../services/organizationService";
+import { CanWillMatrix } from "../components/teams/CanWillMatrix";
+import { SelectionPane } from "../components/teams/SelectionPane";
+import { IndexPanel } from "../components/teams/IndexPanel";
 
 export default function Teams() {
     // ============ API STATE ============
@@ -15,6 +21,14 @@ export default function Teams() {
     const [draggingMember, setDraggingMember] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
+    const [canManage, setCanManage] = useState(false);
+    const [view, setView] = useState('list'); // 'list' or 'reports'
+    const [reportLevel, setReportLevel] = useState('organization'); // 'organization', 'myteams', 'myself'
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [matrixData, setMatrixData] = useState([]);
+    const [userProfile, setUserProfile] = useState(null);
+    const [employeeshipMetrics, setEmployeeshipMetrics] = useState([]);
+    const [performanceMetrics, setPerformanceMetrics] = useState([]);
 
     // ============ TOAST/NOTIFICATIONS ============
     const [toast, setToast] = useState({ message: '', visible: false });
@@ -23,9 +37,25 @@ export default function Teams() {
         setTimeout(() => setToast({ visible: false }), 3000);
     };
 
+    const checkPermissions = async () => {
+        try {
+            const profile = await userProfileService.getProfile();
+            const org = await organizationService.getCurrentOrganization();
+            const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
+            const isOwner = org?.contactEmail === profile?.email;
+            setCanManage(isAdmin || isOwner);
+            setUserProfile(profile);
+        } catch (e) {
+            setCanManage(false);
+        }
+    };
+
     // ============ LOAD INITIAL DATA ============
     useEffect(() => {
-        loadTeams();
+        const init = async () => {
+            await Promise.all([checkPermissions(), loadTeams()]);
+        };
+        init();
     }, []);
 
     const loadTeams = async () => {
@@ -46,6 +76,7 @@ export default function Teams() {
 
     // ============ TEAM OPERATIONS ============
     const createTeam = async (name) => {
+        if (!canManage) return;
         if (!name || !name.trim()) return;
         setSaving(true);
         try {
@@ -63,6 +94,7 @@ export default function Teams() {
     };
 
     const renameTeam = async (teamId, newName) => {
+        if (!canManage) return;
         if (!newName || !newName.trim()) return;
         setSaving(true);
         try {
@@ -80,6 +112,7 @@ export default function Teams() {
     };
 
     const deleteTeam = async (teamId) => {
+        if (!canManage) return;
         if (!confirm('Are you sure you want to delete this team?')) return;
         setSaving(true);
         try {
@@ -95,6 +128,7 @@ export default function Teams() {
     };
 
     const addMemberToTeam = async (teamId, userId) => {
+        if (!canManage) return;
         if (!userId) return;
         setSaving(true);
         try {
@@ -110,6 +144,7 @@ export default function Teams() {
     };
 
     const removeMemberFromTeam = async (teamId, userId) => {
+        if (!canManage) return;
         if (!confirm('Remove this member from the team?')) return;
         setSaving(true);
         try {
@@ -125,6 +160,7 @@ export default function Teams() {
     };
 
     const setTeamLead = async (teamId, userId) => {
+        if (!canManage) return;
         setSaving(true);
         try {
             await teamsService.updateTeam(teamId, {
@@ -138,6 +174,134 @@ export default function Teams() {
         } finally {
             setSaving(false);
         }
+    };
+
+    // ============ REPORT FUNCTIONS ============
+    const loadReportData = async () => {
+        try {
+            setLoading(true);
+            let data = [];
+            
+            if (reportLevel === 'organization') {
+                const report = await teamsService.getOrganizationReport();
+                data = report.teams.map(team => ({
+                    id: team.id,
+                    name: team.name,
+                    type: 'team',
+                    canScore: team.canScore,
+                    willScore: team.willScore,
+                    score: team.overallScore,
+                }));
+            } else if (reportLevel === 'myteams') {
+                const report = await teamsService.getMyTeamsReport();
+                data = report.users.map(user => ({
+                    id: user.id,
+                    name: user.name,
+                    type: 'user',
+                    canScore: user.canScore,
+                    willScore: user.willScore,
+                    score: user.overallScore,
+                }));
+            } else if (reportLevel === 'myself') {
+                const report = await teamsService.getMySelfReport();
+                data = [
+                    {
+                        id: report.user.id,
+                        name: report.user.name,
+                        type: 'user',
+                        canScore: report.user.canScore,
+                        willScore: report.user.willScore,
+                        score: report.user.overallScore,
+                    },
+                    {
+                        id: 'team-avg',
+                        name: report.teamAverage.name,
+                        type: 'team',
+                        canScore: report.teamAverage.canScore,
+                        willScore: report.teamAverage.willScore,
+                        score: report.teamAverage.overallScore,
+                    }
+                ];
+            }
+            
+            setMatrixData(data);
+        } catch (err) {
+            const message = err?.response?.data?.message || 'Failed to load report data';
+            showToast(message, 'error');
+            setMatrixData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (view === 'reports' && teamsData.length > 0) {
+            loadReportData();
+            loadMetrics();
+        }
+    }, [view, reportLevel, teamsData]);
+
+    const loadMetrics = async () => {
+        try {
+            const empMetrics = await teamsService.getEmployeeshipMetrics(reportLevel, null);
+            const perfMetrics = await teamsService.getPerformanceMetrics(reportLevel, null);
+            
+            setEmployeeshipMetrics([
+                { key: 'commitment', label: 'Commitment', value: empMetrics.commitment },
+                { key: 'responsibility', label: 'Responsibility', value: empMetrics.responsibility },
+                { key: 'loyalty', label: 'Loyalty', value: empMetrics.loyalty },
+                { key: 'initiative', label: 'Initiative', value: empMetrics.initiative },
+                { key: 'productivity', label: 'Productivity', value: empMetrics.productivity },
+                { key: 'relations', label: 'Relations', value: empMetrics.relations },
+                { key: 'quality', label: 'Quality', value: empMetrics.quality },
+                { key: 'competence', label: 'Professional Competence', value: empMetrics.competence },
+                { key: 'flexibility', label: 'Flexibility', value: empMetrics.flexibility },
+                { key: 'implementation', label: 'Implementation', value: empMetrics.implementation },
+                { key: 'energy', label: 'Energy', value: empMetrics.energy },
+            ]);
+            
+            setPerformanceMetrics([
+                { key: 'overall', label: 'Overall Performance', value: perfMetrics.overall },
+            ]);
+        } catch (err) {
+            console.error('Failed to load metrics:', err);
+            // Use default/fallback values
+            setEmployeeshipMetrics(getDefaultEmployeeshipMetrics());
+            setPerformanceMetrics(getDefaultPerformanceMetrics());
+        }
+    };
+
+    const handleItemSelect = (itemId) => {
+        if (!canManage && reportLevel !== 'myself') return;
+        
+        setSelectedItems(prev => {
+            if (prev.includes(itemId)) {
+                return prev.filter(id => id !== itemId);
+            }
+            return [...prev, itemId];
+        });
+    };
+
+    const getDefaultEmployeeshipMetrics = () => {
+        return [
+            { key: 'commitment', label: 'Commitment', value: 75 },
+            { key: 'responsibility', label: 'Responsibility', value: 68 },
+            { key: 'loyalty', label: 'Loyalty', value: 82 },
+            { key: 'initiative', label: 'Initiative', value: 71 },
+            { key: 'productivity', label: 'Productivity', value: 79 },
+            { key: 'relations', label: 'Relations', value: 73 },
+            { key: 'quality', label: 'Quality', value: 85 },
+            { key: 'competence', label: 'Professional Competence', value: 77 },
+            { key: 'flexibility', label: 'Flexibility', value: 69 },
+            { key: 'implementation', label: 'Implementation', value: 74 },
+            { key: 'energy', label: 'Energy', value: 80 },
+        ];
+    };
+
+    const getDefaultPerformanceMetrics = () => {
+        return [
+            { key: 'overall', label: 'Overall Performance', value: 76 },
+        ];
     };
 
     const Section = ({ title, children, divider = true }) => (
@@ -177,10 +341,39 @@ export default function Teams() {
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                                 <div className="space-y-4">
-                                    <h1 className="mb-3 text-lg font-semibold text-gray-600 sm:text-xl">Teams & Members</h1>
-                                    <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                        TEAM MANAGEMENT
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
+                                        
+                                        {/* View Toggle */}
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setView('list')}
+                                                className={`px-4 py-2 text-sm rounded ${
+                                                    view === 'list'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                Team List
+                                            </button>
+                                            <button
+                                                onClick={() => setView('reports')}
+                                                className={`px-4 py-2 text-sm rounded ${
+                                                    view === 'reports'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                CAN-WILL Reports
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {view === 'list' ? (
+                                        <>
+                                            <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                                {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
+                                            </div>
 
                                     {toast.visible && (
                                         <div className={`p-3 rounded text-sm ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
@@ -214,26 +407,28 @@ export default function Teams() {
                                                         placeholder="Search members or teams..."
                                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                                     />
-                                                    <div className="flex gap-2">
-                                                        <input 
-                                                            id="newTeamName" 
-                                                            placeholder="Enter new team name" 
-                                                            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
-                                                        />
-                                                        <button
-                                                            onClick={() => {
-                                                                const el = document.getElementById('newTeamName');
-                                                                const val = el?.value?.trim();
-                                                                if (!val) return;
-                                                                createTeam(val);
-                                                                if (el) el.value = '';
-                                                            }}
-                                                            disabled={saving}
-                                                            className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
-                                                        >
-                                                            {saving ? 'Creating...' : 'Create Team'}
-                                                        </button>
-                                                    </div>
+                                                    {canManage && (
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                id="newTeamName" 
+                                                                placeholder="Enter new team name" 
+                                                                className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
+                                                            />
+                                                            <button
+                                                                onClick={() => {
+                                                                    const el = document.getElementById('newTeamName');
+                                                                    const val = el?.value?.trim();
+                                                                    if (!val) return;
+                                                                    createTeam(val);
+                                                                    if (el) el.value = '';
+                                                                }}
+                                                                disabled={saving}
+                                                                className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
+                                                            >
+                                                                {saving ? 'Creating...' : 'Create Team'}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="grid md:grid-cols-2 gap-4">
@@ -255,12 +450,95 @@ export default function Teams() {
                                                                     onRemoveMember={removeMemberFromTeam}
                                                                     onSetLead={setTeamLead}
                                                                     saving={saving}
+                                                                    canManage={canManage}
                                                                 />
                                                             ))
                                                     )}
                                                 </div>
                                             </div>
                                         </Section>
+                                    )}
+                                        </>
+                                    ) : (
+                                        // Reports View
+                                        <>
+                                            {/* Report Level Selector */}
+                                            <div className="flex gap-2 mb-4">
+                                                <button
+                                                    onClick={() => setReportLevel('organization')}
+                                                    className={`px-4 py-2 text-sm rounded ${
+                                                        reportLevel === 'organization'
+                                                            ? 'bg-green-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    Organization
+                                                </button>
+                                                <button
+                                                    onClick={() => setReportLevel('myteams')}
+                                                    className={`px-4 py-2 text-sm rounded ${
+                                                        reportLevel === 'myteams'
+                                                            ? 'bg-green-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    My Teams
+                                                </button>
+                                                <button
+                                                    onClick={() => setReportLevel('myself')}
+                                                    className={`px-4 py-2 text-sm rounded ${
+                                                        reportLevel === 'myself'
+                                                            ? 'bg-green-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    My Self
+                                                </button>
+                                            </div>
+
+                                            {/* Report Description */}
+                                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                                                {reportLevel === 'organization' && "Viewing organization-wide summary: all teams' scores in the CAN-WILL matrix"}
+                                                {reportLevel === 'myteams' && "Viewing your main team: scores of users in your team"}
+                                                {reportLevel === 'myself' && "Viewing your personal position compared to your team's average score"}
+                                            </div>
+
+                                            {/* Reports Grid */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                {/* Left column: Matrix + Selection */}
+                                                <div className="lg:col-span-2 space-y-4">
+                                                    <CanWillMatrix
+                                                        data={matrixData}
+                                                        selectedItems={selectedItems}
+                                                        onItemClick={(item) => handleItemSelect(item.id)}
+                                                    />
+                                                    
+                                                    {(canManage || reportLevel === 'myself') && (
+                                                        <SelectionPane
+                                                            title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
+                                                            items={matrixData}
+                                                            selectedItems={selectedItems}
+                                                            onSelect={handleItemSelect}
+                                                            canSelect={canManage || reportLevel === 'myself'}
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {/* Right column: Indices */}
+                                                <div className="space-y-4">
+                                                    <IndexPanel
+                                                        title="Employeeship Index"
+                                                        metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
+                                                    />
+                                                    
+                                                    <IndexPanel
+                                                        title="Performance Index"
+                                                        metrics={performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics()}
+                                                        highlightedMetric="overall"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -272,9 +550,28 @@ export default function Teams() {
     );
 }
 
-function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving }) {
+function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage }) {
     const [showRenameInput, setShowRenameInput] = useState(false);
     const [renameValue, setRenameValue] = useState(team.name);
+    const navigate = useNavigate();
+    const [showDetails, setShowDetails] = useState(false);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [teamDetail, setTeamDetail] = useState(null);
+    const [teamMembers, setTeamMembers] = useState([]);
+
+    const loadTeamDetails = async () => {
+        try {
+            setDetailsLoading(true);
+            const detail = await teamsService.getTeam(team.id);
+            setTeamDetail(detail || null);
+            const members = await teamsService.getTeamMembers(team.id);
+            setTeamMembers(members || []);
+        } catch (e) {
+            // Silent failure in card; page-level toast already exists
+        } finally {
+            setDetailsLoading(false);
+        }
+    };
 
     return (
         <div className="rounded border p-3 bg-white hover:shadow-md transition-shadow">
@@ -285,27 +582,59 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                     </div>
                     <div>
                         <h3 className="font-semibold text-gray-900">{team.name}</h3>
-                        <p className="text-xs text-gray-600">{team.memberCount || 0} members</p>
+                        <p className="text-xs text-gray-600">
+                            {(() => {
+                                const count = Number.isFinite(team.memberCount)
+                                    ? team.memberCount
+                                    : (Array.isArray(team.members) ? team.members.length : 0);
+                                return `${count} ${count === 1 ? 'member' : 'members'}`;
+                            })()}
+                        </p>
                     </div>
                 </div>
-                <div className="flex gap-1">
-                    <button
-                        onClick={() => setShowRenameInput(!showRenameInput)}
-                        className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
-                    >
-                        Rename
-                    </button>
-                    <button
-                        onClick={() => onDelete(team.id)}
-                        disabled={saving}
-                        className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
-                    >
-                        Delete
-                    </button>
-                </div>
+                {canManage && (
+                    <div className="flex gap-1">
+                        <button
+                            onClick={() => setShowRenameInput(!showRenameInput)}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center justify-center"
+                            title="Rename"
+                            aria-label="Rename team"
+                        >
+                            <FaEdit size={12} />
+                        </button>
+                        <button
+                            onClick={() => onDelete(team.id)}
+                            disabled={saving}
+                            className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60 flex items-center justify-center"
+                            title="Delete"
+                            aria-label="Delete team"
+                        >
+                            <FaTrash size={12} />
+                        </button>
+                        <button
+                            onClick={() => navigate(`/teams/${team.id}`)}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center justify-center"
+                            aria-label="View team details"
+                        >
+                            <FaEye size={12} />
+                        </button>
+                    </div>
+                )}
+                {!canManage && (
+                    <div className="flex gap-1">
+                        <button
+                            onClick={() => navigate(`/teams/${team.id}`)}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 flex items-center justify-center"
+                            aria-label="View team details"
+                            title="View"
+                        >
+                            <FaEye size={12} />
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {showRenameInput && (
+            {canManage && showRenameInput && (
                 <div className="flex gap-2 mb-3">
                     <input
                         value={renameValue}
@@ -325,45 +654,59 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                 </div>
             )}
 
-            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                {team.members && team.members.length > 0 ? (
-                    team.members.map((member) => (
-                        <div key={member.id} className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1">
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
-                                    {member.firstName?.charAt(0) || 'U'}
-                                </div>
-                                <div className="text-sm text-gray-800">
-                                    {member.firstName} {member.lastName}
-                                </div>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${member.role === 'lead' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                                    {member.role === 'lead' ? 'Lead' : 'Member'}
-                                </span>
+            {/* Members preview removed to avoid mismatch; see details page */}
+
+            {showDetails && (
+                <div className="mt-3 border-t pt-3">
+                    {detailsLoading ? (
+                        <div className="text-xs text-gray-500">Loading team details…</div>
+                    ) : (
+                        <>
+                            <div className="mb-2">
+                                <h4 className="text-sm font-semibold text-gray-900">Description</h4>
+                                <p className="text-sm text-gray-700">{teamDetail?.description || 'No description provided.'}</p>
                             </div>
-                            <div className="flex gap-1">
-                                {member.role !== 'lead' && (
-                                    <button
-                                        onClick={() => onSetLead(team.id, member.id)}
-                                        disabled={saving}
-                                        className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50 disabled:opacity-60"
-                                    >
-                                        Set Lead
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => onRemoveMember(team.id, member.id)}
-                                    disabled={saving}
-                                    className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-60"
-                                >
-                                    Remove
-                                </button>
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-900 mb-2">Members</h4>
+                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                    {(teamMembers && teamMembers.length > 0) ? (
+                                        teamMembers.map((m) => (
+                                            <div
+                                                key={m.id || m.userId}
+                                                className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1 cursor-pointer hover:bg-gray-100"
+                                                onClick={() => navigate(`/member/${m.id || m.userId}`)}
+                                                aria-label={`View profile of ${m.firstName} ${m.lastName}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center">
+                                                        {(m.firstName || m.name)?.charAt(0) || 'U'}
+                                                    </div>
+                                                    <div className="text-sm text-gray-800">
+                                                        {m.firstName ? `${m.firstName} ${m.lastName}` : m.name}
+                                                    </div>
+                                                    {m.role && (
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${m.role === 'lead' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                                                            {m.role === 'lead' ? 'Lead' : 'Member'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); navigate(`/member/${m.id || m.userId}`); }}
+                                                    className="text-xs px-2 py-0.5 border rounded hover:bg-gray-50"
+                                                >
+                                                    View Profile
+                                                </button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-xs text-gray-500">No members to display.</p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-xs text-gray-500">No members yet</p>
-                )}
-            </div>
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

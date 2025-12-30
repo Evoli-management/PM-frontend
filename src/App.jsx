@@ -34,6 +34,7 @@ import DontForget from "./pages/DontForget.jsx";
 import KeyAreas from "./pages/KeyAreas.jsx";
 import MyFocus from "./pages/MyFocus.jsx";
 import Teams from "./pages/Teams.jsx";
+import TeamDetail from "./pages/TeamDetail.jsx";
 import GiveStrokes from "./pages/GiveStrokes.jsx";
 import ViewStrokes from "./pages/ViewStrokes.jsx";
 import MemberProfile from "./pages/MemberProfile.jsx";
@@ -98,6 +99,7 @@ export default function App() {
                             <Route path="/dashboard/team" element={<TeamDashboard />} />
                             <Route path="/admin/enps" element={<EnpsDashboard />} />
                             <Route path="/teams" element={<Teams />} />
+                            <Route path="/teams/:teamId" element={<TeamDetail />} />
                             <Route path="/give-strokes" element={<GiveStrokes />} />
                             <Route path="/view-strokes" element={<ViewStrokes />} />
                             <Route path="/member/:userId" element={<MemberProfile />} />
@@ -118,6 +120,8 @@ export default function App() {
                             <Route path="/dashboard/team" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
                             <Route path="/admin/enps" element={<PrivateRoute><EnpsDashboard /></PrivateRoute>} />
                             <Route path="/key-areas" element={<PrivateRoute><KeyAreas /></PrivateRoute>} />
+                            <Route path="/teams" element={<PrivateRoute><Teams /></PrivateRoute>} />
+                            <Route path="/teams/:teamId" element={<PrivateRoute><TeamDetail /></PrivateRoute>} />
                             <Route path="/member/:userId" element={<PrivateRoute><MemberProfile /></PrivateRoute>} />
                             <Route path="/give-strokes" element={<PrivateRoute><GiveStrokes /></PrivateRoute>} />
                             <Route path="/view-strokes" element={<PrivateRoute><ViewStrokes /></PrivateRoute>} />

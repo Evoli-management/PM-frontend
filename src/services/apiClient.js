@@ -8,7 +8,7 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ||
 
 const apiClient = axios.create({
     baseURL: apiBase,
-    timeout: 10000,
+    timeout: 20000, // allow slower networks to complete
     withCredentials: true,
 });
 
@@ -55,6 +55,12 @@ apiClient.interceptors.response.use(
         return response;
     },
     (error) => {
+        // Retry once on timeout to smooth transient slowness
+        if (error.code === 'ECONNABORTED' && !error.config.__retried) {
+            const cfg = { ...error.config, __retried: true };
+            return apiClient(cfg);
+        }
+
         // Print a more detailed, inspectable error object so devs can see server
         // error details directly in the browser console (stringify safely).
         let respData = null;

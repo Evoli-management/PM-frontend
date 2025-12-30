@@ -8,16 +8,34 @@ import { Integrations } from '../components/profile/Integrations';
 import { Toast } from '../components/profile/UIComponents';
 import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations, ManageTeams, ManageMembers, CultureAndValues, OrganizationSettings } from '../components/profile';
 import { FaBars } from 'react-icons/fa';
+import userProfileService from '../services/userProfileService';
+import organizationService from '../services/organizationService';
 
 const OrganizationTab = ({ showToast }) => {
     const [activeSubTab, setActiveSubTab] = React.useState("overview");
+    const [canManage, setCanManage] = React.useState(false);
+
+    React.useEffect(() => {
+        const checkPermissions = async () => {
+            try {
+                const profile = await userProfileService.getProfile();
+                const org = await organizationService.getCurrentOrganization();
+                const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
+                const isOwner = org?.contactEmail === profile?.email;
+                setCanManage(isAdmin || isOwner);
+            } catch (e) {
+                setCanManage(false);
+            }
+        };
+        checkPermissions();
+    }, []);
 
     const subTabs = [
         { id: "overview", label: "Overview" },
-        { id: "teams", label: "Manage Teams" },
-        { id: "members", label: "Manage Members" },
-        { id: "culture", label: "Culture and Values" },
-        { id: "settings", label: "Settings" },
+        { id: "teams", label: canManage ? "Manage Teams" : "View Teams" },
+        { id: "members", label: canManage ? "Manage Members" : "View Members" },
+        { id: "culture", label: canManage ? "Manage Culture and Values" : "View Culture and Values" },
+        ...(canManage ? [{ id: "settings", label: "Settings" }] : []),
     ];
 
     const renderSubTabContent = () => {
