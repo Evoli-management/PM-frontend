@@ -98,9 +98,9 @@ export function ManageTeams({ showToast }) {
           {canManage && (
             <button
               onClick={handleCreateTeam}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm"
             >
-              <FaPlus /> Create new team
+              Create new team
             </button>
           )}
       </div>
@@ -214,8 +214,17 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    // Center the modal in the viewport and add a subtle grayed backdrop that closes
+    // the modal when clicked. Modal content stops propagation so clicks inside do not close it.
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl max-w-3xl w-[min(1100px,90%)] overflow-visible flex flex-col z-10 p-6 max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Create New Team</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -304,7 +313,7 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-lg"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
             >
               {saving ? "Creating..." : "Create Team"}
             </button>
@@ -356,8 +365,17 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    // Center the edit modal in the viewport and add a subtle grayed backdrop that closes
+    // the modal when clicked. Modal content stops propagation so clicks inside do not close it.
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl max-w-3xl w-[min(1100px,90%)] overflow-visible flex flex-col z-10 p-6 max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Edit Team</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
