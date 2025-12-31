@@ -254,7 +254,7 @@ export function OrganizationSettings({ showToast }) {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-lg"
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg"
           >
             {saving ? "Saving..." : "Save"}
           </button>
