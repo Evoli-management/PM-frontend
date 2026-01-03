@@ -77,6 +77,9 @@ export default function GiveStrokes() {
         recipientRef.current = null;
         setSelectedRecipient(recipient);
         setSelectedType('employeeship'); // default type for external recognitions
+        if (!personalNote) {
+            setPersonalNote(`${recipient.name || 'there'}, I think you did a very good job...`);
+        }
         setShowExternalModal(true);
     };
 
@@ -112,6 +115,10 @@ export default function GiveStrokes() {
             alert('Failed to load recognition data');
             setSelectedType(null);
             return;
+        }
+
+        if (!personalNote && selectedRecipient?.name) {
+            setPersonalNote(`${selectedRecipient.name}, I think you did a very good job...`);
         }
 
         setShowDetailsModal(true);
