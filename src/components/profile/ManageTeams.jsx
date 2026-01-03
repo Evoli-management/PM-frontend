@@ -190,12 +190,22 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
     setSaving(true);
     try {
       const teamsService = await import("../../services/teamsService");
-      await teamsService.default.createTeam({
+      // Create team with basic info
+      const response = await teamsService.default.createTeam({
         name: name.trim(),
         description: description.trim(),
-        leadId: leadId || null,
-        memberIds: selectedMembers,
       });
+      
+      const teamId = response.id;
+      
+      // Add members if any selected
+      if (selectedMembers.length > 0) {
+        for (const memberId of selectedMembers) {
+          const role = memberId === leadId ? 'lead' : 'member';
+          await teamsService.default.addTeamMember(teamId, memberId, role);
+        }
+      }
+      
       showToast?.("Team created successfully");
       onSuccess();
     } catch (e) {
@@ -341,12 +351,35 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
     setSaving(true);
     try {
       const teamsService = await import("../../services/teamsService");
+      
+      // Update team basic info (only name and description)
       await teamsService.default.updateTeam(team.id, {
         name: name.trim(),
         description: description.trim(),
-        leadId: leadId || null,
-        memberIds: selectedMembers,
       });
+      
+      // Get current members
+      const currentMembers = team.members?.map(m => m.id) || [];
+      const newMembers = selectedMembers;
+      
+      // Remove members that were deselected
+      for (const memberId of currentMembers) {
+        if (!newMembers.includes(memberId)) {
+          await teamsService.default.removeTeamMember(team.id, memberId);
+        }
+      }
+      
+      // Add new members
+      for (const memberId of newMembers) {
+        if (!currentMembers.includes(memberId)) {
+          const role = memberId === leadId ? 'lead' : 'member';
+          await teamsService.default.addTeamMember(team.id, memberId, role);
+        } else if (memberId === leadId) {
+          // Update role to lead if changed
+          await teamsService.default.updateTeamMemberRole(team.id, memberId, 'lead');
+        }
+      }
+      
       showToast?.("Team updated successfully");
       onSuccess();
     } catch (e) {
