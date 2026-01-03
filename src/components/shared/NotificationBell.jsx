@@ -230,12 +230,21 @@ export default function NotificationBell() {
           {/* Footer - View All */}
           {notifications.length > 0 && (
             <div className="border-t border-gray-200 p-3 text-center">
-              <a
-                href="/notifications"
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    // For HashRouter, navigate to the hash-based route without full reload
+                    window.location.hash = '#/notifications';
+                  } catch (err) {
+                    console.error('Failed to navigate to notifications page', err);
+                  }
+                  setShowDropdown(false);
+                }}
                 className="text-sm text-blue-500 hover:text-blue-600 font-medium"
               >
                 View all notifications
-              </a>
+              </button>
             </div>
           )}
         </div>
