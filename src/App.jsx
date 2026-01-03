@@ -44,6 +44,7 @@ import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
 import Pricing from "./pages/Pricing.jsx";
 import Reminders from "./pages/Reminders.jsx";
 import JoinOrganization from "./pages/JoinOrganization.jsx";
+import CalendarSyncStatus from "./pages/CalendarSyncStatus.jsx";
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
     // Only show footer on public/auth pages
@@ -126,6 +127,7 @@ export default function App() {
                             <Route path="/give-strokes" element={<PrivateRoute><GiveStrokes /></PrivateRoute>} />
                             <Route path="/view-strokes" element={<PrivateRoute><ViewStrokes /></PrivateRoute>} />
                             <Route path="/reminders" element={<PrivateRoute><Reminders /></PrivateRoute>} />
+                            <Route path="/calendar-sync" element={<PrivateRoute><CalendarSyncStatus /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
                 </main>
