@@ -10,6 +10,7 @@ import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
 import ReminderBell from "./ReminderBell";
+import NotificationBell from "./NotificationBell";
 import ReminderModal from "../reminders/ReminderModal";
 
 export default function Navbar() {
@@ -653,6 +654,10 @@ export default function Navbar() {
                                 </button>
                             </div>
                         )}
+                    </div>
+
+                    <div className="relative" ref={menuRef}>
+                        <NotificationBell />
                     </div>
 
                     <div className="relative" ref={menuRef}>

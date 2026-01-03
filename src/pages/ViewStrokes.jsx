@@ -8,13 +8,25 @@ export default function ViewStrokes() {
     const [activeTab, setActiveTab] = useState('received'); // 'received' or 'given'
     const [strokes, setStrokes] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [score, setScore] = useState(null);
+    const [showLedger, setShowLedger] = useState(false);
     const [filters, setFilters] = useState({
         type: '', // '', 'employeeship', 'performance', 'achievement'
     });
 
     useEffect(() => {
         loadStrokes();
+        loadScore();
     }, [activeTab, filters]);
+
+    const loadScore = async () => {
+        try {
+            const scoreData = await recognitionsService.getMyScore();
+            setScore(scoreData);
+        } catch (err) {
+            console.error("Failed to load score:", err);
+        }
+    };
 
     const loadStrokes = async () => {
         try {
@@ -86,6 +98,71 @@ export default function ViewStrokes() {
                         </button>
                         <h1 className="text-3xl font-semibold text-gray-800">My Strokes</h1>
                     </div>
+
+                    {/* Stroke Account Summary */}
+                    {score && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
+                                <p className="text-gray-600 text-sm mb-2">Strokes Received</p>
+                                <p className="text-3xl font-bold text-gray-800">{score.totalReceivedPoints || 0}</p>
+                                <p className="text-xs text-gray-500 mt-2">Points earned from strokes received</p>
+                            </div>
+                            <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
+                                <p className="text-gray-600 text-sm mb-2">Strokes Given</p>
+                                <p className="text-3xl font-bold text-gray-800">{score.totalSentPoints || 0}</p>
+                                <p className="text-xs text-gray-500 mt-2">Points used for strokes given</p>
+                            </div>
+                            <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
+                                <p className="text-gray-600 text-sm mb-2">Total Recognitions</p>
+                                <p className="text-3xl font-bold text-gray-800">{(score.totalReceivedCount || 0) + (score.totalSentCount || 0)}</p>
+                                <p className="text-xs text-gray-500 mt-2">Total recognitions given and received</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Ledger Toggle */}
+                    <div className="mb-4">
+                        <button
+                            onClick={() => setShowLedger(!showLedger)}
+                            className={`px-4 py-2 rounded-lg font-medium transition ${
+                                showLedger
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-white text-blue-500 border border-blue-500 hover:bg-blue-50'
+                            }`}
+                        >
+                            {showLedger ? 'Hide Ledger' : 'View Ledger'}
+                        </button>
+                    </div>
+
+                    {/* Ledger View */}
+                    {showLedger && score && (
+                        <div className="bg-white rounded-lg shadow-sm mb-6 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    <tr className="bg-green-50">
+                                        <td className="px-6 py-4 text-sm text-gray-600">—</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-800">Total Strokes Received</td>
+                                        <td className="px-6 py-4 text-right text-sm text-gray-600">Credit</td>
+                                        <td className="px-6 py-4 text-right text-sm font-bold text-green-600">+{score.totalReceivedPoints || 0}</td>
+                                    </tr>
+                                    <tr className="bg-blue-50">
+                                        <td className="px-6 py-4 text-sm text-gray-600">—</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-800">Total Strokes Given</td>
+                                        <td className="px-6 py-4 text-right text-sm text-gray-600">Debit</td>
+                                        <td className="px-6 py-4 text-right text-sm font-bold text-blue-600">-{score.totalSentPoints || 0}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
                     {/* Tabs */}
                     <div className="bg-white rounded-lg shadow-sm mb-6">
