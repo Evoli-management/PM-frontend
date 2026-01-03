@@ -5,12 +5,14 @@ import organizationService from "../services/organizationService";
 import cultureService from "../services/cultureService";
 import keyAreaService from "../services/keyAreaService";
 import recognitionsService from "../services/recognitionsService";
+import userProfileService from "../services/userProfileService";
 
 export default function GiveStrokes() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [members, setMembers] = useState([]);
     const [searchQuery, setSearchQuery] = useState("");
+    const [currentUserId, setCurrentUserId] = useState(null);
     
     // External recipient
     const [externalName, setExternalName] = useState("");
@@ -43,8 +45,14 @@ export default function GiveStrokes() {
     const loadMembers = async () => {
         try {
             setLoading(true);
-            const data = await organizationService.getOrganizationMembers();
-            setMembers(data || []);
+            const [data, profile] = await Promise.all([
+                organizationService.getOrganizationMembers(),
+                userProfileService.getProfile(),
+            ]);
+            const profileId = profile?.id || null;
+            setCurrentUserId(profileId);
+            const filtered = (data || []).filter(member => member.id !== profileId);
+            setMembers(filtered);
         } catch (err) {
             console.error("Failed to load members:", err);
         } finally {
@@ -53,6 +61,9 @@ export default function GiveStrokes() {
     };
 
     const handleMemberSelect = (member) => {
+        if (currentUserId && member.id === currentUserId) {
+            return;
+        }
         const recipient = { id: member.id, name: `${member.firstName} ${member.lastName}`, type: 'member' };
         recipientRef.current = member.id;
         setSelectedRecipient(recipient);
