@@ -17,6 +17,13 @@ const teamsService = {
     return response.data;
   },
 
+  async getTeamDashboard(teamId) {
+    const response = await axios.get(`${API_URL}/teams/${teamId}/dashboard`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
   async createTeam(data) {
     const response = await axios.post(`${API_URL}/teams`, data, {
       headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
