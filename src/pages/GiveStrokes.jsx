@@ -380,9 +380,18 @@ function ExternalRecipientModal({ recipient, personalNote, onPersonalNoteChange,
                 <h2 className="text-2xl font-semibold text-center mb-4">Send a recognition</h2>
                 <p className="text-gray-600 text-center mb-6">We will email {recipient?.name || 'this person'} at {recipient?.email}.</p>
                 <div className="mb-6">
-                    <label className="block text-gray-700 font-medium mb-2">
-                        Add your personal note:
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-gray-700 font-medium">
+                            Add your personal note:
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => onPersonalNoteChange("")}
+                            className="text-sm text-red-600 hover:underline"
+                        >
+                            Clear
+                        </button>
+                    </div>
                     <textarea
                         value={personalNote}
                         onChange={(e) => onPersonalNoteChange(e.target.value)}
@@ -467,9 +476,18 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                         </div>
 
                         <div className="mb-6">
-                            <label className="block text-gray-700 font-medium mb-2">
-                                Select a "+" mark and add your personal note:
-                            </label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-gray-700 font-medium">
+                                    Select a "+" mark and add your personal note:
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => onPersonalNoteChange("")}
+                                    className="text-sm text-red-600 hover:underline"
+                                >
+                                    Clear
+                                </button>
+                            </div>
                             <textarea
                                 value={personalNote}
                                 onChange={(e) => onPersonalNoteChange(e.target.value)}
@@ -530,9 +548,18 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
 
                 {selectedKeyArea && (
                     <div className="mb-6">
-                        <label className="block text-gray-700 font-medium mb-2">
-                            Add your personal note:
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-gray-700 font-medium">
+                                Add your personal note:
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => onPersonalNoteChange("")}
+                                className="text-sm text-red-600 hover:underline"
+                            >
+                                Clear
+                            </button>
+                        </div>
                         <textarea
                             value={personalNote}
                             onChange={(e) => onPersonalNoteChange(e.target.value)}
@@ -624,9 +651,18 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
 
                         {(selectedGoal || selectedMilestone) && (
                             <div className="mb-6">
-                                <label className="block text-gray-700 font-medium mb-2">
-                                    Add your personal note:
-                                </label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-gray-700 font-medium">
+                                        Add your personal note:
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => onPersonalNoteChange("")}
+                                        className="text-sm text-red-600 hover:underline"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
                                 <textarea
                                     value={personalNote}
                                     onChange={(e) => onPersonalNoteChange(e.target.value)}
