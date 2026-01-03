@@ -115,6 +115,50 @@ const teamsService = {
     });
     return response.data;
   },
+
+  // Team Join Request Methods
+  async requestJoinTeam(teamId, message) {
+    const response = await axios.post(
+      `${API_URL}/teams/${teamId}/join-request`,
+      { message },
+      {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      }
+    );
+    return response.data;
+  },
+
+  async getTeamJoinRequests(teamId) {
+    const response = await axios.get(`${API_URL}/teams/${teamId}/join-requests`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
+  async reviewJoinRequest(teamId, requestId, action, reason) {
+    const response = await axios.patch(
+      `${API_URL}/teams/${teamId}/join-requests/${requestId}`,
+      { action, reason },
+      {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      }
+    );
+    return response.data;
+  },
+
+  async cancelJoinRequest(requestId) {
+    const response = await axios.delete(`${API_URL}/teams/join-requests/${requestId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
+
+  async getMyJoinRequests() {
+    const response = await axios.get(`${API_URL}/teams/my-join-requests`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data;
+  },
 };
 
 export default teamsService;

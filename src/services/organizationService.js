@@ -190,6 +190,36 @@ class OrganizationService {
       throw error;
     }
   }
+
+  /**
+   * Update member role (promote/demote admin) - Admin only
+   * @param {string} memberId - User ID to update
+   * @param {string} role - New role: 'admin' or 'user'
+   */
+  async updateMemberRole(memberId, role) {
+    try {
+      const res = await apiClient.patch(`/organizations/current/members/${memberId}/role`, {
+        role,
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Failed to update member role:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Leave organization and create new single-user organization
+   */
+  async leaveOrganization() {
+    try {
+      const res = await apiClient.post("/organizations/leave");
+      return res.data;
+    } catch (error) {
+      console.error("Failed to leave organization:", error);
+      throw error;
+    }
+  }
 }
 
 export default new OrganizationService();

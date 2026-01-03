@@ -1,0 +1,188 @@
+/* src/components/teams/AdminHandoffDialog.module.css */
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.dialog {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+}
+
+.closeBtn:hover {
+  color: #333;
+}
+
+.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px 20px;
+  border-radius: 4px;
+  margin: 20px 20px 0 20px;
+  border: 1px solid #f5c6cb;
+  font-size: 14px;
+}
+
+.content {
+  padding: 20px;
+}
+
+.description {
+  color: #495057;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 8px;
+  color: #495057;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.confirmBox {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.confirmBox h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.confirmBox p {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirmBox p:last-child {
+  margin-bottom: 0;
+}
+
+.warning {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #ffeaa7;
+  font-size: 13px !important;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancelBtn,
+.nextBtn,
+.leaveBtn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelBtn {
+  background-color: #e9ecef;
+  color: #333;
+}
+
+.cancelBtn:hover {
+  background-color: #dee2e6;
+}
+
+.nextBtn {
+  background-color: #0066cc;
+  color: white;
+}
+
+.nextBtn:hover:not(:disabled) {
+  background-color: #0052a3;
+}
+
+.leaveBtn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.leaveBtn:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.cancelBtn:disabled,
+.nextBtn:disabled,
+.leaveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
