@@ -21,6 +21,7 @@ export default function VerifyEmail() {
     useEffect(() => {
         const params = new URLSearchParams(search);
         const token = params.get("token");
+        const invitationToken = params.get("invitationToken");
         if (!token) {
             setStatus("Missing token");
             return;
@@ -29,8 +30,14 @@ export default function VerifyEmail() {
             try {
                 const auth = await import("../services/authService");
                 await auth.default.verifyEmail(token);
-                setStatus("Email verified successfully. Redirecting to login…");
-                setTimeout(() => navigate("/login"), 1200);
+                setStatus("Email verified successfully. Redirecting…");
+                setTimeout(() => {
+                  if (invitationToken) {
+                    navigate(`/join?token=${invitationToken}`);
+                  } else {
+                    navigate("/login");
+                  }
+                }, 1200);
             } catch (e) {
                 const msg = e?.response?.data?.message || "Verification failed";
                 setStatus(typeof msg === "string" ? msg : "Verification failed");

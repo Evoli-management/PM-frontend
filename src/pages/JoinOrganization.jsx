@@ -2,15 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle, AlertCircle, Loader } from "lucide-react";
 import organizationService from "../services/organizationService";
+import authService from "../services/authService";
 
 export default function JoinOrganization() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
-  const [state, setState] = useState("loading"); // loading, pending, accepting, success, error
+  const [state, setState] = useState("loading"); // loading, pending, unauthenticated, accepting, success, error
   const [invitationInfo, setInvitationInfo] = useState(null);
   const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Load invitation info on mount
   useEffect(() => {
@@ -23,9 +25,24 @@ export default function JoinOrganization() {
     const loadInvitation = async () => {
       try {
         setState("loading");
+        
+        // Check if user is authenticated
+        try {
+          await authService.verify();
+          setIsAuthenticated(true);
+        } catch {
+          setIsAuthenticated(false);
+        }
+
+        // Load invitation info
         const info = await organizationService.getInvitationInfo(token);
         setInvitationInfo(info);
-        setState("pending");
+        
+        if (isAuthenticated) {
+          setState("pending");
+        } else {
+          setState("unauthenticated");
+        }
       } catch (err) {
         setError(err?.response?.data?.message || err.message || "Failed to load invitation");
         setState("error");
@@ -62,7 +79,7 @@ export default function JoinOrganization() {
           </div>
         )}
 
-        {/* Pending Acceptance */}
+        {/* Pending Acceptance (Authenticated) */}
         {state === "pending" && invitationInfo && (
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="text-center mb-6">
@@ -95,6 +112,55 @@ export default function JoinOrganization() {
             >
               Back to Login
             </button>
+          </div>
+        )}
+
+        {/* Unauthenticated State */}
+        {state === "unauthenticated" && invitationInfo && (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">📧</span>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Invitation Received</h1>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-4 mb-6">
+              <p className="text-gray-700 mb-2">
+                <span className="font-semibold">You've been invited to join</span>
+              </p>
+              <p className="text-xl font-bold text-blue-600">{invitationInfo.organizationName}</p>
+              <p className="text-sm text-gray-600 mt-2">
+                Invited by: <span className="font-semibold">{invitationInfo.invitedBy}</span>
+              </p>
+            </div>
+
+            <p className="text-gray-600 mb-6 text-center">
+              To accept this invitation, please log in or create a new account.
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate(`/login?token=${token}`)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
+              >
+                Sign In to Accept
+              </button>
+
+              <button
+                onClick={() => navigate(`/registration?token=${token}`)}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
+              >
+                Create New Account & Accept
+              </button>
+
+              <button
+                onClick={() => navigate("/")}
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition-colors duration-200"
+              >
+                Back to Home
+              </button>
+            </div>
           </div>
         )}
 

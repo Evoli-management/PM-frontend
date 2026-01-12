@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
 // authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
+    const [searchParams] = useSearchParams();
+    const invitationToken = searchParams.get("token");
+    
     const [formData, setFormData] = useState({
         firstName: "",
         lastName: "",
@@ -71,7 +74,14 @@ export default function Registration() {
             } catch {}
             setIsSubmitted(true);
             // Give users more time to read the success message before redirecting
-            setTimeout(() => navigate("/verify-email"), 4000);
+            setTimeout(() => {
+              if (invitationToken) {
+                // If coming from an invite, redirect to verify email with both tokens
+                navigate(`/verify-email?token=${res.verificationToken || ''}&invitationToken=${invitationToken}`);
+              } else {
+                navigate("/verify-email");
+              }
+            }, 4000);
         } catch (err) {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
