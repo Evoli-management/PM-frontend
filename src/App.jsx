@@ -12,6 +12,7 @@ import Home from "./pages/Home.jsx";
 import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
+import RequestRegistrationLink from "./pages/RequestRegistrationLink.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
@@ -51,7 +52,7 @@ export default function App() {
     // Only show footer on public/auth pages
     const publicFooterRoutes = [
         "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
-        "/verify-email", "/verify-password-change", "/verify-email-change"
+        "/get-started", "/verify-email", "/verify-password-change", "/verify-email-change"
     ];
     // Use react-router location so route changes (including client-side navigation)
     // update layout immediately. This prevents the main content from rendering
@@ -82,6 +83,7 @@ export default function App() {
                             <Route path="/pricing" element={<Pricing />} />
 
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
+                            <Route path="/get-started" element={<RequestRegistrationLink />} />
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/verify-password-change" element={<VerifyPasswordChange />} />

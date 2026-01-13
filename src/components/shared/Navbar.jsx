@@ -289,7 +289,7 @@ export default function Navbar() {
     }, []);
 
     // List of public routes where navbar should not be shown
-    const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
+    const publicRoutes = ["/", "/login", "/registration", "/get-started", "/PasswordPageForget", "/reset-password", "/verify-email"];
     const isPublicRoute = publicRoutes.includes(location.pathname);
 
     useEffect(() => {

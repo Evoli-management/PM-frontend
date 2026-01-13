@@ -117,6 +117,13 @@ class AuthService {
             return false;
         }
     }
+
+    async sendRegistrationLink(email) {
+        // Send registration link to email
+        // Always returns success for security (don't reveal if email exists)
+        const res = await apiClient.post("/auth/send-registration-link", { email });
+        return res.data; // { message }
+    }
 }
 
 export default new AuthService();
