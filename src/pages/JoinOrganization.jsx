@@ -27,9 +27,11 @@ export default function JoinOrganization() {
         setState("loading");
         
         // Check if user is authenticated
+        let authenticated = false;
         try {
           await authService.verify();
           setIsAuthenticated(true);
+          authenticated = true;
         } catch {
           setIsAuthenticated(false);
         }
@@ -38,8 +40,19 @@ export default function JoinOrganization() {
         const info = await organizationService.getInvitationInfo(token);
         setInvitationInfo(info);
         
-        if (isAuthenticated) {
-          setState("pending");
+        // If authenticated (user just created account and verified email), automatically accept the invitation
+        if (authenticated) {
+          setState("accepting");
+          try {
+            await organizationService.acceptInvitation(token);
+            setState("success");
+            setTimeout(() => {
+              navigate("/dashboard");
+            }, 2000);
+          } catch (acceptErr) {
+            setError(acceptErr?.response?.data?.message || acceptErr.message || "Failed to accept invitation");
+            setState("pending"); // Fall back to pending state if acceptance fails
+          }
         } else {
           setState("unauthenticated");
         }
@@ -50,7 +63,7 @@ export default function JoinOrganization() {
     };
 
     loadInvitation();
-  }, [token]);
+  }, [token, navigate]);
 
   const handleAcceptInvitation = async () => {
     try {
