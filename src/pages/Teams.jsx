@@ -47,18 +47,26 @@ export default function Teams() {
             setCanManage(isAdmin || isOwner);
             setUserProfile(profile);
             setHasOrganization(true);
+            return true;
         } catch (e) {
             // User has no organization yet
             console.log('User has no organization:', e?.response?.status);
             setCanManage(false);
             setHasOrganization(false);
+            return false;
         }
     };
 
     // ============ LOAD INITIAL DATA ============
     useEffect(() => {
         const init = async () => {
-            await Promise.all([checkPermissions(), loadTeams()]);
+            const hasOrg = await checkPermissions();
+            if (hasOrg) {
+                await loadTeams();
+            } else {
+                // No org: stop loading so empty state renders
+                setLoading(false);
+            }
         };
         init();
     }, []);
@@ -68,7 +76,12 @@ export default function Teams() {
             setLoading(true);
             setError(null);
             const teams = await teamsService.getTeams();
-            setTeamsData(teams || []);
+            const normalized = Array.isArray(teams)
+                ? teams
+                : Array.isArray(teams?.teams)
+                    ? teams.teams
+                    : [];
+            setTeamsData(normalized);
         } catch (err) {
             const message = err?.response?.data?.message || err?.message || 'Failed to load teams';
             setError(message);
