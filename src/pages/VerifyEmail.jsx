@@ -36,11 +36,11 @@ export default function VerifyEmail() {
                 if (invitationToken) {
                     // The backend returns accessToken and refreshToken on verification
                     if (verifyResponse?.accessToken) {
-                        // Store tokens to establish session
+                        // Store tokens using the same keys the rest of the app expects
                         try {
-                            localStorage.setItem('accessToken', verifyResponse.accessToken);
+                            localStorage.setItem('access_token', verifyResponse.accessToken);
                             if (verifyResponse.refreshToken) {
-                                localStorage.setItem('refreshToken', verifyResponse.refreshToken);
+                                localStorage.setItem('refresh_token', verifyResponse.refreshToken);
                             }
                         } catch {}
                     }
