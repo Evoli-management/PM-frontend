@@ -467,5 +467,3 @@ export default function Registration() {
             </div>
     );
 }
-              console.log("[Registration] Redirecting to verify-email. Token:", res.verificationToken, "Invitation:", invitationToken);
-            console.error("[Registration] Register error:", err);

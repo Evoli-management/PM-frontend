@@ -95,13 +95,14 @@ export default function VerifyEmail() {
         } finally {
             setResending(false);
         }
+    };
+
     useEffect(() => {
         if (cooldown > 0) {
-            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+            const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
             return () => clearTimeout(timer);
         }
     }, [cooldown]);
-    };
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
