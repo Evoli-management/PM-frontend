@@ -16,6 +16,19 @@ class OrganizationService {
   }
 
   /**
+   * Get all organizations for current user
+   */
+  async getUserOrganizations() {
+    try {
+      const res = await apiClient.get("/organizations");
+      return res.data || [];
+    } catch (error) {
+      console.error("Failed to fetch user organizations:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all members in current organization
    */
   async getOrganizationMembers() {
