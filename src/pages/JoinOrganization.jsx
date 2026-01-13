@@ -55,8 +55,8 @@ export default function JoinOrganization() {
             setState("pending"); // Fall back to pending state if acceptance fails
           }
         } else {
-          // Not authenticated - show login option
-          setState("unauthenticated");
+          // Not authenticated - redirect to InvitationEntry for proper flow
+          navigate(`/invite?token=${token}`);
         }
       } catch (err) {
         setError(err?.response?.data?.message || err.message || "Failed to load invitation");
