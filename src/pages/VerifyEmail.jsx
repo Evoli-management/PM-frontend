@@ -24,7 +24,7 @@ export default function VerifyEmail() {
         let invitationToken = params.get("invitationToken");
         if (!invitationToken) {
             try {
-                invitationToken = sessionStorage.getItem("pending_invitation_token") || "";
+                invitationToken = localStorage.getItem("pending_invitation_token") || "";
             } catch {}
         }
         console.log("[VerifyEmail] Token:", token, "InvitationToken:", invitationToken);
@@ -55,7 +55,7 @@ export default function VerifyEmail() {
                         } catch {}
                     }
                     try {
-                        sessionStorage.removeItem("pending_invitation_token");
+                        localStorage.removeItem("pending_invitation_token");
                     } catch {}
                     console.log("[VerifyEmail] Redirecting to /join with token:", invitationToken);
                     setTimeout(() => {

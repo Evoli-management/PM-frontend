@@ -97,12 +97,15 @@ export default function Registration() {
         try {
             const { firstName, lastName, email, password } = formData;
             const authService = await import("../services/authService").then((m) => m.default);
+            console.log("[Registration] Registering with email:", email, "Invitation token:", invitationToken);
             const res = await authService.register({ firstName, lastName, email, password });
+            console.log("[Registration] Register response:", res);
             // Save email temporarily for the verify page (resend convenience)
             try {
                 sessionStorage.setItem("recent_registration_email", email);
                 if (invitationToken) {
-                    sessionStorage.setItem("pending_invitation_token", invitationToken);
+                    console.log("[Registration] Storing invitation token in localStorage:", invitationToken);
+                    localStorage.setItem("pending_invitation_token", invitationToken);
                 }
             } catch {}
             setIsSubmitted(true);
@@ -464,3 +467,5 @@ export default function Registration() {
             </div>
     );
 }
+              console.log("[Registration] Redirecting to verify-email. Token:", res.verificationToken, "Invitation:", invitationToken);
+            console.error("[Registration] Register error:", err);
