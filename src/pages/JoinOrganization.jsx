@@ -13,6 +13,8 @@ export default function JoinOrganization() {
   const [invitationInfo, setInvitationInfo] = useState(null);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState(null);
+  const [emailMismatch, setEmailMismatch] = useState(false);
 
   // Load invitation info on mount
   useEffect(() => {
@@ -32,11 +34,14 @@ export default function JoinOrganization() {
         
         // Check if user is authenticated
         let authenticated = false;
+        let userEmail = null;
         try {
-          await authService.verify();
+          const userData = await authService.verify();
           setIsAuthenticated(true);
           authenticated = true;
-          console.log("[JoinOrganization] User is authenticated");
+          userEmail = userData?.user?.email || null;
+          setCurrentUserEmail(userEmail);
+          console.log("[JoinOrganization] User is authenticated with email:", userEmail);
         } catch (authErr) {
           console.log("[JoinOrganization] User is NOT authenticated:", authErr.message);
           setIsAuthenticated(false);
@@ -47,6 +52,15 @@ export default function JoinOrganization() {
         const info = await organizationService.getInvitationInfo(token);
         console.log("[JoinOrganization] Invitation info loaded:", info);
         setInvitationInfo(info);
+        
+        // Check for email mismatch
+        if (authenticated && userEmail && info?.invitedEmail) {
+          const mismatch = userEmail.toLowerCase() !== info.invitedEmail.toLowerCase();
+          setEmailMismatch(mismatch);
+          if (mismatch) {
+            console.warn("[JoinOrganization] Email mismatch detected:", userEmail, "vs", info.invitedEmail);
+          }
+        }
         
         // If authenticated, immediately try to accept the invitation
         if (authenticated) {
@@ -126,6 +140,22 @@ export default function JoinOrganization() {
                 Invited by: <span className="font-semibold">{invitationInfo.invitedBy}</span>
               </p>
             </div>
+
+            {emailMismatch && invitationInfo?.invitedEmail && currentUserEmail && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900 mb-1">Email Address Mismatch</p>
+                  <p className="text-sm text-amber-800 mb-2">
+                    You're logged in as <span className="font-semibold">{currentUserEmail}</span>, but this invitation was sent to{" "}
+                    <span className="font-semibold">{invitationInfo.invitedEmail}</span>.
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    You can still join, but make sure this is the correct account. If not, please log out and log in with the invited email address.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={handleAcceptInvitation}
