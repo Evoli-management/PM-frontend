@@ -1,0 +1,127 @@
+/* src/components/teams/AdminRoleManager.module.css */
+
+.container {
+  position: relative;
+  display: inline-block;
+}
+
+.toggleBtn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggleBtn:hover {
+  background-color: #5a6268;
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-top: 5px;
+  min-width: 220px;
+  z-index: 1000;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e9ecef;
+  gap: 8px;
+}
+
+.header strong {
+  color: #333;
+  font-size: 13px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  color: #333;
+}
+
+.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 8px 12px;
+  font-size: 12px;
+  margin: 8px 12px 0 12px;
+  border-radius: 4px;
+}
+
+.actions {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.promoteBtn,
+.demoteBtn {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  text-align: left;
+}
+
+.promoteBtn {
+  background-color: #28a745;
+  color: white;
+}
+
+.promoteBtn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.demoteBtn {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.demoteBtn:hover:not(:disabled) {
+  background-color: #e0a800;
+}
+
+.promoteBtn:disabled,
+.demoteBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint {
+  display: block;
+  padding: 0 12px 10px 12px;
+  color: #6c757d;
+  font-size: 12px;
+}

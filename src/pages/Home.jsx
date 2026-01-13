@@ -224,8 +224,8 @@ const Home = () => {
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                                 <a
-                                    href="/registration"
-                                    onClick={(e) => handleNavigate(e, "/registration")}
+                                    href="/get-started"
+                                    onClick={(e) => handleNavigate(e, "/get-started")}
                                     className="btn-gradient btn-glow text-white px-8 py-4 rounded-lg font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300"
                                 >
                                     Get Started Free

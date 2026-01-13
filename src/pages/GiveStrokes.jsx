@@ -5,12 +5,14 @@ import organizationService from "../services/organizationService";
 import cultureService from "../services/cultureService";
 import keyAreaService from "../services/keyAreaService";
 import recognitionsService from "../services/recognitionsService";
+import userProfileService from "../services/userProfileService";
 
 export default function GiveStrokes() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [members, setMembers] = useState([]);
     const [searchQuery, setSearchQuery] = useState("");
+    const [currentUserId, setCurrentUserId] = useState(null);
     
     // External recipient
     const [externalName, setExternalName] = useState("");
@@ -23,6 +25,7 @@ export default function GiveStrokes() {
     // Modal states
     const [showTypeModal, setShowTypeModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [showExternalModal, setShowExternalModal] = useState(false);
     const [selectedType, setSelectedType] = useState(null); // 'employeeship', 'performance', 'achievement'
     
     // Recognition details
@@ -43,8 +46,14 @@ export default function GiveStrokes() {
     const loadMembers = async () => {
         try {
             setLoading(true);
-            const data = await organizationService.getOrganizationMembers();
-            setMembers(data || []);
+            const [data, profile] = await Promise.all([
+                organizationService.getOrganizationMembers(),
+                userProfileService.getProfile(),
+            ]);
+            const profileId = profile?.id || null;
+            setCurrentUserId(profileId);
+            const filtered = (data || []).filter(member => member.id !== profileId);
+            setMembers(filtered);
         } catch (err) {
             console.error("Failed to load members:", err);
         } finally {
@@ -53,6 +62,9 @@ export default function GiveStrokes() {
     };
 
     const handleMemberSelect = (member) => {
+        if (currentUserId && member.id === currentUserId) {
+            return;
+        }
         const recipient = { id: member.id, name: `${member.firstName} ${member.lastName}`, type: 'member' };
         recipientRef.current = member.id;
         setSelectedRecipient(recipient);
@@ -64,7 +76,11 @@ export default function GiveStrokes() {
         const recipient = { name: externalName, email: externalEmail, type: 'external' };
         recipientRef.current = null;
         setSelectedRecipient(recipient);
-        setShowTypeModal(true);
+        setSelectedType('employeeship'); // default type for external recognitions
+        if (!personalNote) {
+            setPersonalNote(`${recipient.name || 'there'}, I think you did a very good job...`);
+        }
+        setShowExternalModal(true);
     };
 
     const handleTypeSelect = async (type) => {
@@ -99,6 +115,10 @@ export default function GiveStrokes() {
             alert('Failed to load recognition data');
             setSelectedType(null);
             return;
+        }
+
+        if (!personalNote && selectedRecipient?.name) {
+            setPersonalNote(`${selectedRecipient.name}, I think you did a very good job...`);
         }
 
         setShowDetailsModal(true);
@@ -140,6 +160,7 @@ export default function GiveStrokes() {
             
             // Reset
             setShowDetailsModal(false);
+            setShowExternalModal(false);
             setSelectedRecipient(null);
             setSelectedType(null);
             setSelectedValue(null);
@@ -265,6 +286,16 @@ export default function GiveStrokes() {
                 />
             )}
 
+            {showExternalModal && selectedRecipient?.type === 'external' && (
+                <ExternalRecipientModal
+                    recipient={selectedRecipient}
+                    personalNote={personalNote}
+                    onPersonalNoteChange={setPersonalNote}
+                    onSubmit={handleSubmit}
+                    onClose={() => { setShowExternalModal(false); setSelectedRecipient(null); }}
+                />
+            )}
+
             {/* Details Modal */}
             {showDetailsModal && selectedType === 'employeeship' && (
                 <EmployeeshipModal
@@ -349,6 +380,50 @@ function TypeSelectionModal({ onSelect, onClose }) {
     );
 }
 
+function ExternalRecipientModal({ recipient, personalNote, onPersonalNoteChange, onSubmit, onClose }) {
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-8 max-w-xl w-full">
+                <h2 className="text-2xl font-semibold text-center mb-4">Send a recognition</h2>
+                <p className="text-gray-600 text-center mb-6">We will email {recipient?.name || 'this person'} at {recipient?.email}.</p>
+                <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-gray-700 font-medium">
+                            Add your personal note:
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => onPersonalNoteChange("")}
+                            className="text-sm text-red-600 hover:underline"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <textarea
+                        value={personalNote}
+                        onChange={(e) => onPersonalNoteChange(e.target.value)}
+                        placeholder={`${recipient?.name || 'there'}, I think you did a very good job...`}
+                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        rows={4}
+                    />
+                </div>
+                <div className="flex justify-end gap-3">
+                    <button onClick={onClose} className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                        Back
+                    </button>
+                    <button
+                        onClick={onSubmit}
+                        disabled={!personalNote}
+                        className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                    >
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // Employeeship Modal Component
 function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehaviors, onToggleBehavior, personalNote, onPersonalNoteChange, recipientName, onSubmit, onBack }) {
     return (
@@ -408,9 +483,18 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                         </div>
 
                         <div className="mb-6">
-                            <label className="block text-gray-700 font-medium mb-2">
-                                Select a "+" mark and add your personal note:
-                            </label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-gray-700 font-medium">
+                                    Select a "+" mark and add your personal note:
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => onPersonalNoteChange("")}
+                                    className="text-sm text-red-600 hover:underline"
+                                >
+                                    Clear
+                                </button>
+                            </div>
                             <textarea
                                 value={personalNote}
                                 onChange={(e) => onPersonalNoteChange(e.target.value)}
@@ -471,9 +555,18 @@ function PerformanceModal({ keyAreas, selectedKeyArea, onSelectKeyArea, personal
 
                 {selectedKeyArea && (
                     <div className="mb-6">
-                        <label className="block text-gray-700 font-medium mb-2">
-                            Add your personal note:
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-gray-700 font-medium">
+                                Add your personal note:
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => onPersonalNoteChange("")}
+                                className="text-sm text-red-600 hover:underline"
+                            >
+                                Clear
+                            </button>
+                        </div>
                         <textarea
                             value={personalNote}
                             onChange={(e) => onPersonalNoteChange(e.target.value)}
@@ -565,9 +658,18 @@ function AchievementModal({ achievements, selectedGoal, selectedMilestone, onSel
 
                         {(selectedGoal || selectedMilestone) && (
                             <div className="mb-6">
-                                <label className="block text-gray-700 font-medium mb-2">
-                                    Add your personal note:
-                                </label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-gray-700 font-medium">
+                                        Add your personal note:
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => onPersonalNoteChange("")}
+                                        className="text-sm text-red-600 hover:underline"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
                                 <textarea
                                     value={personalNote}
                                     onChange={(e) => onPersonalNoteChange(e.target.value)}

@@ -1,13 +1,22 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
 // authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
+    const [searchParams] = useSearchParams();
+    const invitationToken = searchParams.get("token");
+    const registrationToken = searchParams.get("regToken");
+    const emailFromUrl = searchParams.get("email");
+    
+    const [invitedEmail, setInvitedEmail] = useState(null);
+    const [loadingInvitation, setLoadingInvitation] = useState(invitationToken ? true : false);
+    const [invitationError, setInvitationError] = useState(null);
+
     const [formData, setFormData] = useState({
         firstName: "",
         lastName: "",
-        email: "",
+        email: emailFromUrl || "", // Pre-fill email from registration link
         password: "",
         confirmPassword: "",
         agreedToTerms: false,
@@ -17,6 +26,30 @@ export default function Registration() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const navigate = useNavigate();
+
+    // Load invitation info if token is present
+    useEffect(() => {
+        if (!invitationToken) return;
+
+        const loadInvitation = async () => {
+            try {
+                const orgService = await import("../services/organizationService").then((m) => m.default);
+                const info = await orgService.getInvitationInfo(invitationToken);
+                if (info?.invitedEmail) {
+                    setInvitedEmail(info.invitedEmail);
+                    setFormData((prev) => ({ ...prev, email: info.invitedEmail }));
+                } else {
+                    setInvitationError("Invalid invitation - no email found");
+                }
+            } catch (err) {
+                setInvitationError("Failed to load invitation details");
+            } finally {
+                setLoadingInvitation(false);
+            }
+        };
+
+        loadInvitation();
+    }, [invitationToken]);
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -32,6 +65,8 @@ export default function Registration() {
             errors.email = "Email is required.";
         } else if (!emailRegex.test(formData.email)) {
             errors.email = "Please enter a valid email address.";
+        } else if (invitedEmail && formData.email.toLowerCase() !== invitedEmail.toLowerCase()) {
+            errors.email = `You must use the invited email: ${invitedEmail}`;
         }
         if (!formData.password) {
             errors.password = "Password is required.";
@@ -64,14 +99,27 @@ export default function Registration() {
         try {
             const { firstName, lastName, email, password } = formData;
             const authService = await import("../services/authService").then((m) => m.default);
+            console.log("[Registration] Registering with email:", email, "Invitation token:", invitationToken);
             const res = await authService.register({ firstName, lastName, email, password });
+            console.log("[Registration] Register response:", res);
             // Save email temporarily for the verify page (resend convenience)
             try {
                 sessionStorage.setItem("recent_registration_email", email);
+                if (invitationToken) {
+                    console.log("[Registration] Storing invitation token in localStorage:", invitationToken);
+                    localStorage.setItem("pending_invitation_token", invitationToken);
+                }
             } catch {}
             setIsSubmitted(true);
             // Give users more time to read the success message before redirecting
-            setTimeout(() => navigate("/verify-email"), 4000);
+            setTimeout(() => {
+              if (invitationToken) {
+                // If coming from an invite, redirect to verify email with both tokens
+                navigate(`/verify-email?token=${res.verificationToken || ''}&invitationToken=${invitationToken}`);
+              } else {
+                navigate("/verify-email");
+              }
+            }, 4000);
         } catch (err) {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
@@ -139,6 +187,28 @@ export default function Registration() {
                         <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center">
                             Sign Up
                         </h2>
+
+                        {invitationError && (
+                            <div className="w-full mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                                {invitationError}
+                            </div>
+                        )}
+
+                        {loadingInvitation && (
+                            <div className="w-full mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
+                                Loading invitation details...
+                            </div>
+                        )}
+
+                        {registrationToken && emailFromUrl && !invitationToken && (
+                            <div className="w-full mb-4 p-3 bg-green-50 border border-green-300 text-green-800 rounded flex items-start gap-2">
+                                <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-semibold">Registration link verified</p>
+                                    <p className="text-sm">Complete the form below to create your account.</p>
+                                </div>
+                            </div>
+                        )}
                         {isSubmitted ? (
                             <div className="flex flex-col items-center justify-center p-8 text-center bg-green-50 rounded-lg shadow-inner">
                                 <CheckCircle2 size={48} className="text-green-500 mb-4" />
@@ -220,11 +290,17 @@ export default function Registration() {
                                         autoComplete="username email"
                                         placeholder="Enter your email"
                                         value={formData.email}
-                                        onChange={handleInputChange}
-                                        className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
+                                        onChange={invitedEmail ? undefined : handleInputChange}
+                                        disabled={!!invitedEmail}
+                                        className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none ${
+                                            invitedEmail ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-green-400'
+                                        } ${
                                             formErrors.email ? "border-red-500" : "border-gray-200"
                                         }`}
                                     />
+                                    {invitedEmail && (
+                                        <p className="text-blue-600 text-xs mt-1">✓ Email from invitation (locked)</p>
+                                    )}
                                     {formErrors.email && (
                                         <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
                                     )}

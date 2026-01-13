@@ -15,6 +15,7 @@ export default function Teams() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [hasOrganization, setHasOrganization] = useState(true); // Track if user has organization
 
     // ============ UI STATE ============
     const [teamsSearch, setTeamsSearch] = useState("");
@@ -45,15 +46,27 @@ export default function Teams() {
             const isOwner = org?.contactEmail === profile?.email;
             setCanManage(isAdmin || isOwner);
             setUserProfile(profile);
+            setHasOrganization(true);
+            return true;
         } catch (e) {
+            // User has no organization yet
+            console.log('User has no organization:', e?.response?.status);
             setCanManage(false);
+            setHasOrganization(false);
+            return false;
         }
     };
 
     // ============ LOAD INITIAL DATA ============
     useEffect(() => {
         const init = async () => {
-            await Promise.all([checkPermissions(), loadTeams()]);
+            const hasOrg = await checkPermissions();
+            if (hasOrg) {
+                await loadTeams();
+            } else {
+                // No org: stop loading so empty state renders
+                setLoading(false);
+            }
         };
         init();
     }, []);
@@ -63,7 +76,12 @@ export default function Teams() {
             setLoading(true);
             setError(null);
             const teams = await teamsService.getTeams();
-            setTeamsData(teams || []);
+            const normalized = Array.isArray(teams)
+                ? teams
+                : Array.isArray(teams?.teams)
+                    ? teams.teams
+                    : [];
+            setTeamsData(normalized);
         } catch (err) {
             const message = err?.response?.data?.message || err?.message || 'Failed to load teams';
             setError(message);
@@ -385,6 +403,50 @@ export default function Teams() {
                                         <div className="text-center py-12 text-gray-500">
                                             <div className="text-4xl mb-2">⏳</div>
                                             <p>Loading teams...</p>
+                                        </div>
+                                    ) : !hasOrganization ? (
+                                        <div className="text-center py-12">
+                                            <div className="text-6xl mb-4">🏢</div>
+                                            <h2 className="text-2xl font-semibold text-gray-800 mb-2">No Organization Yet</h2>
+                                            <p className="text-gray-600 mb-6">You haven't joined or created an organization yet.</p>
+                                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                                <button
+                                                    onClick={() => {
+                                                        // Trigger organization creation
+                                                        const orgName = prompt('Enter your organization name:', 'My Organization');
+                                                        if (orgName?.trim()) {
+                                                            setSaving(true);
+                                                            organizationService.createSelfOrganization()
+                                                                .then(() => {
+                                                                    showToast('Organization created successfully!');
+                                                                    // Reload the page to get the new organization
+                                                                    window.location.reload();
+                                                                })
+                                                                .catch(err => {
+                                                                    const message = err?.response?.data?.message || 'Failed to create organization';
+                                                                    showToast(message, 'error');
+                                                                    setSaving(false);
+                                                                });
+                                        }
+                                                    }}
+                                                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition"
+                                                >
+                                                    ✨ Create Organization
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        // Prompt for invitation token/link
+                                                        const token = prompt('Enter your invitation token or link:', '');
+                                                        if (token?.trim()) {
+                                                            // Navigate to invitation acceptance page
+                                                            window.location.href = `/invite/${token.trim()}`;
+                                                        }
+                                                    }}
+                                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition"
+                                                >
+                                                    📬 Accept Invitation
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : error ? (
                                         <div className="text-center py-12 text-gray-500">

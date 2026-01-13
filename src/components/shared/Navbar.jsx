@@ -10,6 +10,7 @@ import * as goalService from "../../services/goalService";
 import keyAreaService from "../../services/keyAreaService";
 import calendarService from "../../services/calendarService";
 import ReminderBell from "./ReminderBell";
+import NotificationBell from "./NotificationBell";
 import ReminderModal from "../reminders/ReminderModal";
 
 export default function Navbar() {
@@ -288,7 +289,7 @@ export default function Navbar() {
     }, []);
 
     // List of public routes where navbar should not be shown
-    const publicRoutes = ["/", "/login", "/registration", "/PasswordPageForget", "/reset-password", "/verify-email"];
+    const publicRoutes = ["/", "/login", "/registration", "/get-started", "/PasswordPageForget", "/reset-password", "/verify-email"];
     const isPublicRoute = publicRoutes.includes(location.pathname);
 
     useEffect(() => {
@@ -653,6 +654,10 @@ export default function Navbar() {
                                 </button>
                             </div>
                         )}
+                    </div>
+
+                    <div className="relative" ref={menuRef}>
+                        <NotificationBell />
                     </div>
 
                     <div className="relative" ref={menuRef}>

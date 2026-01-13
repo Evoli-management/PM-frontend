@@ -12,6 +12,7 @@ import Home from "./pages/Home.jsx";
 import PasswordPageForget from "./pages/PasswordPageForget.jsx";
 import ResetPasswordpage from "./pages/ResetPasswordpage.jsx";
 import Registration from "./pages/Registration.jsx";
+import RequestRegistrationLink from "./pages/RequestRegistrationLink.jsx";
 import ProfileSetting from "./pages/SetProfile.jsx";
 import ConnectionTest from "./pages/ConnectionTest.jsx";
 import Contacts from "./pages/Contacts.jsx";
@@ -44,12 +45,15 @@ import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
 import Pricing from "./pages/Pricing.jsx";
 import Reminders from "./pages/Reminders.jsx";
 import JoinOrganization from "./pages/JoinOrganization.jsx";
+import InvitationEntry from "./pages/InvitationEntry.jsx";
+import OnboardingWizard from "./pages/OnboardingWizard.jsx";
+import CalendarSyncStatus from "./pages/CalendarSyncStatus.jsx";
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
     // Only show footer on public/auth pages
     const publicFooterRoutes = [
         "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
-        "/verify-email", "/verify-password-change", "/verify-email-change"
+        "/get-started", "/verify-email", "/verify-password-change", "/verify-email-change"
     ];
     // Use react-router location so route changes (including client-side navigation)
     // update layout immediately. This prevents the main content from rendering
@@ -80,10 +84,13 @@ export default function App() {
                             <Route path="/pricing" element={<Pricing />} />
 
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
+                            <Route path="/get-started" element={<RequestRegistrationLink />} />
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/verify-password-change" element={<VerifyPasswordChange />} />
+                            <Route path="/invite" element={<InvitationEntry />} />
                             <Route path="/join" element={<JoinOrganization />} />
+                            <Route path="/onboarding" element={<OnboardingWizard />} />
                             <Route path="/verify-email-change" element={<VerifyEmailChange />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />
                             <Route path="/profile" element={<ProfileSetting />} />
@@ -126,6 +133,7 @@ export default function App() {
                             <Route path="/give-strokes" element={<PrivateRoute><GiveStrokes /></PrivateRoute>} />
                             <Route path="/view-strokes" element={<PrivateRoute><ViewStrokes /></PrivateRoute>} />
                             <Route path="/reminders" element={<PrivateRoute><Reminders /></PrivateRoute>} />
+                            <Route path="/calendar-sync" element={<PrivateRoute><CalendarSyncStatus /></PrivateRoute>} />
                         </Routes>
                     </Suspense>
                 </main>
