@@ -6,6 +6,8 @@ import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react"
 export default function Registration() {
     const [searchParams] = useSearchParams();
     const invitationToken = searchParams.get("token");
+    const registrationToken = searchParams.get("regToken");
+    const emailFromUrl = searchParams.get("email");
     
     const [invitedEmail, setInvitedEmail] = useState(null);
     const [loadingInvitation, setLoadingInvitation] = useState(invitationToken ? true : false);
@@ -14,7 +16,7 @@ export default function Registration() {
     const [formData, setFormData] = useState({
         firstName: "",
         lastName: "",
-        email: "",
+        email: emailFromUrl || "", // Pre-fill email from registration link
         password: "",
         confirmPassword: "",
         agreedToTerms: false,
@@ -195,6 +197,16 @@ export default function Registration() {
                         {loadingInvitation && (
                             <div className="w-full mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded">
                                 Loading invitation details...
+                            </div>
+                        )}
+
+                        {registrationToken && emailFromUrl && !invitationToken && (
+                            <div className="w-full mb-4 p-3 bg-green-50 border border-green-300 text-green-800 rounded flex items-start gap-2">
+                                <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-semibold">Registration link verified</p>
+                                    <p className="text-sm">Complete the form below to create your account.</p>
+                                </div>
                             </div>
                         )}
                         {isSubmitted ? (
