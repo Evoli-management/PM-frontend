@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
+import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
 // authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
@@ -124,8 +125,9 @@ export default function Registration() {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
             const errors = {};
+            
             if (status === 409) {
-                errors.email = "Email already in use.";
+                errors.email = "An account with this email already exists. Would you like to sign in instead?";
             } else if (Array.isArray(msg)) {
                 const text = msg.join(" \n ").toLowerCase();
                 if (text.includes("email")) errors.email = "Please enter a valid email address.";
@@ -134,7 +136,7 @@ export default function Registration() {
                     errors.password = "Password must contain at least one uppercase letter.";
                 if (text.includes("number")) errors.password = "Password must contain at least one number.";
             } else if (typeof msg === "string") {
-                errors.general = msg;
+                errors.general = getFriendlyErrorMessage(msg);
             } else {
                 errors.general = "Registration failed. Please try again.";
             }

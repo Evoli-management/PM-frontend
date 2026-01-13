@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, AlertCircle, CheckCircle2 } from "lucide-react";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 export default function RequestRegistrationLink() {
   const [email, setEmail] = useState("");
@@ -58,11 +59,7 @@ export default function RequestRegistrationLink() {
       const errorMsg =
         err?.response?.data?.message || 
         "Failed to send registration link. Please try again.";
-      setMessage(
-        typeof errorMsg === "string"
-          ? errorMsg
-          : "Failed to send registration link. Please try again."
-      );
+      setMessage(getFriendlyErrorMessage(errorMsg));
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock, faEyeSlash, faEye } from "@fortawesome/free-solid-svg-icons";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 const ResetPasswordPage = () => {
     const [passwords, setPasswords] = useState({
@@ -76,7 +77,7 @@ const ResetPasswordPage = () => {
             navigate("/login");
         } catch (err) {
             const msg = err?.response?.data?.message || "Failed to reset password. Please try again.";
-            setError(typeof msg === "string" ? msg : "Failed to reset password. Please try again.");
+            setError(getFriendlyErrorMessage(msg));
         } finally {
             setIsLoading(false);
         }

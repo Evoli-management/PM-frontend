@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader, AlertCircle } from "lucide-react";
 import organizationService from "../services/organizationService";
 import authService from "../services/authService";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 export default function InvitationEntry() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function InvitationEntry() {
           }
         }
       } catch (err) {
-        setError(err?.response?.data?.message || err.message || "Failed to process invitation");
+        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to process invitation"));
         setState("error");
       }
     };

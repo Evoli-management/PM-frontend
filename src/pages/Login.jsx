@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
 // authService is imported dynamically at call sites to allow code-splitting
 
 const LoginPage = () => {
@@ -74,21 +75,23 @@ const LoginPage = () => {
         } catch (err) {
             console.error("Login error:", err);
             const msg = err.response?.data?.message || "Login failed";
-            // Detect unverified user error (customize if backend uses a different message)
+            const friendlyMsg = getFriendlyErrorMessage(msg);
+            
+            // Detect unverified user error
             if (typeof msg === "string" && msg.toLowerCase().includes("verify your email")) {
                 setError(
                     <span>
-                        Your email is not verified. <br />
+                        {friendlyMsg} <br />
                         <button
                             type="button"
-                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer"
+                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer mt-2"
                             onClick={async () => {
                                 try {
                                     const authService = await import("../services/authService").then((m) => m.default);
                                     await authService.resendVerification(formData.email);
-                                    alert("Verification email resent! Please check your inbox.");
-                                } catch {
-                                    alert("Failed to resend verification email. Try again later.");
+                                    setError("Verification email resent! Check your inbox (including spam folder).");
+                                } catch (resendErr) {
+                                    setError(getFriendlyErrorMessage(resendErr));
                                 }
                             }}
                         >
@@ -97,7 +100,7 @@ const LoginPage = () => {
                     </span>,
                 );
             } else {
-                setError(Array.isArray(msg) ? msg.join(", ") : msg);
+                setError(friendlyMsg);
             }
         } finally {
             setLoading(false);
