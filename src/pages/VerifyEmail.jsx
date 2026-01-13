@@ -27,20 +27,25 @@ export default function VerifyEmail() {
                 invitationToken = sessionStorage.getItem("pending_invitation_token") || "";
             } catch {}
         }
+        console.log("[VerifyEmail] Token:", token, "InvitationToken:", invitationToken);
         if (!token) {
             setStatus("Missing token");
             return;
         }
         (async () => {
             try {
+                console.log("[VerifyEmail] Verifying email with token:", token);
                 const auth = await import("../services/authService");
                 const verifyResponse = await auth.default.verifyEmail(token);
+                console.log("[VerifyEmail] Email verified. Response:", verifyResponse);
                 setStatus("Email verified successfully. Redirecting…");
                 
                 // If there's an invitation token and we got auth tokens back, use them
                 if (invitationToken) {
+                    console.log("[VerifyEmail] Invitation token found, will redirect to /join");
                     // The backend returns accessToken and refreshToken on verification
                     if (verifyResponse?.accessToken) {
+                        console.log("[VerifyEmail] Storing tokens from verification response");
                         // Store tokens using the same keys the rest of the app expects
                         try {
                             localStorage.setItem('access_token', verifyResponse.accessToken);
@@ -52,15 +57,18 @@ export default function VerifyEmail() {
                     try {
                         sessionStorage.removeItem("pending_invitation_token");
                     } catch {}
+                    console.log("[VerifyEmail] Redirecting to /join with token:", invitationToken);
                     setTimeout(() => {
                         navigate(`/join?token=${invitationToken}`);
                     }, 1200);
                 } else {
+                    console.log("[VerifyEmail] No invitation token, redirecting to /login");
                     setTimeout(() => {
                         navigate("/login");
                     }, 1200);
                 }
             } catch (e) {
+                console.error("[VerifyEmail] Verification error:", e);
                 const msg = e?.response?.data?.message || "Verification failed";
                 setStatus(typeof msg === "string" ? msg : "Verification failed");
             }

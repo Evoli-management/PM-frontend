@@ -17,14 +17,18 @@ export default function JoinOrganization() {
   // Load invitation info on mount
   useEffect(() => {
     if (!token) {
+      console.log("[JoinOrganization] No token provided");
       setError("No invitation token provided");
       setState("error");
       return;
     }
 
+    console.log("[JoinOrganization] Token from URL:", token);
+
     const loadInvitation = async () => {
       try {
         setState("loading");
+        console.log("[JoinOrganization] Loading invitation with token:", token);
         
         // Check if user is authenticated
         let authenticated = false;
@@ -32,33 +36,42 @@ export default function JoinOrganization() {
           await authService.verify();
           setIsAuthenticated(true);
           authenticated = true;
-        } catch {
+          console.log("[JoinOrganization] User is authenticated");
+        } catch (authErr) {
+          console.log("[JoinOrganization] User is NOT authenticated:", authErr.message);
           setIsAuthenticated(false);
         }
 
         // Load invitation info
+        console.log("[JoinOrganization] Loading invitation info for token:", token);
         const info = await organizationService.getInvitationInfo(token);
+        console.log("[JoinOrganization] Invitation info loaded:", info);
         setInvitationInfo(info);
         
         // If authenticated, immediately try to accept the invitation
         if (authenticated) {
+          console.log("[JoinOrganization] User authenticated, attempting to accept invitation");
           setState("accepting");
           try {
-            await organizationService.acceptInvitation(token);
+            const result = await organizationService.acceptInvitation(token);
+            console.log("[JoinOrganization] Invitation accepted successfully:", result);
             setState("success");
             // Give user a moment to see success message before redirecting
             setTimeout(() => {
               navigate("/dashboard");
             }, 2000);
           } catch (acceptErr) {
+            console.error("[JoinOrganization] Failed to accept invitation:", acceptErr);
             setError(acceptErr?.response?.data?.message || acceptErr.message || "Failed to accept invitation");
             setState("pending"); // Fall back to pending state if acceptance fails
           }
         } else {
+          console.log("[JoinOrganization] User not authenticated, redirecting to /invite");
           // Not authenticated - redirect to InvitationEntry for proper flow
           navigate(`/invite?token=${token}`);
         }
       } catch (err) {
+        console.error("[JoinOrganization] Error in loadInvitation:", err);
         setError(err?.response?.data?.message || err.message || "Failed to load invitation");
         setState("error");
       }
