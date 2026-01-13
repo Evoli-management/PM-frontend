@@ -12,6 +12,7 @@ import calendarService from "../../services/calendarService";
 import ReminderBell from "./ReminderBell";
 import NotificationBell from "./NotificationBell";
 import ReminderModal from "../reminders/ReminderModal";
+import OrganizationSwitcher from "./OrganizationSwitcher";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
@@ -672,6 +673,9 @@ export default function Navbar() {
                         onClose={handleGlobalReminderClose}
                         onSave={handleGlobalReminderSave}
                     />
+
+                    {/* Organization Switcher - for multi-org users */}
+                    {isAuthenticated && <OrganizationSwitcher />}
 
                     <div className="relative" ref={menuRef}>
                         <button

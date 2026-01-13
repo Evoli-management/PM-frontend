@@ -220,6 +220,26 @@ class OrganizationService {
       throw error;
     }
   }
+
+  /**
+   * Get all organizations for current user
+   * Used for organization switcher
+   */
+  async getUserOrganizations() {
+    try {
+      const res = await apiClient.get("/organizations/user");
+      return res.data || [];
+    } catch (error) {
+      console.error("Failed to fetch user organizations:", error);
+      // Fallback to current organization if endpoint not available
+      try {
+        const current = await this.getCurrentOrganization();
+        return current ? [current] : [];
+      } catch {
+        return [];
+      }
+    }
+  }
 }
 
 export default new OrganizationService();
