@@ -40,12 +40,13 @@ export default function JoinOrganization() {
         const info = await organizationService.getInvitationInfo(token);
         setInvitationInfo(info);
         
-        // If authenticated (user just created account and verified email), automatically accept the invitation
+        // If authenticated, immediately try to accept the invitation
         if (authenticated) {
           setState("accepting");
           try {
             await organizationService.acceptInvitation(token);
             setState("success");
+            // Give user a moment to see success message before redirecting
             setTimeout(() => {
               navigate("/dashboard");
             }, 2000);
@@ -54,6 +55,7 @@ export default function JoinOrganization() {
             setState("pending"); // Fall back to pending state if acceptance fails
           }
         } else {
+          // Not authenticated - show login option
           setState("unauthenticated");
         }
       } catch (err) {
@@ -154,7 +156,7 @@ export default function JoinOrganization() {
 
             <div className="space-y-3">
               <button
-                onClick={() => navigate(`/login?token=${token}`)}
+                onClick={() => navigate(`/login?invitationToken=${token}`)}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200"
               >
                 Sign In to Accept

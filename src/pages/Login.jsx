@@ -1,13 +1,17 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 // authService is imported dynamically at call sites to allow code-splitting
 
 const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
+    const [searchParams] = useSearchParams();
+    const invitationToken = searchParams.get("invitationToken");
+    const prefilledEmail = searchParams.get("email");
+    
     const [formData, setFormData] = useState({
-        email: "",
+        email: prefilledEmail || "",
         password: "",
         rememberMe: false,
     });
@@ -52,7 +56,13 @@ const LoginPage = () => {
                 try {
                     const testRes = await authService.verifyToken();
                     console.log("Token verification successful:", testRes);
-                    navigate("/dashboard");
+                    
+                    // If there's an invitation token, redirect to accept it
+                    if (invitationToken) {
+                        navigate(`/join?token=${invitationToken}`);
+                    } else {
+                        navigate("/dashboard");
+                    }
                 } catch (verifyError) {
                     console.error("Token verification failed:", verifyError);
                     setError("Authentication failed. Please try again.");

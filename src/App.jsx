@@ -44,6 +44,7 @@ import VerifyEmailChange from "./pages/VerifyEmailChange.jsx";
 import Pricing from "./pages/Pricing.jsx";
 import Reminders from "./pages/Reminders.jsx";
 import JoinOrganization from "./pages/JoinOrganization.jsx";
+import InvitationEntry from "./pages/InvitationEntry.jsx";
 import CalendarSyncStatus from "./pages/CalendarSyncStatus.jsx";
 export default function App() {
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -84,6 +85,7 @@ export default function App() {
                             <Route path="/registration" element={<Registration />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/verify-password-change" element={<VerifyPasswordChange />} />
+                            <Route path="/invite" element={<InvitationEntry />} />
                             <Route path="/join" element={<JoinOrganization />} />
                             <Route path="/verify-email-change" element={<VerifyEmailChange />} />
                             <Route path="/profile-settings" element={<ProfileSetting />} />

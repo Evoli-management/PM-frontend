@@ -95,6 +95,28 @@ class AuthService {
         const res = await apiClient.get(`/auth/confirm-email-change`, { params: { token } });
         return res.data; // { message }
     }
+
+    async verify() {
+        try {
+            const res = await apiClient.get("/users/me");
+            return res.data; // Returns user data if authenticated
+        } catch (err) {
+            // Not authenticated
+            throw err;
+        }
+    }
+
+    async checkEmailExists(email) {
+        try {
+            // This is a public endpoint that checks if an email exists without authentication
+            const res = await apiClient.post("/auth/check-email", { email });
+            return res.data?.exists || false;
+        } catch (err) {
+            // If endpoint doesn't exist, default to false (safer option)
+            console.warn("Email check endpoint not available");
+            return false;
+        }
+    }
 }
 
 export default new AuthService();
