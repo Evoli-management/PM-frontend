@@ -42,7 +42,7 @@ export default function InvitationEntry() {
           navigate(`/join?token=${token}`);
         } else {
           // User is not logged in - check if email exists in database
-          const invitedEmail = info?.invited_email;
+          const invitedEmail = info?.invitedEmail;
           if (!invitedEmail) {
             setError("Invalid invitation - no email found");
             setState("error");
