@@ -901,22 +901,33 @@ function InviteUserModal({ onClose, onInvite }) {
           </form>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Invitation link generated. Share this link with the user:
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={inviteUrl}
-                readOnly
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-              />
-              <button
-                onClick={copyToClipboard}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
-              >
-                Copy
-              </button>
+            <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-800">Invitation sent successfully!</p>
+                <p className="text-xs text-green-700 mt-1">An email with the invitation link has been sent to the user.</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">Invitation link (optional to share manually):</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inviteUrl}
+                  readOnly
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                />
+                <button
+                  onClick={copyToClipboard}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                >
+                  Copy
+                </button>
+              </div>
             </div>
             <div className="flex justify-end">
               <button
