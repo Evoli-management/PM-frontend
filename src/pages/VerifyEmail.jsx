@@ -29,15 +29,29 @@ export default function VerifyEmail() {
         (async () => {
             try {
                 const auth = await import("../services/authService");
-                await auth.default.verifyEmail(token);
+                const verifyResponse = await auth.default.verifyEmail(token);
                 setStatus("Email verified successfully. Redirecting…");
-                setTimeout(() => {
-                  if (invitationToken) {
-                    navigate(`/join?token=${invitationToken}`);
-                  } else {
-                    navigate("/login");
-                  }
-                }, 1200);
+                
+                // If there's an invitation token and we got auth tokens back, use them
+                if (invitationToken) {
+                    // The backend returns accessToken and refreshToken on verification
+                    if (verifyResponse?.accessToken) {
+                        // Store tokens to establish session
+                        try {
+                            localStorage.setItem('accessToken', verifyResponse.accessToken);
+                            if (verifyResponse.refreshToken) {
+                                localStorage.setItem('refreshToken', verifyResponse.refreshToken);
+                            }
+                        } catch {}
+                    }
+                    setTimeout(() => {
+                        navigate(`/join?token=${invitationToken}`);
+                    }, 1200);
+                } else {
+                    setTimeout(() => {
+                        navigate("/login");
+                    }, 1200);
+                }
             } catch (e) {
                 const msg = e?.response?.data?.message || "Verification failed";
                 setStatus(typeof msg === "string" ? msg : "Verification failed");
