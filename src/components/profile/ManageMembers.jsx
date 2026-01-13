@@ -205,7 +205,7 @@ export function ManageMembers({ showToast }) {
 function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
   const [firstName, setFirstName] = useState(member.firstName || "");
   const [lastName, setLastName] = useState(member.lastName || "");
-  const [role, setRole] = useState(member.role || "user");
+  const [role, setRole] = useState(member.role || "member");
   const [selectedTeams, setSelectedTeams] = useState(member.teamIds || []);
   const [saving, setSaving] = useState(false);
 
@@ -281,11 +281,12 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="user">User</option>
+              <option value="member">Member</option>
               <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Only admins can edit other users' goals and key areas
+              Role defines member's permissions in the organization
             </p>
           </div>
 
