@@ -101,6 +101,9 @@ export default function Registration() {
             // Save email temporarily for the verify page (resend convenience)
             try {
                 sessionStorage.setItem("recent_registration_email", email);
+                if (invitationToken) {
+                    sessionStorage.setItem("pending_invitation_token", invitationToken);
+                }
             } catch {}
             setIsSubmitted(true);
             // Give users more time to read the success message before redirecting

@@ -21,7 +21,12 @@ export default function VerifyEmail() {
     useEffect(() => {
         const params = new URLSearchParams(search);
         const token = params.get("token");
-        const invitationToken = params.get("invitationToken");
+        let invitationToken = params.get("invitationToken");
+        if (!invitationToken) {
+            try {
+                invitationToken = sessionStorage.getItem("pending_invitation_token") || "";
+            } catch {}
+        }
         if (!token) {
             setStatus("Missing token");
             return;
@@ -44,6 +49,9 @@ export default function VerifyEmail() {
                             }
                         } catch {}
                     }
+                    try {
+                        sessionStorage.removeItem("pending_invitation_token");
+                    } catch {}
                     setTimeout(() => {
                         navigate(`/join?token=${invitationToken}`);
                     }, 1200);
