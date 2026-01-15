@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaPlus, FaTimes } from "react-icons/fa";
+import { FaEdit, FaTrash, FaPlus, FaTimes, FaKey } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import { TeamLeadModal } from "./TeamLeadModal";
 
 export function ManageTeams({ showToast }) {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showTeamLeadModal, setShowTeamLeadModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
   const [canManage, setCanManage] = useState(false);
 
@@ -78,6 +81,24 @@ export function ManageTeams({ showToast }) {
     setShowEditModal(true);
   };
 
+  const handleAssignTeamLead = async (team) => {
+    setSelectedTeam(team);
+    
+    // Load team members
+    try {
+      const teamsService = await import("../../services/teamsService");
+      const teamData = await teamsService.default.getTeamMembers(team.id);
+      // API may return array or object with members property
+      const membersList = Array.isArray(teamData) ? teamData : (teamData?.members || []);
+      setSelectedTeamMembers(membersList);
+    } catch (error) {
+      showToast?.("Failed to load team members", "error");
+      return;
+    }
+
+    setShowTeamLeadModal(true);
+  };
+
   const handleDeleteTeam = async (teamId) => {
     if (!confirm("Are you sure you want to delete this team?")) return;
     
@@ -116,14 +137,27 @@ export function ManageTeams({ showToast }) {
           {teams.map((team) => (
             <div key={team.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
               <div className="flex-1">
-                <div className="font-medium text-gray-900">{team.name}</div>
-                <div className="text-sm text-gray-600">
+                <div className="font-medium text-gray-900 flex items-center gap-2">
+                  {team.name}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
                   Members: {team.memberCount || 0}
-                  {team.leadName && <span className="ml-3">Lead: {team.leadName}</span>}
+                  {team.teamLeadName && (
+                    <span className="ml-3 inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold">
+                      Lead: {team.teamLeadName}
+                    </span>
+                  )}
                 </div>
               </div>
                 {canManage && (
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAssignTeamLead(team)}
+                      className="p-2 text-amber-600 hover:bg-amber-50 rounded"
+                      title="Assign team lead"
+                    >
+                      <FaKey />
+                    </button>
                     <button
                       onClick={() => handleEditTeam(team)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"
@@ -167,6 +201,19 @@ export function ManageTeams({ showToast }) {
           }}
           showToast={showToast}
           members={members}
+        />
+      )}
+
+      {showTeamLeadModal && selectedTeam && (
+        <TeamLeadModal
+          team={selectedTeam}
+          teamMembers={selectedTeamMembers}
+          onClose={() => setShowTeamLeadModal(false)}
+          onSuccess={() => {
+            setShowTeamLeadModal(false);
+            loadTeams();
+          }}
+          showToast={showToast}
         />
       )}
     </div>
