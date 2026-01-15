@@ -6,6 +6,7 @@ import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
 const DontForgetComposer = React.lazy(() => import("../components/tasks/DontForgetComposer.jsx"));
+const DelegatedTasksPanel = React.lazy(() => import("../components/tasks/DelegatedTasksPanel.jsx"));
 
 // Lazy getters for services to allow code-splitting
 let _taskService = null;
@@ -639,6 +640,18 @@ export default function Tasks() {
                                 <h2 className="text-xl font-semibold text-slate-900">Don't Forget</h2>
                             </div>
                             <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
+                                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading delegated tasks…</div>}>
+                                    <DelegatedTasksPanel
+                                        onTaskClick={(task) => {
+                                            if (!task?.id) return;
+                                            try {
+                                                navigate({ pathname: "/key-areas", search: `?task=${task.id}` });
+                                            } catch (e) {
+                                                console.warn('Unable to open delegated task', e);
+                                            }
+                                        }}
+                                    />
+                                </Suspense>
                                 {/* Header area */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="col-span-3 md:col-span-2">
