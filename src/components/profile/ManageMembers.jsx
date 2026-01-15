@@ -15,13 +15,25 @@ export function ManageMembers({ showToast }) {
   const [canManage, setCanManage] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [currentSubscriptionManager, setCurrentSubscriptionManager] = useState(null);
+  const [usage, setUsage] = useState(null);
 
   useEffect(() => {
     checkPermissions();
     loadMembers();
     loadTeams();
     loadSubscriptionManager();
+    loadUsage();
   }, []);
+
+  const loadUsage = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const usageData = await orgService.default.getCurrentUsage();
+      setUsage(usageData);
+    } catch (error) {
+      console.log("Could not load usage:", error);
+    }
+  };
 
   const loadSubscriptionManager = async () => {
     try {
@@ -113,6 +125,7 @@ export function ManageMembers({ showToast }) {
       const orgService = await import("../../services/organizationService");
       const { inviteUrl } = await orgService.default.inviteUser(email);
       showToast?.("Invitation sent successfully");
+      loadUsage(); // Reload usage stats
       return { inviteUrl };
     } catch (e) {
       showToast?.(e?.response?.data?.message || "Failed to send invitation", "error");
@@ -122,25 +135,53 @@ export function ManageMembers({ showToast }) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-4 border-b flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Manage Members/Users</h3>
-          {canManage && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowSubscriptionManagerModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
-                title="Assign subscription manager"
-              >
-                <FaKey /> Subscription Manager
-              </button>
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
-              >
-                <FaUserPlus /> Invite new user
-              </button>
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Manage Members/Users</h3>
+            {canManage && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSubscriptionManagerModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
+                  title="Assign subscription manager"
+                >
+                  <FaKey /> Subscription Manager
+                </button>
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                  disabled={usage && !usage.canAddMembers}
+                  title={usage && !usage.canAddMembers ? `Member limit reached (${usage.maxMembers} on ${usage.planName} plan)` : "Invite new user"}
+                >
+                  <FaUserPlus /> Invite new user
+                </button>
+              </div>
+            )}
+        </div>
+        
+        {/* Usage Stats */}
+        {usage && (
+          <div className="flex items-center gap-4 text-sm">
+            <div className={`flex items-center gap-2 ${usage.canAddMembers ? 'text-gray-600' : 'text-red-600'}`}>
+              <FaUsers />
+              <span>
+                <strong>{usage.currentMembers}/{usage.maxMembers}</strong> members
+              </span>
+              {!usage.canAddMembers && (
+                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">Limit reached</span>
+              )}
             </div>
-          )}
+            <div className={`flex items-center gap-2 ${usage.canAddTeams ? 'text-gray-600' : 'text-red-600'}`}>
+              <FaThLarge />
+              <span>
+                <strong>{usage.currentTeams}/{usage.maxTeams}</strong> teams
+              </span>
+            </div>
+            <div className="text-gray-500 text-xs">
+              Plan: <strong>{usage.planName}</strong>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (

@@ -286,6 +286,19 @@ class OrganizationService {
       throw error;
     }
   }
+
+  /**
+   * Get current subscription usage (members and teams count vs limits)
+   */
+  async getCurrentUsage() {
+    try {
+      const res = await apiClient.get("/organizations/current/usage");
+      return res.data?.usage || null;
+    } catch (error) {
+      console.error("Failed to fetch usage:", error);
+      throw error;
+    }
+  }
 }
 
 export default new OrganizationService();
