@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes, FaBullseye, FaThLarge, FaUsers } from "react-icons/fa";
+import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes, FaBullseye, FaThLarge, FaUsers, FaKey } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import { SubscriptionManagerModal } from "./SubscriptionManagerModal";
 
 export function ManageMembers({ showToast }) {
   const [members, setMembers] = useState([]);
@@ -9,15 +10,28 @@ export function ManageMembers({ showToast }) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showSubscriptionManagerModal, setShowSubscriptionManagerModal] = useState(false);
   const [teams, setTeams] = useState([]);
   const [canManage, setCanManage] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [currentSubscriptionManager, setCurrentSubscriptionManager] = useState(null);
 
   useEffect(() => {
     checkPermissions();
     loadMembers();
     loadTeams();
+    loadSubscriptionManager();
   }, []);
+
+  const loadSubscriptionManager = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const manager = await orgService.default.getSubscriptionManager();
+      setCurrentSubscriptionManager(manager);
+    } catch (error) {
+      console.log("Could not load subscription manager:", error);
+    }
+  };
 
   const checkPermissions = async () => {
     try {
@@ -111,12 +125,21 @@ export function ManageMembers({ showToast }) {
       <div className="p-4 border-b flex items-center justify-between">
         <h3 className="text-lg font-semibold">Manage Members/Users</h3>
           {canManage && (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
-            >
-              <FaUserPlus /> Invite new user
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSubscriptionManagerModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
+                title="Assign subscription manager"
+              >
+                <FaKey /> Subscription Manager
+              </button>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+              >
+                <FaUserPlus /> Invite new user
+              </button>
+            </div>
           )}
       </div>
 
@@ -129,8 +152,13 @@ export function ManageMembers({ showToast }) {
           {members.map((member) => (
             <div key={member.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
               <div className="flex-1">
-                <div className="font-medium text-gray-900">
+                <div className="font-medium text-gray-900 flex items-center gap-2">
                   {member.firstName} {member.lastName}
+                  {currentSubscriptionManager?.id === member.id && (
+                    <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded">
+                      Subscription Manager
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-gray-600">{member.email}</div>
                 <div className="text-xs text-gray-500 mt-1">
@@ -196,6 +224,20 @@ export function ManageMembers({ showToast }) {
         <InviteUserModal
           onClose={() => setShowInviteModal(false)}
           onInvite={handleInviteUser}
+        />
+      )}
+
+      {showSubscriptionManagerModal && (
+        <SubscriptionManagerModal
+          members={members}
+          currentManager={currentSubscriptionManager}
+          onClose={() => setShowSubscriptionManagerModal(false)}
+          onSuccess={() => {
+            setShowSubscriptionManagerModal(false);
+            loadSubscriptionManager();
+            loadMembers();
+          }}
+          showToast={showToast}
         />
       )}
     </div>

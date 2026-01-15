@@ -253,6 +253,39 @@ class OrganizationService {
       }
     }
   }
+
+  /**
+   * Get current subscription manager for organization
+   */
+  async getSubscriptionManager() {
+    try {
+      const res = await apiClient.get("/organizations/current/subscription-manager");
+      return res.data?.manager || null;
+    } catch (error) {
+      console.error("Failed to fetch subscription manager:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Assign subscription manager to a member
+   * Only one subscription manager per organization
+   * @param {string} memberId - User ID to assign as subscription manager
+   */
+  async assignSubscriptionManager(memberId) {
+    try {
+      if (!memberId) {
+        throw new Error("Member ID is required");
+      }
+      const res = await apiClient.patch("/organizations/current/subscription-manager", {
+        memberId,
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Failed to assign subscription manager:", error);
+      throw error;
+    }
+  }
 }
 
 export default new OrganizationService();
