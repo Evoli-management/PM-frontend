@@ -299,6 +299,34 @@ class OrganizationService {
       throw error;
     }
   }
+
+  /**
+   * Get trial status for current organization
+   * Returns trial info including days remaining
+   */
+  async getTrialStatus() {
+    try {
+      const res = await apiClient.get("/organizations/current/trial-status");
+      return res.data?.trial || null;
+    } catch (error) {
+      console.error("Failed to fetch trial status:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start 14-day trial of BUSINESS plan
+   * Only owners, admins, or subscription managers can start trial
+   */
+  async startTrial() {
+    try {
+      const res = await apiClient.post("/organizations/current/start-trial");
+      return res.data;
+    } catch (error) {
+      console.error("Failed to start trial:", error);
+      throw error;
+    }
+  }
 }
 
 export default new OrganizationService();

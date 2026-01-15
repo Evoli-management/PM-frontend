@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes, FaBullseye, FaThLarge, FaUsers, FaKey } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
 import { SubscriptionManagerModal } from "./SubscriptionManagerModal";
+import { TrialStatusBanner } from "./TrialStatusBanner";
 
 export function ManageMembers({ showToast }) {
   const [members, setMembers] = useState([]);
@@ -16,6 +17,7 @@ export function ManageMembers({ showToast }) {
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [currentSubscriptionManager, setCurrentSubscriptionManager] = useState(null);
   const [usage, setUsage] = useState(null);
+  const [trialStatus, setTrialStatus] = useState(null);
 
   useEffect(() => {
     checkPermissions();
@@ -23,7 +25,18 @@ export function ManageMembers({ showToast }) {
     loadTeams();
     loadSubscriptionManager();
     loadUsage();
+    loadTrialStatus();
   }, []);
+
+  const loadTrialStatus = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const trial = await orgService.default.getTrialStatus();
+      setTrialStatus(trial);
+    } catch (error) {
+      console.log("Could not load trial status:", error);
+    }
+  };
 
   const loadUsage = async () => {
     try {
@@ -133,8 +146,32 @@ export function ManageMembers({ showToast }) {
     }
   };
 
+  const handleStartTrial = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      await orgService.default.startTrial();
+      showToast?.("Trial started successfully! You now have 14 days of Business plan access.");
+      // Reload trial status and usage
+      loadTrialStatus();
+      loadUsage();
+    } catch (e) {
+      showToast?.(e?.response?.data?.message || "Failed to start trial", "error");
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
+      {/* Trial Status Banner */}
+      {trialStatus && (
+        <div className="p-4">
+          <TrialStatusBanner 
+            trial={trialStatus} 
+            canManage={canManage}
+            onStartTrial={handleStartTrial}
+          />
+        </div>
+      )}
+      
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Manage Members/Users</h3>
