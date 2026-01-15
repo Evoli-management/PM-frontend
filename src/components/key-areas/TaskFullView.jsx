@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, Suspense } from 'react';
-import { FaChevronLeft, FaStop, FaEllipsisV, FaSave, FaTag, FaTrash, FaEdit, FaAngleDoubleLeft } from 'react-icons/fa';
+import { FaChevronLeft, FaStop, FaEllipsisV, FaSave, FaTag, FaTrash, FaEdit, FaAngleDoubleLeft, FaUserPlus } from 'react-icons/fa';
 import EmptyState from '../../components/goals/EmptyState.jsx';
 import TaskSlideOver from './TaskSlideOver';
 import { useToast } from '../../components/shared/ToastProvider.jsx';
@@ -21,6 +21,7 @@ import {
 
 const CreateActivityModal = React.lazy(() => import('../../components/modals/CreateActivityFormModal.jsx'));
 const EditActivityModal = React.lazy(() => import('./EditActivityModal.jsx'));
+const TaskDelegationModal = React.lazy(() => import('../modals/TaskDelegationModal.jsx'));
 
 // dev helper: HMR verification
 if (import.meta && import.meta.hot) {
@@ -143,6 +144,7 @@ export default function TaskFullView({
     const [localUsers, setLocalUsers] = useState(users || []);
     const [editingDate, setEditingDate] = useState({ id: null, field: null });
     const lastNotifiedRef = useRef(null);
+    const [delegateModalOpen, setDelegateModalOpen] = useState(false);
 
     useEffect(() => {
         setTab(initialTab || "activities");
@@ -631,6 +633,18 @@ export default function TaskFullView({
                                             >
                                                 Edit details
                                             </button>
+                                            {!readOnly && (
+                                                <button
+                                                    role="menuitem"
+                                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                                    onClick={() => {
+                                                        setMenuOpen(false);
+                                                        setDelegateModalOpen(true);
+                                                    }}
+                                                >
+                                                    Delegate task
+                                                </button>
+                                            )}
                                             <button
                                                 role="menuitem"
                                                 className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -862,6 +876,23 @@ export default function TaskFullView({
                     savingActivityIds={savingActivityIds}
                     setSavingActivityIds={setSavingActivityIds}
                 />
+            )}
+
+            {delegateModalOpen && (
+                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
+                    <TaskDelegationModal
+                        isOpen={delegateModalOpen}
+                        task={task}
+                        onClose={() => setDelegateModalOpen(false)}
+                        onDelegated={(result) => {
+                            try {
+                                addToast({ title: 'Task delegated', variant: 'success' });
+                            } catch (e) {}
+                            setDelegateModalOpen(false);
+                            if (result?.task && typeof onSave === 'function') onSave(result.task);
+                        }}
+                    />
+                </Suspense>
             )}
 
             {activityModal.open && activityModal.item && (
