@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FaSave } from 'react-icons/fa';
 import usersService from '../../services/usersService';
+import { useFormattedDate } from '../../hooks/useFormattedDate';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -68,6 +69,12 @@ export default function EditTaskModal({
   const [listIndex, setListIndex] = useState(
     initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1
   );
+  const { formatDate, dateFormat } = useFormattedDate();
+
+  const dateLabel = (value) => {
+    if (!value) return `Format: ${dateFormat}`;
+    return `${formatDate(value)} (Format: ${dateFormat})`;
+  };
   // taskId removed per UX request; tasks selection no longer shown
   const [goal, setGoal] = useState(initialData.goal || '');
   const [usersList, setUsersList] = useState(users || []);
@@ -443,6 +450,7 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
+                <p className="mt-1 text-xs text-slate-500">{dateLabel(startDate)}</p>
               </div>
 
               <div>
@@ -476,6 +484,7 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
+                <p className="mt-1 text-xs text-slate-500">{dateLabel(endDate)}</p>
               </div>
 
               <div>
@@ -510,6 +519,7 @@ export default function EditTaskModal({
                   </button>
                 </div>
                 <p className="mt-0 text-xs text-slate-500">No later than</p>
+                <p className="mt-1 text-xs text-slate-500">{dateLabel(deadline)}</p>
               </div>
 
               <div>
