@@ -778,18 +778,40 @@ export default function DontForget() {
     // Mass edit actions
     const massDelete = async () => {
         if (selectedIds.size === 0) return;
+        const ids = Array.from(selectedIds);
+        let successCount = 0;
+        let failCount = 0;
         try {
-            // Remove on server, ignore individual failures so we best-effort proceed
+            // Remove on server, track successes and failures
             await Promise.all(
-                Array.from(selectedIds).map(async (id) => {
+                ids.map(async (id) => {
                     try {
                         await (await getTaskService()).remove(id);
+                        successCount++;
+                        markSaving(id, 600);
                     } catch (e) {
+                        failCount++;
                         console.warn("Failed to delete task", id, e);
                     }
                 }),
             );
             setTasks((prev) => prev.filter((t) => !selectedIds.has(t.id)));
+            
+            // Provide user feedback
+            if (failCount > 0) {
+                addToast && addToast({ 
+                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}, failed to delete ${failCount} task${failCount !== 1 ? 's' : ''}`, 
+                    type: "warning" 
+                });
+            } else if (successCount > 0) {
+                addToast && addToast({ 
+                    message: `Deleted ${successCount} task${successCount !== 1 ? 's' : ''}`, 
+                    type: "success" 
+                });
+            }
+        } catch (e) {
+            console.error("Mass delete error", e);
+            addToast && addToast({ message: "Failed to delete tasks", type: "error" });
         } finally {
             clearSelection();
         }
@@ -844,6 +866,7 @@ export default function DontForget() {
     };
     const deleteTask = async (id) => {
         try {
+            markSaving(id);
             await (await getTaskService()).remove(id);
             setTasks((prev) => prev.filter((t) => t.id !== id));
             // Remove any local DF list mapping for this task
@@ -853,8 +876,16 @@ export default function DontForget() {
                     return rest;
                 });
             } catch (e) {}
+            // Clear selection if this was a selected task
+            setSelectedIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
         } catch (e) {
             console.error("Failed to delete task", e);
+            addToast && addToast({ message: "Failed to delete task: " + (e?.message || "Unknown error"), type: "error" });
+            throw e;
         }
     };
     const updateField = async (id, key, value) => {
