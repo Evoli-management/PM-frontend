@@ -57,10 +57,6 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                                 </div>
                             </div>
 
-                            <div className="mb-3 rounded bg-[#EDEDED] px-2 py-1 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                PROFILE SETTINGS
-                            </div>
-
                             <section className="mt-5 border-t border-gray-200 pt-5">
                                 <div className="grid gap-4 lg:grid-cols-[240px_auto] items-stretch">
                                     {/* Left sidebar - tabs */}
