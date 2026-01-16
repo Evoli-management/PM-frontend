@@ -26,6 +26,7 @@ import { CSS } from '@dnd-kit/utilities';
 import EnpsChart from "../../components/dashboard/widgets/EnpsChart.jsx";
 import CalendarPreview from "../../components/dashboard/widgets/CalendarPreview.jsx";
 import ActivityFeed from "../../components/dashboard/widgets/ActivityFeed.jsx";
+import KeyAreasWidget from "../../components/dashboard/widgets/KeyAreasWidget.jsx";
 
 import StatsCard from "../../components/dashboard/widgets/StatsCard.jsx";
 import TimeUsagePie from "../../components/dashboard/widgets/TimeUsagePie.jsx";
@@ -277,12 +278,13 @@ export default function Dashboard() {
         widgets: {
             myDay: true,
             goals: true,
+            keyAreas: true,
             enps: true,
             calendarPreview: true,
             activity: true,
         },
         // explicit order for all widgets — will be kept in localStorage (quickAdd removed to avoid duplication with navbar)
-        widgetOrder: ["myDay", "goals", "enps", "calendarPreview", "activity"],
+        widgetOrder: ["myDay", "goals", "keyAreas", "enps", "calendarPreview", "activity"],
         theme: "light", // or 'dark'
     };
 
@@ -394,12 +396,14 @@ export default function Dashboard() {
     const [activeGoals, setActiveGoals] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
     const [calendarToday, setCalendarToday] = useState([]);
+    const [keyAreas, setKeyAreas] = useState([]);
     
     // Loading and error states
     const [dataLoading, setDataLoading] = useState({
         goals: true,
         activity: true,
         calendar: true,
+        keyAreas: true,
     });
     const [dataErrors, setDataErrors] = useState({});
 
@@ -494,6 +498,21 @@ export default function Dashboard() {
                 setDataLoading(prev => ({ ...prev, calendar: false }));
             }
 
+            // Load Key Areas
+            try {
+                console.log("Loading key areas...");
+                const mod = await import("../../services/keyAreaService.js");
+                const keyAreasData = await mod.default.list({ includeTaskCount: true });
+                console.log("Key areas loaded:", keyAreasData);
+                
+                setKeyAreas(keyAreasData);
+                setDataLoading(prev => ({ ...prev, keyAreas: false }));
+            } catch (error) {
+                console.error("Failed to load key areas:", error);
+                setKeyAreas([]);
+                setDataErrors(prev => ({ ...prev, keyAreas: error.message }));
+                setDataLoading(prev => ({ ...prev, keyAreas: false }));
+            }
 
         };
 
@@ -811,6 +830,23 @@ export default function Dashboard() {
                         )}
                     </div>
                 </div>
+                </SortableWidget>
+            );
+        }
+
+        if (key === "keyAreas") {
+            return (
+                <SortableWidget key={key} id={key}>
+                    <div className={widgetClass}>
+                        <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
+                            <h3 className="font-semibold text-blue-700 mb-3">Key Areas Summary</h3>
+                            <KeyAreasWidget 
+                                keyAreas={keyAreas}
+                                loading={dataLoading.keyAreas}
+                                error={dataErrors.keyAreas}
+                            />
+                        </div>
+                    </div>
                 </SortableWidget>
             );
         }
