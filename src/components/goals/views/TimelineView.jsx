@@ -179,7 +179,7 @@ const TimelineView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
-                                        <h3 className="font-semibold text-gray-900 mb-2">{goal.title}</h3>
+                                        <h3 title={goal.title.length > 50 ? goal.title : ""} className="font-semibold text-gray-900 mb-2 break-words">{goal.title}</h3>
                                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                                             <span>{dueDate.toLocaleDateString()}</span>
                                             <span>

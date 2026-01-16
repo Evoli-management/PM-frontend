@@ -152,7 +152,7 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                 onClick={() => onGoalClick(goal)}
             >
                 <div className="flex items-start justify-between mb-3">
-                    <h4 className="font-semibold text-gray-900 text-sm line-clamp-2">{goal.title}</h4>
+                    <h4 title={goal.title.length > 50 ? goal.title : ""} className="font-semibold text-gray-900 text-sm line-clamp-2 break-words">{goal.title}</h4>
                     <div className="relative">
                         <button
                             onClick={(e) => {

@@ -184,7 +184,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600"></div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold text-slate-900 truncate">{goal.title}</h3>
+                                            <h3 title={goal.title.length > 50 ? goal.title : ""} className="font-semibold text-slate-900 truncate">{goal.title}</h3>
                                             <div className="flex items-center gap-2 mt-1">
                                                 {goal.visibility === "private" && (
                                                     <EyeOff className="w-3 h-3 text-amber-500" />

@@ -194,6 +194,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       newErrors.title = "Title is required";
     } else if (formData.title.length < 3) {
       newErrors.title = "Title must be at least 3 characters";
+    } else if (formData.title.length > 200) {
+      newErrors.title = "Title must be less than 200 characters (current: " + formData.title.length + ")";
     }
 
     if (!formData.dueDate) {
@@ -350,18 +352,31 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
           {/* Goal name */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Goal name <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                Goal name <span className="text-red-500">*</span>
+              </label>
+              <span className={`text-xs font-medium ${
+                formData.title.length > 150 ? 'text-red-600' :
+                formData.title.length > 100 ? 'text-yellow-600' :
+                'text-gray-400'
+              }`}>
+                {formData.title.length}/200
+              </span>
+            </div>
             <input
               type="text"
+              maxLength="200"
               value={formData.title}
               onChange={(e) => handleInputChange("title", e.target.value)}
               className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent ${
                 errors.title ? "border-red-300 bg-red-50" : "border-gray-300"
               }`}
-              placeholder=""
+              placeholder="Enter goal name (max 200 characters)"
             />
+            {formData.title.length > 150 && !errors.title && (
+              <p className="text-yellow-700 text-xs mt-1">⚠️ Long names may be truncated in some views</p>
+            )}
             {errors.title && (
               <p className="text-red-600 text-xs mt-1">{errors.title}</p>
             )}
