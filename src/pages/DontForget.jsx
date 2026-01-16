@@ -1204,6 +1204,8 @@ export default function DontForget() {
                         if (!selectedIds.has(t.id)) return t;
                         // If key_area_id present, we'll remove the task from DF view (returned later)
                         const u = { ...t };
+                        if (payload.title !== undefined) u.name = payload.title || "";
+                        if (payload.description !== undefined) u.notes = payload.description || "";
                         if (payload.start_date !== undefined) u.start_date = payload.start_date || "";
                         if (payload.end_date !== undefined) u.end_date = payload.end_date || "";
                         if (payload.deadline !== undefined) u.dueDate = payload.deadline || "";
@@ -1212,7 +1214,7 @@ export default function DontForget() {
                         if (payload.status !== undefined) u.status = payload.status || u.status;
                         if (payload.priority !== undefined) u.priority = payload.priority || u.priority;
                         if (payload.list_index !== undefined) u.listIndex = payload.list_index || u.listIndex;
-                        if (payload.goal !== undefined) u.goal = payload.goal || u.goal;
+                        if (payload.goal_id !== undefined) u.goal = payload.goal_id || u.goal;
                         if (payload.tags !== undefined) u.tags = payload.tags || u.tags;
                         if (payload.key_area_id) return null; // remove moved tasks
                         return u;
