@@ -16,6 +16,7 @@ export default function Teams() {
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
     const [hasOrganization, setHasOrganization] = useState(true); // Track if user has organization
+    const [usage, setUsage] = useState(null); // Plan usage and limits
 
     // ============ UI STATE ============
     const [teamsSearch, setTeamsSearch] = useState("");
@@ -36,6 +37,15 @@ export default function Teams() {
     const showToast = (message, type = 'success') => {
         setToast({ message, visible: true, type });
         setTimeout(() => setToast({ visible: false }), 3000);
+    };
+
+    const loadUsage = async () => {
+        try {
+            const usageData = await organizationService.getCurrentUsage();
+            setUsage(usageData);
+        } catch (error) {
+            console.log('Could not load usage:', error);
+        }
     };
 
     const checkPermissions = async () => {
@@ -62,7 +72,7 @@ export default function Teams() {
         const init = async () => {
             const hasOrg = await checkPermissions();
             if (hasOrg) {
-                await loadTeams();
+                await Promise.all([loadTeams(), loadUsage()]);
             } else {
                 // No org: stop loading so empty state renders
                 setLoading(false);
@@ -103,6 +113,7 @@ export default function Teams() {
             });
             setTeamsData([...teamsData, newTeam]);
             showToast('Team created successfully');
+            loadUsage(); // Reload usage stats
         } catch (err) {
             const message = err?.response?.data?.message || 'Failed to create team';
             showToast(message, 'error');
@@ -462,6 +473,30 @@ export default function Teams() {
                                     ) : (
                                         <Section title="Teams & Members">
                                             <div className="space-y-4">
+                                                {/* Usage Stats */}
+                                                {usage && (
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+                                                        <div className="flex items-center gap-4 text-sm">
+                                                            <span className="text-slate-700">
+                                                                <strong>{usage.currentMembers}</strong> / {usage.maxMembers} members
+                                                            </span>
+                                                            <span className="text-slate-400">•</span>
+                                                            <span className="text-slate-700">
+                                                                <strong>{usage.currentTeams}</strong> / {usage.maxTeams} teams
+                                                            </span>
+                                                            <span className="text-slate-400">•</span>
+                                                            <span className="text-xs px-2 py-1 bg-slate-200 text-slate-700 rounded-full font-medium">
+                                                                {usage.planName} plan
+                                                            </span>
+                                                        </div>
+                                                        {!usage.canAddTeams && (
+                                                            <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                                                                Team limit reached
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                
                                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                                     <input
                                                         value={teamsSearch}
@@ -473,19 +508,25 @@ export default function Teams() {
                                                         <div className="flex gap-2">
                                                             <input 
                                                                 id="newTeamName" 
-                                                                placeholder="Enter new team name" 
-                                                                className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
+                                                                placeholder={usage && !usage.canAddTeams ? `Team limit reached (${usage.maxTeams} max)` : "Enter new team name"}
+                                                                className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                                                                disabled={usage && !usage.canAddTeams}
                                                             />
                                                             <button
                                                                 onClick={() => {
+                                                                    if (usage && !usage.canAddTeams) {
+                                                                        showToast(`Cannot create team: You have ${usage.currentTeams} team(s) but ${usage.planName} plan allows only ${usage.maxTeams}. Upgrade your plan to add more teams.`, 'error');
+                                                                        return;
+                                                                    }
                                                                     const el = document.getElementById('newTeamName');
                                                                     const val = el?.value?.trim();
                                                                     if (!val) return;
                                                                     createTeam(val);
                                                                     if (el) el.value = '';
                                                                 }}
-                                                                disabled={saving}
-                                                                className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
+                                                                disabled={saving || (usage && !usage.canAddTeams)}
+                                                                className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                                title={usage && !usage.canAddTeams ? `Team limit reached (${usage.currentTeams}/${usage.maxTeams} on ${usage.planName} plan). Upgrade to add more teams.` : "Create a new team"}
                                                             >
                                                                 {saving ? 'Creating...' : 'Create Team'}
                                                             </button>
