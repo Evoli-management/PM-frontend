@@ -381,20 +381,20 @@ export default function Sidebar({
                                                 <button
                                                     onClick={(e) => handleKeyAreasClick(e, item)}
                                                     aria-expanded={keyAreasOpen}
-                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                                    className={`relative flex items-center w-full py-2 rounded transition group focus:outline-none ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                                 >
                                                     <span className="text-xl flex items-center justify-center" title={item.label}>
                                                         {renderedIcon}
                                                     </span>
                                                     {!collapsed && <span>{item.label}</span>}
-                                                    {item.badge && (
+                                                    {!collapsed && item.badge && (
                                                         <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
                                                             {item.badge}
                                                         </span>
                                                     )}
-                                                    <FaChevronDown
+                                                    {!collapsed && <FaChevronDown
                                                         className={`ml-auto ${keyAreasOpen ? "rotate-180" : "rotate-0"}`}
-                                                    />
+                                                    />}
                                                 </button>
 
                                                 {!collapsed && keyAreasOpen && (
@@ -496,13 +496,13 @@ export default function Sidebar({
                                     <div key={item.label} className="mb-2">
                                     <Link
                                         to={item.to}
-                                        className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                        className={`relative flex items-center py-2 rounded transition group ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                     >
                                                 <span className="text-xl flex items-center justify-center" title={item.label}>
                                                     {renderedIcon}
                                                 </span>
                                                 {!collapsed && <span>{item.label}</span>}
-                                                {item.badge && (
+                                                {!collapsed && item.badge && (
                                                     <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
                                                         {item.badge}
                                                     </span>
