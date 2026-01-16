@@ -185,10 +185,16 @@ export function ManageMembers({ showToast }) {
                   <FaKey /> Subscription Manager
                 </button>
                 <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                  onClick={() => {
+                    if (usage && !usage.canAddMembers) {
+                      showToast?.(`Cannot add member: You have ${usage.currentMembers} member(s) but ${usage.planName} plan allows only ${usage.maxMembers}. Upgrade your plan to add more members.`, 'error');
+                      return;
+                    }
+                    setShowInviteModal(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
                   disabled={usage && !usage.canAddMembers}
-                  title={usage && !usage.canAddMembers ? `Member limit reached (${usage.maxMembers} on ${usage.planName} plan)` : "Invite new user"}
+                  title={usage && !usage.canAddMembers ? `Member limit reached (${usage.currentMembers}/${usage.maxMembers} on ${usage.planName} plan). Upgrade to add more members.` : "Invite new user"}
                 >
                   <FaUserPlus /> Invite new user
                 </button>

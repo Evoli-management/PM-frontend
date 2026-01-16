@@ -13,11 +13,13 @@ export function ManageTeams({ showToast }) {
   const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
   const [canManage, setCanManage] = useState(false);
+  const [usage, setUsage] = useState(null); // Plan usage and limits
 
   useEffect(() => {
     checkPermissions();
     loadTeams();
     loadOrgMembers();
+    loadUsage();
   }, []);
 
   const checkPermissions = async () => {
@@ -33,6 +35,16 @@ export function ManageTeams({ showToast }) {
     } catch (e) {
       console.log("Could not check permissions:", e);
       setCanManage(false);
+    }
+  };
+
+  const loadUsage = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const usageData = await orgService.default.getCurrentUsage();
+      setUsage(usageData);
+    } catch (error) {
+      console.log("Could not load usage:", error);
     }
   };
 
@@ -72,6 +84,10 @@ export function ManageTeams({ showToast }) {
   };
 
   const handleCreateTeam = () => {
+    if (usage && !usage.canAddTeams) {
+      showToast?.(`Cannot create team: You have ${usage.currentTeams} team(s) but ${usage.planName} plan allows only ${usage.maxTeams}. Upgrade your plan to add more teams.`, 'error');
+      return;
+    }
     setSelectedTeam(null);
     setShowCreateModal(true);
   };
@@ -114,16 +130,44 @@ export function ManageTeams({ showToast }) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-4 border-b flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Manage Teams</h3>
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Manage Teams</h3>
           {canManage && (
             <button
               onClick={handleCreateTeam}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm"
+              disabled={usage && !usage.canAddTeams}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
+              title={usage && !usage.canAddTeams ? `Team limit reached (${usage.currentTeams}/${usage.maxTeams} on ${usage.planName} plan). Upgrade to add more teams.` : "Create a new team"}
             >
-              Create new team
+              <FaPlus /> Create new team
             </button>
           )}
+        </div>
+
+        {/* Usage Stats */}
+        {usage && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-slate-700">
+                <strong>{usage.currentMembers}</strong> / {usage.maxMembers} members
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-700">
+                <strong>{usage.currentTeams}</strong> / {usage.maxTeams} teams
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-xs px-2 py-1 bg-slate-200 text-slate-700 rounded-full font-medium">
+                {usage.planName} plan
+              </span>
+            </div>
+            {!usage.canAddTeams && (
+              <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                Team limit reached
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -185,6 +229,7 @@ export function ManageTeams({ showToast }) {
           onSuccess={() => {
             setShowCreateModal(false);
             loadTeams();
+            loadUsage();
           }}
           showToast={showToast}
           members={members}
