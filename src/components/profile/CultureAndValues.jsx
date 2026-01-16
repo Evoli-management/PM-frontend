@@ -59,7 +59,9 @@ export function CultureAndValues({ showToast }) {
         </div>
         <button
           onClick={handleCreateValue}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm"
+          disabled={values.length >= 12}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
+          title={values.length >= 12 ? "Maximum 12 values allowed" : "Add new value"}
         >
           Add new
         </button>
@@ -72,60 +74,69 @@ export function CultureAndValues({ showToast }) {
           No values defined yet. Add your company's core values to get started.
         </div>
       ) : (
-        <div className="divide-y">
-          {values.map((value) => (
-            <div key={value.id} className="p-4 hover:bg-gray-50">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 flex gap-4">
-                  {value.imageUrl && (
-                    <div className="w-16 h-16 flex-shrink-0">
-                      <img
-                        src={value.imageUrl}
-                        alt={value.heading}
-                        className="w-full h-full object-cover rounded"
-                      />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{value.heading}</h4>
-                    {value.tooltip && (
-                      <p className="text-sm text-gray-600 italic mt-1">"{value.tooltip}"</p>
-                    )}
-                    {value.behaviors && value.behaviors.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">
-                          Describe behaviors:
-                        </p>
-                        <ul className="space-y-1">
-                          {value.behaviors.map((behavior, idx) => (
-                            <li key={idx} className="text-sm text-gray-600">
-                              • {behavior.description}
-                            </li>
-                          ))}
-                        </ul>
+        <div>
+          {values.length >= 12 && (
+            <div className="p-3 m-4 mb-0 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                ⚠️ Maximum limit reached: You can have up to 12 culture values. Delete a value to add new ones.
+              </p>
+            </div>
+          )}
+          <div className="divide-y">
+            {values.map((value) => (
+              <div key={value.id} className="p-4 hover:bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 flex gap-4">
+                    {value.imageUrl && (
+                      <div className="w-16 h-16 flex-shrink-0">
+                        <img
+                          src={value.imageUrl}
+                          alt={value.heading}
+                          className="w-full h-full object-cover rounded"
+                        />
                       </div>
                     )}
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{value.heading}</h4>
+                      {value.tooltip && (
+                        <p className="text-sm text-gray-600 italic mt-1">"{value.tooltip}"</p>
+                      )}
+                      {value.behaviors && value.behaviors.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-gray-700 mb-1">
+                            Describe behaviors:
+                          </p>
+                          <ul className="space-y-1">
+                            {value.behaviors.map((behavior, idx) => (
+                              <li key={idx} className="text-sm text-gray-600">
+                                • {behavior.description}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-4">
+                    <button
+                      onClick={() => handleEditValue(value)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Edit value"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteValue(value.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      title="Delete value"
+                    >
+                      <FaTrash />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    onClick={() => handleEditValue(value)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                    title="Edit value"
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteValue(value.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    title="Delete value"
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
@@ -164,6 +175,10 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
   const [saving, setSaving] = useState(false);
 
   const handleAddBehavior = () => {
+    if (behaviors.length >= 4) {
+      showToast?.("Maximum 4 behaviors allowed per value", "error");
+      return;
+    }
     setBehaviors([...behaviors, { description: "" }]);
   };
 
@@ -307,9 +322,11 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
             <button
               type="button"
               onClick={handleAddBehavior}
-              className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+              disabled={behaviors.length >= 4}
+              className="mt-2 text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={behaviors.length >= 4 ? "Maximum 4 behaviors allowed" : "Add another behavior"}
             >
-              + Add another behavior
+              + Add another behavior {behaviors.length >= 4 && "(max 4)"}
             </button>
           </div>
 
