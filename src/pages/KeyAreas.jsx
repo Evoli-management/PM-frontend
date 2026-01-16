@@ -1476,6 +1476,29 @@ export default function KeyAreas() {
 
         window.addEventListener("sidebar-keyareas-click", showAll);
         window.addEventListener("sidebar-ideas-click", selectIdeas);
+        
+        // Listen for reorder events from sidebar drag-drop
+        const handleSidebarReorder = async (e) => {
+            const reorderedKAs = e?.detail?.keyAreas;
+            if (Array.isArray(reorderedKAs)) {
+                // Update local keyAreas state with the new order from sidebar
+                setKeyAreas(reorderedKAs);
+                // Persist the new order to backend
+                try {
+                    const svc = await getKeyAreaService();
+                    const changed = reorderedKAs.filter((ka, idx) => {
+                        const oldKa = keyAreas[idx];
+                        return !oldKa || oldKa.id !== ka.id || oldKa.position !== ka.position;
+                    });
+                    if (changed.length > 0) {
+                        await svc.reorder(changed);
+                    }
+                } catch (err) {
+                    console.warn("Failed to persist sidebar reorder:", err);
+                }
+            }
+        };
+        window.addEventListener("sidebar-keyareas-reorder", handleSidebarReorder);
 
         // also respect query params when navigated via Link
         const params = new URLSearchParams(location.search);
@@ -1485,6 +1508,7 @@ export default function KeyAreas() {
         return () => {
             window.removeEventListener("sidebar-keyareas-click", showAll);
             window.removeEventListener("sidebar-ideas-click", selectIdeas);
+            window.removeEventListener("sidebar-keyareas-reorder", handleSidebarReorder);
         };
     }, [keyAreas, loading, location.search]);
 

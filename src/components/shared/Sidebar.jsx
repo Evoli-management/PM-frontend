@@ -138,11 +138,14 @@ export default function Sidebar({
         // Insert at new position
         newKeyAreasList.splice(targetIndex, 0, draggedKa);
         
-        // Update the positions for all key areas
-        const updatedKeyAreas = newKeyAreasList.map((ka, index) => ({
-            ...ka,
-            position: index
-        }));
+        // Update the positions for all key areas (1-indexed for Ideas, 1-9 for others)
+        const updatedKeyAreas = newKeyAreasList.map((ka, index) => {
+            const isIdeas = (ka.title || "").trim().toLowerCase() === "ideas" || ka.is_default;
+            return {
+                ...ka,
+                position: isIdeas ? 10 : index + 1
+            };
+        });
         
         // Update local state immediately for UI responsiveness
         setKeyAreasList(updatedKeyAreas);
