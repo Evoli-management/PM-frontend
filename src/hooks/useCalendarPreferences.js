@@ -10,6 +10,13 @@ import {
     getRelativeDateString
 } from '../utils/timeUtils';
 
+// Normalize incoming time format values to a safe ASCII set ('12h' | '24h')
+const normalizeTimeFormat = (value) => {
+    const v = String(value || '').toLowerCase().trim();
+    if (v === '24h' || v === '24-hour' || v === '24hour') return '24h';
+    return '12h';
+};
+
 /**
  * Comprehensive hook for calendar preferences including working hours and time format
  * @param {number} slotSizeMinutes - Size of time slots in minutes (default: 30)
@@ -62,7 +69,7 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
                     startTime: userPrefs.workStartTime ?? localPrefs.workStartTime ?? '08:00',
                     endTime: userPrefs.workEndTime ?? localPrefs.workEndTime ?? '17:00'
                 },
-                timeFormat: userPrefs.timeFormat ?? localPrefs.timeFormat ?? '12h',
+                timeFormat: normalizeTimeFormat(userPrefs.timeFormat ?? localPrefs.timeFormat ?? '12h'),
                 dateFormat: userPrefs.dateFormat ?? localPrefs.dateFormat ?? 'MM/dd/yyyy',
                 timezone: userPrefs.timezone ?? localPrefs.timezone ?? 'UTC'
             };
@@ -175,13 +182,14 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
 
     // Update time format
     const updateTimeFormat = (newTimeFormat) => {
+        const normalized = normalizeTimeFormat(newTimeFormat);
         const newPreferences = {
             ...preferences,
-            timeFormat: newTimeFormat
+            timeFormat: normalized
         };
         
         setPreferences(newPreferences);
-        const { slots, formatted } = updateTimeSlots(preferences.workingHours, newTimeFormat);
+        const { slots, formatted } = updateTimeSlots(preferences.workingHours, normalized);
         
         // Trigger callback if provided
         if (onPreferencesChange) {
@@ -207,8 +215,10 @@ export const useCalendarPreferences = (slotSizeMinutes = 30, onPreferencesChange
 
     // Update all preferences at once
     const updateAllPreferences = (newPrefs) => {
-        setPreferences(newPrefs);
-        const { slots, formatted } = updateTimeSlots(newPrefs.workingHours, newPrefs.timeFormat);
+        const normalized = normalizeTimeFormat(newPrefs.timeFormat);
+        const nextPrefs = { ...newPrefs, timeFormat: normalized };
+        setPreferences(nextPrefs);
+        const { slots, formatted } = updateTimeSlots(nextPrefs.workingHours, normalized);
         
         // Trigger callback if provided
         if (onPreferencesChange) {

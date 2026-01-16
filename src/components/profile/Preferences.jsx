@@ -9,6 +9,13 @@ import { timeToMinutes } from '../../utils/timeUtils';
 import { useCalendarPreferences } from '../../hooks/useCalendarPreferences';
 import { getBrowserTimeZone } from '../../utils/time';
 
+// Normalize incoming time format values to a safe ASCII set ('12h' | '24h')
+const normalizeTimeFormat = (value) => {
+    const v = String(value || '').toLowerCase().trim();
+    if (v === '24h' || v === '24-hour' || v === '24hour') return '24h';
+    return '12h';
+};
+
 // Searchable IANA timezone selector (in-component to avoid adding a new file)
 const IanaTimezoneSelect = ({ value, onChange }) => {
     const [query, setQuery] = React.useState('');
@@ -322,19 +329,22 @@ export const Preferences = ({ showToast }) => {
             // Merge API preferences with local ones.
             // Prefer API values when present, otherwise fall back to localStorage values,
             // and finally fall back to existing defaults (prev).
-            setPreferences(prev => ({
-                ...prev,
-                ...localPreferences,
-                ...apiPreferences,
-                // Ensure work hours use API when available, otherwise local or prev
-                workStartTime: apiPreferences.workStartTime ?? localPreferences.workStartTime ?? prev.workStartTime,
-                workEndTime: apiPreferences.workEndTime ?? localPreferences.workEndTime ?? prev.workEndTime,
-                // Ensure timeFormat/dateFormat/timezone pick normalized API values if present,
-                // otherwise prefer localStorage then existing prev defaults
-                timeFormat: apiPreferences.timeFormat ?? localPreferences.timeFormat ?? prev.timeFormat,
-                dateFormat: apiPreferences.dateFormat ?? localPreferences.dateFormat ?? prev.dateFormat,
-                timezone: apiPreferences.timezone ?? localPreferences.timezone ?? prev.timezone,
-            }));
+            setPreferences(prev => {
+                const mergedTimeFormat = apiPreferences.timeFormat ?? localPreferences.timeFormat ?? prev.timeFormat;
+                return {
+                    ...prev,
+                    ...localPreferences,
+                    ...apiPreferences,
+                    // Ensure work hours use API when available, otherwise local or prev
+                    workStartTime: apiPreferences.workStartTime ?? localPreferences.workStartTime ?? prev.workStartTime,
+                    workEndTime: apiPreferences.workEndTime ?? localPreferences.workEndTime ?? prev.workEndTime,
+                    // Ensure timeFormat/dateFormat/timezone pick normalized API values if present,
+                    // otherwise prefer localStorage then existing prev defaults
+                    timeFormat: normalizeTimeFormat(mergedTimeFormat),
+                    dateFormat: apiPreferences.dateFormat ?? localPreferences.dateFormat ?? prev.dateFormat,
+                    timezone: apiPreferences.timezone ?? localPreferences.timezone ?? prev.timezone,
+                };
+            });
         } catch (error) {
             console.error('Error loading preferences:', error);
             // Fallback to localStorage if API fails
@@ -436,6 +446,8 @@ export const Preferences = ({ showToast }) => {
                 return;
             }
 
+            const sanitizedTimeFormat = normalizeTimeFormat(preferences.timeFormat);
+
             // Prepare API data - only send backend-supported fields
             const apiData = {};
             
@@ -448,7 +460,7 @@ export const Preferences = ({ showToast }) => {
             }
             
             // Add other supported fields
-            if (preferences.timeFormat) apiData.timeFormat = preferences.timeFormat;
+            if (sanitizedTimeFormat) apiData.timeFormat = sanitizedTimeFormat;
             if (preferences.dateFormat) {
                 // Resolve 'auto' to a locale-driven pattern before sending to API
                 if (preferences.dateFormat === 'auto') {
@@ -478,7 +490,10 @@ export const Preferences = ({ showToast }) => {
             }
             
             // Also save all preferences to localStorage for legacy support
-            localStorage.setItem('userPreferences', JSON.stringify(preferences));
+            localStorage.setItem('userPreferences', JSON.stringify({
+                ...preferences,
+                timeFormat: sanitizedTimeFormat,
+            }));
             
             // Refresh calendar preferences to pick up the changes immediately
             if (refreshPreferences) {
@@ -560,7 +575,8 @@ export const Preferences = ({ showToast }) => {
     const updatePreference = (key, value) => {
         // If the user changes the timeFormat, convert existing work hours to the new format
         if (key === 'timeFormat') {
-            const to24 = value === '24h';
+            const normalized = normalizeTimeFormat(value);
+            const to24 = normalized === '24h';
             const to24Time = (t) => {
                 if (!t) return t;
                 // already 24h HH:MM
@@ -623,13 +639,13 @@ export const Preferences = ({ showToast }) => {
 
             setPreferences(prev => ({
                 ...prev,
-                timeFormat: value,
+                timeFormat: normalized,
                 workStartTime: to24 ? to24Time(prev.workStartTime) : to12Time(prev.workStartTime),
                 workEndTime: to24 ? to24Time(prev.workEndTime) : to12Time(prev.workEndTime)
             }));
             // Notify other parts of the app immediately so UI updates without needing to Save
             try {
-                window.dispatchEvent(new CustomEvent('timeFormatChanged', { detail: { timeFormat: value } }));
+                window.dispatchEvent(new CustomEvent('timeFormatChanged', { detail: { timeFormat: normalized } }));
             } catch (__) {}
             return;
         }
@@ -779,8 +795,8 @@ export const Preferences = ({ showToast }) => {
                             onChange={(e) => updatePreference('timeFormat', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border-b border-gray-200 bg-gray-50 focus:bg-white focus:border-gray-400 focus:outline-none"
                         >
-                            <option value="12h">12 Hour</option>
-                            <option value="24h">24 Hour</option>
+                            <option value="12h">12-Hour (AM/PM)</option>
+                            <option value="24h">24-Hour (00:00-23:59)</option>
                         </select>
                     </Field>
                 </div>
