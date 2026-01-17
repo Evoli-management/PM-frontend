@@ -448,7 +448,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                                 className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition"
                             >
                                 {value.imageUrl && (
-                                    <img src={value.imageUrl} alt={value.heading} className="w-16 h-16 mb-2" />
+                                    <img src={value.imageUrl} alt={value.heading} className="w-24 h-24 mb-2 object-cover" />
                                 )}
                                 <span className="text-sm text-gray-700 font-medium text-center">{value.heading}</span>
                             </button>
@@ -458,7 +458,7 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                     <div>
                         <div className="flex items-start gap-4 mb-6">
                             {selectedValue.imageUrl && (
-                                <img src={selectedValue.imageUrl} alt={selectedValue.heading} className="w-24 h-24" />
+                                <img src={selectedValue.imageUrl} alt={selectedValue.heading} className="w-32 h-32 object-cover rounded-lg" />
                             )}
                             <div className="flex-1">
                                 <h3 className="text-xl font-semibold text-gray-700 mb-2">{selectedValue.heading}</h3>
