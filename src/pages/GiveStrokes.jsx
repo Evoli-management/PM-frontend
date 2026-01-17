@@ -463,24 +463,33 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                             <div className="flex-1">
                                 <h3 className="text-xl font-semibold text-gray-700 mb-2">{selectedValue.heading}</h3>
                                 <p className="text-sm text-gray-600 mb-3 font-medium">Select behaviors to recognize:</p>
-                                <div className="space-y-3">
-                                    {selectedValue.behaviors?.map((behavior, idx) => (
-                                        <label key={idx} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-gray-50 transition">
-                                            <button
-                                                type="button"
-                                                onClick={() => onToggleBehavior(behavior.name)}
-                                                className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center border-2 font-bold text-lg transition ${
-                                                    selectedBehaviors.includes(behavior.name)
-                                                        ? 'bg-lime-400 border-lime-400 text-white'
-                                                        : 'border-gray-400 hover:border-lime-400 bg-white'
-                                                }`}
-                                            >
-                                                {selectedBehaviors.includes(behavior.name) ? '+' : '○'}
-                                            </button>
-                                            <span className="text-sm text-gray-800 leading-relaxed flex-1">{behavior.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
+                                {selectedValue.behaviors && selectedValue.behaviors.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {selectedValue.behaviors.map((behavior, idx) => (
+                                            <label key={idx} className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-100 transition border border-gray-100">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onToggleBehavior(behavior.name)}
+                                                    className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center border-2 font-bold text-lg transition mt-0.5 ${
+                                                        selectedBehaviors.includes(behavior.name)
+                                                            ? 'bg-lime-400 border-lime-400 text-white'
+                                                            : 'border-gray-400 hover:border-lime-400 bg-white'
+                                                    }`}
+                                                >
+                                                    {selectedBehaviors.includes(behavior.name) ? '+' : '○'}
+                                                </button>
+                                                <div className="flex-1 flex flex-col">
+                                                    <span className="font-medium text-gray-900">{behavior.name}</span>
+                                                    {behavior.tooltip && <span className="text-xs text-gray-500 mt-0.5">{behavior.tooltip}</span>}
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                        <p className="text-sm text-yellow-800">No behaviors defined for this culture value yet.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
