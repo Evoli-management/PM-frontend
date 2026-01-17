@@ -88,11 +88,11 @@ export function CultureAndValues({ showToast }) {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 flex gap-4">
                     {value.imageUrl && (
-                      <div className="w-16 h-16 flex-shrink-0">
+                      <div className="w-24 h-24 flex-shrink-0">
                         <img
                           src={value.imageUrl}
                           alt={value.heading}
-                          className="w-full h-full object-cover rounded"
+                          className="w-full h-full object-cover rounded-lg"
                         />
                       </div>
                     )}
@@ -284,7 +284,7 @@ function ValueModal({ value, onClose, onSuccess, showToast }) {
                 <img
                   src={imageUrl}
                   alt="Preview"
-                  className="w-16 h-16 object-cover rounded border"
+                  className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200"
                   onError={(e) => {
                     e.target.style.display = "none";
                   }}
