@@ -468,16 +468,16 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                                         <label key={idx} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-gray-50 transition">
                                             <button
                                                 type="button"
-                                                onClick={() => onToggleBehavior(behavior.description)}
+                                                onClick={() => onToggleBehavior(behavior.name)}
                                                 className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center border-2 font-bold text-lg transition ${
-                                                    selectedBehaviors.includes(behavior.description)
+                                                    selectedBehaviors.includes(behavior.name)
                                                         ? 'bg-lime-400 border-lime-400 text-white'
                                                         : 'border-gray-400 hover:border-lime-400 bg-white'
                                                 }`}
                                             >
-                                                {selectedBehaviors.includes(behavior.description) ? '+' : '○'}
+                                                {selectedBehaviors.includes(behavior.name) ? '+' : '○'}
                                             </button>
-                                            <span className="text-sm text-gray-800 leading-relaxed flex-1">{behavior.description}</span>
+                                            <span className="text-sm text-gray-800 leading-relaxed flex-1">{behavior.name}</span>
                                         </label>
                                     ))}
                                 </div>
