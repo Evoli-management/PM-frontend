@@ -7,10 +7,21 @@ const recognitionsService = {
    * Create a new recognition/stroke
    */
   async createRecognition(data) {
-    const response = await axios.post(`${API_URL}/recognitions`, data, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-    });
-    return response.data;
+    try {
+      const response = await axios.post(`${API_URL}/recognitions`, data, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Recognition API Error:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        requestData: data,
+      });
+      throw error;
+    }
   },
 
   /**
