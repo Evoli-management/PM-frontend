@@ -240,7 +240,7 @@ class OrganizationService {
    */
   async getUserOrganizations() {
     try {
-      const res = await apiClient.get("/organizations/user");
+      const res = await apiClient.get("/organizations");
       return res.data || [];
     } catch (error) {
       console.error("Failed to fetch user organizations:", error);
