@@ -462,20 +462,22 @@ function EmployeeshipModal({ values, selectedValue, onSelectValue, selectedBehav
                             )}
                             <div className="flex-1">
                                 <h3 className="text-xl font-semibold text-gray-700 mb-2">{selectedValue.heading}</h3>
-                                <div className="space-y-2">
+                                <p className="text-sm text-gray-600 mb-3 font-medium">Select behaviors to recognize:</p>
+                                <div className="space-y-3">
                                     {selectedValue.behaviors?.map((behavior, idx) => (
-                                        <label key={idx} className="flex items-center gap-2 cursor-pointer">
+                                        <label key={idx} className="flex items-start gap-3 cursor-pointer p-2 rounded hover:bg-gray-50 transition">
                                             <button
+                                                type="button"
                                                 onClick={() => onToggleBehavior(behavior.description)}
-                                                className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
+                                                className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center border-2 font-bold text-lg transition ${
                                                     selectedBehaviors.includes(behavior.description)
                                                         ? 'bg-lime-400 border-lime-400 text-white'
-                                                        : 'border-gray-300'
+                                                        : 'border-gray-400 hover:border-lime-400 bg-white'
                                                 }`}
                                             >
-                                                {selectedBehaviors.includes(behavior.description) && '+'}
+                                                {selectedBehaviors.includes(behavior.description) ? '+' : '○'}
                                             </button>
-                                            <span className="text-sm">{behavior.description}</span>
+                                            <span className="text-sm text-gray-800 leading-relaxed flex-1">{behavior.description}</span>
                                         </label>
                                     ))}
                                 </div>
