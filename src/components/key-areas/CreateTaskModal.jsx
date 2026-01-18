@@ -424,7 +424,7 @@ export default function CreateTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div ref={firstRowRef} style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
@@ -509,7 +509,7 @@ export default function CreateTaskModal({
 
             {/* separator column centered between left and right on md+ */}
             <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
-              <div className="w-px bg-slate-400 my-2" />
+              <div className="w-px bg-slate-200 my-2" />
             </div>
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
