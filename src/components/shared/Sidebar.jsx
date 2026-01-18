@@ -84,7 +84,15 @@ export default function Sidebar({
 }) {
     const location = useLocation();
     const [keyAreasList, setKeyAreasList] = useState([]);
-    const [internalCollapsed, setInternalCollapsed] = useState(false);
+    // Initialize from localStorage to persist across page navigation
+    const [internalCollapsed, setInternalCollapsed] = useState(() => {
+        try {
+            const saved = localStorage.getItem('sidebar-collapsed');
+            return saved ? JSON.parse(saved) : false;
+        } catch {
+            return false;
+        }
+    });
     const [keyAreasOpen, setKeyAreasOpen] = useState(false);
     const [draggedItem, setDraggedItem] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -99,6 +107,15 @@ export default function Sidebar({
             document.documentElement.classList.remove('sidebar-collapsed');
         }
     }, [collapsed]);
+
+    // Persist collapsed state to localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem('sidebar-collapsed', JSON.stringify(internalCollapsed));
+        } catch {
+            // Silently fail if localStorage is unavailable
+        }
+    }, [internalCollapsed]);
 
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
