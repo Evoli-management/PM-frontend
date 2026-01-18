@@ -6,7 +6,6 @@ import {
     FaLock,
     FaChevronDown,
     FaGripVertical,
-    FaClock,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
 
@@ -59,12 +58,6 @@ const navItems = [
             />
         ),
         to: "/give-strokes",
-        section: "Main",
-    },
-    {
-        label: "Reminders",
-        icon: <FaClock className="text-orange-500" />,
-        to: "/reminders",
         section: "Main",
     },
     {
