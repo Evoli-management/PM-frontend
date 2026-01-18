@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
     FaHome,
@@ -90,6 +90,15 @@ export default function Sidebar({
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
+
+    // Sync collapsed state with document for main content margin adjustment
+    useEffect(() => {
+        if (collapsed) {
+            document.documentElement.classList.add('sidebar-collapsed');
+        } else {
+            document.documentElement.classList.remove('sidebar-collapsed');
+        }
+    }, [collapsed]);
 
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");

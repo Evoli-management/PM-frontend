@@ -43,6 +43,23 @@ body {
     margin-bottom: calc(var(--layout-panel-gap) + 8px);
 }
 
+/* Responsive sidebar: adjust main content margin when sidebar collapses */
+@media (min-width: 768px) {
+    main.flex-grow {
+        transition: margin-left 300ms ease;
+    }
+    
+    /* Default: sidebar expanded (256px = 64 * 4 = w-64) */
+    main.flex-grow:not(.public-route) {
+        margin-left: 16rem; /* 256px */
+    }
+    
+    /* When sidebar collapsed: reduce to 80px (w-20) */
+    html.sidebar-collapsed main.flex-grow:not(.public-route) {
+        margin-left: 5rem; /* 80px */
+    }
+}
+
 /* Hide scrollbars but keep scroll functionality */
 .no-scrollbar {
     -ms-overflow-style: none; /* IE and Edge */
