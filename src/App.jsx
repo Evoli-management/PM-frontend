@@ -65,7 +65,7 @@ export default function App() {
             <div className="page-bg">
                 <Navbar />
                 <ModalManager />
-                <main className={isPublicRoute ? "flex-grow" : "flex-grow pt-[72px] md:pt-[72px] md:ml-64"}>
+                <main className={isPublicRoute ? "flex-grow public-route" : "flex-grow pt-[72px] md:pt-[72px]"}>
                     <Suspense
                         fallback={
                             <div className="w-full py-10 flex items-center justify-center text-gray-600">

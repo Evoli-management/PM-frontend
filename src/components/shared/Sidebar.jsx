@@ -91,6 +91,15 @@ export default function Sidebar({
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
 
+    // Sync collapsed state with document for main content margin adjustment
+    useEffect(() => {
+        if (collapsed) {
+            document.documentElement.classList.add('sidebar-collapsed');
+        } else {
+            document.documentElement.classList.remove('sidebar-collapsed');
+        }
+    }, [collapsed]);
+
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
 
