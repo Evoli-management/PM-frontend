@@ -558,6 +558,8 @@ const CalendarContainer = () => {
             if (import.meta.env.DEV) {
                 try { console.debug('Creating appointment payload', payload); } catch (_) {}
             }
+            // Show progress while creating appointment
+            try { setLoading(true); } catch (_) {}
             const created = await calendarService.createAppointment(payload);
             if (import.meta.env.DEV) {
                 try { console.debug('Appointment created (server response)', created); } catch (_) {}
@@ -578,6 +580,7 @@ const CalendarContainer = () => {
                 description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`,
                 variant: "success",
             });
+            try { setLoading(false); } catch (_) {}
         } catch (err) {
             console.warn("Failed to create calendar event from drop", err);
             // Try to extract server-provided details for better user feedback
@@ -590,6 +593,8 @@ const CalendarContainer = () => {
                 }
             } catch (_) {}
             addToast({ title: "Failed to create event", description: details, variant: "error" });
+        } finally {
+            try { setLoading(false); } catch (_) {}
         }
     };
 
