@@ -114,12 +114,18 @@ const TaskRow = ({
               <button
                 type="button"
                 className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                onClick={(e) => {
+                onClick={async (e) => {
                   try { e.stopPropagation(); } catch (__) {}
                   setMenuOpen(false);
                   if (typeof onDeleteClick === 'function') {
                     const ok = window.confirm(`Delete task "${t.title}"?`);
-                    if (ok) onDeleteClick();
+                    if (ok) {
+                      try {
+                        await onDeleteClick();
+                      } catch (err) {
+                        console.error('Delete failed:', err);
+                      }
+                    }
                   }
                 }}
               >
