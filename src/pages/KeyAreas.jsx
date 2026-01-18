@@ -595,7 +595,6 @@ export default function KeyAreas() {
     const [showActivityComposer, setShowActivityComposer] = useState(false);
     const [editingActivityId, setEditingActivityId] = useState(null);
     const [showTaskHelp, setShowTaskHelp] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
@@ -2368,8 +2367,6 @@ export default function KeyAreas() {
             <div className="flex w-full min-h-screen">
                 <Sidebar
                     user={{ name: "User" }}
-                    collapsed={sidebarCollapsed}
-                    onCollapseToggle={() => setSidebarCollapsed((c) => !c)}
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />

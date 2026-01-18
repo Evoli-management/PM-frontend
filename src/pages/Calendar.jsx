@@ -4,7 +4,6 @@ import CalendarContainer from "../components/calendar/CalendarContainer.jsx";
 import { FaBars } from "react-icons/fa";
 
 export default function Calendar() {
-    const [collapsed, setCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     return (
@@ -12,8 +11,6 @@ export default function Calendar() {
             <div className="flex w-full overflow-hidden">
                 <Sidebar
                     user={{ name: "User" }}
-                    collapsed={collapsed}
-                    onCollapseToggle={() => setCollapsed((c) => !c)}
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />

@@ -11,7 +11,6 @@ export default function MyFocus() {
     const [tasks, setTasks] = useState([]);
     const [keyAreasMap, setKeyAreasMap] = useState({});
     const [quadrantFilter, setQuadrantFilter] = useState('all');
-    const [collapsed, setCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -73,8 +72,6 @@ export default function MyFocus() {
             <div className="flex w-full min-h-screen">
                 <Sidebar
                     user={{ name: 'User' }}
-                    collapsed={collapsed}
-                    onCollapseToggle={() => setCollapsed((c) => !c)}
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />
