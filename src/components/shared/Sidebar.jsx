@@ -9,6 +9,15 @@ import {
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
 
+// Lazy load keyAreaService for reordering
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod.default || mod;
+    return _keyAreaService;
+};
+
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
     { label: "Calendar", icon: <FaCalendarAlt className="text-green-600" />, to: "/calendar", section: "Main" },
@@ -549,3 +558,13 @@ export default function Sidebar({
         </aside>
     );
 }
+        
+        // Persist reordering to backend
+        (async () => {
+            try {
+                const keyAreaService = await getKeyAreaService();
+                await keyAreaService.reorder(updatedKeyAreas);
+            } catch (err) {
+                console.error("Failed to persist key area reordering:", err);
+            }
+        })();
