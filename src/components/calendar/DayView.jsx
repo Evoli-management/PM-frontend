@@ -674,7 +674,32 @@ export default function DayView({
                 </div>
                 <div className="flex-1">
                   {/* make all-day area able to stack full-width bars for multi-day tasks */}
-                  <div className="border-b border-gray-200 px-2 py-1">
+                  <div
+                    className="border-b border-gray-200 px-2 py-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Click to create all-day event"
+                    title="Click to create all-day event"
+                    onClick={(e) => {
+                      try { e.stopPropagation(); } catch (_) {}
+                      if (typeof onQuickCreate === "function") {
+                        const base = currentDate || new Date();
+                        const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+                        onQuickCreate(dt, { allDay: true });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        try { e.stopPropagation(); } catch (_) {}
+                        if (typeof onQuickCreate === "function") {
+                          const base = currentDate || new Date();
+                          const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+                          onQuickCreate(dt, { allDay: true });
+                        }
+                      }
+                    }}
+                  >
                     <div className="flex flex-col gap-1 max-h-28 overflow-y-auto">
                       {(() => {
                         try {
@@ -758,7 +783,7 @@ export default function DayView({
                                 <div key={`allday-${t.id || title}`} className="w-full">
                                   <button
                                     type="button"
-                                    onClick={() => onTaskClick && onTaskClick(t)}
+                                    onClick={(e) => { try { e.stopPropagation(); } catch (_) {}; onTaskClick && onTaskClick(t); }}
                                     className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
                                     style={{ ...(styleBar || {}), width: '100%' }}
                                     title={title}

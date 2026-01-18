@@ -106,6 +106,7 @@ const CalendarContainer = () => {
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [appointmentModalOpen, setAppointmentModalOpen] = useState(false);
     const [appointmentInitialStart, setAppointmentInitialStart] = useState(null);
+    const [appointmentInitialAllDay, setAppointmentInitialAllDay] = useState(false);
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
@@ -1234,10 +1235,15 @@ const CalendarContainer = () => {
     };
 
     // Double-click now opens appointment modal instead of auto-creating
-    const handleQuickCreate = (date) => {
+    const handleQuickCreate = (date, opts = {}) => {
         const start = new Date(date);
-        // Allow quick-create at any time
+        const isAllDay = Boolean(opts && opts.allDay);
+        if (isAllDay) {
+            // normalize to start of day
+            start.setHours(0, 0, 0, 0);
+        }
         setAppointmentInitialStart(start);
+        setAppointmentInitialAllDay(isAllDay);
         setAppointmentModalOpen(true);
     };
 
@@ -1795,6 +1801,7 @@ const CalendarContainer = () => {
             {appointmentModalOpen && appointmentInitialStart && (
                 <AppointmentModal
                     startDate={appointmentInitialStart}
+                    allDayDefault={appointmentInitialAllDay}
                     defaultDurationMinutes={30}
                     users={usersList}
                     goals={goalsList}
@@ -1802,12 +1809,14 @@ const CalendarContainer = () => {
                     onClose={() => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
+                        setAppointmentInitialAllDay(false);
                     }}
                     onCreated={(created) => {
                         setEvents((prev) => [...prev, created]);
                         addToast({ title: "Appointment created", variant: "success" });
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
+                        setAppointmentInitialAllDay(false);
                     }}
                 />
             )}

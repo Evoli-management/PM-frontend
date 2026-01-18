@@ -260,6 +260,7 @@ const buildRecurringPattern = ({
         startDate,
         event = null,
         defaultDurationMinutes = 60,
+        allDayDefault = false,
         onClose,
         onCreated,
     onUpdated,
@@ -345,9 +346,9 @@ const buildRecurringPattern = ({
     const [keyAreaId, setKeyAreaId] = useState(initialKeyArea);
 
     const [startDateStr, setStartDateStr] = useState(toYMD(initialStart));
-    const [startTimeStr, setStartTimeStr] = useState(toHM(initialStart));
+    const [startTimeStr, setStartTimeStr] = useState(() => (!isEdit && allDayDefault) ? "00:00" : toHM(initialStart));
     const [endDateStr, setEndDateStr] = useState(toYMD(initialEnd));
-    const [endTimeStr, setEndTimeStr] = useState(toHM(initialEnd));
+    const [endTimeStr, setEndTimeStr] = useState(() => (!isEdit && allDayDefault) ? "23:59" : toHM(initialEnd));
     const [saving, setSaving] = useState(false);
     const [clientConflict, setClientConflict] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -1022,33 +1023,37 @@ const buildRecurringPattern = ({
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="text-sm font-medium text-slate-700">
-                                    Start time
-                                </label>
-                                <TimePicker
-                                    value={startTimeStr}
-                                    onChange={(v) => setStartTimeStr(v)}
-                                    use24Hour={use24Hour}
-                                    outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                    innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                    label="Start time"
-                                />
-                            </div>
+                            {allDayDefault ? (
+                                <div className="mt-2 text-xs text-slate-600">
+                                    This will be created as an all-day event.
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700">Start time</label>
+                                        <TimePicker
+                                            value={startTimeStr}
+                                            onChange={(v) => setStartTimeStr(v)}
+                                            use24Hour={use24Hour}
+                                            outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            label="Start time"
+                                        />
+                                    </div>
 
-                            <div>
-                                <label className="text-sm font-medium text-slate-700">
-                                    End time
-                                </label>
-                                <TimePicker
-                                    value={endTimeStr}
-                                    onChange={(v) => setEndTimeStr(v)}
-                                    use24Hour={use24Hour}
-                                    outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                    innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                    label="End time"
-                                />
-                            </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-700">End time</label>
+                                        <TimePicker
+                                            value={endTimeStr}
+                                            onChange={(v) => setEndTimeStr(v)}
+                                            use24Hour={use24Hour}
+                                            outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            label="End time"
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* separator column centered between left and right on md+ */}
