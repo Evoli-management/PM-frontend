@@ -14,6 +14,7 @@ export function ManageMembers({ showToast }) {
   const [showSubscriptionManagerModal, setShowSubscriptionManagerModal] = useState(false);
   const [teams, setTeams] = useState([]);
   const [canManage, setCanManage] = useState(false);
+  const [canInvite, setCanInvite] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [currentSubscriptionManager, setCurrentSubscriptionManager] = useState(null);
   const [usage, setUsage] = useState(null);
@@ -69,9 +70,13 @@ export function ManageMembers({ showToast }) {
       const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
       const isOwner = org?.contactEmail === profile?.email;
       setCanManage(isAdmin || isOwner);
+
+      // Any authenticated org member can invite; backend now permits all roles
+      setCanInvite(!!org?.id);
     } catch (e) {
       console.log("Could not check permissions:", e);
       setCanManage(false);
+      setCanInvite(false);
     }
   };
 
@@ -175,8 +180,8 @@ export function ManageMembers({ showToast }) {
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Manage Members/Users</h3>
-            {canManage && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {canManage && (
                 <button
                   onClick={() => setShowSubscriptionManagerModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
@@ -184,6 +189,8 @@ export function ManageMembers({ showToast }) {
                 >
                   <FaKey /> Subscription Manager
                 </button>
+              )}
+              {canInvite && (
                 <button
                   onClick={() => {
                     if (usage && !usage.canAddMembers) {
@@ -198,8 +205,8 @@ export function ManageMembers({ showToast }) {
                 >
                   <FaUserPlus /> Invite new user
                 </button>
-              </div>
-            )}
+              )}
+            </div>
         </div>
         
         {/* Usage Stats */}
