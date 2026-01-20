@@ -24,14 +24,9 @@ export function ManageTeams({ showToast }) {
 
   const checkPermissions = async () => {
     try {
-      const profile = await userProfileService.getProfile();
-      const orgService = await import("../../services/organizationService");
-      const org = await orgService.default.getCurrentOrganization();
-      
-      // User can manage teams if they are admin, superuser, or organization owner
-      const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
-      const isOwner = org?.contactEmail === profile?.email;
-      setCanManage(isAdmin || isOwner);
+      // All authenticated users (members, admins, owners) can create teams
+      // Backend only requires authentication, no role-based restrictions
+      setCanManage(true);
     } catch (e) {
       console.log("Could not check permissions:", e);
       setCanManage(false);

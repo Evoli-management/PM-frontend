@@ -51,10 +51,8 @@ export default function Teams() {
     const checkPermissions = async () => {
         try {
             const profile = await userProfileService.getProfile();
-            const org = await organizationService.getCurrentOrganization();
-            const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
-            const isOwner = org?.contactEmail === profile?.email;
-            setCanManage(isAdmin || isOwner);
+            // All authenticated users can create teams per backend permissions
+            setCanManage(true);
             setUserProfile(profile);
             setHasOrganization(true);
             return true;
