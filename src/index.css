@@ -145,3 +145,32 @@ input[type="date"].hide-native-date-icon {
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
     border-color: rgba(59, 130, 246, 0.5);
 }
+
+/* TC011: Idle warning modal animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease;
+}
+
+.animate-slideUp {
+    animation: slideUp 0.3s ease;
+}

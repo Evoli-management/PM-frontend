@@ -55,6 +55,58 @@ export default function Registration() {
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+        
+        // TC027: Clear field-specific error on input
+        if (formErrors[name]) {
+            setFormErrors((prev) => ({ ...prev, [name]: '' }));
+        }
+    };
+    
+    // TC027: Validate individual field on blur
+    const handleFieldBlur = (e) => {
+        const { name, value } = e.target;
+        const errors = {};
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        switch (name) {
+            case 'firstName':
+                if (!value.trim()) errors.firstName = "First name is required.";
+                break;
+            case 'lastName':
+                if (!value.trim()) errors.lastName = "Last name is required.";
+                break;
+            case 'email':
+                if (!value.trim()) {
+                    errors.email = "Email is required.";
+                } else if (!emailRegex.test(value)) {
+                    errors.email = "Please enter a valid email address.";
+                } else if (value.length > 255) {
+                    errors.email = "Email must not exceed 255 characters.";
+                } else if (invitedEmail && value.toLowerCase() !== invitedEmail.toLowerCase()) {
+                    errors.email = `You must use the invited email: ${invitedEmail}`;
+                }
+                break;
+            case 'password':
+                if (!value) {
+                    errors.password = "Password is required.";
+                } else if (value.length < 8) {
+                    errors.password = "Password must be at least 8 characters.";
+                } else if (!/[A-Z]/.test(value)) {
+                    errors.password = "Password must contain at least one uppercase letter.";
+                } else if (!/\d/.test(value)) {
+                    errors.password = "Password must contain at least one number.";
+                }
+                break;
+            case 'confirmPassword':
+                if (value !== formData.password) {
+                    errors.confirmPassword = "Passwords do not match.";
+                }
+                break;
+            default:
+                break;
+        }
+        
+        setFormErrors((prev) => ({ ...prev, ...errors }));
     };
 
     const validateForm = () => {
@@ -251,6 +303,7 @@ export default function Registration() {
                                             placeholder="First name"
                                             value={formData.firstName}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.firstName ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -272,6 +325,7 @@ export default function Registration() {
                                             placeholder="Last name"
                                             value={formData.lastName}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.lastName ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -293,6 +347,7 @@ export default function Registration() {
                                         placeholder="Enter your email"
                                         value={formData.email}
                                         onChange={invitedEmail ? undefined : handleInputChange}
+                                        onBlur={invitedEmail ? undefined : handleFieldBlur}
                                         disabled={!!invitedEmail}
                                         className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none ${
                                             invitedEmail ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-green-400'
@@ -320,6 +375,7 @@ export default function Registration() {
                                             placeholder="Enter password"
                                             value={formData.password}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.password ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -347,6 +403,7 @@ export default function Registration() {
                                             placeholder="Confirm password"
                                             value={formData.confirmPassword}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.confirmPassword ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -403,13 +460,13 @@ export default function Registration() {
                                     />
                                     <label htmlFor="terms" className="text-gray-600 leading-tight">
                                         I agree to the{" "}
-                                        <a href="#" className="text-blue-600 underline">
+                                        <Link to="/terms-of-service" target="_blank" className="text-blue-600 underline">
                                             Terms of Service
-                                        </a>{" "}
+                                        </Link>{" "}
                                         and{" "}
-                                        <a href="#" className="text-blue-600 underline">
+                                        <Link to="/privacy-policy" target="_blank" className="text-blue-600 underline">
                                             privacy policy
-                                        </a>
+                                        </Link>
                                     </label>
                                 </div>
                                 {formErrors.agreedToTerms && (

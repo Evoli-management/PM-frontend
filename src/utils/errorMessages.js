@@ -11,6 +11,8 @@ const errorMessageMap = {
   'User with this email already exists': 'An account with this email already exists. Would you like to sign in instead?',
   'Email is required': 'Please enter your email address.',
   'Password is required': 'Please enter your password.',
+  'Your account has been disabled. Please contact support.': 'Your account has been disabled. Please contact support for assistance.',
+  'Account disabled': 'Your account has been disabled. Please contact support for assistance.',
 
   // Email verification errors
   'Invalid or expired token': 'This link has expired. Request a new verification email.',

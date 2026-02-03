@@ -182,13 +182,13 @@ export default function RequestRegistrationLink() {
 
           <p className="text-xs text-gray-500 text-center mt-4">
             By continuing, you agree to our{" "}
-            <a href="#" className="text-blue-600 hover:text-blue-800">
+            <Link to="/terms-of-service" target="_blank" className="text-blue-600 hover:text-blue-800">
               Terms of Service
-            </a>{" "}
+            </Link>{" "}
             and{" "}
-            <a href="#" className="text-blue-600 hover:text-blue-800">
+            <Link to="/privacy-policy" target="_blank" className="text-blue-600 hover:text-blue-800">
               Privacy Policy
-            </a>
+            </Link>
           </p>
         </div>
       </div>

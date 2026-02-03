@@ -36,11 +36,18 @@ const LoginPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
+        
+        // TC022: Client-side email length validation
+        if (formData.email.length > 255) {
+            setError("Email must not exceed 255 characters");
+            return;
+        }
+        
         setLoading(true);
         try {
-            const { email, password } = formData;
+            const { email, password, rememberMe } = formData;
             const authService = await import("../services/authService").then((m) => m.default);
-            const res = await authService.login({ email, password });
+            const res = await authService.login({ email, password, rememberMe });
 
             // Try to get token from response
             let token = res.token || (res.user && res.user.token);
@@ -74,7 +81,22 @@ const LoginPage = () => {
             }
         } catch (err) {
             console.error("Login error:", err);
-            const msg = err.response?.data?.message || "Login failed";
+            
+            // Extract error message - handle arrays, strings, and network errors
+            let msg;
+            if (err.response?.data?.message) {
+                msg = err.response.data.message;
+                // If backend returns array of validation errors, join them
+                if (Array.isArray(msg)) {
+                    msg = msg[0]; // Use first error message
+                }
+            } else if (err.message) {
+                // Network errors (no response from server)
+                msg = err.message;
+            } else {
+                msg = "Login failed";
+            }
+            
             const friendlyMsg = getFriendlyErrorMessage(msg);
             
             // Detect unverified user error

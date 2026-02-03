@@ -1,10 +1,12 @@
-import { Routes, Route, useLocation } from "react-router-dom";
-import { Suspense } from "react";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Suspense, useState, useEffect } from "react";
 import Navbar from "./components/shared/Navbar.jsx";
 import ModalManager from "./components/shared/ModalManager.jsx";
 import PrivateRoute from "./components/shared/PrivateRoute.jsx";
 import Footer from "./components/shared/Footer.jsx";
+import IdleWarningModal from "./components/IdleWarningModal.jsx";
 import { isFeatureEnabled } from "./utils/flags.js";
+import { initIdleTimeout, cleanupIdleTimeout, resetIdle } from "./utils/idleTimeout.js";
 
 // Core pages
 import LoginPage from "./pages/Login.jsx";
@@ -48,12 +50,20 @@ import JoinOrganization from "./pages/JoinOrganization.jsx";
 import InvitationEntry from "./pages/InvitationEntry.jsx";
 import OnboardingWizard from "./pages/OnboardingWizard.jsx";
 import CalendarSyncStatus from "./pages/CalendarSyncStatus.jsx";
+import TermsOfService from "./pages/TermsOfService.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
 export default function App() {
+    const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
+    
+    // TC011: Idle timeout state
+    const [showIdleWarning, setShowIdleWarning] = useState(false);
+    
     // Only show footer on public/auth pages
     const publicFooterRoutes = [
         "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
-        "/get-started", "/verify-email", "/verify-password-change", "/verify-email-change"
+        "/get-started", "/verify-email", "/verify-password-change", "/verify-email-change",
+        "/terms-of-service", "/privacy-policy"
     ];
     // Use react-router location so route changes (including client-side navigation)
     // update layout immediately. This prevents the main content from rendering
@@ -61,10 +71,55 @@ export default function App() {
     // dashboard tiles to appear beneath the fixed sidebar until a full refresh.
     const location = useLocation();
     const isPublicRoute = publicFooterRoutes.includes(location.pathname);
+    
+    // TC011: Initialize idle timeout tracking for authenticated users
+    useEffect(() => {
+        const token = localStorage.getItem('access_token');
+        if (token && !isPublicRoute) {
+            const handleIdle = async () => {
+                // User has been idle too long - log them out
+                localStorage.removeItem('access_token');
+                const authService = await import("./services/authService").then((m) => m.default);
+                await authService.logout();
+                navigate('/login?reason=idle');
+            };
+            
+            const handleWarning = () => {
+                // Show warning modal
+                setShowIdleWarning(true);
+            };
+            
+            initIdleTimeout(handleIdle, handleWarning);
+            
+            return () => {
+                cleanupIdleTimeout();
+            };
+        }
+    }, [isPublicRoute, navigate]);
+    
+    const handleContinueSession = () => {
+        setShowIdleWarning(false);
+        resetIdle();
+    };
+    
+    const handleLogoutFromIdle = async () => {
+        setShowIdleWarning(false);
+        localStorage.removeItem('access_token');
+        const authService = await import("./services/authService").then((m) => m.default);
+        await authService.logout();
+        navigate('/login');
+    };
+
     return (
             <div className="page-bg">
                 <Navbar />
                 <ModalManager />
+                <IdleWarningModal
+                    isOpen={showIdleWarning}
+                    onContinue={handleContinueSession}
+                    onLogout={handleLogoutFromIdle}
+                    timeRemaining={5}
+                />
                 <main className={isPublicRoute ? "flex-grow public-route" : "flex-grow pt-[72px] md:pt-[72px]"}>
                     <Suspense
                         fallback={
@@ -82,6 +137,10 @@ export default function App() {
                             <Route path="/contacts" element={<Contacts />} />
                             <Route path="/testimonials" element={<Testimonials />} />
                             <Route path="/pricing" element={<Pricing />} />
+                            
+                            {/* TC028: Terms and Privacy pages */}
+                            <Route path="/terms-of-service" element={<TermsOfService />} />
+                            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
                             <Route path="/reset-password" element={<ResetPasswordpage />} />
                             <Route path="/get-started" element={<RequestRegistrationLink />} />
