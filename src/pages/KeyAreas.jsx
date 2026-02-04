@@ -3665,6 +3665,7 @@ export default function KeyAreas() {
                                                 users={users}
                                                 goals={goals}
                                                 availableLists={availableListNumbers}
+                                                parentListNames={selectedKA ? listNames[selectedKA.id] : null}
                                                 onSave={async (payload) => {
                                                     try {
                                                         const created = await api.createTask(payload);
