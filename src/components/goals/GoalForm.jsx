@@ -211,6 +211,15 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       }
     }
 
+    // Validate start date <= due date
+    if (formData.startDate && formData.dueDate) {
+      const startDate = new Date(formData.startDate);
+      const dueDate = new Date(formData.dueDate);
+      if (startDate > dueDate) {
+        newErrors.startDate = "Start date must be before or equal to due date";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

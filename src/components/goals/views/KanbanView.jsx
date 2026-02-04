@@ -325,8 +325,8 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                             </div>
                         </div>
 
-                        {/* Column Content */}
-                        <div className="p-4 space-y-3 min-h-[400px]">
+                        {/* Column Content - Fixed height with scrolling */}
+                        <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
                             {column.goals.map((goal) => (
                                 <GoalCard key={goal.id} goal={goal} />
                             ))}
