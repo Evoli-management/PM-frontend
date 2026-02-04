@@ -2673,6 +2673,9 @@ export default function KeyAreas() {
                         setViewTab={setViewTab}
                         activeFilter={activeFilter}
                         setActiveFilter={setActiveFilter}
+                        searchValue={siteSearch}
+                        onSearchChange={setSiteSearch}
+                        onSettingsClick={() => setShowColumnSettings(true)}
                     />
                     
                     <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
@@ -2785,68 +2788,6 @@ export default function KeyAreas() {
                                     )}
 
                                     <div className="ml-auto flex items-center gap-1.5">
-                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                            <FaSearch className="text-slate-700 mr-1.5 text-sm" />
-                                            <input
-                                                placeholder={
-                                                    viewTab === 'delegated' ? 'Search…' :
-                                                    viewTab === 'todo' ? 'Search…' :
-                                                    selectedKA ? `Search…` : 'Search…'
-                                                }
-                                                className="bg-transparent outline-none text-xs w-28 sm:w-32"
-                                                value={siteSearch}
-                                                onChange={(e) => setSiteSearch(e.target.value)}
-                                            />
-                                        </div>
-
-                                        {/* View dropdown */}
-                                        <div className="relative" ref={viewMenuRef}>
-                                            <button
-                                                onClick={() => setShowViewMenu((s) => !s)}
-                                                className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-slate-50"
-                                                aria-haspopup="menu"
-                                                aria-expanded={showViewMenu ? "true" : "false"}
-                                            >
-                                                View
-                                                <svg
-                                                    className={`w-3 h-3 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                >
-                                                    <path d="M6 9l6 6 6-6" />
-                                                </svg>
-                                            </button>
-                                            {showViewMenu && (
-                                                <div
-                                                    role="menu"
-                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
-                                                >
-                                                    {[
-                                                        { key: "list", label: "List" },
-                                                    ].map((opt) => (
-                                                        <button
-                                                            key={opt.key}
-                                                            role="menuitem"
-                                                            onClick={() => {
-                                                                setView(opt.key);
-                                                                setShowViewMenu(false);
-                                                            }}
-                                                            className={`block w-full text-left px-3 py-2 text-sm ${
-                                                                view === opt.key
-                                                                    ? "bg-blue-100 text-blue-700 font-semibold"
-                                                                    : "text-slate-800 hover:bg-slate-50"
-                                                            }`}
-                                                        >
-                                                            {opt.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
                                         {/* Columns (gear) placed beside View in header */}
                                         <div className="relative ml-1" ref={columnsMenuRef}>
                                             <button
