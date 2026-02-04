@@ -2673,9 +2673,6 @@ export default function KeyAreas() {
                         setViewTab={setViewTab}
                         activeFilter={activeFilter}
                         setActiveFilter={setActiveFilter}
-                        searchValue={siteSearch}
-                        onSearchChange={setSiteSearch}
-                        onSettingsClick={() => setShowColumnSettings(true)}
                     />
                     
                     <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
