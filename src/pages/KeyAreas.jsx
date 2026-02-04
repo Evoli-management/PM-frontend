@@ -100,10 +100,10 @@ const api = {
         await (await getKeyAreaService()).remove(id);
         return true;
     },
-    async listTasks(keyAreaId) {
+    async listTasks(keyAreaId, opts = {}) {
         // Fetch from backend and normalize for UI
         try {
-            const rows = await (await getTaskService()).list({ keyAreaId });
+            const rows = await (await getTaskService()).list({ keyAreaId, withoutGoal: opts.withoutGoal });
             return (Array.isArray(rows) ? rows : []).map((t) => ({
                 ...t,
                 // `taskService.list` already maps backend enums to FE-friendly values
@@ -425,6 +425,8 @@ export default function KeyAreas() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const [taskTab, setTaskTab] = useState(1);
+    // View tab state: 'all' | 'activity-trap' | 'delegated'
+    const [viewTab, setViewTab] = useState('all');
     const [allTasks, setAllTasks] = useState([]);
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
@@ -644,6 +646,36 @@ export default function KeyAreas() {
             }
         } catch (_) {}
     }, [goals.length]);
+
+    // Reload tasks when viewTab changes (all vs activity-trap)
+    useEffect(() => {
+        if (!selectedKA) return;
+        (async () => {
+            const opts = {};
+            if (viewTab === 'activity-trap') {
+                opts.withoutGoal = true;
+            }
+            const t = await api.listTasks(selectedKA.id, opts);
+            setAllTasks(t);
+            // Reload activities for the filtered tasks
+            try {
+                const svc = await getActivityService();
+                const entries = await Promise.all(
+                    (t || []).map(async (row) => {
+                        try {
+                            const list = await svc.list({ taskId: row.id });
+                            return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                        } catch {
+                            return [String(row.id), []];
+                        }
+                    }),
+                );
+                setActivitiesByTask(Object.fromEntries(entries));
+            } catch (e) {
+                // ignore activity load failures
+            }
+        })();
+    }, [viewTab, selectedKA?.id]);
     
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
     // Toasts and saving state for activity updates
@@ -1790,8 +1822,13 @@ export default function KeyAreas() {
         // Close any open task full view when switching Key Areas
         setSelectedTaskFull(null);
         setSelectedKA(ka);
-        const t = await api.listTasks(ka.id);
-        try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0 }); } catch (__) {}
+        // Load tasks based on the view mode (all vs activity-trap)
+        const opts = {};
+        if (viewTab === 'activity-trap') {
+            opts.withoutGoal = true;
+        }
+        const t = await api.listTasks(ka.id, opts);
+        try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0, viewTab }); } catch (__) {}
         setAllTasks(t);
         // refresh activities for these tasks
         try {
@@ -1811,6 +1848,8 @@ export default function KeyAreas() {
             // ignore activity load failures; UI will show zeroes
         }
         setTaskTab(1);
+        // Reset view tab to 'all' when opening a new key area
+        setViewTab('all');
     setSearchTerm("");
     setSiteSearch("");
         setQuadrant("all");
@@ -2916,6 +2955,54 @@ export default function KeyAreas() {
                                                     className="border rounded px-2 py-1 text-sm bg-white"
                                                     placeholder="Tag"
                                                 />
+                                            </div>
+                                        </div>
+
+                                        {/* View Tabs Section (All / Activity Trap / Delegated) */}
+                                        <div className="pt-2 border-t">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-sm font-medium text-slate-600">View:</span>
+                                                <div className="flex gap-1 bg-slate-100 border border-slate-200 rounded-lg p-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewTab('all')}
+                                                        className={`px-3 py-1.5 rounded text-sm font-semibold transition ${
+                                                            viewTab === 'all'
+                                                                ? 'bg-white text-slate-900 shadow'
+                                                                : 'bg-transparent text-slate-700 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        All Tasks
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewTab('activity-trap')}
+                                                        className={`px-3 py-1.5 rounded text-sm font-semibold transition ${
+                                                            viewTab === 'activity-trap'
+                                                                ? 'bg-red-100 text-red-900 shadow'
+                                                                : 'bg-transparent text-slate-700 hover:bg-slate-200'
+                                                        }`}
+                                                        title="Show tasks without goal assignment"
+                                                    >
+                                                        Activity Trap
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setViewTab('delegated');
+                                                            // Future: Load delegated tasks
+                                                            addToast?.({ title: 'Delegated view coming soon', description: 'This feature is in development' });
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded text-sm font-semibold transition ${
+                                                            viewTab === 'delegated'
+                                                                ? 'bg-blue-100 text-blue-900 shadow'
+                                                                : 'bg-transparent text-slate-700 hover:bg-slate-200'
+                                                        }`}
+                                                        title="Show delegated tasks"
+                                                    >
+                                                        Delegated
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
 
