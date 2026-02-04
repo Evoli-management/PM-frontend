@@ -11,6 +11,7 @@ import EditTaskModal from '../components/key-areas/EditTaskModal';
 import EditActivityModal from '../components/key-areas/EditActivityModal';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
+import ViewTabsNavigation from '../components/key-areas/ViewTabsNavigation';
 import { FaCog } from 'react-icons/fa';
 import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
@@ -651,6 +652,75 @@ export default function KeyAreas() {
 
     // Reload tasks when viewTab or activeFilter changes
     useEffect(() => {
+        // Handle MY FOCUS tab - navigate to separate page
+        if (viewTab === 'my-focus') {
+            navigate('/my-focus');
+            return;
+        }
+        
+        // Handle DELEGATED tab - show delegated tasks
+        if (viewTab === 'delegated') {
+            // Load tasks delegated to current user
+            (async () => {
+                try {
+                    const svc = await getTaskService();
+                    // Get tasks where delegated_to equals current user
+                    const allUserTasks = await svc.list({});
+                    const delegatedToMe = (allUserTasks || []).filter(t => 
+                        t.delegatedTo === currentUserId || t.delegated_to === currentUserId
+                    );
+                    setAllTasks(delegatedToMe);
+                    
+                    // Load activities for delegated tasks
+                    const actSvc = await getActivityService();
+                    const entries = await Promise.all(
+                        (delegatedToMe || []).map(async (row) => {
+                            try {
+                                const list = await actSvc.list({ taskId: row.id });
+                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                            } catch {
+                                return [String(row.id), []];
+                            }
+                        }),
+                    );
+                    setActivitiesByTask(Object.fromEntries(entries));
+                } catch (e) {
+                    console.error('Failed to load delegated tasks', e);
+                }
+            })();
+            return;
+        }
+        
+        // Handle TODO tab - show all tasks across all key areas
+        if (viewTab === 'todo') {
+            (async () => {
+                try {
+                    const svc = await getTaskService();
+                    // Load ALL tasks (no key area filter)
+                    const allUserTasks = await svc.list({});
+                    setAllTasks(allUserTasks || []);
+                    
+                    // Load activities for all tasks
+                    const actSvc = await getActivityService();
+                    const entries = await Promise.all(
+                        (allUserTasks || []).map(async (row) => {
+                            try {
+                                const list = await actSvc.list({ taskId: row.id });
+                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                            } catch {
+                                return [String(row.id), []];
+                            }
+                        }),
+                    );
+                    setActivitiesByTask(Object.fromEntries(entries));
+                } catch (e) {
+                    console.error('Failed to load all tasks', e);
+                }
+            })();
+            return;
+        }
+        
+        // For ACTIVE TASKS and ACTIVITY TRAP - require selected key area
         if (!selectedKA) return;
         (async () => {
             const opts = {};
@@ -678,7 +748,7 @@ export default function KeyAreas() {
                 // ignore activity load failures
             }
         })();
-    }, [viewTab, activeFilter, selectedKA?.id]);
+    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate]);
     
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
     // Toasts and saving state for activity updates
@@ -2576,88 +2646,12 @@ export default function KeyAreas() {
                 )}
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
                     {/* Main View Tabs (legacy pattern - at top like legacy UI) */}
-                    <div className="bg-gradient-to-r from-cyan-400 to-cyan-500 px-4 py-3 shadow-sm">
-                        <div className="flex items-center gap-2 overflow-x-auto">
-                            {/* ACTIVE TASKS Tab */}
-                            <button
-                                type="button"
-                                onClick={() => setViewTab('active-tasks')}
-                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                    viewTab === 'active-tasks'
-                                        ? 'bg-white text-slate-900 shadow'
-                                        : 'bg-transparent text-white hover:bg-cyan-600'
-                                }`}
-                            >
-                                ACTIVE TASKS
-                            </button>
-                            {/* DELEGATED Tab */}
-                            <button
-                                type="button"
-                                onClick={() => setViewTab('delegated')}
-                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                    viewTab === 'delegated'
-                                        ? 'bg-white text-slate-900 shadow'
-                                        : 'bg-transparent text-white hover:bg-cyan-600'
-                                }`}
-                                title="Show delegated tasks"
-                            >
-                                DELEGATED
-                            </button>
-                            {/* TO-DO Tab */}
-                            <button
-                                type="button"
-                                onClick={() => setViewTab('todo')}
-                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                    viewTab === 'todo'
-                                        ? 'bg-white text-slate-900 shadow'
-                                        : 'bg-transparent text-white hover:bg-cyan-600'
-                                }`}
-                                title="Show to-do items"
-                            >
-                                TO-DO (RED)
-                            </button>
-                            {/* ACTIVITY TRAP Tab */}
-                            <button
-                                type="button"
-                                onClick={() => setViewTab('activity-trap')}
-                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                    viewTab === 'activity-trap'
-                                        ? 'bg-white text-slate-900 shadow'
-                                        : 'bg-transparent text-white hover:bg-cyan-600'
-                                }`}
-                                title="Show tasks without goal assignment"
-                            >
-                                ACTIVITY TRAP
-                            </button>
-                            {/* MY FOCUS Tab */}
-                            <button
-                                type="button"
-                                onClick={() => setViewTab('my-focus')}
-                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                    viewTab === 'my-focus'
-                                        ? 'bg-white text-slate-900 shadow'
-                                        : 'bg-transparent text-white hover:bg-cyan-600'
-                                }`}
-                                title="Show My Focus (Eisenhower matrix)"
-                            >
-                                MY FOCUS
-                            </button>
-                            
-                            {/* Sub-filter: Active / All Tasks (only visible when in ACTIVE TASKS tab) */}
-                            {viewTab === 'active-tasks' && (
-                                <div className="ml-4 flex items-center gap-2">
-                                    <select
-                                        value={activeFilter}
-                                        onChange={(e) => setActiveFilter(e.target.value)}
-                                        className="px-2 py-1 border border-cyan-300 rounded text-sm bg-white hover:border-cyan-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                    >
-                                        <option value="active">Active tasks</option>
-                                        <option value="all">All tasks</option>
-                                    </select>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <ViewTabsNavigation 
+                        viewTab={viewTab}
+                        setViewTab={setViewTab}
+                        activeFilter={activeFilter}
+                        setActiveFilter={setActiveFilter}
+                    />
                     
                     <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
@@ -2746,8 +2740,8 @@ export default function KeyAreas() {
                                         <FaChevronLeft />
                                     </button>
 
-                                    {/* Show selected KA icon then title inline */}
-                                    {selectedKA && (
+                                    {/* Show selected KA icon then title inline - or special views */}
+                                    {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (
                                         <div className="inline-flex items-center gap-1">
                                             <img
                                                 alt="Key Areas"
@@ -2759,9 +2753,11 @@ export default function KeyAreas() {
                                             />
                                             <span 
                                                 className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1"
-                                                style={{ color: selectedKA.color || '#1F2937' }}
+                                                style={{ color: (selectedKA && selectedKA.color) || '#1F2937' }}
                                             >
-                                                {selectedKA.title}
+                                                {viewTab === 'delegated' ? 'Delegated Tasks' : 
+                                                 viewTab === 'todo' ? 'To-Do (All Tasks)' :
+                                                 selectedKA?.title || ''}
                                             </span>
                                         </div>
                                     )}
@@ -2770,7 +2766,11 @@ export default function KeyAreas() {
                                         <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
                                             <FaSearch className="text-slate-700 mr-2" />
                                             <input
-                                                placeholder={`Search tasks in "${selectedKA.title}"…`}
+                                                placeholder={
+                                                    viewTab === 'delegated' ? 'Search delegated tasks…' :
+                                                    viewTab === 'todo' ? 'Search all tasks…' :
+                                                    selectedKA ? `Search tasks in "${selectedKA.title}"…` : 'Search tasks…'
+                                                }
                                                 className="bg-transparent outline-none text-sm w-40 sm:w-56"
                                                 value={siteSearch}
                                                 onChange={(e) => setSiteSearch(e.target.value)}
@@ -2953,13 +2953,17 @@ export default function KeyAreas() {
                                 />
                             </div>
                         )}
-                        {selectedKA && (
+                        {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
                                         <div className="flex items-center justify-between border-b pb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-700">Task Lists:</span>
+                                                <span className="font-medium text-slate-700">
+                                                    {viewTab === 'delegated' ? 'Delegated Tasks:' :
+                                                     viewTab === 'todo' ? 'All Tasks:' :
+                                                     'Task Lists:'}
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-3 text-sm">
                                                 <span className="text-slate-500" aria-live="polite">
