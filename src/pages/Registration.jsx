@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
 import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
+import TermsOfServiceModal from "../components/modals/TermsOfServiceModal";
+import PrivacyPolicyModal from "../components/modals/PrivacyPolicyModal";
 // authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
@@ -13,6 +15,8 @@ export default function Registration() {
     const [invitedEmail, setInvitedEmail] = useState(null);
     const [loadingInvitation, setLoadingInvitation] = useState(invitationToken ? true : false);
     const [invitationError, setInvitationError] = useState(null);
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -215,7 +219,8 @@ export default function Registration() {
     const strength = getPasswordStrength(password);
 
     return (
-        <div className="min-h-screen flex items-center w-full max-w-6xl mx-auto">
+        <>
+            <div className="min-h-screen flex items-center w-full max-w-6xl mx-auto">
                 <div className="relative grid md:grid-cols-2 items-center rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
                     {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
                     <div
@@ -460,13 +465,21 @@ export default function Registration() {
                                     />
                                     <label htmlFor="terms" className="text-gray-600 leading-tight">
                                         I agree to the{" "}
-                                        <Link to="/terms-of-service" target="_blank" className="text-blue-600 underline">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTermsModal(true)}
+                                            className="text-blue-600 underline hover:text-blue-800"
+                                        >
                                             Terms of Service
-                                        </Link>{" "}
+                                        </button>{" "}
                                         and{" "}
-                                        <Link to="/privacy-policy" target="_blank" className="text-blue-600 underline">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPrivacyModal(true)}
+                                            className="text-blue-600 underline hover:text-blue-800"
+                                        >
                                             privacy policy
-                                        </Link>
+                                        </button>
                                     </label>
                                 </div>
                                 {formErrors.agreedToTerms && (
@@ -536,5 +549,16 @@ export default function Registration() {
                     </div>
                 </div>
             </div>
+            
+            {/* Modals */}
+            <TermsOfServiceModal 
+                isOpen={showTermsModal} 
+                onClose={() => setShowTermsModal(false)} 
+            />
+            <PrivacyPolicyModal 
+                isOpen={showPrivacyModal} 
+                onClose={() => setShowPrivacyModal(false)} 
+            />
+        </>
     );
 }
