@@ -1,9 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaExclamation } from 'react-icons/fa';
 
 /**
  * UnifiedTaskActivityTable - Displays tasks AND activities in a single table
  * Used for DELEGATED, TODO, and ACTIVITY TRAP tabs
+ * 
+ * Features:
+ * - Inline editing of title, dates, key area, responsible person
+ * - Mark as complete/incomplete
+ * - Delete items
+ * - Toggle private/public
+ * - Mass selection and bulk edit
+ * - Open detailed view modal
  */
 export default function UnifiedTaskActivityTable({ 
     tasks = [], 
@@ -13,7 +22,12 @@ export default function UnifiedTaskActivityTable({
     users = [],
     goals = [],
     onTaskClick,
-    onActivityClick 
+    onActivityClick,
+    onTaskUpdate,
+    onActivityUpdate,
+    onTaskDelete,
+    onActivityDelete,
+    onMassEdit
 }) {
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [sortField, setSortField] = useState('priority');
@@ -23,6 +37,8 @@ export default function UnifiedTaskActivityTable({
     const [searchQuery, setSearchQuery] = useState('');
     const [showTasks, setShowTasks] = useState(true);
     const [showActivities, setShowActivities] = useState(true);
+    const [editingCell, setEditingCell] = useState(null);
+    const [editValues, setEditValues] = useState({});
 
     // Flatten tasks and activities into single array
     const allItems = useMemo(() => {
@@ -141,6 +157,69 @@ export default function UnifiedTaskActivityTable({
             newSelected.add(itemId);
         }
         setSelectedItems(newSelected);
+    };
+
+    const handleCompleteToggle = (item, e) => {
+        e.stopPropagation();
+        const isCompleted = item.dateCompleted || item.date_completed;
+        const updatedItem = {
+            ...item,
+            dateCompleted: isCompleted ? null : new Date().toISOString(),
+            date_completed: isCompleted ? null : new Date().toISOString()
+        };
+        
+        if (item.type === 'task' && onTaskUpdate) {
+            onTaskUpdate(item.id || item.task_id, updatedItem);
+        } else if (item.type === 'activity' && onActivityUpdate) {
+            onActivityUpdate(item.id || item.activity_id, updatedItem);
+        }
+    };
+
+    const handleDelete = (item, e) => {
+        e.stopPropagation();
+        if (confirm(`Are you sure you want to delete this ${item.type}?`)) {
+            if (item.type === 'task' && onTaskDelete) {
+                onTaskDelete(item.id || item.task_id);
+            } else if (item.type === 'activity' && onActivityDelete) {
+                onActivityDelete(item.id || item.activity_id);
+            }
+        }
+    };
+
+    const handleTogglePrivate = (item, e) => {
+        e.stopPropagation();
+        const updatedItem = {
+            ...item,
+            public: item.public ? 0 : 1
+        };
+        
+        if (item.type === 'task' && onTaskUpdate) {
+            onTaskUpdate(item.id || item.task_id, updatedItem);
+        } else if (item.type === 'activity' && onActivityUpdate) {
+            onActivityUpdate(item.id || item.activity_id, updatedItem);
+        }
+    };
+
+    const handleCellEdit = (item, field, value) => {
+        const updatedItem = { ...item, [field]: value };
+        
+        if (item.type === 'task' && onTaskUpdate) {
+            onTaskUpdate(item.id || item.task_id, updatedItem);
+        } else if (item.type === 'activity' && onActivityUpdate) {
+            onActivityUpdate(item.id || item.activity_id, updatedItem);
+        }
+        
+        setEditingCell(null);
+    };
+
+    const handleMassEdit = (e) => {
+        e.stopPropagation();
+        if (selectedItems.size > 0 && onMassEdit) {
+            const selectedIds = Array.from(selectedItems);
+            const tasks = selectedIds.filter(id => id.startsWith('task-')).map(id => id.replace('task-', ''));
+            const acts = selectedIds.filter(id => id.startsWith('activity-')).map(id => id.replace('activity-', ''));
+            onMassEdit({ taskIds: tasks, activityIds: acts });
+        }
     };
 
     const formatDate = (date) => {
@@ -269,6 +348,7 @@ export default function UnifiedTaskActivityTable({
                     <div className="flex items-center gap-2">
                         <span className="text-sm">{selectedItems.size} selected</span>
                         <button
+                            onClick={handleMassEdit}
                             className={`px-3 py-1 text-sm rounded ${
                                 selectedItems.size === 0
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -325,23 +405,20 @@ export default function UnifiedTaskActivityTable({
                             {columns.includes('responsible') && (
                                 <th className="w-32 p-2">Responsible</th>
                             )}
+                            <th className="w-24 p-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {sortedItems.map((item) => {
                             const deadlineValue = item.deadline || item.dueDate || item.due_date;
                             const overdue = isOverdue(deadlineValue, item.endDate || item.end_date);
+                            const isCompleted = item.dateCompleted || item.date_completed;
+                            const isPrivate = item.public === 0 || item.public === '0' ? true : false;
+                            
                             return (
                                 <tr
                                     key={item.itemId}
-                                    className={`border-b hover:bg-gray-50 cursor-pointer ${overdue ? 'bg-red-50' : ''}`}
-                                    onClick={() => {
-                                        if (item.type === 'task' && onTaskClick) {
-                                            onTaskClick(item);
-                                        } else if (item.type === 'activity' && onActivityClick) {
-                                            onActivityClick(item);
-                                        }
-                                    }}
+                                    className={`border-b hover:bg-gray-50 ${overdue ? 'bg-red-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
                                 >
                                     <td className="p-2 text-center">
                                         <input
@@ -355,15 +432,24 @@ export default function UnifiedTaskActivityTable({
                                         />
                                     </td>
                                     {columns.includes('priority') && (
-                                        <td className="p-2 text-center font-bold">
+                                        <td className="p-2 text-center font-bold text-red-600">
                                             {getPriorityIcon(item.priority)}
                                         </td>
                                     )}
                                     {columns.includes('title') && (
-                                        <td className="p-2">
+                                        <td 
+                                            className="p-2 cursor-pointer hover:bg-blue-100"
+                                            onClick={() => {
+                                                if (item.type === 'task' && onTaskClick) {
+                                                    onTaskClick(item);
+                                                } else if (item.type === 'activity' && onActivityClick) {
+                                                    onActivityClick(item);
+                                                }
+                                            }}
+                                        >
                                             <div className="flex items-center gap-2">
                                                 {item.type === 'task' ? '📦' : '📋'}
-                                                <span>{item.title}</span>
+                                                <span className={isCompleted ? 'line-through text-gray-500' : ''}>{item.title}</span>
                                             </div>
                                         </td>
                                     )}
@@ -380,7 +466,9 @@ export default function UnifiedTaskActivityTable({
                                         <td className="p-2 text-xs">{formatDate(item.endDate || item.end_date)}</td>
                                     )}
                                     {columns.includes('deadline') && (
-                                        <td className="p-2 text-xs">{formatDate(deadlineValue)}</td>
+                                        <td className={`p-2 text-xs ${overdue ? 'text-red-600 font-bold' : ''}`}>
+                                            {formatDate(deadlineValue)}
+                                        </td>
                                     )}
                                     {columns.includes('keyArea') && (
                                         <td className="p-2 text-xs">
@@ -390,6 +478,69 @@ export default function UnifiedTaskActivityTable({
                                     {columns.includes('responsible') && (
                                         <td className="p-2 text-xs">{item.assignee || item.responsible || ''}</td>
                                     )}
+                                    {/* Action Buttons */}
+                                    <td className="p-2 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            {/* Open Details Link */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (item.type === 'task' && onTaskClick) {
+                                                        onTaskClick(item);
+                                                    } else if (item.type === 'activity' && onActivityClick) {
+                                                        onActivityClick(item);
+                                                    }
+                                                }}
+                                                className="text-blue-500 hover:text-blue-700 p-1"
+                                                title="Open details"
+                                            >
+                                                <FaExternalLinkAlt size={14} />
+                                            </button>
+
+                                            {/* Toggle Complete */}
+                                            {isCompleted ? (
+                                                <button
+                                                    onClick={(e) => handleCompleteToggle(item, e)}
+                                                    className="text-gray-400 hover:text-red-600 p-1"
+                                                    title="Mark as not completed"
+                                                >
+                                                    <FaTimes size={14} />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={(e) => handleCompleteToggle(item, e)}
+                                                    className="text-gray-400 hover:text-green-600 p-1"
+                                                    title="Mark as completed"
+                                                >
+                                                    <FaCheck size={14} />
+                                                </button>
+                                            )}
+
+                                            {/* Toggle Private/Public */}
+                                            {viewTab !== 'delegated' && (
+                                                <button
+                                                    onClick={(e) => handleTogglePrivate(item, e)}
+                                                    className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
+                                                    title={isPrivate ? 'Mark as public' : 'Mark as private'}
+                                                >
+                                                    {isPrivate ? (
+                                                        <FaLock size={14} />
+                                                    ) : (
+                                                        <FaLockOpen size={14} />
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {/* Delete */}
+                                            <button
+                                                onClick={(e) => handleDelete(item, e)}
+                                                className="text-gray-400 hover:text-red-700 p-1"
+                                                title="Delete"
+                                            >
+                                                <FaTrash size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             );
                         })}

@@ -3646,6 +3646,58 @@ export default function KeyAreas() {
                                             setTaskFullInitialTab("activities");
                                         }
                                     }}
+                                    onTaskUpdate={async (id, updatedTask) => {
+                                        try {
+                                            const result = await api.updateTask(id, updatedTask);
+                                            setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                        } catch (error) {
+                                            console.error('Failed to update task:', error);
+                                        }
+                                    }}
+                                    onTaskDelete={async (id) => {
+                                        try {
+                                            await api.deleteTask(id);
+                                            setAllTasks(prev => prev.filter(t => t.id !== id));
+                                        } catch (error) {
+                                            console.error('Failed to delete task:', error);
+                                        }
+                                    }}
+                                    onActivityUpdate={async (id, updatedActivity) => {
+                                        try {
+                                            const activityService = await getActivityService();
+                                            const result = await activityService.update(id, updatedActivity);
+                                            // Update the activities in state
+                                            setActivitiesByTask(prev => {
+                                                const updated = { ...prev };
+                                                for (let key in updated) {
+                                                    updated[key] = updated[key].map(a => a.id === id ? result : a);
+                                                }
+                                                return updated;
+                                            });
+                                        } catch (error) {
+                                            console.error('Failed to update activity:', error);
+                                        }
+                                    }}
+                                    onActivityDelete={async (id) => {
+                                        try {
+                                            const activityService = await getActivityService();
+                                            await activityService.remove(id);
+                                            // Remove the activity from state
+                                            setActivitiesByTask(prev => {
+                                                const updated = { ...prev };
+                                                for (let key in updated) {
+                                                    updated[key] = updated[key].filter(a => a.id !== id);
+                                                }
+                                                return updated;
+                                            });
+                                        } catch (error) {
+                                            console.error('Failed to delete activity:', error);
+                                        }
+                                    }}
+                                    onMassEdit={(selected) => {
+                                        // TODO: Implement mass edit modal
+                                        console.log('Mass edit:', selected);
+                                    }}
                                 />
                             </div>
                         )}
