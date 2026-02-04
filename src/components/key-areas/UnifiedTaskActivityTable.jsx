@@ -306,11 +306,11 @@ export default function UnifiedTaskActivityTable({
         if (viewTab === 'delegated') {
             return ['priority', 'title', 'deadline', 'keyArea', 'responsible'];
         } else if (viewTab === 'todo') {
-            return ['priority', 'title', 'tab', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
+            return ['priority', 'title', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
         } else if (viewTab === 'activity-trap') {
-            return ['priority', 'title', 'tab', 'goal', 'startDate', 'endDate', 'deadline', 'keyArea'];
+            return ['priority', 'title', 'goal', 'startDate', 'endDate', 'deadline', 'keyArea'];
         }
-        return ['priority', 'title', 'tab', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
+        return ['priority', 'title', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
     }, [viewTab]);
 
     const getKeyAreaName = (keyAreaId) => {
@@ -433,9 +433,6 @@ export default function UnifiedTaskActivityTable({
                                     Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                             )}
-                            {columns.includes('tab') && (
-                                <th className="w-20 p-2">Tab</th>
-                            )}
                             {columns.includes('goal') && (
                                 <th className="w-32 p-2">Goal</th>
                             )}
@@ -541,9 +538,6 @@ export default function UnifiedTaskActivityTable({
                                                 )}
                                             </div>
                                         </td>
-                                    )}
-                                    {columns.includes('tab') && (
-                                        <td className="p-2 text-center text-xs">{item.displayId || ''}</td>
                                     )}
                                     {columns.includes('goal') && (
                                         <td
