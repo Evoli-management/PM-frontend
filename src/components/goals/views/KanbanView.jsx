@@ -1,4 +1,4 @@
-// src/components/goals/views/KanbanView.jsx - Professional Kanban Board
+// src/components/goals/views/KanbanView.jsx - Professional Kanban Board with Drag & Drop
 import React, { useState, useEffect } from "react";
 import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
@@ -13,10 +13,35 @@ import {
     FaClock,
     FaPlus,
 } from "react-icons/fa";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragOverlay,
+    useDroppable,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
     const [localGoals, setLocalGoals] = useState(goals || []);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     useEffect(() => {
         let mounted = true;
@@ -108,6 +133,66 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                 }
             }
         }
+    };
+
+    const handleDragEnd = async (event) => {
+        const { active, over } = event;
+
+        if (!over) return;
+
+        const activeGoal = localGoals.find((g) => g.id === active.id);
+        if (!activeGoal) return;
+
+        // Determine target status from over id
+        let targetStatus = null;
+        if (over.id === "droppable-active") targetStatus = "active";
+        else if (over.id === "droppable-completed") targetStatus = "completed";
+        else if (over.id === "droppable-archived") targetStatus = "archived";
+        else {
+            // Dropped on another goal - get its status
+            const overGoal = localGoals.find((g) => g.id === over.id);
+            if (overGoal) targetStatus = overGoal.status;
+        }
+
+        if (!targetStatus || activeGoal.status === targetStatus) return;
+
+        try {
+            // Optimistically update local state
+            setLocalGoals((prev) =>
+                prev.map((g) => (g.id === activeGoal.id ? { ...g, status: targetStatus } : g))
+            );
+
+            // Update on server
+            await onUpdate(activeGoal.id, { status: targetStatus });
+        } catch (error) {
+            console.error("Failed to update goal status:", error);
+            // Revert on error
+            setLocalGoals(goals);
+            alert(`Failed to move goal: ${error.message}`);
+        }
+    };
+
+    const DroppableColumn = ({ id, children }) => {
+        const { setNodeRef } = useDroppable({ id });
+        return <div ref={setNodeRef}>{children}</div>;
+    };
+
+    const SortableGoalCard = ({ goal }) => {
+        const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+            id: goal.id,
+        });
+
+        const style = {
+            transform: CSS.Transform.toString(transform),
+            transition,
+            opacity: isDragging ? 0.5 : 1,
+        };
+
+        return (
+            <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+                <GoalCard goal={goal} />
+            </div>
+        );
     };
 
     const GoalCard = ({ goal }) => {
@@ -311,36 +396,46 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
     }
 
     return (
-        <div className="flex gap-6 overflow-x-auto pb-4">
-            {columns.map((column) => (
-                <div key={column.id} className="flex-shrink-0 w-80">
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                        {/* Column Header */}
-                        <div className="p-4 border-b border-gray-200">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-gray-900">{column.title}</h3>
-                                <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
-                                    {column.goals.length}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Column Content - Fixed height with scrolling */}
-                        <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
-                            {column.goals.map((goal) => (
-                                <GoalCard key={goal.id} goal={goal} />
-                            ))}
-
-                            {column.goals.length === 0 && (
-                                <div className="text-center py-8 text-gray-400">
-                                    <p className="text-sm">No {column.title.toLowerCase()}</p>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <div className="flex gap-6 overflow-x-auto pb-4">
+                {columns.map((column) => (
+                    <div key={column.id} className="flex-shrink-0 w-80">
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                            {/* Column Header */}
+                            <div className="p-4 border-b border-gray-200">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-gray-900">{column.title}</h3>
+                                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
+                                        {column.goals.length}
+                                    </span>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Column Content - Fixed height with scrolling */}
+                            <DroppableColumn id={`droppable-${column.id}`}>
+                                <SortableContext
+                                    items={column.goals.map((g) => g.id)}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                                        {column.goals.map((goal) => (
+                                            <SortableGoalCard key={goal.id} goal={goal} />
+                                        ))}
+
+                                        {column.goals.length === 0 && (
+                                            <div className="text-center py-8 text-gray-400">
+                                                <p className="text-sm">No {column.title.toLowerCase()}</p>
+                                                <p className="text-xs mt-2">Drag goals here</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </SortableContext>
+                            </DroppableColumn>
                         </div>
                     </div>
-                </div>
-            ))}
-        </div>
+                ))}
+            </div>
+        </DndContext>
     );
 };
 

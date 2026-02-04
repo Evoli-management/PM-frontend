@@ -1,4 +1,4 @@
-// src/components/goals/views/ListView.jsx - Modern list view for goals
+// src/components/goals/views/ListView.jsx - Modern list view for goals with inline editing
 import React, { useState, useEffect } from "react";
 import { calculateGoalProgress } from "../../../utils/goalUtils";
 import {
@@ -11,11 +11,15 @@ import {
     EyeOff,
     Archive,
     Clock,
+    Check,
+    X,
 } from "lucide-react";
 
 const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
     const [localGoals, setLocalGoals] = useState(goals || []);
+    const [editingGoal, setEditingGoal] = useState(null);
+    const [editedTitle, setEditedTitle] = useState("");
 
     useEffect(() => {
         let mounted = true;
@@ -97,6 +101,32 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                 }
             }
         }
+    };
+
+    const handleStartEdit = (goal, e) => {
+        e.stopPropagation();
+        setEditingGoal(goal.id);
+        setEditedTitle(goal.title);
+    };
+
+    const handleSaveEdit = async (goalId, e) => {
+        e.stopPropagation();
+        if (editedTitle.trim() && editedTitle !== goals.find(g => g.id === goalId)?.title) {
+            try {
+                await onUpdate(goalId, { title: editedTitle.trim() });
+            } catch (error) {
+                console.error("Failed to update goal title:", error);
+                alert(`Failed to update goal: ${error.message}`);
+            }
+        }
+        setEditingGoal(null);
+        setEditedTitle("");
+    };
+
+    const handleCancelEdit = (e) => {
+        e.stopPropagation();
+        setEditingGoal(null);
+        setEditedTitle("");
     };
 
     const getStatusColor = (status) => {
@@ -184,7 +214,51 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600"></div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 title={goal.title.length > 50 ? goal.title : ""} className="font-semibold text-slate-900 truncate">{goal.title}</h3>
+                                            {editingGoal === goal.id ? (
+                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="text"
+                                                        value={editedTitle}
+                                                        onChange={(e) => setEditedTitle(e.target.value)}
+                                                        className="flex-1 px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") handleSaveEdit(goal.id, e);
+                                                            if (e.key === "Escape") handleCancelEdit(e);
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={(e) => handleSaveEdit(goal.id, e)}
+                                                        className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                                        title="Save"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={handleCancelEdit}
+                                                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                        title="Cancel"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="group/title flex items-center gap-2">
+                                                    <h3 
+                                                        title={goal.title.length > 50 ? goal.title : ""} 
+                                                        className="font-semibold text-slate-900 truncate flex-1"
+                                                    >
+                                                        {goal.title}
+                                                    </h3>
+                                                    <button
+                                                        onClick={(e) => handleStartEdit(goal, e)}
+                                                        className="opacity-0 group-hover/title:opacity-100 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-opacity"
+                                                        title="Edit title"
+                                                    >
+                                                        <Pencil className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-2 mt-1">
                                                 {goal.visibility === "private" && (
                                                     <EyeOff className="w-3 h-3 text-amber-500" />

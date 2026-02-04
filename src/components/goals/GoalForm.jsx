@@ -11,6 +11,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
   const [formData, setFormData] = useState({
     title: goal?.title || "",
     description: goal?.description || "",
+    priority: goal?.priority || "medium",
+    tags: goal?.tags || [],
     startDate: goal?.startDate
       ? new Date(goal.startDate).toISOString().split("T")[0]
       : defaultDate,
@@ -44,6 +46,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     setFormData({
       title: goal?.title || "",
       description: goal?.description || "",
+      priority: goal?.priority || "medium",
+      tags: goal?.tags || [],
       startDate: goal?.startDate
         ? new Date(goal.startDate).toISOString().split("T")[0]
         : defaultDate,
@@ -492,6 +496,39 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   <option value="public">Public</option>
                   <option value="private">Private</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) =>
+                    handleInputChange("priority", e.target.value)
+                  }
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={Array.isArray(formData.tags) ? formData.tags.join(", ") : ""}
+                  onChange={(e) => {
+                    const tags = e.target.value.split(",").map((t) => t.trim()).filter((t) => t);
+                    handleInputChange("tags", tags);
+                  }}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  placeholder="e.g., important, urgent, review"
+                />
               </div>
             </div>
 

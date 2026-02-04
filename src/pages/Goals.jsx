@@ -35,6 +35,7 @@ const Goals = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [sortBy, setSortBy] = useState("dueDate");
+    const [tagFilter, setTagFilter] = useState("");
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [keyAreas, setKeyAreas] = useState([]);
     const [toast, setToast] = useState(null);
@@ -119,6 +120,14 @@ const Goals = () => {
             filtered = filtered.filter((goal) => goal.status === statusFilter);
         }
 
+        if (tagFilter) {
+            filtered = filtered.filter((goal) =>
+                Array.isArray(goal.tags) && goal.tags.some((tag) =>
+                    tag.toLowerCase().includes(tagFilter.toLowerCase())
+                )
+            );
+        }
+
         filtered.sort((a, b) => {
             switch (sortBy) {
                 case "dueDate":
@@ -127,6 +136,9 @@ const Goals = () => {
                     return (b.progressPercent || 0) - (a.progressPercent || 0);
                 case "title":
                     return a.title.localeCompare(b.title);
+                case "priority":
+                    const priorityOrder = { high: 0, medium: 1, low: 2 };
+                    return (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
                 case "created":
                     return new Date(b.createdAt) - new Date(a.createdAt);
                 default:
@@ -135,7 +147,7 @@ const Goals = () => {
         });
 
         setFilteredGoals(filtered);
-    }, [goals, searchTerm, statusFilter, sortBy]);
+    }, [goals, searchTerm, statusFilter, sortBy, tagFilter]);
 
     const handleCreateGoal = async (goalData) => {
         try {
@@ -484,6 +496,14 @@ const Goals = () => {
                                                         </select>
                                                     </div>
 
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Filter by tag..."
+                                                        value={tagFilter}
+                                                        onChange={(e) => setTagFilter(e.target.value)}
+                                                        className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
+                                                    />
+
                                                     <div className="relative">
                                                         <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
                                                         <select
@@ -492,6 +512,7 @@ const Goals = () => {
                                                             className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
                                                         >
                                                             <option value="dueDate">Due Date</option>
+                                                            <option value="priority">Priority</option>
                                                             <option value="progress">Progress</option>
                                                             <option value="title">Title</option>
                                                             <option value="created">Recently Created</option>
