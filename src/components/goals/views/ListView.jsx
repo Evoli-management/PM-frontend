@@ -15,7 +15,7 @@ import {
     X,
 } from "lucide-react";
 
-const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
+const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new Set(), onToggleSelection }) => {
     const [actionGoal, setActionGoal] = useState(null);
     const [localGoals, setLocalGoals] = useState(goals || []);
     const [editingGoal, setEditingGoal] = useState(null);
@@ -155,7 +155,8 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                 <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-slate-600">
-                    <div className="col-span-4">Goal</div>
+                    {onToggleSelection && <div className="col-span-1">Select</div>}
+                    <div className={onToggleSelection ? "col-span-3" : "col-span-4"}>Goal</div>
                     <div className="col-span-2">Status</div>
                     <div className="col-span-2">Progress</div>
                     <div className="col-span-2">Due Date</div>
@@ -209,8 +210,24 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete }) => {
                                 onClick={() => onGoalClick(goal)}
                         >
                             <div className="grid grid-cols-12 gap-4 items-center">
+                                {/* Checkbox */}
+                                {onToggleSelection && (
+                                    <div className="col-span-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedGoals.has(goal.id)}
+                                            onChange={(e) => {
+                                                e.stopPropagation();
+                                                onToggleSelection(goal.id);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        />
+                                    </div>
+                                )}
+
                                 {/* Goal Info */}
-                                <div className="col-span-4">
+                                <div className={onToggleSelection ? "col-span-3" : "col-span-4"}>
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600"></div>
                                         <div className="flex-1 min-w-0">

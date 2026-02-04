@@ -3,7 +3,7 @@ import React from "react";
 import GoalCard from "./GoalCard";
 import EmptyState from "./EmptyState";
 
-const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
+const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete, selectedGoals = new Set(), onToggleSelection }) => {
     if (!goals || goals.length === 0) {
         return <EmptyState onCreateClick={() => { }} />;
     }
@@ -70,6 +70,21 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
     return (
         <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {goals.map((goal) => (
+                <div key={goal.id} className="relative">
+                    {onToggleSelection && (
+                        <div className="absolute top-3 left-3 z-10">
+                            <input
+                                type="checkbox"
+                                checked={selectedGoals.has(goal.id)}
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    onToggleSelection(goal.id);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
+                            />
+                        </div>
+                    )}
                     <GoalCard
                     key={goal.id}
                     goal={goal}
@@ -81,6 +96,7 @@ const GoalList = ({ goals, onGoalOpen, onGoalEdit, onUpdate, onDelete }) => {
                     onToggleVisibility={handleToggleVisibility}
                     onDelete={handleDelete}
                 />
+                </div>
             ))}
         </div>
     );
