@@ -201,10 +201,10 @@ const TermsOfService = () => {
 
         <div className="mt-8 pt-6 border-t border-gray-200 flex gap-6">
           <Link
-            to="/login"
+            to="/registration"
             className="text-blue-600 hover:text-blue-800 font-medium"
           >
-            ← Back to Login
+            ← Back to Registration
           </Link>
           <Link
             to="/privacy-policy"
