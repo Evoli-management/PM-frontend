@@ -2575,6 +2575,90 @@ export default function KeyAreas() {
                     />
                 )}
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
+                    {/* Main View Tabs (legacy pattern - at top like legacy UI) */}
+                    <div className="bg-gradient-to-r from-cyan-400 to-cyan-500 px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 overflow-x-auto">
+                            {/* ACTIVE TASKS Tab */}
+                            <button
+                                type="button"
+                                onClick={() => setViewTab('active-tasks')}
+                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
+                                    viewTab === 'active-tasks'
+                                        ? 'bg-white text-slate-900 shadow'
+                                        : 'bg-transparent text-white hover:bg-cyan-600'
+                                }`}
+                            >
+                                ACTIVE TASKS
+                            </button>
+                            {/* DELEGATED Tab */}
+                            <button
+                                type="button"
+                                onClick={() => setViewTab('delegated')}
+                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
+                                    viewTab === 'delegated'
+                                        ? 'bg-white text-slate-900 shadow'
+                                        : 'bg-transparent text-white hover:bg-cyan-600'
+                                }`}
+                                title="Show delegated tasks"
+                            >
+                                DELEGATED
+                            </button>
+                            {/* TO-DO Tab */}
+                            <button
+                                type="button"
+                                onClick={() => setViewTab('todo')}
+                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
+                                    viewTab === 'todo'
+                                        ? 'bg-white text-slate-900 shadow'
+                                        : 'bg-transparent text-white hover:bg-cyan-600'
+                                }`}
+                                title="Show to-do items"
+                            >
+                                TO-DO (RED)
+                            </button>
+                            {/* ACTIVITY TRAP Tab */}
+                            <button
+                                type="button"
+                                onClick={() => setViewTab('activity-trap')}
+                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
+                                    viewTab === 'activity-trap'
+                                        ? 'bg-white text-slate-900 shadow'
+                                        : 'bg-transparent text-white hover:bg-cyan-600'
+                                }`}
+                                title="Show tasks without goal assignment"
+                            >
+                                ACTIVITY TRAP
+                            </button>
+                            {/* MY FOCUS Tab */}
+                            <button
+                                type="button"
+                                onClick={() => setViewTab('my-focus')}
+                                className={`px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap transition ${
+                                    viewTab === 'my-focus'
+                                        ? 'bg-white text-slate-900 shadow'
+                                        : 'bg-transparent text-white hover:bg-cyan-600'
+                                }`}
+                                title="Show My Focus (Eisenhower matrix)"
+                            >
+                                MY FOCUS
+                            </button>
+                            
+                            {/* Sub-filter: Active / All Tasks (only visible when in ACTIVE TASKS tab) */}
+                            {viewTab === 'active-tasks' && (
+                                <div className="ml-4 flex items-center gap-2">
+                                    <select
+                                        value={activeFilter}
+                                        onChange={(e) => setActiveFilter(e.target.value)}
+                                        className="px-2 py-1 border border-cyan-300 rounded text-sm bg-white hover:border-cyan-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    >
+                                        <option value="active">Active tasks</option>
+                                        <option value="all">All tasks</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
                     <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-4">
@@ -2960,91 +3044,6 @@ export default function KeyAreas() {
                                                     placeholder="Tag"
                                                 />
                                             </div>
-                                        </div>
-
-                                        {/* Main View Tabs (legacy pattern): ACTIVE TASKS, DELEGATED, TO-DO, ACTIVITY TRAP, MY FOCUS */}
-                                        <div className="pt-3 border-t">
-                                            <div className="flex items-center gap-1 overflow-x-auto bg-slate-100 border border-slate-200 rounded-lg px-1 py-1">
-                                                {/* ACTIVE TASKS Tab */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setViewTab('active-tasks')}
-                                                    className={`px-3 py-2 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                                        viewTab === 'active-tasks'
-                                                            ? 'bg-white text-slate-900 shadow'
-                                                            : 'bg-transparent text-slate-700 hover:bg-slate-200'
-                                                    }`}
-                                                >
-                                                    ACTIVE TASKS
-                                                </button>
-                                                {/* DELEGATED Tab */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setViewTab('delegated')}
-                                                    className={`px-3 py-2 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                                        viewTab === 'delegated'
-                                                            ? 'bg-white text-slate-900 shadow'
-                                                            : 'bg-transparent text-slate-700 hover:bg-slate-200'
-                                                    }`}
-                                                    title="Show delegated tasks"
-                                                >
-                                                    DELEGATED
-                                                </button>
-                                                {/* TO-DO Tab */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setViewTab('todo')}
-                                                    className={`px-3 py-2 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                                        viewTab === 'todo'
-                                                            ? 'bg-red-100 text-red-900 shadow'
-                                                            : 'bg-transparent text-slate-700 hover:bg-slate-200'
-                                                    }`}
-                                                    title="Show to-do items"
-                                                >
-                                                    TO-DO (RED)
-                                                </button>
-                                                {/* ACTIVITY TRAP Tab */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setViewTab('activity-trap')}
-                                                    className={`px-3 py-2 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                                        viewTab === 'activity-trap'
-                                                            ? 'bg-red-100 text-red-900 shadow'
-                                                            : 'bg-transparent text-slate-700 hover:bg-slate-200'
-                                                    }`}
-                                                    title="Show tasks without goal assignment"
-                                                >
-                                                    ACTIVITY TRAP
-                                                </button>
-                                                {/* MY FOCUS Tab */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setViewTab('my-focus')}
-                                                    className={`px-3 py-2 rounded text-sm font-semibold whitespace-nowrap transition ${
-                                                        viewTab === 'my-focus'
-                                                            ? 'bg-white text-slate-900 shadow'
-                                                            : 'bg-transparent text-slate-700 hover:bg-slate-200'
-                                                    }`}
-                                                    title="Show My Focus (Eisenhower matrix)"
-                                                >
-                                                    MY FOCUS
-                                                </button>
-                                            </div>
-
-                                            {/* Sub-filter: Active / All Tasks (only visible when in ACTIVE TASKS tab) */}
-                                            {viewTab === 'active-tasks' && (
-                                                <div className="mt-2 flex items-center gap-2">
-                                                    <span className="text-xs font-medium text-slate-600 uppercase">Active Tasks</span>
-                                                    <select
-                                                        value={activeFilter}
-                                                        onChange={(e) => setActiveFilter(e.target.value)}
-                                                        className="px-2 py-1 border border-slate-300 rounded text-sm bg-white hover:border-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                                    >
-                                                        <option value="active">Active tasks</option>
-                                                        <option value="all">All tasks</option>
-                                                    </select>
-                                                </div>
-                                            )}
                                         </div>
 
                                         {/* List Tabs Section (left sidebar lists within the view) */}
