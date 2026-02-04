@@ -47,11 +47,13 @@ const mapPriorityFromApi = (p) => {
 const base = "/tasks";
 
 const taskService = {
-    async list({ keyAreaId, unassigned } = {}) {
+    async list({ keyAreaId, unassigned, delegatedTo, withoutGoal } = {}) {
         // In dev, bypass browser cache to avoid 304/Not Modified confusion after updates
         const params = {};
         if (keyAreaId) params.keyAreaId = keyAreaId;
         if (unassigned) params.unassigned = true;
+        if (delegatedTo) params.delegatedTo = true;
+        if (withoutGoal) params.withoutGoal = true;
         if (import.meta.env?.DEV) params._ts = Date.now();
         // Note: Do NOT send custom Cache-Control request header; it triggers CORS preflight and may be disallowed by server.
         // We use a cache-busting query param instead.

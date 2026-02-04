@@ -660,16 +660,12 @@ export default function KeyAreas() {
         
         // Handle DELEGATED tab - show delegated tasks
         if (viewTab === 'delegated') {
-            // Load tasks delegated to current user
             (async () => {
                 try {
                     const svc = await getTaskService();
-                    // Get tasks where delegated_to equals current user
-                    const allUserTasks = await svc.list({});
-                    const delegatedToMe = (allUserTasks || []).filter(t => 
-                        t.delegatedTo === currentUserId || t.delegated_to === currentUserId
-                    );
-                    setAllTasks(delegatedToMe);
+                    // Backend filters tasks delegated TO current user
+                    const delegatedToMe = await svc.list({ delegatedTo: true });
+                    setAllTasks(delegatedToMe || []);
                     
                     // Load activities for delegated tasks
                     const actSvc = await getActivityService();
@@ -691,12 +687,12 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle TODO tab - show all tasks across all key areas
+        // Handle TODO tab - show all tasks across all key areas (no key area filter)
         if (viewTab === 'todo') {
             (async () => {
                 try {
                     const svc = await getTaskService();
-                    // Load ALL tasks (no key area filter)
+                    // Load ALL user tasks (empty opts = all tasks owned by user)
                     const allUserTasks = await svc.list({});
                     setAllTasks(allUserTasks || []);
                     
@@ -723,10 +719,10 @@ export default function KeyAreas() {
         // For ACTIVE TASKS and ACTIVITY TRAP - require selected key area
         if (!selectedKA) return;
         (async () => {
-            const opts = {};
+            const opts = { keyAreaId: selectedKA.id };
             // Determine filtering based on current tab
             if (viewTab === 'activity-trap') {
-                opts.withoutGoal = true; // Activity Trap: show tasks without goals
+                opts.withoutGoal = true; // Activity Trap: show tasks without goals from this key area
             }
             const t = await api.listTasks(selectedKA.id, opts);
             setAllTasks(t);
