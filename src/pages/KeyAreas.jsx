@@ -16,6 +16,7 @@ import { FaCog } from 'react-icons/fa';
 import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
+import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
     safeParseDate,
@@ -716,39 +717,14 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle ACTIVITY TRAP - show tasks without goals from ALL key areas
-        if (viewTab === 'activity-trap') {
-            (async () => {
-                try {
-                    const svc = await getTaskService();
-                    // Load ALL tasks without goals (no key area filter)
-                    const trapTasks = await svc.list({ withoutGoal: true });
-                    setAllTasks(trapTasks || []);
-                    
-                    // Load activities for all tasks
-                    const actSvc = await getActivityService();
-                    const entries = await Promise.all(
-                        (trapTasks || []).map(async (row) => {
-                            try {
-                                const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
-                            } catch {
-                                return [String(row.id), []];
-                            }
-                        }),
-                    );
-                    setActivitiesByTask(Object.fromEntries(entries));
-                } catch (e) {
-                    console.error('Failed to load activity trap tasks', e);
-                }
-            })();
-            return;
-        }
-        
-        // For ACTIVE TASKS - require selected key area
+        // For ACTIVE TASKS and ACTIVITY TRAP - require selected key area
         if (!selectedKA) return;
         (async () => {
             const opts = { keyAreaId: selectedKA.id };
+            // Determine filtering based on current tab
+            if (viewTab === 'activity-trap') {
+                opts.withoutGoal = true; // Activity Trap: show tasks without goals from this key area
+            }
             const t = await api.listTasks(selectedKA.id, opts);
             setAllTasks(t);
             // Reload activities for the filtered tasks
@@ -3623,6 +3599,32 @@ export default function KeyAreas() {
                                     </div>
                             </div>
                         )}
+
+                        {/* Unified Table View for DELEGATED, TODO, ACTIVITY TRAP tabs */}
+                        {(viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap') && (
+                            <div className="flex-1 overflow-auto px-4 py-4">
+                                <UnifiedTaskActivityTable
+                                    viewTab={viewTab}
+                                    tasks={allTasks}
+                                    activities={allActivities}
+                                    keyAreas={keyAreas}
+                                    users={users}
+                                    goals={goals}
+                                    onTaskClick={(task) => {
+                                        setSelectedTaskFull(task);
+                                        setTaskFullInitialTab("activities");
+                                    }}
+                                    onActivityClick={(activity) => {
+                                        const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                        if (task) {
+                                            setSelectedTaskFull(task);
+                                            setTaskFullInitialTab("activities");
+                                        }
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         {/* Global Activities popover (attached to hamburger) */}
                         {openActivitiesMenu && (
                             <>
