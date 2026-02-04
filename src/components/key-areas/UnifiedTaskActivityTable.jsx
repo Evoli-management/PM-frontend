@@ -7,9 +7,11 @@ import { format } from 'date-fns';
  */
 export default function UnifiedTaskActivityTable({ 
     tasks = [], 
-    activitiesByTask = {}, 
+    activities = [], 
     viewTab,
     keyAreas = [],
+    users = [],
+    goals = [],
     onTaskClick,
     onActivityClick 
 }) {
@@ -19,37 +21,39 @@ export default function UnifiedTaskActivityTable({
     const [keyAreaFilter, setKeyAreaFilter] = useState('');
     const [responsibleFilter, setResponsibleFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showTasks, setShowTasks] = useState(true);
+    const [showActivities, setShowActivities] = useState(true);
 
     // Flatten tasks and activities into single array
     const allItems = useMemo(() => {
         const items = [];
         
         // Add all tasks
-        tasks.forEach(task => {
-            items.push({
-                ...task,
-                type: 'task',
-                itemId: `task-${task.id}`,
-                displayId: task.id,
+        if (showTasks) {
+            tasks.forEach(task => {
+                items.push({
+                    ...task,
+                    type: 'task',
+                    itemId: `task-${task.id}`,
+                    displayId: task.id,
+                });
             });
-            
-            // Add activities for this task
-            const activities = activitiesByTask[task.id] || [];
+        }
+        
+        // Add all activities
+        if (showActivities) {
             activities.forEach(activity => {
                 items.push({
                     ...activity,
                     type: 'activity',
                     itemId: `activity-${activity.id}`,
                     displayId: activity.id,
-                    taskId: task.id,
-                    // Inherit some task properties
-                    keyAreaId: task.keyAreaId || task.key_area_id,
                 });
             });
-        });
+        }
         
         return items;
-    }, [tasks, activitiesByTask]);
+    }, [tasks, activities, showTasks, showActivities]);
 
     // Filter items
     const filteredItems = useMemo(() => {
@@ -164,53 +168,93 @@ export default function UnifiedTaskActivityTable({
 
     return (
         <div className="flex flex-col h-full">
+            {/* Special Header for Delegated View */}
+            {viewTab === 'delegated' && (
+                <div className="px-4 py-2 bg-white border-b">
+                    <h3 className="text-lg font-semibold">Delegated Tasks</h3>
+                </div>
+            )}
+
             {/* Filters Row */}
-            <div className="flex items-center gap-4 p-4 bg-gray-50 border-b">
+            <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b flex-wrap">
                 <span className="text-sm font-medium">Filter:</span>
                 
+                {/* Task/Activity Toggle Buttons */}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowTasks(!showTasks)}
+                        className={`p-2 rounded hover:bg-gray-200 ${showTasks ? 'text-blue-600' : 'text-gray-400'}`}
+                        title="Filter tasks"
+                    >
+                        <span className="text-xl">📦</span>
+                    </button>
+                    <button
+                        onClick={() => setShowActivities(!showActivities)}
+                        className={`p-2 rounded hover:bg-gray-200 ${showActivities ? 'text-blue-600' : 'text-gray-400'}`}
+                        title="Filter activities"
+                    >
+                        <span className="text-xl">📋</span>
+                    </button>
+                </div>
+
                 {/* Key Area Filter */}
                 <select
                     value={keyAreaFilter}
                     onChange={(e) => setKeyAreaFilter(e.target.value)}
-                    className="px-3 py-1 text-sm border rounded"
+                    className="px-3 py-1 text-sm border rounded bg-white"
                 >
-                    <option value="">All Key Areas</option>
-                    {keyAreas.map(ka => (
-                        <option key={ka.id} value={ka.id}>{ka.name || ka.keyArea}</option>
+                    <option value="">Key Area</option>
+                    {keyAreas.map((ka, idx) => (
+                        <option key={ka.id} value={ka.id}>
+                            {idx + 1}. {ka.name || ka.title}
+                        </option>
                     ))}
                 </select>
 
-                {/* Responsible Filter */}
+                {/* Responsible Filter - only if column is visible */}
                 {columns.includes('responsible') && (
                     <select
                         value={responsibleFilter}
                         onChange={(e) => setResponsibleFilter(e.target.value)}
-                        className="px-3 py-1 text-sm border rounded"
+                        className="px-3 py-1 text-sm border rounded bg-white"
                     >
-                        <option value="">All Responsible</option>
-                        {/* TODO: Add unique responsible people from items */}
+                        <option value="">Responsible</option>
+                        {users.map(user => (
+                            <option key={user.id} value={user.id || user.member_id}>
+                                {user.name || user.firstname} {user.lastname || ''}
+                            </option>
+                        ))}
                     </select>
                 )}
 
                 {/* Search */}
-                <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="px-3 py-1 text-sm border rounded flex-1 max-w-xs"
-                />
-
-                {/* Mass Edit */}
                 <div className="ml-auto flex items-center gap-2">
-                    <span className="text-sm">{selectedItems.size} selected</span>
-                    <button
-                        className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                        disabled={selectedItems.size === 0}
-                    >
-                        Mass Edit
-                    </button>
+                    <input
+                        type="text"
+                        placeholder="Search"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="px-3 py-1 text-sm border rounded w-48 bg-white"
+                    />
+                    <span className="text-blue-500 cursor-pointer">🔍</span>
                 </div>
+
+                {/* Mass Edit - hidden for delegated view */}
+                {viewTab !== 'delegated' && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm">{selectedItems.size} selected</span>
+                        <button
+                            className={`px-3 py-1 text-sm rounded ${
+                                selectedItems.size === 0
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
+                            disabled={selectedItems.size === 0}
+                        >
+                            Mass edit
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Table */}
