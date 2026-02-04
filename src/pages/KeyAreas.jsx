@@ -716,15 +716,40 @@ export default function KeyAreas() {
             })();
             return;
         }
+
+        // Handle ACTIVITY TRAP tab - show tasks without goals from ALL key areas (no key area filter)
+        if (viewTab === 'activity-trap') {
+            (async () => {
+                try {
+                    const svc = await getTaskService();
+                    // Load all tasks without goals (empty keyAreaId = all key areas)
+                    const trapTasks = await svc.list({ withoutGoal: true });
+                    setAllTasks(trapTasks || []);
+                    
+                    // Load activities for all trap tasks
+                    const actSvc = await getActivityService();
+                    const entries = await Promise.all(
+                        (trapTasks || []).map(async (row) => {
+                            try {
+                                const list = await actSvc.list({ taskId: row.id });
+                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                            } catch {
+                                return [String(row.id), []];
+                            }
+                        }),
+                    );
+                    setActivitiesByTask(Object.fromEntries(entries));
+                } catch (e) {
+                    console.error('Failed to load activity trap tasks', e);
+                }
+            })();
+            return;
+        }
         
-        // For ACTIVE TASKS and ACTIVITY TRAP - require selected key area
+        // For ACTIVE TASKS - require selected key area
         if (!selectedKA) return;
         (async () => {
             const opts = { keyAreaId: selectedKA.id };
-            // Determine filtering based on current tab
-            if (viewTab === 'activity-trap') {
-                opts.withoutGoal = true; // Activity Trap: show tasks without goals from this key area
-            }
             const t = await api.listTasks(selectedKA.id, opts);
             setAllTasks(t);
             // Reload activities for the filtered tasks
@@ -3606,7 +3631,7 @@ export default function KeyAreas() {
                                 <UnifiedTaskActivityTable
                                     viewTab={viewTab}
                                     tasks={allTasks}
-                                    activities={allActivities}
+                                    activities={Object.values(activitiesByTask).flat()}
                                     keyAreas={keyAreas}
                                     users={users}
                                     goals={goals}
