@@ -2975,7 +2975,7 @@ export default function KeyAreas() {
                                 />
                             </div>
                         )}
-                        {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (
+                        {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap') && (
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
