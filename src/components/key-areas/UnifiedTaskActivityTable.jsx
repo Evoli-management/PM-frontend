@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
+import taskDelegationService from '../../services/taskDelegationService';
 
 /**
  * UnifiedTaskActivityTable - Displays tasks AND activities in a single table
@@ -22,6 +23,7 @@ export default function UnifiedTaskActivityTable({
     keyAreas = [],
     users = [],
     goals = [],
+    currentUserId,
     onTaskClick,
     onActivityClick,
     onTaskUpdate,
@@ -234,8 +236,47 @@ export default function UnifiedTaskActivityTable({
         setEditValue('');
     };
 
-    const saveEdit = (item, field, value) => {
+    const saveEdit = async (item, field, value) => {
         const updates = {};
+        
+        // Handle delegation when changing responsible person
+        if (field === 'responsibleId' && item.type === 'task' && value && currentUserId) {
+            // Check if we're assigning to someone other than current user (i.e., delegating)
+            const newResponsibleId = value;
+            const currentOwner = item.userId || item.user_id;
+            
+            // Only delegate if:
+            // 1. New responsible is different from current user
+            // 2. Current user is the owner OR already delegated to them
+            if (String(newResponsibleId) !== String(currentUserId)) {
+                try {
+                    // Call delegation API
+                    await taskDelegationService.delegateTask(item.id, {
+                        delegatedToUserId: newResponsibleId,
+                        notes: `Task delegated via inline edit`
+                    });
+                    
+                    console.log('Task delegated successfully');
+                    
+                    // Update will be handled by the parent refresh
+                    setEditingCell(null);
+                    setEditValue('');
+                    
+                    // Trigger parent callback to refresh data
+                    if (onTaskUpdate) {
+                        onTaskUpdate(item.id, { delegatedToUserId: newResponsibleId });
+                    }
+                    return;
+                } catch (error) {
+                    console.error('Failed to delegate task:', error);
+                    alert(error.response?.data?.message || 'Failed to delegate task. Please try again.');
+                    cancelEdit();
+                    return;
+                }
+            }
+        }
+        
+        // Standard field updates
         if (field === 'title') {
             updates.title = value;
             updates.name = value;

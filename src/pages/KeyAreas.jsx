@@ -3565,6 +3565,7 @@ export default function KeyAreas() {
                                     keyAreas={keyAreas}
                                     users={users}
                                     goals={goals}
+                                    currentUserId={currentUserId}
                                     onTaskClick={(task) => {
                                         setSelectedTaskFull(task);
                                         setTaskFullInitialTab("activities");
@@ -3578,8 +3579,31 @@ export default function KeyAreas() {
                                     }}
                                     onTaskUpdate={async (id, updatedTask) => {
                                         try {
-                                            const result = await api.updateTask(id, updatedTask);
-                                            setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                            // If delegation happened, refresh the task list for the current view
+                                            if (updatedTask.delegatedToUserId) {
+                                                // Task was delegated, reload the appropriate view
+                                                if (viewTab === 'delegated') {
+                                                    const svc = await getTaskService();
+                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
+                                                    setAllTasks(delegatedToMe || []);
+                                                } else if (viewTab === 'todo') {
+                                                    const svc = await getTaskService();
+                                                    const allUserTasks = await svc.list({});
+                                                    setAllTasks(allUserTasks || []);
+                                                } else if (viewTab === 'activity-trap') {
+                                                    const svc = await getTaskService();
+                                                    const trapTasks = await svc.list({ withoutGoal: true });
+                                                    setAllTasks(trapTasks || []);
+                                                } else if (selectedKA) {
+                                                    // Active tasks view - reload selected key area tasks
+                                                    const rows = await api.listTasks(selectedKA.id);
+                                                    setAllTasks(rows || []);
+                                                }
+                                            } else {
+                                                // Normal update
+                                                const result = await api.updateTask(id, updatedTask);
+                                                setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                            }
                                         } catch (error) {
                                             console.error('Failed to update task:', error);
                                         }
