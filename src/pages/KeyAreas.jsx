@@ -505,6 +505,10 @@ export default function KeyAreas() {
         deadline: "",
         end_date: "",
     });
+    const [sortBy, setSortBy] = useState("manual");
+    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterAssignee, setFilterAssignee] = useState("");
+    const [filterTag, setFilterTag] = useState("");
     const [view, setView] = useState("list");
     const defaultVisible = {
         responsible: true,
@@ -923,6 +927,9 @@ export default function KeyAreas() {
             const updated = await api.updateTask(id, patch);
             // api.updateTask returns normalized UI-friendly task shape
             setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+            setSelectedTaskFull((prevFull) =>
+                prevFull && String(prevFull.id) === String(id) ? { ...prevFull, ...updated } : prevFull,
+            );
             markSaving(id);
         } catch (err) {
             console.error('[KeyAreas] Failed to update task field', err);
@@ -1860,15 +1867,41 @@ export default function KeyAreas() {
     const renameList = async (n) => {
         if (!selectedKA) return;
         const current = getListName(selectedKA.id, n);
-        const val = prompt("Rename list", current);
-        if (val === null) return; // cancelled
-        const newMap = { ...(listNames[String(selectedKA.id)] || {}), [String(n)]: val };
+        const raw = prompt("Rename list", current);
+        if (raw === null) return; // cancelled
+        const val = String(raw || "").trim();
+        if (!val) {
+            alert("List name cannot be empty.");
+            return;
+        }
+        const existingNames = Object.values(listNames[String(selectedKA.id)] || {});
+        const hasDuplicate = existingNames.some(
+            (name) => String(name || "").toLowerCase() === val.toLowerCase() && String(name) !== String(current),
+        );
+        if (hasDuplicate) {
+            alert("A list with this name already exists in this Key Area.");
+            return;
+        }
+
+        const prevMap = { ...(listNames[String(selectedKA.id)] || {}) };
+        const newMap = { ...prevMap, [String(n)]: val };
         setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: newMap }));
+        setKeyAreas((prev) =>
+            (prev || []).map((ka) =>
+                String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: newMap } : ka,
+            ),
+        );
         try {
             const svc = await getKeyAreaService();
             await svc.update(selectedKA.id, { listNames: newMap });
         } catch (e) {
             console.error("Failed to persist list names", e);
+            setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: prevMap }));
+            setKeyAreas((prev) =>
+                (prev || []).map((ka) =>
+                    String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: prevMap } : ka,
+                ),
+            );
             alert("Failed to save list name. Please try again.");
         }
     };
@@ -1891,14 +1924,28 @@ export default function KeyAreas() {
             : `Remove list ${n}? It will disappear since it has no tasks.`;
         if (!confirm(msg)) return;
         const { [String(n)]: _rem, ...rest } = names;
+        const prevMap = { ...names };
+        const prevTab = taskTab;
         const newMap = { ...rest };
         setListNames((prev) => ({ ...prev, [String(kaId)]: newMap }));
+        setKeyAreas((prev) =>
+            (prev || []).map((ka) =>
+                String(ka.id) === String(kaId) ? { ...ka, listNames: newMap } : ka,
+            ),
+        );
         if (taskTab === n) setTaskTab(1);
         try {
             const svc = await getKeyAreaService();
             await svc.update(kaId, { listNames: newMap });
         } catch (e) {
             console.error("Failed to persist list names", e);
+            setListNames((prev) => ({ ...prev, [String(kaId)]: prevMap }));
+            setKeyAreas((prev) =>
+                (prev || []).map((ka) =>
+                    String(ka.id) === String(kaId) ? { ...ka, listNames: prevMap } : ka,
+                ),
+            );
+            setTaskTab(prevTab);
             alert("Failed to delete list. Please try again.");
         }
     };
@@ -1920,10 +1967,54 @@ export default function KeyAreas() {
                 (t) => (t.title || "").toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q),
             );
         }
+        if (filterStatus && filterStatus !== "all") {
+            const fs = String(filterStatus).toLowerCase();
+            arr = arr.filter((t) => String(t.status || "").toLowerCase() === fs);
+        }
+        if (filterAssignee) {
+            const fa = String(filterAssignee).toLowerCase();
+            arr = arr.filter((t) => String(t.assignee || t.responsible || "").toLowerCase() === fa);
+        }
+        if (filterTag.trim()) {
+            const ft = filterTag.trim().toLowerCase();
+            arr = arr.filter((t) => String(t.tags || "").toLowerCase().includes(ft));
+        }
         // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
         if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
         return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted]);
+    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag]);
+
+    const sortedTasks = useMemo(() => {
+        const arr = Array.isArray(visibleTasks) ? visibleTasks.slice() : [];
+        switch (sortBy) {
+            case "date":
+                arr.sort((a, b) => {
+                    const ad = a.deadline || a.due_date || a.dueDate || a.end_date || null;
+                    const bd = b.deadline || b.due_date || b.dueDate || b.end_date || null;
+                    if (!ad && !bd) return 0;
+                    if (!ad) return 1;
+                    if (!bd) return -1;
+                    return new Date(ad).getTime() - new Date(bd).getTime();
+                });
+                break;
+            case "priority":
+                arr.sort((a, b) => getPriorityLevel(b.priority) - getPriorityLevel(a.priority));
+                break;
+            case "status":
+                {
+                    const order = { open: 0, in_progress: 1, done: 2, completed: 2, cancelled: 3, blocked: 3 };
+                    arr.sort(
+                        (a, b) =>
+                            (order[String(a.status || "").toLowerCase()] ?? 99) -
+                            (order[String(b.status || "").toLowerCase()] ?? 99),
+                    );
+                }
+                break;
+            default:
+                break;
+        }
+        return arr;
+    }, [visibleTasks, sortBy]);
 
     // Debug traces removed: temporary logging used during goal/title load debugging cleared.
 
@@ -1978,15 +2069,20 @@ export default function KeyAreas() {
     const clearSelection = () => setSelectedIds(new Set());
     const selectAllVisible = () => {
         const all = new Set(selectedIds);
-        const allSelected = visibleTasks.every((t) => all.has(t.id));
+        const allSelected = sortedTasks.every((t) => all.has(t.id));
         if (allSelected) {
             // unselect all visible
-            visibleTasks.forEach((t) => all.delete(t.id));
+            sortedTasks.forEach((t) => all.delete(t.id));
         } else {
-            visibleTasks.forEach((t) => all.add(t.id));
+            sortedTasks.forEach((t) => all.add(t.id));
         }
         setSelectedIds(all);
     };
+
+    const selectedTasks = useMemo(
+        () => (Array.isArray(sortedTasks) ? sortedTasks.filter((t) => selectedIds.has(t.id)) : []),
+        [sortedTasks, selectedIds],
+    );
 
     const applyBulkEdit = async (e) => {
         e.preventDefault();
@@ -2468,6 +2564,15 @@ export default function KeyAreas() {
                                                     onChange={(e) => setFilter(e.target.value)}
                                                 />
                                             </div>
+                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                                <FaSearch className="text-slate-700 mr-2" />
+                                                <input
+                                                    placeholder="Search tasks across all key areas..."
+                                                    className="bg-transparent outline-none text-sm w-64"
+                                                    value={siteSearch}
+                                                    onChange={(e) => setSiteSearch(e.target.value)}
+                                                />
+                                            </div>
                                             <button
                                                 className={`flex items-center gap-2 rounded-lg font-semibold shadow px-2 py-1 text-sm border border-slate-200 ${
                                                     canAdd
@@ -2484,6 +2589,9 @@ export default function KeyAreas() {
                                             >
                                                New Key Area
                                             </button>
+                                            {!canAdd && (
+                                                <span className="text-xs text-slate-500">Max 10 Key Areas reached.</span>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -2759,7 +2867,58 @@ export default function KeyAreas() {
                                                 </button>
                                             </div>
                                         </div>
-                                        
+
+                                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Sort by:</span>
+                                                <select
+                                                    value={sortBy}
+                                                    onChange={(e) => setSortBy(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                >
+                                                    <option value="manual">Manual</option>
+                                                    <option value="date">Due Date</option>
+                                                    <option value="priority">Priority</option>
+                                                    <option value="status">Status</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Status:</span>
+                                                <select
+                                                    value={filterStatus}
+                                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                >
+                                                    <option value="all">All</option>
+                                                    <option value="open">Open</option>
+                                                    <option value="in_progress">In Progress</option>
+                                                    <option value="done">Done</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Owner:</span>
+                                                <select
+                                                    value={filterAssignee}
+                                                    onChange={(e) => setFilterAssignee(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                >
+                                                    <option value="">All</option>
+                                                    {(users || []).map((u) => (
+                                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Tag:</span>
+                                                <input
+                                                    value={filterTag}
+                                                    onChange={(e) => setFilterTag(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                    placeholder="Tag"
+                                                />
+                                            </div>
+                                        </div>
+
                                         {/* Tabs Section */}
                                         <div className="pt-3">
                                             <div
@@ -3068,7 +3227,7 @@ export default function KeyAreas() {
                                                 </form>
                                             )}
                                             {view === "list" ? (
-                                                visibleTasks.length === 0 ? (
+                                                sortedTasks.length === 0 ? (
                                                     <EmptyState
                                                         title="List is empty."
                                                         hint="Use the 'Add Task' button below to create your first task."
@@ -3083,8 +3242,8 @@ export default function KeyAreas() {
                                                                             type="checkbox"
                                                                             aria-label="Select all visible"
                                                                             checked={
-                                                                                visibleTasks.length > 0 &&
-                                                                                visibleTasks.every((t) =>
+                                                                                sortedTasks.length > 0 &&
+                                                                                sortedTasks.every((t) =>
                                                                                     selectedIds.has(t.id),
                                                                                 )
                                                                             }
@@ -3142,7 +3301,7 @@ export default function KeyAreas() {
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="bg-white">
-                                                                {visibleTasks.map((t) => {
+                                                                {sortedTasks.map((t) => {
                                                                     const q = computeEisenhowerQuadrant({
                                                                         deadline: t.deadline,
                                                                         end_date: t.end_date,
@@ -3378,19 +3537,47 @@ export default function KeyAreas() {
                             </>
                         )}
                         {!selectedKA && (
-                            <KeyAreasList
-                                loading={loading}
-                                showOnlyIdeas={showOnlyIdeas}
-                                ideaForShow={ideaForShow}
-                                filteredKAs={filteredKAs}
-                                dragKAId={dragKAId}
-                                openKA={openKA}
-                                reorderByDrop={reorderByDrop}
-                                setDragKAId={setDragKAId}
-                                setEditing={setEditing}
-                                setShowForm={setShowForm}
-                                onDeleteKA={onDeleteKA}
-                            />
+                            <>
+                                {String(siteSearch || "").trim().length >= 2 && (
+                                    <div className="mb-4 bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+                                        <div className="text-sm font-semibold text-slate-700 mb-2">
+                                            Search results for “{siteSearch.trim()}”
+                                        </div>
+                                        {isSearching ? (
+                                            <div className="text-sm text-slate-500">Searching…</div>
+                                        ) : (searchResults && searchResults.length ? (
+                                            <ul className="space-y-2">
+                                                {searchResults.map((t) => {
+                                                    const ka = (keyAreas || []).find((k) => String(k.id) === String(t.key_area_id || t.keyAreaId || t.key_area));
+                                                    return (
+                                                        <li key={t.id} className="text-sm">
+                                                            <span className="font-semibold text-slate-900">{t.title || t.name}</span>
+                                                            {ka ? (
+                                                                <span className="text-slate-500"> — {ka.title || ka.name}</span>
+                                                            ) : null}
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <div className="text-sm text-slate-500">No matching tasks found.</div>
+                                        ))}
+                                    </div>
+                                )}
+                                <KeyAreasList
+                                    loading={loading}
+                                    showOnlyIdeas={showOnlyIdeas}
+                                    ideaForShow={ideaForShow}
+                                    filteredKAs={filteredKAs}
+                                    dragKAId={dragKAId}
+                                    openKA={openKA}
+                                    reorderByDrop={reorderByDrop}
+                                    setDragKAId={setDragKAId}
+                                    setEditing={setEditing}
+                                    setShowForm={setShowForm}
+                                    onDeleteKA={onDeleteKA}
+                                />
+                            </>
                         )}
                         {/* DETAIL: Tabs */}
                         {selectedKA && (
