@@ -61,16 +61,19 @@ export default function UnifiedTaskActivityTable({
         
         // Key area filter
         if (keyAreaFilter) {
-            filtered = filtered.filter(item => 
-                (item.keyAreaId || item.key_area_id) === keyAreaFilter
-            );
+            filtered = filtered.filter(item => {
+                const itemKeyArea = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea;
+                return String(itemKeyArea || '') === String(keyAreaFilter);
+            });
         }
         
         // Responsible filter
         if (responsibleFilter) {
-            filtered = filtered.filter(item => 
-                (item.assignee || item.responsible) === responsibleFilter
-            );
+            filtered = filtered.filter(item => {
+                const assignee = item.assignee || item.responsible || '';
+                const assigneeId = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
+                return String(assigneeId || '') === String(responsibleFilter) || String(assignee) === String(responsibleFilter);
+            });
         }
         
         // Search filter
@@ -91,6 +94,21 @@ export default function UnifiedTaskActivityTable({
         sorted.sort((a, b) => {
             let aVal = a[sortField];
             let bVal = b[sortField];
+
+            if (sortField === 'dueDate') {
+                aVal = a.dueDate || a.due_date || a.deadline;
+                bVal = b.dueDate || b.due_date || b.deadline;
+            }
+
+            if (sortField === 'startDate') {
+                aVal = a.startDate || a.start_date;
+                bVal = b.startDate || b.start_date;
+            }
+
+            if (sortField === 'endDate') {
+                aVal = a.endDate || a.end_date;
+                bVal = b.endDate || b.end_date;
+            }
             
             if (sortField === 'priority') {
                 // High=3, Medium=2, Low=1
@@ -145,7 +163,7 @@ export default function UnifiedTaskActivityTable({
         const now = new Date();
         const deadlineDate = deadline ? new Date(deadline) : null;
         const endD = endDate ? new Date(endDate) : null;
-        
+
         return (deadlineDate && deadlineDate < now) || (endD && endD < now);
     };
 
@@ -162,8 +180,15 @@ export default function UnifiedTaskActivityTable({
     }, [viewTab]);
 
     const getKeyAreaName = (keyAreaId) => {
-        const ka = keyAreas.find(k => k.id === keyAreaId);
-        return ka?.name || ka?.keyArea || '';
+        if (!keyAreaId) return '';
+        const ka = keyAreas.find(k => String(k.id) === String(keyAreaId));
+        return ka?.name || ka?.title || ka?.keyArea || '';
+    };
+
+    const getGoalName = (goalId) => {
+        if (!goalId) return '';
+        const goal = goals.find(g => String(g.id) === String(goalId));
+        return goal?.title || goal?.name || '';
     };
 
     return (
@@ -304,7 +329,8 @@ export default function UnifiedTaskActivityTable({
                     </thead>
                     <tbody>
                         {sortedItems.map((item) => {
-                            const overdue = isOverdue(item.dueDate || item.due_date, item.endDate || item.end_date);
+                            const deadlineValue = item.deadline || item.dueDate || item.due_date;
+                            const overdue = isOverdue(deadlineValue, item.endDate || item.end_date);
                             return (
                                 <tr
                                     key={item.itemId}
@@ -345,7 +371,7 @@ export default function UnifiedTaskActivityTable({
                                         <td className="p-2 text-center text-xs">{item.displayId || ''}</td>
                                     )}
                                     {columns.includes('goal') && (
-                                        <td className="p-2 text-xs">{item.goalId || item.goal_id ? 'Assigned' : ''}</td>
+                                        <td className="p-2 text-xs">{getGoalName(item.goalId || item.goal_id)}</td>
                                     )}
                                     {columns.includes('startDate') && (
                                         <td className="p-2 text-xs">{formatDate(item.startDate || item.start_date)}</td>
@@ -354,10 +380,12 @@ export default function UnifiedTaskActivityTable({
                                         <td className="p-2 text-xs">{formatDate(item.endDate || item.end_date)}</td>
                                     )}
                                     {columns.includes('deadline') && (
-                                        <td className="p-2 text-xs">{formatDate(item.dueDate || item.due_date)}</td>
+                                        <td className="p-2 text-xs">{formatDate(deadlineValue)}</td>
                                     )}
                                     {columns.includes('keyArea') && (
-                                        <td className="p-2 text-xs">{getKeyAreaName(item.keyAreaId || item.key_area_id)}</td>
+                                        <td className="p-2 text-xs">
+                                            {getKeyAreaName(item.keyAreaId || item.key_area_id || item.key_area || item.keyArea)}
+                                        </td>
                                     )}
                                     {columns.includes('responsible') && (
                                         <td className="p-2 text-xs">{item.assignee || item.responsible || ''}</td>
