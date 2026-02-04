@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaExclamation } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt } from 'react-icons/fa';
+import { toDateOnly } from '../../utils/keyareasHelpers';
 
 /**
  * UnifiedTaskActivityTable - Displays tasks AND activities in a single table
@@ -38,7 +39,7 @@ export default function UnifiedTaskActivityTable({
     const [showTasks, setShowTasks] = useState(true);
     const [showActivities, setShowActivities] = useState(true);
     const [editingCell, setEditingCell] = useState(null);
-    const [editValues, setEditValues] = useState({});
+    const [editValue, setEditValue] = useState('');
 
     // Flatten tasks and activities into single array
     const allItems = useMemo(() => {
@@ -200,16 +201,15 @@ export default function UnifiedTaskActivityTable({
         }
     };
 
-    const handleCellEdit = (item, field, value) => {
-        const updatedItem = { ...item, [field]: value };
-        
+    const handleCellEdit = (item, updates) => {
         if (item.type === 'task' && onTaskUpdate) {
-            onTaskUpdate(item.id || item.task_id, updatedItem);
+            onTaskUpdate(item.id || item.task_id, updates);
         } else if (item.type === 'activity' && onActivityUpdate) {
-            onActivityUpdate(item.id || item.activity_id, updatedItem);
+            onActivityUpdate(item.id || item.activity_id, updates);
         }
         
         setEditingCell(null);
+        setEditValue('');
     };
 
     const handleMassEdit = (e) => {
@@ -220,6 +220,61 @@ export default function UnifiedTaskActivityTable({
             const acts = selectedIds.filter(id => id.startsWith('activity-')).map(id => id.replace('activity-', ''));
             onMassEdit({ taskIds: tasks, activityIds: acts });
         }
+    };
+
+    const getCellKey = (item, field) => `${item.itemId}-${field}`;
+
+    const startEdit = (item, field, value) => {
+        setEditingCell(getCellKey(item, field));
+        setEditValue(value ?? '');
+    };
+
+    const cancelEdit = () => {
+        setEditingCell(null);
+        setEditValue('');
+    };
+
+    const saveEdit = (item, field, value) => {
+        const updates = {};
+        if (field === 'title') {
+            updates.title = value;
+            updates.name = value;
+        } else if (field === 'startDate') {
+            const v = value ? toDateOnly(value) : null;
+            updates.start_date = v;
+            updates.startDate = v;
+        } else if (field === 'endDate') {
+            const v = value ? toDateOnly(value) : null;
+            updates.end_date = v;
+            updates.endDate = v;
+        } else if (field === 'deadline') {
+            const v = value ? toDateOnly(value) : null;
+            updates.deadline = v;
+            updates.dueDate = v;
+            updates.due_date = v;
+        } else if (field === 'keyAreaId') {
+            updates.keyAreaId = value || null;
+            updates.key_area_id = value || null;
+        } else if (field === 'responsibleId') {
+            updates.assigneeId = value || null;
+            updates.assignee_id = value || null;
+            updates.responsibleId = value || null;
+            updates.responsible_id = value || null;
+        } else if (field === 'goalId') {
+            updates.goalId = value || null;
+            updates.goal_id = value || null;
+        } else {
+            updates[field] = value;
+        }
+
+        handleCellEdit(item, updates);
+    };
+
+    const getResponsibleLabel = (item) => {
+        const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
+        const user = users.find(u => String(u.id || u.member_id) === String(id));
+        if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
+        return item.assignee || item.responsible || '';
     };
 
     const formatDate = (date) => {
@@ -414,6 +469,20 @@ export default function UnifiedTaskActivityTable({
                             const overdue = isOverdue(deadlineValue, item.endDate || item.end_date);
                             const isCompleted = item.dateCompleted || item.date_completed;
                             const isPrivate = item.public === 0 || item.public === '0' ? true : false;
+                            const titleKey = getCellKey(item, 'title');
+                            const startDateKey = getCellKey(item, 'startDate');
+                            const endDateKey = getCellKey(item, 'endDate');
+                            const deadlineKey = getCellKey(item, 'deadline');
+                            const keyAreaKey = getCellKey(item, 'keyAreaId');
+                            const responsibleKey = getCellKey(item, 'responsibleId');
+                            const goalKey = getCellKey(item, 'goalId');
+                            const titleValue = item.title || item.name || '';
+                            const startDateValue = toDateOnly(item.startDate || item.start_date);
+                            const endDateValue = toDateOnly(item.endDate || item.end_date);
+                            const deadlineValueInput = toDateOnly(deadlineValue);
+                            const keyAreaIdValue = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || '';
+                            const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || '';
+                            const goalIdValue = item.goalId || item.goal_id || '';
                             
                             return (
                                 <tr
@@ -438,18 +507,38 @@ export default function UnifiedTaskActivityTable({
                                     )}
                                     {columns.includes('title') && (
                                         <td 
-                                            className="p-2 cursor-pointer hover:bg-blue-100"
+                                            className="p-2 hover:bg-blue-100"
                                             onClick={() => {
+                                                if (editingCell === titleKey) return;
                                                 if (item.type === 'task' && onTaskClick) {
                                                     onTaskClick(item);
                                                 } else if (item.type === 'activity' && onActivityClick) {
                                                     onActivityClick(item);
                                                 }
                                             }}
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'title', titleValue);
+                                            }}
                                         >
                                             <div className="flex items-center gap-2">
                                                 {item.type === 'task' ? '📦' : '📋'}
-                                                <span className={isCompleted ? 'line-through text-gray-500' : ''}>{item.title}</span>
+                                                {editingCell === titleKey ? (
+                                                    <input
+                                                        autoFocus
+                                                        className="w-full border rounded px-2 py-1 text-sm"
+                                                        value={editValue}
+                                                        onChange={(e) => setEditValue(e.target.value)}
+                                                        onBlur={() => saveEdit(item, 'title', editValue)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') saveEdit(item, 'title', editValue);
+                                                            if (e.key === 'Escape') cancelEdit();
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
+                                                )}
                                             </div>
                                         </td>
                                     )}
@@ -457,26 +546,160 @@ export default function UnifiedTaskActivityTable({
                                         <td className="p-2 text-center text-xs">{item.displayId || ''}</td>
                                     )}
                                     {columns.includes('goal') && (
-                                        <td className="p-2 text-xs">{getGoalName(item.goalId || item.goal_id)}</td>
+                                        <td
+                                            className="p-2 text-xs"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'goalId', String(goalIdValue || ''));
+                                            }}
+                                        >
+                                            {editingCell === goalKey ? (
+                                                <select
+                                                    autoFocus
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => saveEdit(item, 'goalId', e.target.value)}
+                                                    onBlur={cancelEdit}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="">Goal</option>
+                                                    {goals.map((g) => (
+                                                        <option key={g.id} value={g.id}>
+                                                            {g.title || g.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span>{getGoalName(goalIdValue)}</span>
+                                            )}
+                                        </td>
                                     )}
                                     {columns.includes('startDate') && (
-                                        <td className="p-2 text-xs">{formatDate(item.startDate || item.start_date)}</td>
+                                        <td
+                                            className="p-2 text-xs"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'startDate', startDateValue);
+                                            }}
+                                        >
+                                            {editingCell === startDateKey ? (
+                                                <input
+                                                    autoFocus
+                                                    type="date"
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    onBlur={() => saveEdit(item, 'startDate', editValue)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <span>{formatDate(startDateValue)}</span>
+                                            )}
+                                        </td>
                                     )}
                                     {columns.includes('endDate') && (
-                                        <td className="p-2 text-xs">{formatDate(item.endDate || item.end_date)}</td>
+                                        <td
+                                            className="p-2 text-xs"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'endDate', endDateValue);
+                                            }}
+                                        >
+                                            {editingCell === endDateKey ? (
+                                                <input
+                                                    autoFocus
+                                                    type="date"
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    onBlur={() => saveEdit(item, 'endDate', editValue)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <span>{formatDate(endDateValue)}</span>
+                                            )}
+                                        </td>
                                     )}
                                     {columns.includes('deadline') && (
-                                        <td className={`p-2 text-xs ${overdue ? 'text-red-600 font-bold' : ''}`}>
-                                            {formatDate(deadlineValue)}
+                                        <td
+                                            className={`p-2 text-xs ${overdue ? 'text-red-600 font-bold' : ''}`}
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'deadline', deadlineValueInput);
+                                            }}
+                                        >
+                                            {editingCell === deadlineKey ? (
+                                                <input
+                                                    autoFocus
+                                                    type="date"
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    onBlur={() => saveEdit(item, 'deadline', editValue)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <span>{formatDate(deadlineValue)}</span>
+                                            )}
                                         </td>
                                     )}
                                     {columns.includes('keyArea') && (
-                                        <td className="p-2 text-xs">
-                                            {getKeyAreaName(item.keyAreaId || item.key_area_id || item.key_area || item.keyArea)}
+                                        <td
+                                            className="p-2 text-xs"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'keyAreaId', String(keyAreaIdValue || ''));
+                                            }}
+                                        >
+                                            {editingCell === keyAreaKey ? (
+                                                <select
+                                                    autoFocus
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => saveEdit(item, 'keyAreaId', e.target.value)}
+                                                    onBlur={cancelEdit}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="">Key Area</option>
+                                                    {keyAreas.map((ka, idx) => (
+                                                        <option key={ka.id} value={ka.id}>
+                                                            {idx + 1}. {ka.name || ka.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span>{getKeyAreaName(keyAreaIdValue)}</span>
+                                            )}
                                         </td>
                                     )}
                                     {columns.includes('responsible') && (
-                                        <td className="p-2 text-xs">{item.assignee || item.responsible || ''}</td>
+                                        <td
+                                            className="p-2 text-xs"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'responsibleId', String(responsibleIdValue || ''));
+                                            }}
+                                        >
+                                            {editingCell === responsibleKey ? (
+                                                <select
+                                                    autoFocus
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
+                                                    onBlur={cancelEdit}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="">Responsible</option>
+                                                    {users.map((user) => (
+                                                        <option key={user.id || user.member_id} value={user.id || user.member_id}>
+                                                            {user.name || user.firstname} {user.lastname || ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span>{getResponsibleLabel(item)}</span>
+                                            )}
+                                        </td>
                                     )}
                                     {/* Action Buttons */}
                                     <td className="p-2 text-center">
