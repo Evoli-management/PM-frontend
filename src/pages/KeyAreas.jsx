@@ -2784,40 +2784,32 @@ export default function KeyAreas() {
                                         </div>
                                     )}
 
-                                    <div className="ml-auto flex items-center gap-2">
+                                    <div className="ml-auto flex items-center gap-1.5">
                                         <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                            <FaSearch className="text-slate-700 mr-2" />
+                                            <FaSearch className="text-slate-700 mr-1.5 text-sm" />
                                             <input
                                                 placeholder={
-                                                    viewTab === 'delegated' ? 'Search delegated tasks…' :
-                                                    viewTab === 'todo' ? 'Search all tasks…' :
-                                                    selectedKA ? `Search tasks in "${selectedKA.title}"…` : 'Search tasks…'
+                                                    viewTab === 'delegated' ? 'Search…' :
+                                                    viewTab === 'todo' ? 'Search…' :
+                                                    selectedKA ? `Search…` : 'Search…'
                                                 }
-                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
+                                                className="bg-transparent outline-none text-xs w-28 sm:w-32"
                                                 value={siteSearch}
                                                 onChange={(e) => setSiteSearch(e.target.value)}
                                             />
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate('/my-focus')}
-                                            className="bg-white rounded-lg border border-slate-200 px-3 py-1 text-sm font-semibold hover:bg-slate-50"
-                                        >
-                                            My Focus
-                                        </button>
-
                                         {/* View dropdown */}
                                         <div className="relative" ref={viewMenuRef}>
                                             <button
                                                 onClick={() => setShowViewMenu((s) => !s)}
-                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
+                                                className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-slate-50"
                                                 aria-haspopup="menu"
                                                 aria-expanded={showViewMenu ? "true" : "false"}
                                             >
                                                 View
                                                 <svg
-                                                    className={`w-4 h-4 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
+                                                    className={`w-3 h-3 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
                                                     viewBox="0 0 24 24"
                                                     fill="none"
                                                     stroke="currentColor"
