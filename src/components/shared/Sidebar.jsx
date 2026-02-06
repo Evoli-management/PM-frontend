@@ -188,6 +188,16 @@ export default function Sidebar({
         }
         
         setDraggedItem(null);
+
+        // Persist reordering to backend
+        (async () => {
+            try {
+                const keyAreaService = await getKeyAreaService();
+                await keyAreaService.reorder(updatedKeyAreas);
+            } catch (err) {
+                console.error("Failed to persist key area reordering:", err);
+            }
+        })();
     };
 
     const handleKeyAreasClick = (e, item) => {
@@ -558,13 +568,3 @@ export default function Sidebar({
         </aside>
     );
 }
-        
-        // Persist reordering to backend
-        (async () => {
-            try {
-                const keyAreaService = await getKeyAreaService();
-                await keyAreaService.reorder(updatedKeyAreas);
-            } catch (err) {
-                console.error("Failed to persist key area reordering:", err);
-            }
-        })();
