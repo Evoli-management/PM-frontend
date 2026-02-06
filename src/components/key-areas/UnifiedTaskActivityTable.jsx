@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 
@@ -347,9 +347,9 @@ export default function UnifiedTaskActivityTable({
         if (viewTab === 'delegated') {
             return ['priority', 'title', 'deadline', 'keyArea', 'responsible'];
         } else if (viewTab === 'todo') {
-            return ['priority', 'title', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
+            return ['priority', 'title', 'tab', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
         } else if (viewTab === 'activity-trap') {
-            return ['priority', 'title', 'goal', 'startDate', 'endDate', 'deadline', 'keyArea'];
+            return ['priority', 'title', 'tab', 'goal', 'startDate', 'endDate', 'deadline', 'keyArea'];
         }
         return ['priority', 'title', 'startDate', 'endDate', 'deadline', 'keyArea', 'responsible'];
     }, [viewTab]);
@@ -370,98 +370,102 @@ export default function UnifiedTaskActivityTable({
         <div className="flex flex-col h-full">
             {/* Special Header for Delegated View */}
             {viewTab === 'delegated' && (
-                <div className="px-4 py-2 bg-white border-b">
-                    <h3 className="text-lg font-semibold">Delegated Tasks</h3>
+                <div className="px-4 py-3 bg-white border-b">
+                    <h3 className="text-lg font-semibold text-center text-blue-700">Delegated Tasks</h3>
                 </div>
             )}
 
             {/* Filters Row */}
-            <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b flex-wrap">
-                <span className="text-sm font-medium">Filter:</span>
-                
-                {/* Task/Activity Toggle Buttons */}
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setShowTasks(!showTasks)}
-                        className={`p-2 rounded hover:bg-gray-200 ${showTasks ? 'text-blue-600' : 'text-gray-400'}`}
-                        title="Filter tasks"
-                    >
-                        <span className="text-xl">📦</span>
-                    </button>
-                    <button
-                        onClick={() => setShowActivities(!showActivities)}
-                        className={`p-2 rounded hover:bg-gray-200 ${showActivities ? 'text-blue-600' : 'text-gray-400'}`}
-                        title="Filter activities"
-                    >
-                        <span className="text-xl">📋</span>
-                    </button>
-                </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-2 bg-white border-b flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-sm font-medium">Filter:</span>
 
-                {/* Key Area Filter */}
-                <select
-                    value={keyAreaFilter}
-                    onChange={(e) => setKeyAreaFilter(e.target.value)}
-                    className="px-3 py-1 text-sm border rounded bg-white"
-                >
-                    <option value="">Key Area</option>
-                    {keyAreas.map((ka, idx) => (
-                        <option key={ka.id} value={ka.id}>
-                            {idx + 1}. {ka.name || ka.title}
-                        </option>
-                    ))}
-                </select>
+                    {/* Task/Activity Toggle Buttons */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowTasks(!showTasks)}
+                            className={`p-1.5 rounded border ${showTasks ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-300 text-gray-400'}`}
+                            title="Filter tasks"
+                        >
+                            <FaStop className="text-xs" />
+                        </button>
+                        <button
+                            onClick={() => setShowActivities(!showActivities)}
+                            className={`p-1.5 rounded border ${showActivities ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-300 text-gray-400'}`}
+                            title="Filter activities"
+                        >
+                            <FaAlignJustify className="text-xs" />
+                        </button>
+                    </div>
 
-                {/* Responsible Filter - only if column is visible */}
-                {columns.includes('responsible') && (
+                    {/* Key Area Filter */}
                     <select
-                        value={responsibleFilter}
-                        onChange={(e) => setResponsibleFilter(e.target.value)}
+                        value={keyAreaFilter}
+                        onChange={(e) => setKeyAreaFilter(e.target.value)}
                         className="px-3 py-1 text-sm border rounded bg-white"
                     >
-                        <option value="">Responsible</option>
-                        {users.map(user => (
-                            <option key={user.id} value={user.id || user.member_id}>
-                                {user.name || user.firstname} {user.lastname || ''}
+                        <option value="">Key Area</option>
+                        {keyAreas.map((ka, idx) => (
+                            <option key={ka.id} value={ka.id}>
+                                {idx + 1}. {ka.name || ka.title}
                             </option>
                         ))}
                     </select>
-                )}
 
-                {/* Search */}
-                <div className="ml-auto flex items-center gap-2">
-                    <input
-                        type="text"
-                        placeholder="Search"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="px-3 py-1 text-sm border rounded w-48 bg-white"
-                    />
-                    <span className="text-blue-500 cursor-pointer">🔍</span>
+                    {/* Responsible Filter - only if column is visible */}
+                    {columns.includes('responsible') && (
+                        <select
+                            value={responsibleFilter}
+                            onChange={(e) => setResponsibleFilter(e.target.value)}
+                            className="px-3 py-1 text-sm border rounded bg-white"
+                        >
+                            <option value="">Responsible</option>
+                            {users.map(user => (
+                                <option key={user.id} value={user.id || user.member_id}>
+                                    {user.name || user.firstname} {user.lastname || ''}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
 
-                {/* Mass Edit - hidden for delegated view */}
-                {viewTab !== 'delegated' && (
+                <div className="flex items-center gap-3">
+                    {/* Search */}
                     <div className="flex items-center gap-2">
-                        <span className="text-sm">{selectedItems.size} selected</span>
-                        <button
-                            onClick={handleMassEdit}
-                            className={`px-3 py-1 text-sm rounded ${
-                                selectedItems.size === 0
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-green-600 text-white hover:bg-green-700'
-                            }`}
-                            disabled={selectedItems.size === 0}
-                        >
-                            Mass edit
-                        </button>
+                        <input
+                            type="text"
+                            placeholder="Search"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="px-3 py-1 text-sm border rounded w-48 bg-white"
+                        />
+                        <span className="text-blue-500 cursor-pointer">🔍</span>
                     </div>
-                )}
+
+                    {/* Mass Edit - hidden for delegated view */}
+                    {viewTab !== 'delegated' && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm">{selectedItems.size} selected</span>
+                            <button
+                                onClick={handleMassEdit}
+                                className={`px-3 py-1 text-sm rounded ${
+                                    selectedItems.size === 0
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-green-600 text-white hover:bg-green-700'
+                                }`}
+                                disabled={selectedItems.size === 0}
+                            >
+                                Mass edit
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Table */}
             <div className="flex-1 overflow-auto">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-100 sticky top-0">
+                    <thead className="bg-slate-50 sticky top-0">
                         <tr>
                             <th className="w-8 p-2"></th>
                             {columns.includes('priority') && (
@@ -473,6 +477,9 @@ export default function UnifiedTaskActivityTable({
                                 <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('title')}>
                                     Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
+                            )}
+                            {columns.includes('tab') && (
+                                <th className="w-20 p-2">Tab</th>
                             )}
                             {columns.includes('goal') && (
                                 <th className="w-32 p-2">Goal</th>
@@ -578,6 +585,11 @@ export default function UnifiedTaskActivityTable({
                                                     <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
                                                 )}
                                             </div>
+                                        </td>
+                                    )}
+                                    {columns.includes('tab') && (
+                                        <td className="p-2 text-xs text-center">
+                                            {item.list_index || item.listIndex || item.list || ''}
                                         </td>
                                     )}
                                     {columns.includes('goal') && (
@@ -708,32 +720,20 @@ export default function UnifiedTaskActivityTable({
                                         </td>
                                     )}
                                     {columns.includes('responsible') && (
-                                        <td
-                                            className="p-2 text-xs"
-                                            onDoubleClick={(e) => {
-                                                e.stopPropagation();
-                                                startEdit(item, 'responsibleId', String(responsibleIdValue || ''));
-                                            }}
-                                        >
-                                            {editingCell === responsibleKey ? (
-                                                <select
-                                                    autoFocus
-                                                    className="w-full border rounded px-2 py-1 text-xs"
-                                                    value={editValue}
-                                                    onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
-                                                    onBlur={cancelEdit}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <option value="">Responsible</option>
-                                                    {users.map((user) => (
-                                                        <option key={user.id || user.member_id} value={user.id || user.member_id}>
-                                                            {user.name || user.firstname} {user.lastname || ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <span>{getResponsibleLabel(item)}</span>
-                                            )}
+                                        <td className="p-2 text-xs">
+                                            <select
+                                                className="w-full border rounded px-2 py-1 text-xs bg-white"
+                                                value={String(responsibleIdValue || '')}
+                                                onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <option value="">Responsible</option>
+                                                {users.map((user) => (
+                                                    <option key={user.id || user.member_id} value={user.id || user.member_id}>
+                                                        {user.name || user.firstname} {user.lastname || ''}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </td>
                                     )}
                                     {/* Action Buttons */}
