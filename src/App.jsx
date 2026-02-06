@@ -59,10 +59,9 @@ export default function App() {
     // TC011: Idle timeout state
     const [showIdleWarning, setShowIdleWarning] = useState(false);
     
-    // Only show footer on public/auth pages
+    // Only show footer on non-auth public pages
     const publicFooterRoutes = [
-        "/", "/login", "/PasswordPageForget", "/reset-password", "/registration", 
-        "/get-started", "/verify-email", "/verify-password-change", "/verify-email-change",
+        "/", "/modules", "/contacts", "/testimonials", "/pricing",
         "/terms-of-service", "/privacy-policy"
     ];
     // Use react-router location so route changes (including client-side navigation)
