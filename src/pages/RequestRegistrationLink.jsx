@@ -24,7 +24,7 @@ export default function RequestRegistrationLink() {
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setMessage("Please enter a valid email address.");
+      setMessage("Email must be an email.");
       setStatus("error");
       return;
     }

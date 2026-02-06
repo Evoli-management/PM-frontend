@@ -25,7 +25,7 @@ const ForgotPasswordPage = () => {
             return;
         }
         if (!email.includes("@") || !email.includes(".")) {
-            setError("Please enter a valid email address");
+            setError("Email must be an email.");
             return;
         }
         if (cooldown > 0) return;

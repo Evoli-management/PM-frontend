@@ -83,7 +83,7 @@ export default function Registration() {
                 if (!value.trim()) {
                     errors.email = "Email is required.";
                 } else if (!emailRegex.test(value)) {
-                    errors.email = "Please enter a valid email address.";
+                    errors.email = "Email must be an email.";
                 } else if (value.length > 255) {
                     errors.email = "Email must not exceed 255 characters.";
                 } else if (invitedEmail && value.toLowerCase() !== invitedEmail.toLowerCase()) {
@@ -121,7 +121,7 @@ export default function Registration() {
         if (!formData.email.trim()) {
             errors.email = "Email is required.";
         } else if (!emailRegex.test(formData.email)) {
-            errors.email = "Please enter a valid email address.";
+            errors.email = "Email must be an email.";
         } else if (invitedEmail && formData.email.toLowerCase() !== invitedEmail.toLowerCase()) {
             errors.email = `You must use the invited email: ${invitedEmail}`;
         }

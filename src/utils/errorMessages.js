@@ -21,7 +21,9 @@ const errorMessageMap = {
   'Invalid token': 'This verification link is invalid. Request a new one.',
 
   // Password reset errors
-  'Invalid email': 'Please enter a valid email address.',
+  'Invalid email': 'Email must be an email.',
+  'Invalid email format': 'Email must be an email.',
+  'email must be an email': 'Email must be an email.',
   'Password must be at least 8 characters': 'Password must be at least 8 characters long.',
   'Password must contain at least one uppercase letter': 'Password must include at least one uppercase letter (A-Z).',
   'Password must contain at least one number': 'Password must include at least one number (0-9).',
@@ -41,7 +43,7 @@ const errorMessageMap = {
   'Too many requests': 'Too many attempts. Please wait a moment before trying again.',
   'Too many verification email requests': 'You\'ve requested too many verification emails. Please wait 1 hour before trying again.',
   'You have reached the limit for requesting registration links': 'You\'ve reached the daily limit for registration links. Please try again tomorrow.',
-  'Too many login attempts': 'Too many login attempts. Please wait 1 hour before trying again.',
+  'Too many login attempts': 'Too many login attempts. Please wait 5 minutes before trying again.',
 
   // Network/server errors
   'Failed to send email': 'We couldn\'t send the email. Please check your email address and try again.',

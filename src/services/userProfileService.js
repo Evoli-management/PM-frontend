@@ -187,7 +187,7 @@ class UserProfileService {
             if (!profileData.email || profileData.email.trim().length === 0) {
                 errors.email = 'Email is required';
             } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileData.email)) {
-                errors.email = 'Invalid email format';
+                errors.email = 'Email must be an email.';
             }
         }
 
