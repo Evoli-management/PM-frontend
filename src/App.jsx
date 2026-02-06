@@ -59,8 +59,15 @@ export default function App() {
     // TC011: Idle timeout state
     const [showIdleWarning, setShowIdleWarning] = useState(false);
     
+    // Public routes (no sidebar/layout offset)
+    const publicRoutes = [
+        "/", "/login", "/PasswordPageForget", "/reset-password", "/registration",
+        "/get-started", "/verify-email", "/verify-password-change", "/verify-email-change",
+        "/terms-of-service", "/privacy-policy", "/modules", "/contacts", "/testimonials", "/pricing",
+        "/invite", "/join", "/onboarding"
+    ];
     // Only show footer on non-auth public pages
-    const publicFooterRoutes = [
+    const footerRoutes = [
         "/", "/modules", "/contacts", "/testimonials", "/pricing",
         "/terms-of-service", "/privacy-policy"
     ];
@@ -69,7 +76,8 @@ export default function App() {
     // without the left margin when navigating (e.g. after login) which caused
     // dashboard tiles to appear beneath the fixed sidebar until a full refresh.
     const location = useLocation();
-    const isPublicRoute = publicFooterRoutes.includes(location.pathname);
+    const isPublicRoute = publicRoutes.includes(location.pathname);
+    const showFooter = footerRoutes.includes(location.pathname);
     
     // TC011: Initialize idle timeout tracking for authenticated users
     useEffect(() => {
@@ -195,7 +203,7 @@ export default function App() {
                         </Routes>
                     </Suspense>
                 </main>
-                {isPublicRoute && <Footer />}
+                {showFooter && <Footer />}
             </div>
     );
 }
