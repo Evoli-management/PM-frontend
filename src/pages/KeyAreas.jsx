@@ -17,6 +17,7 @@ import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
+import taskDelegationService from '../services/taskDelegationService';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
     safeParseDate,
@@ -700,9 +701,14 @@ export default function KeyAreas() {
         if (viewTab === 'delegated') {
             (async () => {
                 try {
-                    const svc = await getTaskService();
-                    // Backend filters tasks delegated TO current user
-                    const delegatedToMe = await svc.list({ delegatedTo: true });
+                    let delegatedToMe = [];
+                    try {
+                        delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                    } catch (err) {
+                        const svc = await getTaskService();
+                        delegatedToMe = await svc.list({ delegatedTo: true });
+                    }
+
                     setAllTasks(delegatedToMe || []);
                     
                     // Load activities for delegated tasks
