@@ -17,6 +17,7 @@ import OrganizationSwitcher from "./OrganizationSwitcher";
 export default function Navbar() {
     const [open, setOpen] = useState(false);
     const [openQuick, setOpenQuick] = useState(false);
+    const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
     const menuRef = useRef(null);
     const quickRef = useRef(null);
@@ -56,7 +57,6 @@ export default function Navbar() {
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const searchRef = useRef(null);
     const [openSearch, setOpenSearch] = useState(false);
-    const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem('pm:dashboard:prefs');
