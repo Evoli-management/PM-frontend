@@ -78,6 +78,7 @@ export default function App() {
     const location = useLocation();
     const isPublicRoute = publicRoutes.includes(location.pathname);
     const showFooter = footerRoutes.includes(location.pathname);
+    const showKeyAreaTabs = location.pathname.startsWith('/key-areas') || location.pathname === '/my-focus';
     
     // TC011: Initialize idle timeout tracking for authenticated users
     useEffect(() => {
@@ -127,7 +128,15 @@ export default function App() {
                     onLogout={handleLogoutFromIdle}
                     timeRemaining={5}
                 />
-                <main className={isPublicRoute ? "flex-grow public-route" : "flex-grow pt-[72px] md:pt-[72px]"}>
+                <main
+                    className={
+                        isPublicRoute
+                            ? "flex-grow public-route"
+                            : showKeyAreaTabs
+                                ? "flex-grow pt-[104px] md:pt-[104px]"
+                                : "flex-grow pt-[72px] md:pt-[72px]"
+                    }
+                >
                     <Suspense
                         fallback={
                             <div className="w-full py-10 flex items-center justify-center text-gray-600">

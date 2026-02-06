@@ -651,6 +651,42 @@ export default function KeyAreas() {
         } catch (_) {}
     }, [goals.length]);
 
+    // Sync view tab and active filter from URL params
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || "");
+        const viewParam = params.get('view');
+        const activeParam = params.get('active');
+        const allowedViews = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
+        if (viewParam && allowedViews.has(viewParam) && viewParam !== viewTab) {
+            setViewTab(viewParam);
+        }
+        if (activeParam && (activeParam === 'active' || activeParam === 'all') && activeParam !== activeFilter) {
+            setActiveFilter(activeParam);
+        }
+    }, [location.search]);
+
+    // Persist view tab and active filter to URL (keep other params intact)
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || "");
+        let changed = false;
+        if (params.get('view') !== viewTab) {
+            params.set('view', viewTab);
+            changed = true;
+        }
+        if (viewTab === 'active-tasks') {
+            if (params.get('active') !== activeFilter) {
+                params.set('active', activeFilter);
+                changed = true;
+            }
+        } else if (params.has('active')) {
+            params.delete('active');
+            changed = true;
+        }
+        if (changed) {
+            navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+        }
+    }, [viewTab, activeFilter]);
+
     // Reload tasks when viewTab or activeFilter changes
     useEffect(() => {
         // Handle MY FOCUS tab - navigate to separate page
@@ -2668,12 +2704,14 @@ export default function KeyAreas() {
                 )}
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
                     {/* Main View Tabs (legacy pattern - at top like legacy UI) */}
-                    <ViewTabsNavigation 
-                        viewTab={viewTab}
-                        setViewTab={setViewTab}
-                        activeFilter={activeFilter}
-                        setActiveFilter={setActiveFilter}
-                    />
+                    <div className="md:hidden">
+                        <ViewTabsNavigation 
+                            viewTab={viewTab}
+                            setViewTab={setViewTab}
+                            activeFilter={activeFilter}
+                            setActiveFilter={setActiveFilter}
+                        />
+                    </div>
                     
                     <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">

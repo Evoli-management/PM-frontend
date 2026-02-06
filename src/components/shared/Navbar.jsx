@@ -43,6 +43,7 @@ export default function Navbar() {
     const location = useLocation();
     const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
+    const showKeyAreaTabs = location.pathname.startsWith('/key-areas') || location.pathname === '/my-focus';
     const widgetsRef = useRef(null);
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -444,14 +445,24 @@ export default function Navbar() {
         return null;
     }
 
+    const activeKeyAreaView = (() => {
+        if (location.pathname === '/my-focus') return 'my-focus';
+        const params = new URLSearchParams(location.search || '');
+        return params.get('view') || 'active-tasks';
+    })();
+    const activeKeyAreaFilter = (() => {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('active') || 'active';
+    })();
+
     return (
         <header
-            className="bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
+            className={`bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 ${showKeyAreaTabs ? 'h-auto' : 'h-16'} flex flex-col`}
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
         >
-            <div className="w-full px-2 md:px-4 h-full flex items-center justify-between">
+            <div className="w-full px-2 md:px-4 h-16 flex items-center justify-between">
                     <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
@@ -743,6 +754,80 @@ export default function Navbar() {
                     </div>
                 </div>
             </div>
+            {showKeyAreaTabs && (
+                <div className="w-full border-t border-gray-200 bg-gray-50">
+                    <div className="w-full px-2 md:px-4">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap py-1">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=active-tasks&active=active')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                ACTIVE TASKS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=active-tasks&active=all')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                ALL TASKS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=delegated')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'delegated'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                DELEGATED
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=todo')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'todo'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                TO-DO (RED)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=activity-trap')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'activity-trap'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                ACTIVITY TRAP
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/my-focus')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'my-focus'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY FOCUS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </header>
     );
 }
