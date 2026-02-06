@@ -446,8 +446,8 @@ export default function Registration() {
                                                 <p className={/[^A-Za-z0-9]/.test(password) ? "text-green-400" : ""}>
                                                     • At least one special character
                                                 </p>
-                                                <p className={password.length >= 6 ? "text-green-400" : ""}>
-                                                    • Minimum 6 characters
+                                                <p className={password.length >= 8 ? "text-green-400" : ""}>
+                                                    • Minimum 8 characters
                                                 </p>
                                             </div>
                                         )}
