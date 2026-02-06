@@ -14,7 +14,6 @@ const LoginPage = () => {
     const [formData, setFormData] = useState({
         email: prefilledEmail || "",
         password: "",
-        rememberMe: false,
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -25,10 +24,10 @@ const LoginPage = () => {
     };
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
-            [name]: type === "checkbox" ? checked : value,
+            [name]: value,
         }));
         setError("");
     };
@@ -45,9 +44,9 @@ const LoginPage = () => {
         
         setLoading(true);
         try {
-            const { email, password, rememberMe } = formData;
+            const { email, password } = formData;
             const authService = await import("../services/authService").then((m) => m.default);
-            const res = await authService.login({ email, password, rememberMe });
+            const res = await authService.login({ email, password });
 
             // Try to get token from response
             let token = res.token || (res.user && res.user.token);
@@ -198,18 +197,7 @@ const LoginPage = () => {
                                 <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-lg" />
                             </span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-2">
-                            <label className="flex items-center text-sm text-black">
-                                <input
-                                    type="checkbox"
-                                    name="rememberMe"
-                                    checked={formData.rememberMe}
-                                    onChange={handleInputChange}
-                                    className="mr-2"
-                                    aria-label="Remember me"
-                                />
-                                Remember me!
-                            </label>
+                        <div className="flex flex-col sm:flex-row items-center justify-end w-full gap-2">
                             <Link
                                 to="/PasswordPageForget"
                                 className="text-sm text-blue-700 underline font-semibold bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
