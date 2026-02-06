@@ -367,31 +367,31 @@ export default function UnifiedTaskActivityTable({
     };
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full ta-legacy">
             {/* Special Header for Delegated View */}
             {viewTab === 'delegated' && (
-                <div className="px-4 py-3 bg-white border-b">
-                    <h3 className="text-lg font-semibold text-center text-blue-700">Delegated Tasks</h3>
+                <div className="px-4 py-3 bg-white border-b ta-header">
+                    <h3 className="text-lg font-semibold text-center ta-accent">Delegated Tasks</h3>
                 </div>
             )}
 
             {/* Filters Row */}
-            <div className="flex items-center justify-between gap-3 px-4 py-2 bg-white border-b flex-wrap">
+            <div className="flex items-center justify-between gap-3 px-4 py-2 bg-white border-b flex-wrap ta-filters-row">
                 <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-medium">Filter:</span>
+                    <span className="text-sm font-medium ta-filter-label">Filter:</span>
 
                     {/* Task/Activity Toggle Buttons */}
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowTasks(!showTasks)}
-                            className={`p-1.5 rounded border ${showTasks ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-300 text-gray-400'}`}
+                            className={`ta-toggle-btn ${showTasks ? 'is-active' : ''}`}
                             title="Filter tasks"
                         >
                             <FaStop className="text-xs" />
                         </button>
                         <button
                             onClick={() => setShowActivities(!showActivities)}
-                            className={`p-1.5 rounded border ${showActivities ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-300 text-gray-400'}`}
+                            className={`ta-toggle-btn ${showActivities ? 'is-active' : ''}`}
                             title="Filter activities"
                         >
                             <FaAlignJustify className="text-xs" />
@@ -402,7 +402,7 @@ export default function UnifiedTaskActivityTable({
                     <select
                         value={keyAreaFilter}
                         onChange={(e) => setKeyAreaFilter(e.target.value)}
-                        className="px-3 py-1 text-sm border rounded bg-white"
+                        className="ta-filter-control"
                     >
                         <option value="">Key Area</option>
                         {keyAreas.map((ka, idx) => (
@@ -417,7 +417,7 @@ export default function UnifiedTaskActivityTable({
                         <select
                             value={responsibleFilter}
                             onChange={(e) => setResponsibleFilter(e.target.value)}
-                            className="px-3 py-1 text-sm border rounded bg-white"
+                            className="ta-filter-control"
                         >
                             <option value="">Responsible</option>
                             {users.map(user => (
@@ -437,21 +437,19 @@ export default function UnifiedTaskActivityTable({
                             placeholder="Search"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="px-3 py-1 text-sm border rounded w-48 bg-white"
+                            className="ta-filter-control ta-search-input"
                         />
-                        <span className="text-blue-500 cursor-pointer">🔍</span>
+                        <span className="ta-accent cursor-pointer">🔍</span>
                     </div>
 
                     {/* Mass Edit - hidden for delegated view */}
                     {viewTab !== 'delegated' && (
                         <div className="flex items-center gap-2">
-                            <span className="text-sm">{selectedItems.size} selected</span>
+                            <span className="text-sm ta-selected-count">{selectedItems.size} selected</span>
                             <button
                                 onClick={handleMassEdit}
-                                className={`px-3 py-1 text-sm rounded ${
-                                    selectedItems.size === 0
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        : 'bg-green-600 text-white hover:bg-green-700'
+                                className={`ta-mass-edit-btn ${
+                                    selectedItems.size === 0 ? 'is-disabled' : ''
                                 }`}
                                 disabled={selectedItems.size === 0}
                             >
@@ -464,8 +462,8 @@ export default function UnifiedTaskActivityTable({
 
             {/* Table */}
             <div className="flex-1 overflow-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-slate-50 sticky top-0">
+                <table className="w-full text-sm ta-table">
+                    <thead className="bg-slate-50 sticky top-0 ta-thead">
                         <tr>
                             <th className="w-8 p-2"></th>
                             {columns.includes('priority') && (
@@ -546,7 +544,7 @@ export default function UnifiedTaskActivityTable({
                                         />
                                     </td>
                                     {columns.includes('priority') && (
-                                        <td className="p-2 text-center font-bold text-red-600">
+                                        <td className="p-2 text-center font-bold ta-priority">
                                             {getPriorityIcon(item.priority)}
                                         </td>
                                     )}
@@ -749,7 +747,7 @@ export default function UnifiedTaskActivityTable({
                                                         onActivityClick(item);
                                                     }
                                                 }}
-                                                className="text-blue-500 hover:text-blue-700 p-1"
+                                                className="ta-accent hover:opacity-80 p-1"
                                                 title="Open details"
                                             >
                                                 <FaExternalLinkAlt size={14} />

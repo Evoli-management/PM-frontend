@@ -182,3 +182,109 @@ input[type="date"].hide-native-date-icon {
 .animate-slideUp {
     animation: slideUp 0.3s ease;
 }
+
+/* Legacy-inspired Tasks & Activities layout (page_id 3/4/5) */
+.ta-legacy {
+    --ta-accent: #2563eb;
+}
+
+.ta-legacy .ta-accent {
+    color: var(--ta-accent);
+}
+
+.ta-legacy .ta-filters-row {
+    background: #fff;
+    border-bottom: 1px solid #d5d5d5;
+}
+
+.ta-legacy .ta-filter-label {
+    font-size: 13px;
+    color: #333;
+}
+
+.ta-legacy .ta-filter-control {
+    height: 26px;
+    border: 1px solid #cfcfcf;
+    border-radius: 3px;
+    padding: 0 8px;
+    font-size: 12px;
+    background: #fff;
+    color: #333;
+}
+
+.ta-legacy .ta-filter-control:focus {
+    outline: none;
+    border-color: var(--ta-accent);
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+.ta-legacy .ta-search-input {
+    width: 190px;
+}
+
+.ta-legacy .ta-toggle-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    border: 1px solid #cfcfcf;
+    background: #fff;
+    color: #9aa0a6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ta-legacy .ta-toggle-btn.is-active {
+    border-color: var(--ta-accent);
+    color: var(--ta-accent);
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.ta-legacy .ta-selected-count {
+    font-size: 12px;
+    color: #555;
+}
+
+.ta-legacy .ta-mass-edit-btn {
+    height: 26px;
+    border-radius: 3px;
+    padding: 0 10px;
+    font-size: 12px;
+    border: 1px solid var(--ta-accent);
+    color: #fff;
+    background: var(--ta-accent);
+}
+
+.ta-legacy .ta-mass-edit-btn:hover {
+    filter: brightness(0.95);
+}
+
+.ta-legacy .ta-mass-edit-btn.is-disabled {
+    border-color: #d0d0d0;
+    background: #e5e7eb;
+    color: #9aa0a6;
+    cursor: not-allowed;
+}
+
+.ta-legacy .ta-table {
+    border-collapse: collapse;
+}
+
+.ta-legacy .ta-thead th {
+    background: #f5f5f5;
+    border-bottom: 1px solid #d5d5d5;
+    font-size: 12px;
+    color: #555;
+    padding: 6px 8px;
+}
+
+.ta-legacy .ta-table tbody td {
+    border-bottom: 1px solid #e1e1e1;
+    font-size: 12px;
+    padding: 6px 8px;
+    color: #333;
+}
+
+.ta-legacy .ta-priority {
+    color: var(--ta-accent);
+}
