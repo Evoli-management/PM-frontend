@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaSearch } from "react-icons/fa";
 import organizationService from "../services/organizationService";
@@ -8,6 +9,7 @@ import recognitionsService from "../services/recognitionsService";
 import userProfileService from "../services/userProfileService";
 
 export default function GiveStrokes() {
+    const location = useLocation();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [members, setMembers] = useState([]);
@@ -47,6 +49,12 @@ export default function GiveStrokes() {
     useEffect(() => {
         loadMembers();
     }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || '');
+        const tab = params.get('tab') || 'give';
+        setActiveTab(tab === 'account' ? 'account' : 'give');
+    }, [location.search]);
 
     useEffect(() => {
         if (activeTab === 'account' && currentUserId) {
@@ -228,30 +236,6 @@ export default function GiveStrokes() {
                                 onClick={() => setMobileSidebarOpen(true)}
                             >
                                 <FaBars />
-                            </button>
-                        </div>
-
-                        {/* Tabs */}
-                        <div className="flex gap-2 mb-6">
-                            <button
-                                onClick={() => setActiveTab('give')}
-                                className={`px-8 py-3 rounded-full font-medium transition ${
-                                    activeTab === 'give'
-                                        ? 'bg-cyan-400 text-white'
-                                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                                }`}
-                            >
-                                GIVE STROKES
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('account')}
-                                className={`px-8 py-3 rounded-full font-medium transition ${
-                                    activeTab === 'account'
-                                        ? 'bg-cyan-400 text-white'
-                                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                                }`}
-                            >
-                                STROKE ACCOUNT
                             </button>
                         </div>
 
