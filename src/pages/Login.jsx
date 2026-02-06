@@ -143,8 +143,8 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto">
-            <div className="grid grid-cols-2 rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
+        <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto px-4">
+            <div className="grid md:grid-cols-2 w-full rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
                 {/* <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" /> */}
                 {/* Left: form pane */}
                 <div className="p-8 flex flex-col justify-center">

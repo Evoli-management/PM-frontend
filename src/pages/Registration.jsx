@@ -220,8 +220,8 @@ export default function Registration() {
 
     return (
         <>
-            <div className="min-h-screen flex items-center w-full max-w-6xl mx-auto">
-                <div className="relative grid md:grid-cols-2 items-center rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
+            <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto px-4">
+                <div className="relative grid md:grid-cols-2 w-full items-center rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
                     {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
                     <div
                         className="p-8 flex flex-col items-center justify-center"
