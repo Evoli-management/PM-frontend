@@ -50,6 +50,7 @@ export default function Navbar() {
     const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
     const showKeyAreaTabs = location.pathname.startsWith('/key-areas') || location.pathname === '/my-focus';
+    const showTeamsTabs = location.pathname.startsWith('/teams');
     const widgetsRef = useRef(null);
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -461,6 +462,10 @@ export default function Navbar() {
         return params.get('active') || 'active';
     })();
     const activeTasksLabel = activeKeyAreaFilter === 'all' ? 'ALL TASKS' : 'ACTIVE TASKS';
+    const activeTeamsTab = (() => {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('tab') || 'teams-members';
+    })();
 
     return (
         <header
@@ -575,6 +580,56 @@ export default function Navbar() {
                                 }`}
                             >
                                 MY FOCUS
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {showTeamsTabs && !showKeyAreaTabs && (
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=teams-members')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'teams-members'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                TEAMS & MEMBERS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=organization')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'organization'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY ORGANISATION
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=myteams')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'myteams'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY TEAMS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=myreport')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'myreport'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY REPORT
                             </button>
                         </div>
                     </div>

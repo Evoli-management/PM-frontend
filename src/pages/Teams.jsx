@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
 import { FaBars, FaEdit, FaTrash, FaEye } from "react-icons/fa";
 import teamsService from "../services/teamsService";
@@ -24,6 +24,7 @@ export default function Teams() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
     const [canManage, setCanManage] = useState(false);
+    const location = useLocation();
     const [view, setView] = useState('list'); // 'list' or 'reports'
     const [reportLevel, setReportLevel] = useState('organization'); // 'organization', 'myteams', 'myself'
     const [selectedItems, setSelectedItems] = useState([]);
@@ -78,6 +79,23 @@ export default function Teams() {
         };
         init();
     }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || '');
+        const tab = params.get('tab') || 'teams-members';
+        if (tab === 'teams-members') {
+            setView('list');
+        } else if (tab === 'organization') {
+            setView('reports');
+            setReportLevel('organization');
+        } else if (tab === 'myteams') {
+            setView('reports');
+            setReportLevel('myteams');
+        } else if (tab === 'myreport') {
+            setView('reports');
+            setReportLevel('myself');
+        }
+    }, [location.search]);
 
     const loadTeams = async () => {
         try {
@@ -331,6 +349,109 @@ export default function Teams() {
         ];
     };
 
+    const employeeshipAverage = useMemo(() => {
+        const metrics = employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics();
+        const values = metrics.map((m) => Number(m.value) || 0);
+        const sum = values.reduce((acc, v) => acc + v, 0);
+        return values.length ? sum / values.length : 0;
+    }, [employeeshipMetrics]);
+
+    const performanceOverall = useMemo(() => {
+        const metrics = performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics();
+        const overall = metrics.find((m) => m.key === 'overall');
+        return Number(overall?.value) || 0;
+    }, [performanceMetrics]);
+
+    const profileStars = useMemo(() => {
+        const avg = (employeeshipAverage + performanceOverall) / 2;
+        if (avg >= 80) return 3;
+        if (avg >= 60) return 2;
+        if (avg >= 40) return 1;
+        return 0;
+    }, [employeeshipAverage, performanceOverall]);
+
+    const profileStatus = useMemo(() => {
+        if (profileStars >= 3) return 'Star Double Bagger';
+        if (profileStars === 2) return 'Star Performer';
+        if (profileStars === 1) return 'Double Bagger';
+        return '';
+    }, [profileStars]);
+
+    const renderReportSidePanel = () => {
+        if (reportLevel === 'myself') {
+            const avatarUrl = userProfile?.avatarUrl || userProfile?.avatar || '';
+            const displayName = userProfile?.fullName || userProfile?.name || 'Profile';
+            return (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex flex-col items-center gap-3 text-center">
+                        {avatarUrl ? (
+                            <img
+                                src={avatarUrl}
+                                alt={displayName}
+                                className="h-20 w-20 rounded-full object-cover border"
+                            />
+                        ) : (
+                            <div className="h-20 w-20 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-3xl">
+                                {displayName.charAt(0)}
+                            </div>
+                        )}
+                        {profileStatus && (
+                            <div className="text-sm text-gray-700">Profile status: {profileStatus}</div>
+                        )}
+                        <div className="flex items-center gap-1 text-blue-600">
+                            {[1, 2, 3].map((i) => (
+                                <span key={i} className={i <= profileStars ? 'text-blue-600' : 'text-gray-300'}>
+                                    ★
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const listTitle = reportLevel === 'organization'
+            ? 'Select a team you lead to see the report:'
+            : 'Select team member to see his/her report:';
+        const listItems = matrixData || [];
+
+        return (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="text-sm text-gray-700 mb-2">{listTitle}</div>
+                {listItems.length === 0 ? (
+                    <div className="text-xs text-gray-500">No items available.</div>
+                ) : (
+                    <div className="flex flex-wrap gap-2">
+                        {listItems.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => handleItemSelect(item.id)}
+                                className={`px-2 py-1 text-xs rounded border ${
+                                    selectedItems.includes(item.id)
+                                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                                        : 'border-gray-200 text-gray-600 hover:text-gray-800 hover:border-gray-300'
+                                }`}
+                            >
+                                {item.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {reportLevel === 'myteams' && (
+                    <div className="mt-3">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/teams?tab=organization')}
+                            className="px-3 py-1.5 text-xs rounded bg-red-500 text-white hover:bg-red-600"
+                        >
+                            Back
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const Section = ({ title, children, divider = true }) => (
         <section className={divider ? "mt-5 border-t border-gray-200 pt-5" : "mt-5 pt-5"}>
             {title ? <h2 className="mb-3 text-[15px] font-semibold text-gray-800">{title}</h2> : null}
@@ -368,32 +489,8 @@ export default function Teams() {
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between mb-3">
+                                    <div className="flex flex-col gap-3 mb-3">
                                         <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
-                                        
-                                        {/* View Toggle */}
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setView('list')}
-                                                className={`px-4 py-2 text-sm rounded ${
-                                                    view === 'list'
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                }`}
-                                            >
-                                                Team List
-                                            </button>
-                                            <button
-                                                onClick={() => setView('reports')}
-                                                className={`px-4 py-2 text-sm rounded ${
-                                                    view === 'reports'
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                }`}
-                                            >
-                                                CAN-WILL Reports
-                                            </button>
-                                        </div>
                                     </div>
 
                                     {view === 'list' ? (
@@ -563,45 +660,11 @@ export default function Teams() {
                                     ) : (
                                         // Reports View
                                         <>
-                                            {/* Report Level Selector */}
-                                            <div className="flex gap-2 mb-4">
-                                                <button
-                                                    onClick={() => setReportLevel('organization')}
-                                                    className={`px-4 py-2 text-sm rounded ${
-                                                        reportLevel === 'organization'
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                                >
-                                                    Organization
-                                                </button>
-                                                <button
-                                                    onClick={() => setReportLevel('myteams')}
-                                                    className={`px-4 py-2 text-sm rounded ${
-                                                        reportLevel === 'myteams'
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                                >
-                                                    My Teams
-                                                </button>
-                                                <button
-                                                    onClick={() => setReportLevel('myself')}
-                                                    className={`px-4 py-2 text-sm rounded ${
-                                                        reportLevel === 'myself'
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                                >
-                                                    My Self
-                                                </button>
-                                            </div>
-
                                             {/* Report Description */}
                                             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                                                {reportLevel === 'organization' && "Viewing organization-wide summary: all teams' scores in the CAN-WILL matrix"}
-                                                {reportLevel === 'myteams' && "Viewing your main team: scores of users in your team"}
-                                                {reportLevel === 'myself' && "Viewing your personal position compared to your team's average score"}
+                                                {reportLevel === 'organization' && "Select a team you lead to see the report."}
+                                                {reportLevel === 'myteams' && "Select a team member to see the report."}
+                                                {reportLevel === 'myself' && "Your personal report compared to your team's average score."}
                                             </div>
 
                                             {/* Reports Grid */}
@@ -625,8 +688,9 @@ export default function Teams() {
                                                     )}
                                                 </div>
 
-                                                {/* Right column: Indices */}
+                                                {/* Right column: Side panel + Indices */}
                                                 <div className="space-y-4">
+                                                    {renderReportSidePanel()}
                                                     <IndexPanel
                                                         title="Employeeship Index"
                                                         metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
