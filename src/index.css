@@ -58,6 +58,14 @@ body {
     html.sidebar-collapsed main.flex-grow:not(.public-route) {
         margin-left: 5rem; /* 80px */
     }
+
+    /* Align Key Areas navbar tabs with content area (after sidebar) */
+    .navbar-keyarea-tabs {
+        margin-left: 16rem; /* 256px */
+    }
+    html.sidebar-collapsed .navbar-keyarea-tabs {
+        margin-left: 5rem; /* 80px */
+    }
 }
 
 /* Hide scrollbars but keep scroll functionality */

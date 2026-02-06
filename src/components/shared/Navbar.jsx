@@ -21,12 +21,14 @@ export default function Navbar() {
     const menuRef = useRef(null);
     const quickRef = useRef(null);
     const quickButtonRef = useRef(null);
+    const activeMenuRef = useRef(null);
 
     // Close the profile/settings popover when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
             const node = menuRef.current;
             const qnode = quickRef.current;
+            const activeNode = activeMenuRef.current;
             // Close profile menu if click outside
             if (open && node && !node.contains(e.target)) {
                 setOpen(false);
@@ -35,10 +37,13 @@ export default function Navbar() {
             if (openQuick && qnode && !qnode.contains(e.target)) {
                 setOpenQuick(false);
             }
+            if (openActiveMenu && activeNode && !activeNode.contains(e.target)) {
+                setOpenActiveMenu(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [open, openQuick]);
+    }, [open, openQuick, openActiveMenu]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
@@ -51,6 +56,7 @@ export default function Navbar() {
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const searchRef = useRef(null);
     const [openSearch, setOpenSearch] = useState(false);
+    const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const [widgetsPrefs, setWidgetsPrefs] = useState(() => {
         try {
             const raw = localStorage.getItem('pm:dashboard:prefs');
@@ -454,6 +460,7 @@ export default function Navbar() {
         const params = new URLSearchParams(location.search || '');
         return params.get('active') || 'active';
     })();
+    const activeTasksLabel = activeKeyAreaFilter === 'all' ? 'ALL TASKS' : 'ACTIVE TASKS';
 
     return (
         <header
@@ -478,29 +485,53 @@ export default function Navbar() {
                     
                 {showKeyAreaTabs && (
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap">
-                            <button
-                                type="button"
-                                onClick={() => navigate('/key-areas?view=active-tasks&active=active')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                ACTIVE TASKS
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => navigate('/key-areas?view=active-tasks&active=all')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                ALL TASKS
-                            </button>
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <div className="relative" ref={activeMenuRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenActiveMenu((prev) => !prev)}
+                                    className={`px-2 py-2 rounded transition flex items-center gap-1 ${
+                                        activeKeyAreaView === 'active-tasks'
+                                            ? 'text-blue-600 border-b-2 border-blue-600'
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    {activeTasksLabel}
+                                    <span className="text-[10px]">▾</span>
+                                </button>
+                                {openActiveMenu && (
+                                    <div className="absolute left-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-50">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigate('/key-areas?view=active-tasks&active=active');
+                                                setOpenActiveMenu(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                                activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
+                                                    ? 'text-blue-600'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            ACTIVE TASKS
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigate('/key-areas?view=active-tasks&active=all');
+                                                setOpenActiveMenu(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                                activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
+                                                    ? 'text-blue-600'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            ALL TASKS
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => navigate('/key-areas?view=delegated')}
