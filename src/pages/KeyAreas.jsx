@@ -431,6 +431,7 @@ export default function KeyAreas() {
     const [viewTab, setViewTab] = useState('active-tasks');
     // Sub-filter for ACTIVE TASKS view: 'active' (no completed) or 'all' (including completed)
     const [activeFilter, setActiveFilter] = useState('active');
+    const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
@@ -2731,7 +2732,7 @@ export default function KeyAreas() {
                                 className="flex items-center justify-between gap-3 mb-4"
                                 style={{ display: selectedTaskFull ? "none" : undefined }}
                             >
-                            {!selectedKA ? (
+                            {!selectedKA && !isGlobalTasksView ? (
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
                                     {!showOnlyIdeas && (
@@ -2786,22 +2787,24 @@ export default function KeyAreas() {
                                     >
                                         <FaBars />
                                     </button>
-                                    <button
-                                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                                        aria-label="Back"
-                                        style={{ minWidth: 36, minHeight: 36 }}
-                                        onClick={() => {
-                                            setSelectedKA(null);
-                                            setAllTasks([]);
-                                            // Clear any URL params (like ?select=ideas) to show full list
-                                            navigate("/key-areas", { replace: true });
-                                        }}
-                                    >
-                                        <FaChevronLeft />
-                                    </button>
+                                    {selectedKA && (
+                                        <button
+                                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                            aria-label="Back"
+                                            style={{ minWidth: 36, minHeight: 36 }}
+                                            onClick={() => {
+                                                setSelectedKA(null);
+                                                setAllTasks([]);
+                                                // Clear any URL params (like ?select=ideas) to show full list
+                                                navigate("/key-areas", { replace: true });
+                                            }}
+                                        >
+                                            <FaChevronLeft />
+                                        </button>
+                                    )}
 
                                     {/* Show selected KA icon then title inline - or special views */}
-                                    {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (
+                                    {(selectedKA || isGlobalTasksView) && (
                                         <div className="inline-flex items-center gap-1">
                                             <img
                                                 alt="Key Areas"
@@ -2817,6 +2820,7 @@ export default function KeyAreas() {
                                             >
                                                 {viewTab === 'delegated' ? 'Delegated Tasks' : 
                                                  viewTab === 'todo' ? 'To-Do (All Tasks)' :
+                                                 viewTab === 'activity-trap' ? 'Activity Trap' :
                                                  selectedKA?.title || ''}
                                             </span>
                                         </div>
@@ -3759,7 +3763,7 @@ export default function KeyAreas() {
                                 </div>
                             </>
                         )}
-                        {!selectedKA && (
+                        {!selectedKA && !isGlobalTasksView && (
                             <>
                                 {String(siteSearch || "").trim().length >= 2 && (
                                     <div className="mb-4 bg-white border border-slate-200 rounded-lg shadow-sm p-3">
