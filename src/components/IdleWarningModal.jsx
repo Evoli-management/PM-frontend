@@ -8,7 +8,7 @@ const IdleWarningModal = ({ isOpen, onContinue, onLogout, timeRemaining }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black bg-opacity-60 animate-fadeIn">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-[1px] animate-fadeIn">
       <div className="bg-white rounded-xl p-8 max-w-md w-[90%] shadow-2xl text-center animate-slideUp">
         <div className="text-5xl mb-4">⏰</div>
         <h2 className="text-2xl font-semibold text-gray-900 mb-4">
