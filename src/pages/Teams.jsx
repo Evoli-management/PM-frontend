@@ -743,17 +743,13 @@ export default function Teams() {
                         </div>
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <div className="flex flex-col gap-3 mb-3">
                                         <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
                                     </div>
 
                                     {view === 'list' ? (
                                         <>
-                                            <div className="mb-3 min-h-[40px] rounded bg-blue-50 border border-blue-100 px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-blue-700 sm:text-[12px] flex items-center justify-center">
-                                                {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
-                                            </div>
-
                                     {toast.visible && (
                                         <div className={`p-3 rounded text-sm ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                                             {toast.message}
@@ -841,8 +837,8 @@ export default function Teams() {
                                         </div>
                                     ) : (
                                         <Section title="Teams & Members">
-                                            <div className="space-y-4">
-                                                <div className="grid gap-3 md:grid-cols-3">
+                                            <div className="space-y-3">
+                                                <div className="grid gap-2 md:grid-cols-3">
                                                     <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                         <div className="text-xs text-gray-500">Organization</div>
                                                         <div className="text-sm font-semibold text-gray-800">{organizationName}</div>
@@ -874,8 +870,8 @@ export default function Teams() {
                                                     </div>
                                                 </div>
 
-                                                <div className="grid gap-4 lg:grid-cols-3">
-                                                    <div className="lg:col-span-2 space-y-4">
+                                                <div className="grid gap-3 lg:grid-cols-3">
+                                                    <div className="lg:col-span-2 space-y-3">
                                                         <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                             <div className="flex items-center justify-between">
                                                                 <div className="text-sm font-semibold text-gray-800">Your Teams</div>
@@ -919,7 +915,7 @@ export default function Teams() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-4 lg:sticky lg:top-20 self-start">
+                                                    <div className="space-y-3 lg:sticky lg:top-20 self-start">
                                                         <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                             <div className="text-sm font-semibold text-gray-800">Quick Actions</div>
                                                             <div className="mt-2 flex flex-col gap-2">
