@@ -4,6 +4,7 @@ import { ProfileLayout } from '../components/profile/ProfileLayout';
 import { PersonalInformation } from '../components/profile/PersonalInformation';
 import { SecuritySettings } from '../components/profile/SecuritySettings';
 import { Preferences } from '../components/profile/Preferences';
+import { Privacy } from '../components/profile/Privacy';
 import { Integrations } from '../components/profile/Integrations';
 import { Toast } from '../components/profile/UIComponents';
 import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations, ManageTeams, ManageMembers, OrganizationSettings } from '../components/profile';
@@ -126,6 +127,8 @@ export default function ProfileSetting() {
                 return <SecuritySettings showToast={showToast} />;
             case "Preferences":
                 return <Preferences showToast={showToast} />;
+            case "Privacy":
+                return <Privacy showToast={showToast} />;
             case "Integrations":
                 return <Integrations showToast={showToast} />;
             case "Organization":

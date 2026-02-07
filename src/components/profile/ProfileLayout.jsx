@@ -5,6 +5,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         "My Profile",
         "Security",
         "Preferences",
+        "Privacy",
         "Integrations",
         "Organization",
     ];
@@ -22,6 +23,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                     "my-profile": "My Profile",
                     "security": "Security",
                     "preferences": "Preferences",
+                    "privacy": "Privacy",
                     "integrations": "Integrations",
                     "organization": "Organization",
                 };
