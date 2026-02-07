@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Section, Field, LoadingButton } from './UIComponents';
 import userProfileService from '../../services/userProfileService';
 import authService from '../../services/authService';
+import privacyService from '../../services/privacyService';
 
 export const Privacy = ({ showToast }) => {
     const navigate = useNavigate();
@@ -33,11 +34,18 @@ export const Privacy = ({ showToast }) => {
     const loadPrivacySettings = async () => {
         setLoading(true);
         try {
-            // Load from localStorage for now - replace with API call
-            const saved = localStorage.getItem('userPrivacySettings');
-            if (saved) {
-                setPrivacy(prev => ({ ...prev, ...JSON.parse(saved) }));
-            }
+            const prefs = await privacyService.getPreferences();
+            const profileVisibility = prefs.profileVisibility || (prefs.profilePublic ? 'public' : 'team');
+            const dataRetentionDays = typeof prefs.dataRetentionDays === 'number'
+                ? prefs.dataRetentionDays
+                : parseInt(prefs.dataRetentionDays || '365', 10);
+
+            setPrivacy(prev => ({
+                ...prev,
+                profileVisibility,
+                dataRetentionPeriod: Number.isNaN(dataRetentionDays) ? 365 : dataRetentionDays,
+                allowDataExport: prefs.allowDataExport ?? true,
+            }));
         } catch (error) {
             showToast('Failed to load privacy settings', 'error');
         } finally {
@@ -48,11 +56,29 @@ export const Privacy = ({ showToast }) => {
     const savePrivacySettings = async () => {
         setSaving(true);
         try {
-            // Save to localStorage for now - replace with API call
-            localStorage.setItem('userPrivacySettings', JSON.stringify(privacy));
-            showToast('Privacy settings saved successfully');
+            const payload = {
+                profileVisibility: privacy.profileVisibility,
+                dataRetentionDays: privacy.dataRetentionPeriod,
+                allowDataExport: privacy.allowDataExport,
+            };
+
+            const res = await privacyService.updatePreferences(payload);
+            const updated = res.preferences || {};
+            const profileVisibility = updated.profileVisibility || (updated.profilePublic ? 'public' : privacy.profileVisibility);
+            const dataRetentionDays = typeof updated.dataRetentionDays === 'number'
+                ? updated.dataRetentionDays
+                : parseInt(updated.dataRetentionDays || `${privacy.dataRetentionPeriod}`, 10);
+
+            setPrivacy(prev => ({
+                ...prev,
+                profileVisibility,
+                dataRetentionPeriod: Number.isNaN(dataRetentionDays) ? prev.dataRetentionPeriod : dataRetentionDays,
+                allowDataExport: updated.allowDataExport ?? prev.allowDataExport,
+            }));
+            showToast(res.message || 'Privacy settings saved successfully');
         } catch (error) {
-            showToast('Failed to save privacy settings', 'error');
+            const message = error.response?.data?.message || 'Failed to save privacy settings';
+            showToast(message, 'error');
         } finally {
             setSaving(false);
         }
@@ -64,11 +90,12 @@ export const Privacy = ({ showToast }) => {
     
     const exportData = async () => {
         try {
-            // Simulate data export - replace with actual API call
-            showToast('Data export initiated. You will receive an email when ready.', 'info');
+            const res = await privacyService.requestDataExport();
+            showToast(res.message || 'Data export initiated. You will receive an email when ready.', 'info');
             setShowExportModal(false);
         } catch (error) {
-            showToast('Failed to initiate data export', 'error');
+            const message = error.response?.data?.message || 'Failed to initiate data export';
+            showToast(message, 'error');
         }
     };
     
