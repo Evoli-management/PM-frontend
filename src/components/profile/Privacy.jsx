@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import { Section, Field, LoadingButton } from './UIComponents';
 import userProfileService from '../../services/userProfileService';
 import authService from '../../services/authService';
 
@@ -9,35 +9,10 @@ export const Privacy = ({ showToast }) => {
     const [privacy, setPrivacy] = useState({
         // Profile Visibility
         profileVisibility: 'team', // public, team, private
-        showEmail: false,
-        showPhone: false,
-        showLocation: false,
-        
-        // Activity Visibility
-        showOnlineStatus: true,
-        showLastActivity: false,
-        showWorkingHours: true,
-        showCurrentProject: false,
-        
-        // Data & Analytics
-        allowAnalytics: true,
-        allowUsageData: false,
-        allowCrashReports: true,
-        allowPersonalization: true,
-        
-        // Communication
-        allowDirectMessages: true,
-        allowMentions: true,
-        allowCalendarInvites: true,
-        allowNotifications: true,
-        
+
         // Data Export & Deletion
         dataRetentionPeriod: 365, // days
         allowDataExport: true,
-        
-        // Third-party Access
-        allowThirdPartyApps: false,
-        allowAPIAccess: false
     });
     
     const [loading, setLoading] = useState(false);
@@ -168,126 +143,6 @@ export const Privacy = ({ showToast }) => {
                             <option value="private">Private - Only you</option>
                         </select>
                     </Field>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Toggle
-                            label="Show Email Address"
-                            description="Display email in your profile"
-                            checked={privacy.showEmail}
-                            onChange={(checked) => updatePrivacySetting('showEmail', checked)}
-                        />
-                        <Toggle
-                            label="Show Phone Number"
-                            description="Display phone in your profile"
-                            checked={privacy.showPhone}
-                            onChange={(checked) => updatePrivacySetting('showPhone', checked)}
-                        />
-                        <Toggle
-                            label="Show Location"
-                            description="Display your location"
-                            checked={privacy.showLocation}
-                            onChange={(checked) => updatePrivacySetting('showLocation', checked)}
-                        />
-                    </div>
-                </div>
-            </Section>
-            
-            {/* Activity Visibility */}
-            <Section 
-                title="Activity Visibility" 
-                description="Control what activity information others can see"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Show Online Status"
-                        description="Let others see when you're online"
-                        checked={privacy.showOnlineStatus}
-                        onChange={(checked) => updatePrivacySetting('showOnlineStatus', checked)}
-                    />
-                    <Toggle
-                        label="Show Last Activity"
-                        description="Display when you were last active"
-                        checked={privacy.showLastActivity}
-                        onChange={(checked) => updatePrivacySetting('showLastActivity', checked)}
-                    />
-                    <Toggle
-                        label="Show Working Hours"
-                        description="Display your working hours"
-                        checked={privacy.showWorkingHours}
-                        onChange={(checked) => updatePrivacySetting('showWorkingHours', checked)}
-                    />
-                    <Toggle
-                        label="Show Current Project"
-                        description="Display what project you're working on"
-                        checked={privacy.showCurrentProject}
-                        onChange={(checked) => updatePrivacySetting('showCurrentProject', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Data & Analytics */}
-            <Section 
-                title="Data & Analytics" 
-                description="Control how your data is used for analytics and improvements"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Allow Analytics"
-                        description="Help improve the app with usage analytics"
-                        checked={privacy.allowAnalytics}
-                        onChange={(checked) => updatePrivacySetting('allowAnalytics', checked)}
-                    />
-                    <Toggle
-                        label="Share Usage Data"
-                        description="Share anonymized usage statistics"
-                        checked={privacy.allowUsageData}
-                        onChange={(checked) => updatePrivacySetting('allowUsageData', checked)}
-                    />
-                    <Toggle
-                        label="Allow Crash Reports"
-                        description="Send crash reports to help fix bugs"
-                        checked={privacy.allowCrashReports}
-                        onChange={(checked) => updatePrivacySetting('allowCrashReports', checked)}
-                    />
-                    <Toggle
-                        label="Allow Personalization"
-                        description="Use data to personalize your experience"
-                        checked={privacy.allowPersonalization}
-                        onChange={(checked) => updatePrivacySetting('allowPersonalization', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Communication */}
-            <Section 
-                title="Communication Preferences" 
-                description="Control how others can communicate with you"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Allow Direct Messages"
-                        description="Let team members message you directly"
-                        checked={privacy.allowDirectMessages}
-                        onChange={(checked) => updatePrivacySetting('allowDirectMessages', checked)}
-                    />
-                    <Toggle
-                        label="Allow Mentions"
-                        description="Allow others to mention you in comments"
-                        checked={privacy.allowMentions}
-                        onChange={(checked) => updatePrivacySetting('allowMentions', checked)}
-                    />
-                    <Toggle
-                        label="Allow Calendar Invites"
-                        description="Let others send you meeting invites"
-                        checked={privacy.allowCalendarInvites}
-                        onChange={(checked) => updatePrivacySetting('allowCalendarInvites', checked)}
-                    />
-                    <Toggle
-                        label="Allow Notifications"
-                        description="Receive notifications from the platform"
-                        checked={privacy.allowNotifications}
-                        onChange={(checked) => updatePrivacySetting('allowNotifications', checked)}
-                    />
                 </div>
             </Section>
             
@@ -314,20 +169,6 @@ export const Privacy = ({ showToast }) => {
                         </p>
                     </Field>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Toggle
-                            label="Allow Third-party Apps"
-                            description="Let third-party apps access your data"
-                            checked={privacy.allowThirdPartyApps}
-                            onChange={(checked) => updatePrivacySetting('allowThirdPartyApps', checked)}
-                        />
-                        <Toggle
-                            label="Allow API Access"
-                            description="Enable API access to your account"
-                            checked={privacy.allowAPIAccess}
-                            onChange={(checked) => updatePrivacySetting('allowAPIAccess', checked)}
-                        />
-                    </div>
                 </div>
             </Section>
             
