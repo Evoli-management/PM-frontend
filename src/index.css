@@ -183,6 +183,14 @@ input[type="date"].hide-native-date-icon {
     animation: slideUp 0.3s ease;
 }
 
+/* Soften modal backdrops to keep page visible */
+.fixed.inset-0.bg-black.bg-opacity-50,
+.fixed.inset-0.bg-black\/50 {
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+
 /* Legacy-inspired Tasks & Activities layout (page_id 3/4/5) */
 .ta-legacy {
     --ta-accent: #2563eb;
