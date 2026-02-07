@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
-import { FaBars, FaEdit, FaTrash, FaEye } from "react-icons/fa";
+import { FaBars, FaEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
 import teamsService from "../services/teamsService";
 import userProfileService from "../services/userProfileService";
 import organizationService from "../services/organizationService";
@@ -20,6 +20,8 @@ export default function Teams() {
 
     // ============ UI STATE ============
     const [teamsSearch, setTeamsSearch] = useState("");
+    const [memberSearch, setMemberSearch] = useState("");
+    const [teamsFilter, setTeamsFilter] = useState("all");
     const [draggingMember, setDraggingMember] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
@@ -30,6 +32,8 @@ export default function Teams() {
     const [selectedItems, setSelectedItems] = useState([]);
     const [matrixData, setMatrixData] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
+    const [orgMembers, setOrgMembers] = useState([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
     const [employeeshipMetrics, setEmployeeshipMetrics] = useState([]);
     const [performanceMetrics, setPerformanceMetrics] = useState([]);
     const [mySelfReport, setMySelfReport] = useState(null);
@@ -47,6 +51,19 @@ export default function Teams() {
             setUsage(usageData);
         } catch (error) {
             console.log('Could not load usage:', error);
+        }
+    };
+
+    const loadMembers = async () => {
+        try {
+            setLoadingMembers(true);
+            const members = await organizationService.getOrganizationMembers();
+            setOrgMembers(Array.isArray(members) ? members : []);
+        } catch (error) {
+            console.log('Could not load organization members:', error);
+            setOrgMembers([]);
+        } finally {
+            setLoadingMembers(false);
         }
     };
 
@@ -72,7 +89,7 @@ export default function Teams() {
         const init = async () => {
             const hasOrg = await checkPermissions();
             if (hasOrg) {
-                await Promise.all([loadTeams(), loadUsage()]);
+                await Promise.all([loadTeams(), loadUsage(), loadMembers()]);
             } else {
                 // No org: stop loading so empty state renders
                 setLoading(false);
@@ -350,6 +367,106 @@ export default function Teams() {
             { key: 'overall', label: 'Overall Performance', value: 76 },
         ];
     };
+
+    const organizationName = useMemo(() => {
+        return userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || 'My Organization';
+    }, [userProfile]);
+
+    const currentUserId = userProfile?.id;
+
+    const filteredTeams = useMemo(() => {
+        const base = teamsData.filter(t => t.name.toLowerCase().includes(teamsSearch.toLowerCase()));
+        if (teamsFilter === 'all') return base;
+        if (teamsFilter === 'empty') {
+            return base.filter(t => {
+                const count = Number.isFinite(t.memberCount)
+                    ? t.memberCount
+                    : (Array.isArray(t.members) ? t.members.length : 0);
+                return count === 0;
+            });
+        }
+        if (teamsFilter === 'lead') {
+            return base.filter(t => String(t.leadId || t.leaderId || t.lead?.id || '') === String(currentUserId || ''));
+        }
+        if (teamsFilter === 'mine') {
+            return base.filter(t => {
+                const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
+                const members = Array.isArray(t.members) ? t.members : [];
+                const inIds = currentUserId && memberIds.some(id => String(id) === String(currentUserId));
+                const inMembers = currentUserId && members.some(m => String(m.id || m.userId) === String(currentUserId));
+                return Boolean(inIds || inMembers);
+            });
+        }
+        return base;
+    }, [teamsData, teamsSearch, teamsFilter, currentUserId]);
+
+    const filteredMembers = useMemo(() => {
+        return orgMembers.filter(m => {
+            const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.name || '';
+            return name.toLowerCase().includes(memberSearch.toLowerCase());
+        });
+    }, [orgMembers, memberSearch]);
+
+    const getMemberRoleLabel = (member) => {
+        const role = (member.role || member.orgRole || member.accessRole || '').toLowerCase();
+        if (role.includes('admin') || role.includes('owner')) return 'Admin';
+        if (role.includes('lead')) return 'Lead';
+        return 'Member';
+    };
+
+    const getTeamRiskLabel = (team) => {
+        const count = Number.isFinite(team.memberCount)
+            ? team.memberCount
+            : (Array.isArray(team.members) ? team.members.length : 0);
+        const hasLead = Boolean(team.leadId || team.leaderId || team.lead?.id);
+        if (count === 0 && !hasLead) return 'No lead & no members';
+        if (count === 0) return 'No members';
+        if (!hasLead) return 'No lead';
+        return 'At risk';
+    };
+
+    const myTeams = useMemo(() => {
+        if (!currentUserId) return [];
+        return teamsData.filter(t => {
+            const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
+            const members = Array.isArray(t.members) ? t.members : [];
+            const isLead = String(t.leadId || t.leaderId || t.lead?.id || '') === String(currentUserId);
+            const inIds = memberIds.some(id => String(id) === String(currentUserId));
+            const inMembers = members.some(m => String(m.id || m.userId) === String(currentUserId));
+            return isLead || inIds || inMembers;
+        }).slice(0, 4);
+    }, [teamsData, currentUserId]);
+
+    const atRiskTeams = useMemo(() => {
+        return teamsData.filter(t => {
+            const count = Number.isFinite(t.memberCount)
+                ? t.memberCount
+                : (Array.isArray(t.members) ? t.members.length : 0);
+            const hasLead = Boolean(t.leadId || t.leaderId || t.lead?.id);
+            return count === 0 || !hasLead;
+        }).slice(0, 4);
+    }, [teamsData]);
+
+    const recentActivity = useMemo(() => {
+        const entries = teamsData.map(t => {
+            const timestamp = t.lastActivityAt || t.last_activity_at || t.updatedAt || t.updated_at || t.lastActivity;
+            return {
+                id: t.id,
+                name: t.name,
+                timestamp: timestamp ? new Date(timestamp) : null,
+            };
+        }).filter(e => e.timestamp instanceof Date && !Number.isNaN(e.timestamp.getTime()));
+        return entries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 4);
+    }, [teamsData]);
+
+    const activeTeamsCount = useMemo(() => {
+        return teamsData.filter(t => {
+            const count = Number.isFinite(t.memberCount)
+                ? t.memberCount
+                : (Array.isArray(t.members) ? t.members.length : 0);
+            return count > 0;
+        }).length;
+    }, [teamsData]);
 
     const employeeshipAverage = useMemo(() => {
         const metrics = employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics();
@@ -641,35 +758,140 @@ export default function Teams() {
                                     ) : (
                                         <Section title="Teams & Members">
                                             <div className="space-y-4">
-                                                {/* Usage Stats */}
-                                                {usage && (
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
-                                                        <div className="flex items-center gap-4 text-sm">
-                                                            <span className="text-slate-700">
-                                                                <strong>{usage.currentMembers}</strong> / {usage.maxMembers} members
-                                                            </span>
-                                                            <span className="text-slate-400">•</span>
-                                                            <span className="text-slate-700">
-                                                                <strong>{usage.currentTeams}</strong> / {usage.maxTeams} teams
-                                                            </span>
-                                                            <span className="text-slate-400">•</span>
-                                                            <span className="text-xs px-2 py-1 bg-slate-200 text-slate-700 rounded-full font-medium">
-                                                                {usage.planName} plan
-                                                            </span>
-                                                        </div>
-                                                        {!usage.canAddTeams && (
-                                                            <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                                                                Team limit reached
-                                                            </span>
-                                                        )}
+                                                <div className="grid gap-3 md:grid-cols-3">
+                                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                        <div className="text-xs text-gray-500">Organization</div>
+                                                        <div className="text-sm font-semibold text-gray-800">{organizationName}</div>
+                                                        <div className="mt-2 text-[11px] text-gray-500">Plan: {usage?.planName || '—'}</div>
                                                     </div>
-                                                )}
+                                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                        <div className="text-xs text-gray-500">Members</div>
+                                                        <div className="text-sm font-semibold text-gray-800">
+                                                            {usage?.currentMembers ?? orgMembers.length} / {usage?.maxMembers ?? '—'}
+                                                        </div>
+                                                        <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                                                            <div
+                                                                className="h-2 rounded-full bg-blue-600"
+                                                                style={{ width: `${usage?.maxMembers ? Math.min((usage.currentMembers / usage.maxMembers) * 100, 100) : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                        <div className="text-xs text-gray-500">Teams</div>
+                                                        <div className="text-sm font-semibold text-gray-800">
+                                                            {usage?.currentTeams ?? teamsData.length} / {usage?.maxTeams ?? '—'}
+                                                        </div>
+                                                        <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                                                            <div
+                                                                className="h-2 rounded-full bg-blue-600"
+                                                                style={{ width: `${usage?.maxTeams ? Math.min((usage.currentTeams / usage.maxTeams) * 100, 100) : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid gap-4 lg:grid-cols-3">
+                                                    <div className="lg:col-span-2 space-y-4">
+                                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="text-sm font-semibold text-gray-800">Your Teams</div>
+                                                                <span className="text-xs text-gray-500">{myTeams.length} pinned</span>
+                                                            </div>
+                                                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                                                {myTeams.length === 0 ? (
+                                                                    <div className="text-xs text-gray-500">No teams assigned yet.</div>
+                                                                ) : (
+                                                                    myTeams.map(team => (
+                                                                        <div key={team.id} className="rounded border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                                                                            <div className="font-semibold text-gray-800">{team.name}</div>
+                                                                            <div className="mt-1 text-[11px] text-gray-500">
+                                                                                {Number.isFinite(team.memberCount)
+                                                                                    ? `${team.memberCount} members`
+                                                                                    : `${Array.isArray(team.members) ? team.members.length : 0} members`}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="text-sm font-semibold text-gray-800">Recent Activity</div>
+                                                                <span className="text-xs text-gray-500">Latest updates</span>
+                                                            </div>
+                                                            <div className="mt-2 space-y-2">
+                                                                {recentActivity.length === 0 ? (
+                                                                    <div className="text-xs text-gray-500">No recent activity yet.</div>
+                                                                ) : (
+                                                                    recentActivity.map((entry) => (
+                                                                        <div key={entry.id} className="flex items-center justify-between text-xs text-gray-600">
+                                                                            <span className="font-medium text-gray-800">{entry.name}</span>
+                                                                            <span>{entry.timestamp.toLocaleDateString()}</span>
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-4">
+                                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="text-sm font-semibold text-gray-800">Quick Actions</div>
+                                                            <div className="mt-2 flex flex-col gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => document.getElementById('newTeamName')?.focus()}
+                                                                    className="px-3 py-2 text-xs rounded bg-green-600 text-white hover:bg-green-700"
+                                                                >
+                                                                    Create team
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        const email = prompt('Invite member email:', '');
+                                                                        if (!email?.trim()) return;
+                                                                        try {
+                                                                            await organizationService.inviteUser(email.trim());
+                                                                            showToast('Invitation sent');
+                                                                        } catch (err) {
+                                                                            const message = err?.response?.data?.message || 'Failed to invite member';
+                                                                            showToast(message, 'error');
+                                                                        }
+                                                                    }}
+                                                                    className="px-3 py-2 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                                                                >
+                                                                    Invite member
+                                                                </button>
+                                                                <div className="mt-1 text-[11px] text-gray-500">
+                                                                    Active teams: {activeTeamsCount} • Open slots: {usage?.maxMembers ? Math.max(usage.maxMembers - (usage.currentMembers || 0), 0) : '—'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                                            <div className="text-sm font-semibold text-amber-800">At‑risk teams</div>
+                                                            <div className="mt-2 space-y-2">
+                                                                {atRiskTeams.length === 0 ? (
+                                                                    <div className="text-xs text-amber-700">No at‑risk teams right now.</div>
+                                                                ) : (
+                                                                    atRiskTeams.map(team => (
+                                                                        <div key={team.id} className="flex items-center justify-between text-xs text-amber-800">
+                                                                            <span className="font-medium">{team.name}</span>
+                                                                            <span>{getTeamRiskLabel(team)}</span>
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 
                                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                                     <input
                                                         value={teamsSearch}
                                                         onChange={(e) => setTeamsSearch(e.target.value)}
-                                                        placeholder="Search members or teams..."
+                                                        placeholder="Search teams..."
                                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                                     />
                                                     {canManage && (
@@ -702,28 +924,91 @@ export default function Teams() {
                                                     )}
                                                 </div>
 
+                                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                    <button
+                                                        onClick={() => setTeamsFilter('all')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'all' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        All Teams
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamsFilter('mine')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'mine' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        My Teams
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamsFilter('lead')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'lead' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        Teams I Lead
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamsFilter('empty')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'empty' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        Empty Teams
+                                                    </button>
+                                                </div>
+
+                                                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-sm font-semibold text-gray-800">Members</div>
+                                                        <span className="text-xs text-gray-500">{orgMembers.length} total</span>
+                                                    </div>
+                                                    <div className="mt-2">
+                                                        <div className="relative">
+                                                            <FaSearch className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+                                                            <input
+                                                                value={memberSearch}
+                                                                onChange={(e) => setMemberSearch(e.target.value)}
+                                                                placeholder="Search members..."
+                                                                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded"
+                                                            />
+                                                        </div>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {loadingMembers ? (
+                                                                <span className="text-xs text-gray-500">Loading members...</span>
+                                                            ) : filteredMembers.length === 0 ? (
+                                                                <span className="text-xs text-gray-500">No members found.</span>
+                                                            ) : (
+                                                                filteredMembers.slice(0, 12).map((m) => (
+                                                                    <div key={m.id || m.member_id} className="flex items-center gap-2 rounded-full border border-gray-200 px-2 py-1 text-xs text-gray-700">
+                                                                        <span className="h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-600">
+                                                                            {(m.firstName || m.name || 'U').charAt(0)}
+                                                                        </span>
+                                                                        <span>{`${m.firstName || ''} ${m.lastName || ''}`.trim() || m.name}</span>
+                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${getMemberRoleLabel(m) === 'Admin' ? 'bg-purple-600 text-white' : getMemberRoleLabel(m) === 'Lead' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                                                            {getMemberRoleLabel(m)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 <div className="grid md:grid-cols-2 gap-4">
-                                                    {teamsData.length === 0 ? (
+                                                    {filteredTeams.length === 0 ? (
                                                         <div className="col-span-full text-center py-12 text-gray-500 border border-gray-200 rounded">
                                                             <div className="text-4xl mb-2">👥</div>
                                                             <p>No teams yet. Create your first team!</p>
                                                         </div>
                                                     ) : (
-                                                        teamsData
-                                                            .filter(t => t.name.toLowerCase().includes(teamsSearch.toLowerCase()))
-                                                            .map((team) => (
-                                                                <TeamCard
-                                                                    key={team.id}
-                                                                    team={team}
-                                                                    onRename={renameTeam}
-                                                                    onDelete={deleteTeam}
-                                                                    onAddMember={addMemberToTeam}
-                                                                    onRemoveMember={removeMemberFromTeam}
-                                                                    onSetLead={setTeamLead}
-                                                                    saving={saving}
-                                                                    canManage={canManage}
-                                                                />
-                                                            ))
+                                                        filteredTeams.map((team) => (
+                                                            <TeamCard
+                                                                key={team.id}
+                                                                team={team}
+                                                                onRename={renameTeam}
+                                                                onDelete={deleteTeam}
+                                                                onAddMember={addMemberToTeam}
+                                                                onRemoveMember={removeMemberFromTeam}
+                                                                onSetLead={setTeamLead}
+                                                                saving={saving}
+                                                                canManage={canManage}
+                                                                orgMembers={orgMembers}
+                                                            />
+                                                        ))
                                                     )}
                                                 </div>
                                             </div>
@@ -788,7 +1073,7 @@ export default function Teams() {
     );
 }
 
-function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage }) {
+function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage, orgMembers }) {
     const [showRenameInput, setShowRenameInput] = useState(false);
     const [renameValue, setRenameValue] = useState(team.name);
     const navigate = useNavigate();
@@ -810,6 +1095,13 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
             setDetailsLoading(false);
         }
     };
+
+    const leadId = team.leadId || team.leaderId || team.lead?.id;
+    const leadUser = orgMembers?.find(m => String(m.id || m.member_id) === String(leadId)) || null;
+    const leadName = leadUser ? `${leadUser.firstName || ''} ${leadUser.lastName || ''}`.trim() : team.leadName || team.leaderName || '';
+    const leadInitial = (leadName || team.name || 'T').charAt(0);
+    const lastActivity = team.lastActivityAt || team.last_activity_at || team.updatedAt || team.updated_at || team.lastActivity;
+    const lastActivityLabel = lastActivity ? new Date(lastActivity).toLocaleDateString() : '—';
 
     return (
         <div className="rounded border p-3 bg-white hover:shadow-md transition-shadow">
@@ -870,6 +1162,16 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                         </button>
                     </div>
                 )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-600">
+                        {leadInitial}
+                    </div>
+                    <span>{leadName ? `Lead: ${leadName}` : 'Lead: —'}</span>
+                </div>
+                <span>Last activity: {lastActivityLabel}</span>
             </div>
 
             {canManage && showRenameInput && (
