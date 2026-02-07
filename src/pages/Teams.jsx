@@ -1098,13 +1098,6 @@ export default function Teams() {
                                     ) : (
                                         // Reports View
                                         <>
-                                            {/* Report Description */}
-                                            <div className="mb-4 min-h-[40px] flex items-center p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                                                {reportLevel === 'organization' && "Select a team you lead to see the report."}
-                                                {reportLevel === 'myteams' && "Select a team member to see the report."}
-                                                {reportLevel === 'myself' && "Your personal report compared to your team's average score."}
-                                            </div>
-
                                             {loading ? (
                                                 <div className="animate-pulse grid grid-cols-1 lg:grid-cols-3 gap-4">
                                                     <div className="lg:col-span-2 space-y-4">
