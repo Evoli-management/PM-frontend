@@ -370,6 +370,28 @@ export default function Navbar() {
     const openCreateModal = (type) => {
         try {
             setOpenQuick(false);
+
+            if (type === 'dontforget') {
+                navigate('/tasks?dontforget=1');
+                setTimeout(() => {
+                    try { window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: 'dontforget' } })); } catch (_) {}
+                }, 50);
+                return;
+            }
+
+            if (type === 'appointment') {
+                navigate('/calendar');
+                setTimeout(() => {
+                    try { window.dispatchEvent(new CustomEvent('open-create-appointment', { detail: { start: new Date().toISOString() } })); } catch (_) {}
+                }, 50);
+                return;
+            }
+
+            if (type === 'stroke') {
+                navigate('/give-strokes?tab=give');
+                return;
+            }
+
             window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type } }));
         } catch (err) {
             console.warn('openCreateModal handler error', err);

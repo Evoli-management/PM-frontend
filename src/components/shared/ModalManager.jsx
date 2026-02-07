@@ -21,6 +21,11 @@ export default function ModalManager() {
     useEffect(() => {
         const handler = (e) => {
             const type = e?.detail?.type || e?.detail;
+            if (type === 'appointment') {
+                try { window.dispatchEvent(new CustomEvent('open-create-appointment')); } catch (_) {}
+                setModal({ type: null, payload: null });
+                return;
+            }
             setModal({ type, payload: e?.detail || null });
         };
         window.addEventListener('open-create-modal', handler);
@@ -105,18 +110,7 @@ export default function ModalManager() {
             )}
 
             {/* Appointment / Calendar modal */}
-            {modal.type === 'appointment' && (
-                <Suspense fallback={<div role="status" aria-live="polite" className="p-6">Loading…</div>}>
-                    <CalendarCreateModal
-                        isOpen={true}
-                        onClose={close}
-                        onSave={handleCalendarSave}
-                        defaultType={'task'}
-                        initialData={{}}
-                        preselectedKeyArea={null}
-                    />
-                </Suspense>
-            )}
+            {modal.type === 'appointment' && null}
 
             {/* Goal modal */}
             {modal.type === 'goal' && (

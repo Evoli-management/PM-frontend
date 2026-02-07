@@ -124,6 +124,28 @@ const CalendarContainer = () => {
     const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
 
+    // Listen for global appointment create requests (Quick Actions)
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const start = e?.detail?.start ? new Date(e.detail.start) : new Date();
+                if (isNaN(start.getTime())) {
+                    setAppointmentInitialStart(new Date());
+                } else {
+                    setAppointmentInitialStart(start);
+                }
+                setAppointmentInitialAllDay(false);
+                setAppointmentModalOpen(true);
+            } catch (_) {
+                setAppointmentInitialStart(new Date());
+                setAppointmentInitialAllDay(false);
+                setAppointmentModalOpen(true);
+            }
+        };
+        window.addEventListener('open-create-appointment', handler);
+        return () => window.removeEventListener('open-create-appointment', handler);
+    }, []);
+
     // Load persisted view/date on mount
     useEffect(() => {
         try {
