@@ -762,7 +762,7 @@ export default function Teams() {
 
                                     {view === 'list' ? (
                                         <>
-                                            <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
+                                            <div className="mb-3 min-h-[40px] rounded bg-blue-50 border border-blue-100 px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-blue-700 sm:text-[12px] flex items-center justify-center">
                                                 {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
                                             </div>
 
@@ -773,9 +773,28 @@ export default function Teams() {
                                     )}
 
                                     {loading ? (
-                                        <div className="text-center py-12 text-gray-500">
-                                            <div className="text-4xl mb-2">⏳</div>
-                                            <p>Loading teams...</p>
+                                        <div className="animate-pulse space-y-4">
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                <div className="h-20 rounded-lg bg-slate-100"></div>
+                                                <div className="h-20 rounded-lg bg-slate-100"></div>
+                                                <div className="h-20 rounded-lg bg-slate-100"></div>
+                                            </div>
+                                            <div className="grid gap-4 lg:grid-cols-3">
+                                                <div className="lg:col-span-2 space-y-4">
+                                                    <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                    <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="h-28 rounded-lg bg-slate-100"></div>
+                                                    <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                </div>
+                                            </div>
+                                            <div className="h-10 rounded bg-slate-100"></div>
+                                            <div className="h-12 rounded bg-slate-100"></div>
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="h-28 rounded bg-slate-100"></div>
+                                                <div className="h-28 rounded bg-slate-100"></div>
+                                            </div>
                                         </div>
                                     ) : !hasOrganization ? (
                                         <div className="text-center py-12">
@@ -912,7 +931,7 @@ export default function Teams() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-4">
+                                                    <div className="space-y-4 lg:sticky lg:top-20 self-start">
                                                         <div className="rounded-lg border border-gray-200 bg-white p-3">
                                                             <div className="text-sm font-semibold text-gray-800">Quick Actions</div>
                                                             <div className="mt-2 flex flex-col gap-2">
@@ -946,14 +965,14 @@ export default function Teams() {
                                                             </div>
                                                         </div>
 
-                                                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                                            <div className="text-sm font-semibold text-amber-800">At‑risk teams</div>
+                                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                                            <div className="text-sm font-semibold text-blue-800">At‑risk teams</div>
                                                             <div className="mt-2 space-y-2">
                                                                 {atRiskTeams.length === 0 ? (
-                                                                    <div className="text-xs text-amber-700">No at‑risk teams right now.</div>
+                                                                    <div className="text-xs text-blue-700">No at‑risk teams right now.</div>
                                                                 ) : (
                                                                     atRiskTeams.map(team => (
-                                                                        <div key={team.id} className="flex items-center justify-between text-xs text-amber-800">
+                                                                        <div key={team.id} className="flex items-center justify-between text-xs text-blue-800">
                                                                             <span className="font-medium">{team.name}</span>
                                                                             <span>{getTeamRiskLabel(team)}</span>
                                                                         </div>
@@ -1096,48 +1115,59 @@ export default function Teams() {
                                         // Reports View
                                         <>
                                             {/* Report Description */}
-                                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                                            <div className="mb-4 min-h-[40px] flex items-center p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
                                                 {reportLevel === 'organization' && "Select a team you lead to see the report."}
                                                 {reportLevel === 'myteams' && "Select a team member to see the report."}
                                                 {reportLevel === 'myself' && "Your personal report compared to your team's average score."}
                                             </div>
 
-                                            {/* Reports Grid */}
-                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                                {/* Left column: Matrix + Selection */}
-                                                <div className="lg:col-span-2 space-y-4">
-                                                    <CanWillMatrix
-                                                        data={matrixData}
-                                                        selectedItems={selectedItems}
-                                                        onItemClick={(item) => handleItemSelect(item.id)}
-                                                    />
-                                                    
-                                                    {(canManage || reportLevel === 'myself') && (
-                                                        <SelectionPane
-                                                            title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
-                                                            items={matrixData}
+                                            {loading ? (
+                                                <div className="animate-pulse grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                    <div className="lg:col-span-2 space-y-4">
+                                                        <div className="h-80 rounded-lg bg-slate-100"></div>
+                                                        <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        <div className="h-40 rounded-lg bg-slate-100"></div>
+                                                        <div className="h-48 rounded-lg bg-slate-100"></div>
+                                                        <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                    <div className="lg:col-span-2 space-y-4">
+                                                        <CanWillMatrix
+                                                            data={matrixData}
                                                             selectedItems={selectedItems}
-                                                            onSelect={handleItemSelect}
-                                                            canSelect={canManage || reportLevel === 'myself'}
+                                                            onItemClick={(item) => handleItemSelect(item.id)}
                                                         />
-                                                    )}
-                                                </div>
+                                                        
+                                                        {(canManage || reportLevel === 'myself') && (
+                                                            <SelectionPane
+                                                                title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
+                                                                items={matrixData}
+                                                                selectedItems={selectedItems}
+                                                                onSelect={handleItemSelect}
+                                                                canSelect={canManage || reportLevel === 'myself'}
+                                                            />
+                                                        )}
+                                                    </div>
 
-                                                {/* Right column: Side panel + Indices */}
-                                                <div className="space-y-4">
-                                                    {renderReportSidePanel()}
-                                                    <IndexPanel
-                                                        title="Employeeship Index"
-                                                        metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
-                                                    />
-                                                    
-                                                    <IndexPanel
-                                                        title="Performance Index"
-                                                        metrics={performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics()}
-                                                        highlightedMetric="overall"
-                                                    />
+                                                    <div className="space-y-4 lg:sticky lg:top-20 self-start">
+                                                        {renderReportSidePanel()}
+                                                        <IndexPanel
+                                                            title="Employeeship Index"
+                                                            metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
+                                                        />
+                                                        
+                                                        <IndexPanel
+                                                            title="Performance Index"
+                                                            metrics={performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics()}
+                                                            highlightedMetric="overall"
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
