@@ -32,6 +32,7 @@ export default function Teams() {
     const [userProfile, setUserProfile] = useState(null);
     const [employeeshipMetrics, setEmployeeshipMetrics] = useState([]);
     const [performanceMetrics, setPerformanceMetrics] = useState([]);
+    const [mySelfReport, setMySelfReport] = useState(null);
 
     // ============ TOAST/NOTIFICATIONS ============
     const [toast, setToast] = useState({ message: '', visible: false });
@@ -249,6 +250,7 @@ export default function Teams() {
                 }));
             } else if (reportLevel === 'myself') {
                 const report = await teamsService.getMySelfReport();
+                setMySelfReport(report);
                 data = [
                     {
                         id: report.user.id,
@@ -377,10 +379,29 @@ export default function Teams() {
         return '';
     }, [profileStars]);
 
+    const strongestWeakest = useMemo(() => {
+        const metrics = employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics();
+        if (!metrics.length) return { strongest: null, weakest: null };
+        const sorted = [...metrics].sort((a, b) => (b.value || 0) - (a.value || 0));
+        return { strongest: sorted[0], weakest: sorted[sorted.length - 1] };
+    }, [employeeshipMetrics]);
+
     const renderReportSidePanel = () => {
         if (reportLevel === 'myself') {
             const avatarUrl = userProfile?.avatarUrl || userProfile?.avatar || '';
             const displayName = userProfile?.fullName || userProfile?.name || 'Profile';
+            const teamEmployeeship = Number(mySelfReport?.teamAverage?.canScore) || 0;
+            const teamPerformance = Number(mySelfReport?.teamAverage?.overallScore) || 0;
+            const personalOverall = (employeeshipAverage + performanceOverall) / 2;
+            const trendDirection = teamPerformance
+                ? (personalOverall >= teamPerformance ? 'up' : 'down')
+                : 'neutral';
+            const trendLabel = trendDirection === 'up'
+                ? 'Trending up vs team avg'
+                : trendDirection === 'down'
+                    ? 'Below team avg'
+                    : 'No team average yet';
+
             return (
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
                     <div className="flex flex-col items-center gap-3 text-center">
@@ -405,6 +426,58 @@ export default function Teams() {
                                 </span>
                             ))}
                         </div>
+                        <div className={`text-xs font-medium ${trendDirection === 'up' ? 'text-green-600' : trendDirection === 'down' ? 'text-red-600' : 'text-gray-500'}`}>
+                            {trendDirection === 'up' ? '▲' : trendDirection === 'down' ? '▼' : '•'} {trendLabel}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3 text-left">
+                        <div>
+                            <div className="text-xs font-semibold text-gray-700 mb-1">Employeeship</div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-500 w-16">You</span>
+                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(employeeshipAverage, 100)}%` }}></div>
+                                    </div>
+                                    <span className="text-[11px] text-gray-600 w-10 text-right">{employeeshipAverage.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                        <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamEmployeeship, 100)}%` }}></div>
+                                    </div>
+                                    <span className="text-[11px] text-gray-600 w-10 text-right">{teamEmployeeship.toFixed(1)}%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="text-xs font-semibold text-gray-700 mb-1">Performance</div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-500 w-16">You</span>
+                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(performanceOverall, 100)}%` }}></div>
+                                    </div>
+                                    <span className="text-[11px] text-gray-600 w-10 text-right">{performanceOverall.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                        <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamPerformance, 100)}%` }}></div>
+                                    </div>
+                                    <span className="text-[11px] text-gray-600 w-10 text-right">{teamPerformance.toFixed(1)}%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {strongestWeakest.strongest && strongestWeakest.weakest && (
+                            <div className="rounded-md bg-slate-50 border border-slate-200 p-2 text-xs text-gray-700">
+                                <div><span className="font-semibold">Strongest:</span> {strongestWeakest.strongest.label}</div>
+                                <div><span className="font-semibold">Next focus:</span> {strongestWeakest.weakest.label}</div>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
