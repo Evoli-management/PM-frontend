@@ -181,10 +181,10 @@ export const Toast = ({ visible, message, type = 'success', onClose }) => {
     const icon = type === 'success' ? '✓' : '✗';
 
     return (
-        <div className={`fixed top-4 right-4 z-50 rounded-lg border p-3 shadow-lg ${bgColor} ${textColor}`}>
-            <div className="flex items-center gap-2">
+        <div className={`fixed top-4 right-4 z-[9999] max-w-[90vw] sm:max-w-md rounded-lg border p-3 shadow-lg ${bgColor} ${textColor}`}>
+            <div className="flex items-start gap-2">
                 <span className="text-lg">{icon}</span>
-                <span className="text-sm font-medium">{message}</span>
+                <span className="text-sm font-medium whitespace-normal break-words">{message}</span>
                 <button
                     onClick={onClose}
                     className="ml-2 text-lg leading-none hover:opacity-70"

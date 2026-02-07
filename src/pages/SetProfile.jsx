@@ -42,7 +42,12 @@ const OrganizationTab = ({ showToast }) => {
     const renderSubTabContent = () => {
         switch (activeSubTab) {
             case "overview":
-                return <OrganizationOverview showToast={showToast} />;
+                return (
+                    <OrganizationOverview
+                        showToast={showToast}
+                        onTransferOwnership={() => setActiveSubTab("members")}
+                    />
+                );
             case "teams":
                 return <ManageTeams showToast={showToast} />;
             case "members":
@@ -52,7 +57,12 @@ const OrganizationTab = ({ showToast }) => {
             case "settings":
                 return <OrganizationSettings showToast={showToast} />;
             default:
-                return <OrganizationOverview showToast={showToast} />;
+                return (
+                    <OrganizationOverview
+                        showToast={showToast}
+                        onTransferOwnership={() => setActiveSubTab("members")}
+                    />
+                );
         }
     };
 

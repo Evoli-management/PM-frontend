@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import organizationService from "../../services/organizationService";
 import userProfileService from "../../services/userProfileService";
 
-export function OrganizationOverview({ onLeave, showToast }) {
+export function OrganizationOverview({ onLeave, showToast, onTransferOwnership }) {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [leaving, setLeaving] = useState(false);
@@ -11,6 +11,7 @@ export function OrganizationOverview({ onLeave, showToast }) {
   const [saving, setSaving] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [leaveError, setLeaveError] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -53,13 +54,16 @@ export function OrganizationOverview({ onLeave, showToast }) {
   const handleLeave = async () => {
     if (!confirm("Leave this organization and create your own?")) return;
     setLeaving(true);
+    setLeaveError('');
     try {
       const res = await organizationService.leaveOrganization();
       showToast?.("Left organization successfully");
       onLeave?.(res.organization);
       setOrg(res.organization);
     } catch (e) {
-      showToast?.(e?.response?.data?.message || e.message || "Failed to leave organization", "error");
+      const message = e?.response?.data?.message || e.message || "Failed to leave organization";
+      setLeaveError(message);
+      showToast?.(message, "error");
     } finally {
       setLeaving(false);
     }
@@ -107,6 +111,31 @@ export function OrganizationOverview({ onLeave, showToast }) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
+      {leaveError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>{leaveError}</span>
+            <div className="flex items-center gap-2">
+              {leaveError.toLowerCase().includes('transfer ownership') && (
+                <button
+                  type="button"
+                  onClick={onTransferOwnership}
+                  className="px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700"
+                >
+                  Transfer ownership
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setLeaveError('')}
+                className="px-2 py-1 text-xs rounded border border-red-200 text-red-700 hover:bg-red-100"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
             {canEdit ? (
