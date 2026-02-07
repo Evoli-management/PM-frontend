@@ -30,6 +30,7 @@ export default function Teams() {
     const [view, setView] = useState('list'); // 'list' or 'reports'
     const [reportLevel, setReportLevel] = useState('organization'); // 'organization', 'myteams', 'myself'
     const [selectedItems, setSelectedItems] = useState([]);
+    const [compareMode, setCompareMode] = useState(false);
     const [matrixData, setMatrixData] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
     const [orgMembers, setOrgMembers] = useState([]);
@@ -337,12 +338,19 @@ export default function Teams() {
 
     const handleItemSelect = (itemId) => {
         if (!canManage && reportLevel !== 'myself') return;
-        
+
         setSelectedItems(prev => {
-            if (prev.includes(itemId)) {
-                return prev.filter(id => id !== itemId);
+            const alreadySelected = prev.includes(itemId);
+            if (compareMode && reportLevel === 'organization') {
+                if (alreadySelected) {
+                    return prev.filter(id => id !== itemId);
+                }
+                return [...prev, itemId];
             }
-            return [...prev, itemId];
+            if (alreadySelected) {
+                return [];
+            }
+            return [itemId];
         });
     };
 
@@ -604,12 +612,80 @@ export default function Teams() {
             ? 'Select a team you lead to see the report:'
             : 'Select team member to see his/her report:';
         const listItems = matrixData || [];
+        const averageScore = listItems.length
+            ? listItems.reduce((acc, item) => acc + (Number(item.score) || 0), 0) / listItems.length
+            : 0;
 
         return (
             <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="text-sm text-gray-700 mb-2">{listTitle}</div>
+                {reportLevel === 'organization' && listItems.length > 0 && (
+                    <div className="flex items-center justify-between mb-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-600">
+                            <input
+                                type="checkbox"
+                                checked={compareMode}
+                                onChange={(e) => setCompareMode(e.target.checked)}
+                            />
+                            Compare mode
+                        </label>
+                        <span className="text-[11px] text-gray-500">Avg score: {averageScore.toFixed(1)}</span>
+                    </div>
+                )}
+
                 {listItems.length === 0 ? (
-                    <div className="text-xs text-gray-500">No items available.</div>
+                    <div className="text-xs text-gray-500">
+                        {reportLevel === 'organization' ? 'No teams led yet.' : 'No items available.'}
+                        {reportLevel === 'organization' && (
+                            <div className="mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/teams?tab=teams-members')}
+                                    className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700"
+                                >
+                                    Create team
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ) : reportLevel === 'organization' ? (
+                    <div className="space-y-2">
+                        {listItems.map((item) => {
+                            const score = Number(item.score) || 0;
+                            const trendUp = score >= averageScore;
+                            const team = teamsData.find(t => String(t.id) === String(item.id));
+                            const memberCount = Number.isFinite(team?.memberCount)
+                                ? team.memberCount
+                                : (Array.isArray(team?.members) ? team.members.length : 0);
+
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleItemSelect(item.id)}
+                                    className={`w-full text-left px-2 py-2 text-xs rounded border ${
+                                        selectedItems.includes(item.id)
+                                            ? 'border-blue-600 text-blue-700 bg-blue-50'
+                                            : 'border-gray-200 text-gray-600 hover:text-gray-800 hover:border-gray-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-semibold">{item.name}</span>
+                                        <span className={`text-[11px] ${trendUp ? 'text-green-600' : 'text-red-600'}`}>{trendUp ? '▲' : '▼'}</span>
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <div className="flex-1 h-1.5 rounded-full bg-gray-200">
+                                            <div className="h-1.5 rounded-full bg-blue-600" style={{ width: `${Math.min(score, 100)}%` }}></div>
+                                        </div>
+                                        <span className="text-[11px] text-gray-500">{score.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
+                                        <span>{memberCount} members</span>
+                                        <span>{trendUp ? 'Above avg' : 'Below avg'}</span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {listItems.map((item) => (
@@ -627,6 +703,7 @@ export default function Teams() {
                         ))}
                     </div>
                 )}
+
                 {reportLevel === 'myteams' && (
                     <div className="mt-3">
                         <button
