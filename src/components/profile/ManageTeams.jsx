@@ -432,10 +432,37 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
   const [selectedMembers, setSelectedMembers] = useState(
     team.memberIds || team.members?.map((m) => m.id) || []
   );
+  const [currentMembers, setCurrentMembers] = useState([]);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadCurrentMembers = async () => {
+      try {
+        const teamsService = await import("../../services/teamsService");
+        const teamData = await teamsService.default.getTeamMembers(team.id);
+        const list = Array.isArray(teamData) ? teamData : (teamData?.members || []);
+        const ids = list.map((m) => m.id || m.userId).filter(Boolean);
+        if (isMounted) {
+          setCurrentMembers(list);
+          setSelectedMembers(ids);
+        }
+      } catch (e) {
+        // Fallback to existing selection if fetch fails
+      }
+    };
+
+    if (team?.id) {
+      loadCurrentMembers();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [team?.id]);
+
   const currentMemberIds = new Set(
-    (team.members?.map((m) => m.id) || team.memberIds || []).filter(Boolean)
+    currentMembers.map((m) => m.id || m.userId).filter(Boolean)
   );
 
   const handleSubmit = async (e) => {
@@ -456,12 +483,14 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
       });
       
       // Get current members
-      const currentMembers = team.members?.map(m => m.id) || [];
+      const currentMemberIdsList = currentMembers.length
+        ? currentMembers.map((m) => m.id || m.userId).filter(Boolean)
+        : [];
       const currentLeadId = team.leadId || team.teamLeadUserId || "";
       const newMembers = selectedMembers;
       
       // Remove members that were deselected
-      for (const memberId of currentMembers) {
+      for (const memberId of currentMemberIdsList) {
         if (!newMembers.includes(memberId)) {
           await teamsService.default.removeTeamMember(team.id, memberId);
         }
@@ -469,13 +498,13 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
       
       // Add new members
       for (const memberId of newMembers) {
-        if (!currentMembers.includes(memberId)) {
+        if (!currentMemberIdsList.includes(memberId)) {
           await teamsService.default.addTeamMember(team.id, memberId, 'member');
         }
       }
 
       if (leadId) {
-        if (!newMembers.includes(leadId) && !currentMembers.includes(leadId)) {
+        if (!newMembers.includes(leadId) && !currentMemberIdsList.includes(leadId)) {
           await teamsService.default.addTeamMember(team.id, leadId, 'member');
         }
 
