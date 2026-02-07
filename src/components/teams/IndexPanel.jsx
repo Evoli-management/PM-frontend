@@ -6,7 +6,9 @@ export function IndexPanel({ title, metrics, highlightedMetric }) {
             <h3 className="text-sm font-semibold mb-3 text-gray-800">{title}</h3>
             
             <div className="space-y-2">
-                {metrics.map((metric, index) => {
+                {metrics.length === 0 ? (
+                    <div className="text-xs text-gray-500">No data yet.</div>
+                ) : metrics.map((metric, index) => {
                     const isHighlighted = highlightedMetric === metric.key;
                     const percentage = metric.value || 0;
                     

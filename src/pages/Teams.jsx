@@ -330,9 +330,8 @@ export default function Teams() {
             ]);
         } catch (err) {
             console.error('Failed to load metrics:', err);
-            // Use default/fallback values
-            setEmployeeshipMetrics(getDefaultEmployeeshipMetrics());
-            setPerformanceMetrics(getDefaultPerformanceMetrics());
+            setEmployeeshipMetrics([]);
+            setPerformanceMetrics([]);
         }
     };
 
@@ -354,27 +353,9 @@ export default function Teams() {
         });
     };
 
-    const getDefaultEmployeeshipMetrics = () => {
-        return [
-            { key: 'commitment', label: 'Commitment', value: 75 },
-            { key: 'responsibility', label: 'Responsibility', value: 68 },
-            { key: 'loyalty', label: 'Loyalty', value: 82 },
-            { key: 'initiative', label: 'Initiative', value: 71 },
-            { key: 'productivity', label: 'Productivity', value: 79 },
-            { key: 'relations', label: 'Relations', value: 73 },
-            { key: 'quality', label: 'Quality', value: 85 },
-            { key: 'competence', label: 'Professional Competence', value: 77 },
-            { key: 'flexibility', label: 'Flexibility', value: 69 },
-            { key: 'implementation', label: 'Implementation', value: 74 },
-            { key: 'energy', label: 'Energy', value: 80 },
-        ];
-    };
+    const getDefaultEmployeeshipMetrics = () => [];
 
-    const getDefaultPerformanceMetrics = () => {
-        return [
-            { key: 'overall', label: 'Overall Performance', value: 76 },
-        ];
-    };
+    const getDefaultPerformanceMetrics = () => [];
 
     const organizationName = useMemo(() => {
         return userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || 'My Organization';
@@ -517,6 +498,7 @@ export default function Teams() {
             const displayName = userProfile?.fullName || userProfile?.name || 'Profile';
             const teamEmployeeship = Number(mySelfReport?.teamAverage?.canScore) || 0;
             const teamPerformance = Number(mySelfReport?.teamAverage?.overallScore) || 0;
+            const hasMetrics = employeeshipMetrics.length > 0 || performanceMetrics.length > 0;
             const personalOverall = (employeeshipAverage + performanceOverall) / 2;
             const trendDirection = teamPerformance
                 ? (personalOverall >= teamPerformance ? 'up' : 'down')
@@ -557,51 +539,57 @@ export default function Teams() {
                     </div>
 
                     <div className="mt-4 space-y-3 text-left">
-                        <div>
-                            <div className="text-xs font-semibold text-gray-700 mb-1">Employeeship</div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-gray-500 w-16">You</span>
-                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
-                                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(employeeshipAverage, 100)}%` }}></div>
+                        {hasMetrics ? (
+                            <>
+                                <div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">Employeeship</div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">You</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(employeeshipAverage, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{employeeshipAverage.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamEmployeeship, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{teamEmployeeship.toFixed(1)}%</span>
+                                        </div>
                                     </div>
-                                    <span className="text-[11px] text-gray-600 w-10 text-right">{employeeshipAverage.toFixed(1)}%</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-gray-500 w-16">Team avg</span>
-                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
-                                        <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamEmployeeship, 100)}%` }}></div>
-                                    </div>
-                                    <span className="text-[11px] text-gray-600 w-10 text-right">{teamEmployeeship.toFixed(1)}%</span>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div>
-                            <div className="text-xs font-semibold text-gray-700 mb-1">Performance</div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-gray-500 w-16">You</span>
-                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
-                                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(performanceOverall, 100)}%` }}></div>
+                                <div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">Performance</div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">You</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(performanceOverall, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{performanceOverall.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamPerformance, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{teamPerformance.toFixed(1)}%</span>
+                                        </div>
                                     </div>
-                                    <span className="text-[11px] text-gray-600 w-10 text-right">{performanceOverall.toFixed(1)}%</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-gray-500 w-16">Team avg</span>
-                                    <div className="flex-1 bg-gray-200 h-2 rounded-full">
-                                        <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamPerformance, 100)}%` }}></div>
-                                    </div>
-                                    <span className="text-[11px] text-gray-600 w-10 text-right">{teamPerformance.toFixed(1)}%</span>
-                                </div>
-                            </div>
-                        </div>
 
-                        {strongestWeakest.strongest && strongestWeakest.weakest && (
-                            <div className="rounded-md bg-slate-50 border border-slate-200 p-2 text-xs text-gray-700">
-                                <div><span className="font-semibold">Strongest:</span> {strongestWeakest.strongest.label}</div>
-                                <div><span className="font-semibold">Next focus:</span> {strongestWeakest.weakest.label}</div>
-                            </div>
+                                {strongestWeakest.strongest && strongestWeakest.weakest && (
+                                    <div className="rounded-md bg-slate-50 border border-slate-200 p-2 text-xs text-gray-700">
+                                        <div><span className="font-semibold">Strongest:</span> {strongestWeakest.strongest.label}</div>
+                                        <div><span className="font-semibold">Next focus:</span> {strongestWeakest.weakest.label}</div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="text-xs text-gray-500">Metrics are not available yet.</div>
                         )}
                     </div>
                 </div>
@@ -1157,12 +1145,12 @@ export default function Teams() {
                                                         {renderReportSidePanel()}
                                                         <IndexPanel
                                                             title="Employeeship Index"
-                                                            metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
+                                                            metrics={employeeshipMetrics}
                                                         />
                                                         
                                                         <IndexPanel
                                                             title="Performance Index"
-                                                            metrics={performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics()}
+                                                            metrics={performanceMetrics}
                                                             highlightedMetric="overall"
                                                         />
                                                     </div>
