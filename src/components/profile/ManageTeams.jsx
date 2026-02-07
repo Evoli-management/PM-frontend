@@ -277,21 +277,19 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
     setSaving(true);
     try {
       const teamsService = await import("../../services/teamsService");
-      // Create team with basic info
-      const response = await teamsService.default.createTeam({
+      const memberIds = Array.from(
+        new Set([
+          ...selectedMembers,
+          ...(leadId ? [leadId] : []),
+        ])
+      );
+
+      await teamsService.default.createTeam({
         name: name.trim(),
         description: description.trim(),
+        leadId: leadId || undefined,
+        memberIds: memberIds.length > 0 ? memberIds : undefined,
       });
-      
-      const teamId = response.id;
-      
-      // Add members if any selected
-      if (selectedMembers.length > 0) {
-        for (const memberId of selectedMembers) {
-          const role = memberId === leadId ? 'lead' : 'member';
-          await teamsService.default.addTeamMember(teamId, memberId, role);
-        }
-      }
       
       showToast?.("Team created successfully");
       onSuccess();
@@ -380,22 +378,28 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
               Team Members
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
-              {members.map((member) => (
-                <label
-                  key={member.id}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                >
+              {members.map((member) => {
+                const isSelected = selectedMembers.includes(member.id);
+                return (
+                  <label
+                    key={member.id}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  >
                   <input
                     type="checkbox"
-                    checked={selectedMembers.includes(member.id)}
+                      checked={isSelected}
                     onChange={() => toggleMember(member.id)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm">
-                    {member.firstName} {member.lastName}
-                  </span>
-                </label>
-              ))}
+                    <span className="text-sm flex-1">
+                      {member.firstName} {member.lastName}
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                      {isSelected ? 'Selected' : 'Not selected'}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -424,9 +428,15 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
 function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
   const [name, setName] = useState(team.name || "");
   const [description, setDescription] = useState(team.description || "");
-  const [leadId, setLeadId] = useState(team.leadId || "");
-  const [selectedMembers, setSelectedMembers] = useState(team.memberIds || []);
+  const [leadId, setLeadId] = useState(team.leadId || team.teamLeadUserId || "");
+  const [selectedMembers, setSelectedMembers] = useState(
+    team.memberIds || team.members?.map((m) => m.id) || []
+  );
   const [saving, setSaving] = useState(false);
+
+  const currentMemberIds = new Set(
+    (team.members?.map((m) => m.id) || team.memberIds || []).filter(Boolean)
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -447,6 +457,7 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
       
       // Get current members
       const currentMembers = team.members?.map(m => m.id) || [];
+      const currentLeadId = team.leadId || team.teamLeadUserId || "";
       const newMembers = selectedMembers;
       
       // Remove members that were deselected
@@ -459,11 +470,17 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
       // Add new members
       for (const memberId of newMembers) {
         if (!currentMembers.includes(memberId)) {
-          const role = memberId === leadId ? 'lead' : 'member';
-          await teamsService.default.addTeamMember(team.id, memberId, role);
-        } else if (memberId === leadId) {
-          // Update role to lead if changed
-          await teamsService.default.updateTeamMemberRole(team.id, memberId, 'lead');
+          await teamsService.default.addTeamMember(team.id, memberId, 'member');
+        }
+      }
+
+      if (leadId) {
+        if (!newMembers.includes(leadId) && !currentMembers.includes(leadId)) {
+          await teamsService.default.addTeamMember(team.id, leadId, 'member');
+        }
+
+        if (leadId !== currentLeadId) {
+          await teamsService.default.assignTeamLead(team.id, leadId);
         }
       }
       
@@ -552,22 +569,29 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
               Team Members
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
-              {members.map((member) => (
-                <label
-                  key={member.id}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                >
+              {members.map((member) => {
+                const isSelected = selectedMembers.includes(member.id);
+                const isCurrent = currentMemberIds.has(member.id);
+                return (
+                  <label
+                    key={member.id}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  >
                   <input
                     type="checkbox"
-                    checked={selectedMembers.includes(member.id)}
+                      checked={isSelected}
                     onChange={() => toggleMember(member.id)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm">
-                    {member.firstName} {member.lastName}
-                  </span>
-                </label>
-              ))}
+                    <span className="text-sm flex-1">
+                      {member.firstName} {member.lastName}
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${isCurrent ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {isCurrent ? 'In team' : 'Not in team'}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 

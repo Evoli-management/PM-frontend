@@ -140,13 +140,16 @@ export default function Teams() {
     // ============ TEAM OPERATIONS ============
     const createTeam = async (name) => {
         if (!canManage) return;
-        if (!name || !name.trim()) return;
+        if (!name || !name.trim()) {
+            showToast('Team name is required', 'error');
+            return;
+        }
         setSaving(true);
         try {
             const newTeam = await teamsService.createTeam({
                 name: name.trim(),
             });
-            setTeamsData([...teamsData, newTeam]);
+            setTeamsData((prev) => [...prev, newTeam]);
             showToast('Team created successfully');
             loadUsage(); // Reload usage stats
         } catch (err) {
@@ -227,9 +230,7 @@ export default function Teams() {
         if (!canManage) return;
         setSaving(true);
         try {
-            await teamsService.updateTeam(teamId, {
-                leadId: userId,
-            });
+            await teamsService.assignTeamLead(teamId, userId);
             await loadTeams();
             showToast('Team leader updated successfully');
         } catch (err) {
