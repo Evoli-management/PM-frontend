@@ -744,9 +744,11 @@ export default function Teams() {
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
                                 <div className="space-y-3">
-                                    <div className="flex flex-col gap-3 mb-3">
-                                        <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
-                                    </div>
+                                    {view === 'list' && (
+                                        <div className="flex flex-col gap-3 mb-3">
+                                            <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
+                                        </div>
+                                    )}
 
                                     {view === 'list' ? (
                                         <>
