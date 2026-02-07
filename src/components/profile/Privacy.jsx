@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import userProfileService from '../../services/userProfileService';
+import authService from '../../services/authService';
 
 export const Privacy = ({ showToast }) => {
+    const navigate = useNavigate();
     const [privacy, setPrivacy] = useState({
         // Profile Visibility
         profileVisibility: 'team', // public, team, private
@@ -39,7 +43,13 @@ export const Privacy = ({ showToast }) => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showDeactivateModal, setShowDeactivateModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deactivatePassword, setDeactivatePassword] = useState('');
+    const [showDeletePassword, setShowDeletePassword] = useState(false);
+    const [showDeactivatePassword, setShowDeactivatePassword] = useState(false);
+    const [actionLoading, setActionLoading] = useState({ deactivate: false, delete: false });
     
     useEffect(() => {
         loadPrivacySettings();
@@ -88,12 +98,46 @@ export const Privacy = ({ showToast }) => {
     };
     
     const deleteAccount = async () => {
+        if (!deletePassword.trim()) {
+            showToast('Please enter your password to delete your account', 'error');
+            return;
+        }
+
+        setActionLoading(prev => ({ ...prev, delete: true }));
         try {
-            // Simulate account deletion - replace with actual API call
-            showToast('Account deletion request submitted', 'info');
+            await userProfileService.deleteAccount(deletePassword);
+            showToast('Your account has been deleted', 'info');
             setShowDeleteModal(false);
+            setDeletePassword('');
+            await authService.logout();
+            navigate('/login?reason=deleted');
         } catch (error) {
-            showToast('Failed to submit deletion request', 'error');
+            const message = error.response?.data?.message || 'Failed to delete account';
+            showToast(message, 'error');
+        } finally {
+            setActionLoading(prev => ({ ...prev, delete: false }));
+        }
+    };
+
+    const deactivateAccount = async () => {
+        if (!deactivatePassword.trim()) {
+            showToast('Please enter your password to deactivate your account', 'error');
+            return;
+        }
+
+        setActionLoading(prev => ({ ...prev, deactivate: true }));
+        try {
+            await userProfileService.deactivateAccount(deactivatePassword);
+            showToast('Your account has been deactivated', 'info');
+            setShowDeactivateModal(false);
+            setDeactivatePassword('');
+            await authService.logout();
+            navigate('/login?reason=deactivated');
+        } catch (error) {
+            const message = error.response?.data?.message || 'Failed to deactivate account';
+            showToast(message, 'error');
+        } finally {
+            setActionLoading(prev => ({ ...prev, deactivate: false }));
         }
     };
     
@@ -305,6 +349,19 @@ export const Privacy = ({ showToast }) => {
                             Export Data
                         </button>
                     </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="font-medium text-amber-900 mb-2">Deactivate Account</h4>
+                        <p className="text-sm text-amber-700 mb-3">
+                            Temporarily disable your account. You can contact support to reactivate it later.
+                        </p>
+                        <button
+                            onClick={() => setShowDeactivateModal(true)}
+                            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+                        >
+                            Deactivate Account
+                        </button>
+                    </div>
                     
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <h4 className="font-medium text-red-900 mb-2">Delete Account</h4>
@@ -358,6 +415,56 @@ export const Privacy = ({ showToast }) => {
                     </div>
                 </div>
             )}
+
+            {/* Deactivate Account Modal */}
+            {showDeactivateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-md w-full p-6">
+                        <h3 className="text-lg font-semibold text-amber-900 mb-4">Deactivate Account</h3>
+                        <p className="text-gray-600 mb-4">
+                            Your account will be disabled and you will be logged out. You can contact support to reactivate it.
+                        </p>
+                        <div className="mb-4">
+                            <label className="text-sm font-medium text-gray-700">Confirm your password</label>
+                            <div className="relative mt-1">
+                                <input
+                                    type={showDeactivatePassword ? 'text' : 'password'}
+                                    value={deactivatePassword}
+                                    onChange={(e) => setDeactivatePassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    placeholder="Enter your password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeactivatePassword(prev => !prev)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                                >
+                                    {showDeactivatePassword ? 'Hide' : 'Show'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowDeactivateModal(false);
+                                    setDeactivatePassword('');
+                                }}
+                                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                                disabled={actionLoading.deactivate}
+                            >
+                                Cancel
+                            </button>
+                            <LoadingButton
+                                onClick={deactivateAccount}
+                                loading={actionLoading.deactivate}
+                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg"
+                            >
+                                Deactivate Account
+                            </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Delete Account Modal */}
             {showDeleteModal && (
@@ -376,15 +483,39 @@ export const Privacy = ({ showToast }) => {
                         <p className="text-sm text-red-600 font-medium mb-6">
                             This action cannot be undone.
                         </p>
+                        <div className="mb-4">
+                            <label className="text-sm font-medium text-gray-700">Confirm your password</label>
+                            <div className="relative mt-1">
+                                <input
+                                    type={showDeletePassword ? 'text' : 'password'}
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    placeholder="Enter your password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeletePassword(prev => !prev)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                                >
+                                    {showDeletePassword ? 'Hide' : 'Show'}
+                                </button>
+                            </div>
+                        </div>
                         <div className="flex justify-end space-x-3">
                             <button
-                                onClick={() => setShowDeleteModal(false)}
+                                onClick={() => {
+                                    setShowDeleteModal(false);
+                                    setDeletePassword('');
+                                }}
                                 className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                                disabled={actionLoading.delete}
                             >
                                 Cancel
                             </button>
                             <LoadingButton
                                 onClick={deleteAccount}
+                                loading={actionLoading.delete}
                                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
                             >
                                 Delete Account
