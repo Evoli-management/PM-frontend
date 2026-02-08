@@ -31,7 +31,7 @@ export function CanWillMatrix({ data, selectedItems, onItemClick }) {
             <h3 className="text-sm font-semibold mb-4 text-gray-800">CAN-WILL Matrix</h3>
             
             {/* Matrix Container */}
-            <div className="relative w-full" style={{ paddingBottom: '75%' }}>
+            <div className="relative w-full" style={{ paddingBottom: '100%', minHeight: '360px' }}>
                 {/* Quadrant backgrounds */}
                 <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-px bg-gray-300">
                     <div className="bg-yellow-50"></div>

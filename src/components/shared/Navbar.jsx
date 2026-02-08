@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import teamsService from "../../services/teamsService";
 import taskService from "../../services/taskService";
 import activityService from "../../services/activityService";
 import * as goalService from "../../services/goalService";
@@ -19,6 +20,7 @@ export default function Navbar() {
     const [openQuick, setOpenQuick] = useState(false);
     const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
+    const [hasLeadTeams, setHasLeadTeams] = useState(false);
     const menuRef = useRef(null);
     const quickRef = useRef(null);
     const quickButtonRef = useRef(null);
@@ -366,6 +368,31 @@ export default function Navbar() {
         }
     };
 
+    useEffect(() => {
+        let isActive = true;
+        const loadLeadTeams = async () => {
+            if (!showTeamsTabs || !userProfile?.id) return;
+            try {
+                const teams = await teamsService.getTeams();
+                const list = Array.isArray(teams)
+                    ? teams
+                    : Array.isArray(teams?.teams)
+                        ? teams.teams
+                        : [];
+                const lead = list.some((t) =>
+                    String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(userProfile.id)
+                );
+                if (isActive) setHasLeadTeams(lead);
+            } catch (e) {
+                if (isActive) setHasLeadTeams(false);
+            }
+        };
+        loadLeadTeams();
+        return () => {
+            isActive = false;
+        };
+    }, [showTeamsTabs, userProfile?.id]);
+
     // Helper: open a modal globally via event so we reuse existing modal UI
     const openCreateModal = (type) => {
         try {
@@ -636,17 +663,19 @@ export default function Navbar() {
                             >
                                 MY ORGANISATION
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => navigate('/teams?tab=myteams')}
-                                className={`px-2 py-2 rounded transition ${
-                                    activeTeamsTab === 'myteams'
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                MY TEAMS
-                            </button>
+                            {hasLeadTeams && (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/teams?tab=myteams')}
+                                    className={`px-2 py-2 rounded transition ${
+                                        activeTeamsTab === 'myteams'
+                                            ? 'text-blue-600 border-b-2 border-blue-600'
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    MY TEAMS
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => navigate('/teams?tab=myreport')}

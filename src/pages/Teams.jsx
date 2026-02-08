@@ -413,7 +413,7 @@ export default function Teams() {
         const count = Number.isFinite(team.memberCount)
             ? team.memberCount
             : (Array.isArray(team.members) ? team.members.length : 0);
-        const hasLead = Boolean(team.leadId || team.leaderId || team.lead?.id);
+        const hasLead = Boolean(team.leadId || team.leaderId || team.teamLeadUserId || team.lead?.id);
         if (count === 0 && !hasLead) return 'No lead & no members';
         if (count === 0) return 'No members';
         if (!hasLead) return 'No lead';
@@ -425,19 +425,30 @@ export default function Teams() {
         return teamsData.filter(t => {
             const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
             const members = Array.isArray(t.members) ? t.members : [];
-            const isLead = String(t.leadId || t.leaderId || t.lead?.id || '') === String(currentUserId);
+            const isLead = String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId);
             const inIds = memberIds.some(id => String(id) === String(currentUserId));
             const inMembers = members.some(m => String(m.id || m.userId) === String(currentUserId));
             return isLead || inIds || inMembers;
         }).slice(0, 4);
     }, [teamsData, currentUserId]);
 
+    const hasLeadTeams = useMemo(() => {
+        if (!currentUserId) return false;
+        return teamsData.some(t => String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId));
+    }, [teamsData, currentUserId]);
+
+    useEffect(() => {
+        if (view === 'reports' && reportLevel === 'myteams' && !hasLeadTeams) {
+            setReportLevel('organization');
+        }
+    }, [view, reportLevel, hasLeadTeams]);
+
     const atRiskTeams = useMemo(() => {
         return teamsData.filter(t => {
             const count = Number.isFinite(t.memberCount)
                 ? t.memberCount
                 : (Array.isArray(t.members) ? t.members.length : 0);
-            const hasLead = Boolean(t.leadId || t.leaderId || t.lead?.id);
+            const hasLead = Boolean(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id);
             return count === 0 || !hasLead;
         }).slice(0, 4);
     }, [teamsData]);
