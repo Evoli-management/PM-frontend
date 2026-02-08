@@ -227,7 +227,7 @@ export function OrganizationSettings({ showToast }) {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Claus Meller Consulting"
+                placeholder=""
               />
             </div>
 
@@ -240,7 +240,7 @@ export function OrganizationSettings({ showToast }) {
                 value={vatNumber}
                 onChange={(e) => setVatNumber(e.target.value)}
                 className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="VAT number"
+                placeholder=""
               />
             </div>
           </div>
@@ -260,7 +260,7 @@ export function OrganizationSettings({ showToast }) {
                 value={addressStreet}
                 onChange={(e) => setAddressStreet(e.target.value)}
                 className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Smičiklasova cesta 140, 4000 Kranj"
+                placeholder=""
               />
             </div>
 
@@ -274,7 +274,7 @@ export function OrganizationSettings({ showToast }) {
                   value={addressCity}
                   onChange={(e) => setAddressCity(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Kranj"
+                  placeholder=""
                 />
               </div>
 
@@ -287,7 +287,7 @@ export function OrganizationSettings({ showToast }) {
                   value={addressState}
                   onChange={(e) => setAddressState(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Gorenjska"
+                  placeholder=""
                 />
               </div>
             </div>
@@ -302,7 +302,7 @@ export function OrganizationSettings({ showToast }) {
                   value={addressZip}
                   onChange={(e) => setAddressZip(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="4000"
+                  placeholder=""
                 />
               </div>
 
@@ -315,7 +315,7 @@ export function OrganizationSettings({ showToast }) {
                   value={addressCountry}
                   onChange={(e) => setAddressCountry(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Slovenia"
+                  placeholder=""
                 />
               </div>
             </div>
