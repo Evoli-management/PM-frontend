@@ -376,7 +376,7 @@ export default function Teams() {
             });
         }
         if (teamsFilter === 'lead') {
-            return base.filter(t => String(t.leadId || t.leaderId || t.lead?.id || '') === String(currentUserId || ''));
+            return base.filter(t => String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId || ''));
         }
         if (teamsFilter === 'mine') {
             return base.filter(t => {
