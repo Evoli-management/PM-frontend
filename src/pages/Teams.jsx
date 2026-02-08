@@ -26,6 +26,7 @@ export default function Teams() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
     const [canManage, setCanManage] = useState(false);
+    const [orgName, setOrgName] = useState("");
     const location = useLocation();
     const [view, setView] = useState('list'); // 'list' or 'reports'
     const [reportLevel, setReportLevel] = useState('organization'); // 'organization', 'myteams', 'myself'
@@ -75,6 +76,10 @@ export default function Teams() {
             setCanManage(true);
             setUserProfile(profile);
             setHasOrganization(true);
+            try {
+                const org = await organizationService.getCurrentOrganization();
+                setOrgName(org?.name || "");
+            } catch {}
             return true;
         } catch (e) {
             // User has no organization yet
@@ -359,8 +364,8 @@ export default function Teams() {
     const getDefaultPerformanceMetrics = () => [];
 
     const organizationName = useMemo(() => {
-        return userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || 'My Organization';
-    }, [userProfile]);
+        return orgName || userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || 'My Organization';
+    }, [orgName, userProfile]);
 
     const currentUserId = userProfile?.id;
 
@@ -952,21 +957,6 @@ export default function Teams() {
                                                             </div>
                                                         </div>
 
-                                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                                                            <div className="text-sm font-semibold text-blue-800">At‑risk teams</div>
-                                                            <div className="mt-2 space-y-2">
-                                                                {atRiskTeams.length === 0 ? (
-                                                                    <div className="text-xs text-blue-700">No at‑risk teams right now.</div>
-                                                                ) : (
-                                                                    atRiskTeams.map(team => (
-                                                                        <div key={team.id} className="flex items-center justify-between text-xs text-blue-800">
-                                                                            <span className="font-medium">{team.name}</span>
-                                                                            <span>{getTeamRiskLabel(team)}</span>
-                                                                        </div>
-                                                                    ))
-                                                                )}
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 </div>
                                                 
