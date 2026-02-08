@@ -52,13 +52,21 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         e.stopPropagation();
         setRespondingTaskId(taskId);
         try {
-            await taskDelegationService.acceptDelegation(taskId);
+            const result = await taskDelegationService.acceptDelegation(taskId);
+            
+            // Update local state immediately for instant UI feedback
+            setDelegatedTasks(prevTasks =>
+                prevTasks.map(task =>
+                    task.id === taskId
+                        ? { ...task, delegationStatus: 'accepted' }
+                        : task
+                )
+            );
+            
             addToast({
                 title: 'Task accepted successfully',
                 variant: 'success',
             });
-            // Reload tasks to update status
-            await loadDelegatedTasks();
         } catch (error) {
             console.error('Failed to accept delegation:', error);
             addToast({
@@ -75,13 +83,21 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         e.stopPropagation();
         setRespondingTaskId(taskId);
         try {
-            await taskDelegationService.rejectDelegation(taskId);
+            const result = await taskDelegationService.rejectDelegation(taskId);
+            
+            // Update local state immediately for instant UI feedback
+            setDelegatedTasks(prevTasks =>
+                prevTasks.map(task =>
+                    task.id === taskId
+                        ? { ...task, delegationStatus: 'rejected' }
+                        : task
+                )
+            );
+            
             addToast({
                 title: 'Task rejected successfully',
                 variant: 'success',
             });
-            // Reload tasks to update status
-            await loadDelegatedTasks();
         } catch (error) {
             console.error('Failed to reject delegation:', error);
             addToast({
