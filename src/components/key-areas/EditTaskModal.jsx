@@ -76,7 +76,7 @@ export default function EditTaskModal({
     return `${formatDate(value)} (Format: ${dateFormat})`;
   };
   // taskId removed per UX request; tasks selection no longer shown
-  const [goal, setGoal] = useState(initialData.goal || '');
+  const [goal, setGoal] = useState(initialData.goalId || initialData.goal_id || initialData.goal || '');
   const [usersList, setUsersList] = useState(users || []);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [allTasks, setAllTasks] = useState([]);
@@ -115,7 +115,7 @@ export default function EditTaskModal({
   const nextList = initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1;
   if (listIndex !== nextList) setListIndex(nextList);
   // taskId removed per UX request; tasks selection no longer shown
-  const nextGoal = initialData.goal || '';
+  const nextGoal = initialData.goalId || initialData.goal_id || initialData.goal || '';
   if (goal !== nextGoal) setGoal(nextGoal);
     // load users if none provided so the assignee dropdown always contains at least the current user
     (async () => {

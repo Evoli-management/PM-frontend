@@ -128,7 +128,7 @@ export default function CreateTaskModal({
   const [listIndex, setListIndex] = useState(
     initialData.list || initialData.list_index || ''
   );
-  const [goal, setGoal] = useState(initialData.goal || '');
+  const [goal, setGoal] = useState(initialData.goalId || initialData.goal_id || initialData.goal || '');
   const [usersList, setUsersList] = useState(users || []);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [allTasks, setAllTasks] = useState([]);
@@ -171,7 +171,7 @@ export default function CreateTaskModal({
     if (String(keyAreaId) !== String(nextKA)) setKeyAreaId(nextKA);
     const nextList = initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1;
     if (listIndex !== nextList) setListIndex(nextList);
-    const nextGoal = initialData.goal || '';
+    const nextGoal = initialData.goalId || initialData.goal_id || initialData.goal || '';
     if (goal !== nextGoal) setGoal(nextGoal);
 
     (async () => {
