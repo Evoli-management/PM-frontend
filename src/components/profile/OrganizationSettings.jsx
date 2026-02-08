@@ -15,6 +15,10 @@ export function OrganizationSettings({ showToast }) {
   const [addressCountry, setAddressCountry] = useState("");
   const [enpsInterval, setEnpsInterval] = useState("2 weeks");
   const [subscriptionManager, setSubscriptionManager] = useState("");
+  const [plans, setPlans] = useState([]);
+  const [usage, setUsage] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [changingPlan, setChangingPlan] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -23,8 +27,14 @@ export function OrganizationSettings({ showToast }) {
   const loadSettings = async () => {
     try {
       const orgService = await import("../../services/organizationService");
-      const data = await orgService.default.getOrganizationSettings();
+      const [data, currentUsage, planList] = await Promise.all([
+        orgService.default.getOrganizationSettings(),
+        orgService.default.getCurrentUsage(),
+        orgService.default.getPlans(),
+      ]);
       setSettings(data);
+      setUsage(currentUsage || null);
+      setPlans(Array.isArray(planList) ? planList : []);
       
       // Populate form fields
       setCompanyName(data.name || "");
@@ -36,10 +46,31 @@ export function OrganizationSettings({ showToast }) {
       setAddressCountry(data.addressCountry || "");
       setEnpsInterval(data.enpsInterval || "2 weeks");
       setSubscriptionManager(data.subscriptionManager || "");
+      if (data.subscriptionPlanId) {
+        setSelectedPlanId(data.subscriptionPlanId);
+      } else if (data.subscriptionPlan && planList?.length) {
+        const byName = planList.find((p) => p.name === data.subscriptionPlan);
+        if (byName) setSelectedPlanId(byName.id);
+      }
     } catch (e) {
       showToast?.(e?.response?.data?.message || "Failed to load settings", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePlanChange = async () => {
+    if (!selectedPlanId || selectedPlanId === settings?.subscriptionPlanId) return;
+    setChangingPlan(true);
+    try {
+      const orgService = await import("../../services/organizationService");
+      await orgService.default.updateSubscriptionPlan(selectedPlanId);
+      showToast?.("Subscription plan updated successfully");
+      await loadSettings();
+    } catch (e) {
+      showToast?.(e?.response?.data?.message || "Failed to update subscription plan", "error");
+    } finally {
+      setChangingPlan(false);
     }
   };
 
@@ -135,6 +166,44 @@ export function OrganizationSettings({ showToast }) {
                     {settings.subscriptionStatus}
                   </p>
                 )}
+                {usage && (
+                  <p className="text-xs mt-2 text-gray-600">
+                    Usage: {usage.currentMembers}/{usage.maxMembers} members • {usage.currentTeams}/{usage.maxTeams} teams
+                  </p>
+                )}
+              </div>
+            )}
+
+            {plans.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Change Plan
+                </label>
+                <select
+                  value={selectedPlanId}
+                  onChange={(e) => setSelectedPlanId(e.target.value)}
+                  className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="" disabled>Select a plan</option>
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} • {p.maxMembers} members • {p.maxTeams} teams
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePlanChange}
+                    disabled={changingPlan || !selectedPlanId || selectedPlanId === settings?.subscriptionPlanId}
+                    className="px-3 py-2 text-sm rounded bg-blue-600 text-white disabled:opacity-60"
+                  >
+                    {changingPlan ? "Updating..." : "Update Plan"}
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    Downgrade allowed only after member/team limits are met.
+                  </span>
+                </div>
               </div>
             )}
           </div>

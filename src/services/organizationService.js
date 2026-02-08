@@ -327,6 +327,36 @@ class OrganizationService {
       throw error;
     }
   }
+
+  /**
+   * Get active subscription plans
+   */
+  async getPlans() {
+    try {
+      const res = await apiClient.get("/organizations/plans");
+      return res.data?.plans || [];
+    } catch (error) {
+      console.error("Failed to fetch plans:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update subscription plan for current organization
+   * @param {string} planId
+   */
+  async updateSubscriptionPlan(planId) {
+    try {
+      if (!planId) {
+        throw new Error("Plan ID is required");
+      }
+      const res = await apiClient.patch("/organizations/current/plan", { planId });
+      return res.data;
+    } catch (error) {
+      console.error("Failed to update subscription plan:", error);
+      throw error;
+    }
+  }
 }
 
 export default new OrganizationService();
