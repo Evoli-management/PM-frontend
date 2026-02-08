@@ -38,6 +38,26 @@ const taskDelegationService = {
     const res = await apiClient.delete(`${base}/${taskId}/delegation`);
     return res.data;
   },
+
+  /**
+   * Accept a delegated task
+   */
+  async acceptDelegation(taskId, reason = '') {
+    const res = await apiClient.post(`${base}/${taskId}/delegation/accept`, {
+      reason: reason || undefined,
+    });
+    return res.data;
+  },
+
+  /**
+   * Reject a delegated task
+   */
+  async rejectDelegation(taskId, reason = '') {
+    const res = await apiClient.post(`${base}/${taskId}/delegation/reject`, {
+      reason: reason || undefined,
+    });
+    return res.data;
+  },
 };
 
 export default taskDelegationService;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaUserCheck, FaTimes, FaHistory } from 'react-icons/fa';
+import { FaUserCheck, FaTimes, FaHistory, FaCheck, FaBan } from 'react-icons/fa';
 import taskDelegationService from '../../services/taskDelegationService';
 import { useToast } from '../shared/ToastProvider.jsx';
 
@@ -9,6 +9,8 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
     const [selectedTask, setSelectedTask] = useState(null);
     const [showHistory, setShowHistory] = useState(false);
     const [history, setHistory] = useState([]);
+    const [filterStatus, setFilterStatus] = useState('pending'); // 'pending', 'accepted', 'rejected', 'all'
+    const [respondingTaskId, setRespondingTaskId] = useState(null);
 
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
 
@@ -46,6 +48,58 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         }
     };
 
+    const handleAcceptDelegation = async (taskId, e) => {
+        e.stopPropagation();
+        setRespondingTaskId(taskId);
+        try {
+            await taskDelegationService.acceptDelegation(taskId);
+            addToast({
+                title: 'Task accepted successfully',
+                variant: 'success',
+            });
+            // Reload tasks to update status
+            await loadDelegatedTasks();
+        } catch (error) {
+            console.error('Failed to accept delegation:', error);
+            addToast({
+                title: 'Failed to accept delegation',
+                description: error.response?.data?.message || 'Please try again',
+                variant: 'error',
+            });
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
+    const handleRejectDelegation = async (taskId, e) => {
+        e.stopPropagation();
+        setRespondingTaskId(taskId);
+        try {
+            await taskDelegationService.rejectDelegation(taskId);
+            addToast({
+                title: 'Task rejected successfully',
+                variant: 'success',
+            });
+            // Reload tasks to update status
+            await loadDelegatedTasks();
+        } catch (error) {
+            console.error('Failed to reject delegation:', error);
+            addToast({
+                title: 'Failed to reject delegation',
+                description: error.response?.data?.message || 'Please try again',
+                variant: 'error',
+            });
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
+    // Filter tasks based on selected status
+    const filteredTasks = delegatedTasks.filter(task => {
+        if (filterStatus === 'all') return true;
+        return task.delegationStatus === filterStatus;
+    });
+
     if (loading) {
         return (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -66,7 +120,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         <>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <FaUserCheck className="text-blue-600" />
                             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -85,28 +139,46 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                             Refresh
                         </button>
                     </div>
+
+                    {/* Status Filter Tabs */}
+                    <div className="flex gap-2 flex-wrap">
+                        {['pending', 'accepted', 'rejected', 'all'].map((status) => (
+                            <button
+                                key={status}
+                                onClick={() => setFilterStatus(status)}
+                                className={`px-3 py-1 text-xs font-medium rounded-full transition ${
+                                    filterStatus === status
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                {status === 'pending' && `⏳ Pending (${delegatedTasks.filter(t => t.delegationStatus === 'pending').length})`}
+                                {status === 'accepted' && `✓ Accepted (${delegatedTasks.filter(t => t.delegationStatus === 'accepted').length})`}
+                                {status === 'rejected' && `✗ Rejected (${delegatedTasks.filter(t => t.delegationStatus === 'rejected').length})`}
+                                {status === 'all' && `All (${delegatedTasks.length})`}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="p-6">
-                    {delegatedTasks.length === 0 ? (
+                    {filteredTasks.length === 0 ? (
                         <div className="text-center py-8">
                             <FaUserCheck className="mx-auto text-4xl text-gray-300 dark:text-gray-600 mb-3" />
                             <p className="text-gray-500 dark:text-gray-400">
-                                No tasks delegated to you
+                                {delegatedTasks.length === 0 ? 'No tasks delegated to you' : `No ${filterStatus} tasks`}
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {delegatedTasks.map((task) => (
+                            {filteredTasks.map((task) => (
                                 <div
                                     key={task.id}
                                     className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 
-                                             hover:border-blue-500 dark:hover:border-blue-500 transition-colors
-                                             cursor-pointer"
-                                    onClick={() => onTaskClick?.(task)}
+                                             hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
                                 >
                                     <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1">
+                                        <div className="flex-1 cursor-pointer" onClick={() => onTaskClick?.(task)}>
                                             <h3 className="font-medium text-gray-900 dark:text-white mb-1">
                                                 {task.title}
                                             </h3>
@@ -139,19 +211,52 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                                         </span>
                                                     </div>
                                                 )}
+                                                {task.delegationStatus && (
+                                                    <div>
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium
+                                                            ${task.delegationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                              task.delegationStatus === 'accepted' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                                              'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                                            {task.delegationStatus}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedTask(task);
-                                                loadHistory(task.id);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                                            title="View delegation history"
-                                        >
-                                            <FaHistory />
-                                        </button>
+
+                                        <div className="flex items-center gap-2">
+                                            {task.delegationStatus === 'pending' && (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => handleAcceptDelegation(task.id, e)}
+                                                        disabled={respondingTaskId === task.id}
+                                                        className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition disabled:opacity-50"
+                                                        title="Accept this delegation"
+                                                    >
+                                                        <FaCheck />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleRejectDelegation(task.id, e)}
+                                                        disabled={respondingTaskId === task.id}
+                                                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition disabled:opacity-50"
+                                                        title="Reject this delegation"
+                                                    >
+                                                        <FaBan />
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedTask(task);
+                                                    loadHistory(task.id);
+                                                }}
+                                                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"
+                                                title="View delegation history"
+                                            >
+                                                <FaHistory />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
