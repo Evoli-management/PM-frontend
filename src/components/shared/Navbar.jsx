@@ -650,7 +650,7 @@ export default function Navbar() {
                                         : 'text-slate-600 hover:text-slate-900'
                                 }`}
                             >
-                                TEAMS & MEMBERS
+                                OVERVIEW
                             </button>
                             <button
                                 type="button"
