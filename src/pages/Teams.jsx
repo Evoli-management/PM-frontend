@@ -331,9 +331,11 @@ export default function Teams() {
                 { key: 'energy', label: 'Energy', value: empMetrics.energy },
             ]);
             
-            setPerformanceMetrics([
-                { key: 'overall', label: 'Overall Performance', value: perfMetrics.overall },
-            ]);
+            const performanceList = Array.isArray(perfMetrics?.metrics) && perfMetrics.metrics.length > 0
+                ? perfMetrics.metrics
+                : [{ key: 'overall', label: 'Overall Performance', value: perfMetrics?.overall || 0 }];
+
+            setPerformanceMetrics(performanceList);
         } catch (err) {
             console.error('Failed to load metrics:', err);
             setEmployeeshipMetrics([]);
