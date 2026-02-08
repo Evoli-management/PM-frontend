@@ -174,6 +174,7 @@ const api = {
     async updateTask(id, task) {
         const payload = {
             keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
+            goalId: task.goal_id || task.goalId || task.goal || null,
             title: task.title,
             description: nullableString(task.description, true),
             assignee: nullableString(task.assignee, true),

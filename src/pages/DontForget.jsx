@@ -678,6 +678,7 @@ export default function DontForget() {
                     ? new Date(payload.deadline).toISOString()
                     : undefined,
                 duration: payload?.duration ? String(payload.duration) : undefined,
+                goalId: payload?.goal_id || payload?.goalId || payload?.goal || null,
                 // Only include status/priority if provided, else let backend defaults apply
                 ...(mappedStatus ? { status: mappedStatus } : {}),
                 ...(mappedPriority ? { priority: mappedPriority } : {}),

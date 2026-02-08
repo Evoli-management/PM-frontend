@@ -282,6 +282,7 @@ export default function Tasks() {
                 endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : undefined,
                 dueDate: payload?.dueDate ? new Date(payload.dueDate).toISOString() : undefined,
                 duration: payload?.duration ? String(payload.duration) : undefined,
+                goalId: payload?.goal_id || payload?.goalId || payload?.goal || null,
                 // Only include status/priority if provided, else let backend defaults apply
                 ...(mappedStatus ? { status: mappedStatus } : {}),
                 ...(mappedPriority ? { priority: mappedPriority } : {}),
