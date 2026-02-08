@@ -27,10 +27,11 @@ export function OrganizationSettings({ showToast }) {
   const loadSettings = async () => {
     try {
       const orgService = await import("../../services/organizationService");
-      const [data, currentUsage, planList] = await Promise.all([
+      const [data, currentUsage, planList, manager] = await Promise.all([
         orgService.default.getOrganizationSettings(),
         orgService.default.getCurrentUsage(),
         orgService.default.getPlans(),
+        orgService.default.getSubscriptionManager(),
       ]);
       setSettings(data);
       setUsage(currentUsage || null);
@@ -45,7 +46,11 @@ export function OrganizationSettings({ showToast }) {
       setAddressZip(data.addressZip || "");
       setAddressCountry(data.addressCountry || "");
       setEnpsInterval(data.enpsInterval || "2 weeks");
-      setSubscriptionManager(data.subscriptionManager || "");
+      if (manager && (manager.firstName || manager.lastName)) {
+        setSubscriptionManager(`${manager.firstName || ""} ${manager.lastName || ""}`.trim());
+      } else {
+        setSubscriptionManager("");
+      }
       if (data.subscriptionPlanId) {
         setSelectedPlanId(data.subscriptionPlanId);
       } else if (data.subscriptionPlan && planList?.length) {
@@ -89,7 +94,6 @@ export function OrganizationSettings({ showToast }) {
         addressZip: addressZip.trim(),
         addressCountry: addressCountry.trim(),
         enpsInterval,
-        subscriptionManager: subscriptionManager.trim(),
       });
       showToast?.("Settings saved successfully");
       loadSettings();
@@ -148,9 +152,9 @@ export function OrganizationSettings({ showToast }) {
               <input
                 type="text"
                 value={subscriptionManager}
-                onChange={(e) => setSubscriptionManager(e.target.value)}
+                readOnly
                 className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Alef Tunik"
+                placeholder=""
               />
             </div>
 
