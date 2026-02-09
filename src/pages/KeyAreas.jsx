@@ -253,6 +253,49 @@ const api = {
     },
 };
 
+const normalizeActivityWithTask = (activity, task) => {
+    const norm = normalizeActivity(activity || {});
+    if (!norm) return norm;
+
+    const taskId = task?.id ?? task?.task_id ?? task?.taskId ?? null;
+    const keyAreaId =
+        norm.key_area_id ??
+        task?.key_area_id ??
+        task?.keyAreaId ??
+        task?.keyArea ??
+        null;
+    const listIndex =
+        norm.list ??
+        task?.list_index ??
+        task?.listIndex ??
+        task?.list ??
+        null;
+    const goalId =
+        norm.goal_id ??
+        norm.goalId ??
+        task?.goal_id ??
+        task?.goalId ??
+        task?.goal ??
+        null;
+    const assignee = norm.assignee ?? task?.assignee ?? null;
+
+    return {
+        ...norm,
+        title: norm.title || norm.text || norm.activity_name || norm.name || '',
+        name: norm.name || norm.title || norm.text || norm.activity_name || '',
+        taskId: norm.taskId || taskId || null,
+        key_area_id: keyAreaId,
+        keyAreaId,
+        list: listIndex,
+        list_index: listIndex,
+        listIndex,
+        goal_id: goalId,
+        goalId,
+        assignee,
+        responsible: norm.responsible ?? assignee ?? null,
+    };
+};
+
 // Shared helpers (imported from utils/keyareasHelpers)
 
 // Minimal placeholders to keep non-list views functional
@@ -750,7 +793,12 @@ export default function KeyAreas() {
                         (allUserTasks || []).map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                                return [
+                                    String(row.id),
+                                    Array.isArray(list)
+                                        ? list.map((activity) => normalizeActivityWithTask(activity, row))
+                                        : [],
+                                ];
                             } catch {
                                 return [String(row.id), []];
                             }
@@ -779,7 +827,12 @@ export default function KeyAreas() {
                         (trapTasks || []).map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                                return [
+                                    String(row.id),
+                                    Array.isArray(list)
+                                        ? list.map((activity) => normalizeActivityWithTask(activity, row))
+                                        : [],
+                                ];
                             } catch {
                                 return [String(row.id), []];
                             }

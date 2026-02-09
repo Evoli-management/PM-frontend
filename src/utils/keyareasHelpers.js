@@ -223,6 +223,8 @@ export const normalizeActivity = (a = {}) => {
         ...a,
         id,
         text,
+        title: a.title ?? a.name ?? text,
+        name: a.name ?? a.title ?? text,
         status,
         completed: !!completed,
         completionDate: completionDate || null,
@@ -235,8 +237,13 @@ export const normalizeActivity = (a = {}) => {
         created_task_id,
         // key area / list / goal / notes / duration
         key_area_id: key_area_id || null,
+        keyAreaId: key_area_id || null,
         list: list || null,
+        list_index: list || null,
+        listIndex: list || null,
         goal: goal || null,
+        goal_id: goal || null,
+        goalId: goal || null,
         notes: notes || null,
         duration: duration || null,
         // assignee aliases

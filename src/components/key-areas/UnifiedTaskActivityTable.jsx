@@ -578,7 +578,7 @@ export default function UnifiedTaskActivityTable({
                             const keyAreaKey = getCellKey(item, 'keyAreaId');
                             const responsibleKey = getCellKey(item, 'responsibleId');
                             const goalKey = getCellKey(item, 'goalId');
-                            const titleValue = item.title || item.name || '';
+                            const titleValue = item.title || item.name || item.text || item.activity_name || '';
                             const startDateValue = toDateOnly(item.startDate || item.start_date);
                             const endDateValue = toDateOnly(item.endDate || item.end_date);
                             const deadlineValueInput = toDateOnly(deadlineValue);
