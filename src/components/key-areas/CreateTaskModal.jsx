@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FaSave } from 'react-icons/fa';
 import usersService from '../../services/usersService';
+import { useDraggable } from '../../hooks/useDraggable';
+import { useResizable } from '../../hooks/useResizable';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -139,6 +141,24 @@ export default function CreateTaskModal({
   const endRef = useRef(null);
   const deadlineRef = useRef(null);
   const usersLoadedRef = useRef(false);
+
+  const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
+  const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 510);
+  
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+  
+  useEffect(() => {
+    if (isOpen) resetPosition();
+  }, [isOpen, resetPosition]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -425,14 +445,27 @@ export default function CreateTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-  <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+      <div className="absolute inset-0 bg-black/40" />
+  <div 
+        className="relative z-10 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 flex flex-col overflow-hidden"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : isDraggingResize ? 'se-resize' : 'default',
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          minWidth: '300px',
+          minHeight: '200px'
+        }}
+      >
         <style>{`
           .no-calendar::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
           .no-calendar::-webkit-clear-button, .no-calendar::-webkit-inner-spin-button { display: none; -webkit-appearance: none; }
           .no-calendar::-ms-clear { display: none; }
         `}</style>
-  <div className="relative px-5 py-2 border-b border-slate-200">
+  <div 
+          className="relative px-5 py-2 border-b border-slate-200 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={handleMouseDown}
+        >
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
             {finalIsDontForget ? "Create Don't forget task" : 'Create Task'}
           </h3>
@@ -448,7 +481,7 @@ export default function CreateTaskModal({
           </div>
         </div>
 
-  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2">
+  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1">
           <div>
             <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
             <input
@@ -644,6 +677,25 @@ export default function CreateTaskModal({
             <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
           </div>
         </form>
+        {/* Right resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
+          className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
+          style={{ zIndex: 40 }}
+        />
+        {/* Bottom resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')}
+          className="absolute bottom-0 left-0 w-full h-1 cursor-s-resize hover:bg-blue-500/20 transition-colors"
+          style={{ zIndex: 40 }}
+        />
+        {/* Corner resize handle (southeast) */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/30 transition-colors rounded-tl"
+          style={{ zIndex: 41 }}
+          title="Drag to resize"
+        />
       </div>
     </div>
   );

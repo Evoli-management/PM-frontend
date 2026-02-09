@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useDraggable } from "../../hooks/useDraggable";
+import { useResizable } from "../../hooks/useResizable";
 import calendarService from "../../services/calendarService";
 import { useToast } from "../shared/ToastProvider.jsx";
 import { FaTrash } from "react-icons/fa";
@@ -413,6 +415,20 @@ const buildRecurringPattern = ({
 
     const startRef = useRef(null);
     const endRef = useRef(null);
+
+    const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
+    const { size, isDraggingResize, handleResizeMouseDown } = useResizable(600, 560);
+    
+    useEffect(() => {
+        if (isDragging) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            return () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+        }
+    }, [isDragging, handleMouseMove, handleMouseUp]);
 
     useEffect(() => {
         const handleEscape = (e) => {
@@ -846,13 +862,18 @@ const buildRecurringPattern = ({
     return (
         <div
             className="fixed inset-0 z-50 grid place-items-center bg-black/40"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
-            }}
         >
             <div
-                className="appointment-modal relative z-10 max-h-[85vh] w-[640px] max-w-[95vw] overflow-auto rounded-2xl bg-white ring-1 ring-black/5"
-                style={{ ["--assignee-accent"]: "#7c3aed" }}
+                className="appointment-modal relative z-10 rounded-2xl bg-white ring-1 ring-black/5 flex flex-col overflow-hidden"
+                style={{ 
+                    ["--assignee-accent"]: "#7c3aed",
+                    transform: `translate(${position.x}px, ${position.y}px)`,
+                    cursor: isDragging ? 'grabbing' : isDraggingResize ? 'se-resize' : 'default',
+                    width: `${size.width}px`,
+                    height: `${size.height}px`,
+                    minWidth: '300px',
+                    minHeight: '200px'
+                }}
             >
                 <style>{`
                     .no-calendar::-webkit-calendar-picker-indicator {
@@ -893,18 +914,20 @@ const buildRecurringPattern = ({
                         border-color: #cbd5e1 !important;
                         background-color: #ffffff !important;
                     }
-                    .appointment-modal .appointment-time-control:focus,
                     .appointment-modal select[name=assignee]:focus,
+                    .appointment-modal select[name=assignee]:focus-visible {
+                        border-color: #a855f7 !important;
+                    }
+                    .appointment-modal .appointment-time-control:focus,
                     .appointment-modal input[name=start_date]:focus,
                     .appointment-modal input[name=end_date]:focus,
                     .appointment-modal .appointment-time-control:focus-visible,
-                    .appointment-modal select[name=assignee]:focus-visible,
                     .appointment-modal input[name=start_date]:focus-visible,
                     .appointment-modal input[name=end_date]:focus-visible {
                         box-shadow: none !important;
-                        outline: 2px solid var(--assignee-accent) !important;
+                        outline: 2px solid rgba(34, 197, 94, 0.35) !important;
                         outline-offset: 0px !important;
-                        border-color: var(--assignee-accent) !important;
+                        border-color: #22c55e !important;
                     }
                     .appointment-modal .appointment-time-control {
                         cursor: pointer;
@@ -912,7 +935,10 @@ const buildRecurringPattern = ({
                 `}</style>
 
                 {/* Header */}
-                <div className="relative border-b border-slate-200 px-5 py-2">
+                <div 
+                    className="relative border-b border-slate-200 px-5 py-2 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+                    onMouseDown={handleMouseDown}
+                >
                     <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
                         {isEdit ? "Edit Appointment" : "Create Appointment"}
                     </h3>
@@ -930,7 +956,7 @@ const buildRecurringPattern = ({
 
                 {/* Body */}
                 <form
-                    className="space-y-2 px-4 pb-4 pt-2"
+                    className="space-y-2 px-4 pb-4 pt-2 overflow-y-auto flex-1"
                     onSubmit={(e) => {
                         e.preventDefault();
                         if (!saving) handleSave();
@@ -947,7 +973,7 @@ const buildRecurringPattern = ({
                         <input
                             id="appointment-title"
                             required
-                            className="left-focus mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                            className="left-focus mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
                             placeholder="Appointment title"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
@@ -956,9 +982,9 @@ const buildRecurringPattern = ({
                     </div>
 
                     {/* 2-column layout turned into 3-column with centered separator */}
-                    <div className="grid grid-cols-1 gap-y-4 md:grid-cols-[1fr_auto_1fr] md:gap-x-0.5">
+                    <div className="grid grid-cols-1 gap-y-4 md:grid-cols-[1fr_auto_1fr] md:gap-x-6">
                         {/* Left column: start date, end date, start time, end time */}
-                        <div className="space-y-3 md:col-span-1">
+                        <div className="grid grid-rows-4 gap-0 md:col-span-1">
                             <div>
                                 <label className="text-sm font-medium text-slate-700">
                                     Start date
@@ -975,7 +1001,7 @@ const buildRecurringPattern = ({
                                     />
                                     <button
                                         type="button"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600"
                                         aria-label="Open date picker"
                                         onClick={() => {
                                             try {
@@ -1007,7 +1033,7 @@ const buildRecurringPattern = ({
                                     />
                                     <button
                                         type="button"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600"
                                         aria-label="Open date picker"
                                         onClick={() => {
                                             try {
@@ -1024,7 +1050,7 @@ const buildRecurringPattern = ({
                             </div>
 
                             {allDayDefault ? (
-                                <div className="mt-2 text-xs text-slate-600">
+                                <div className="text-xs text-slate-600 mt-2">
                                     This will be created as an all-day event.
                                 </div>
                             ) : (
@@ -1035,8 +1061,8 @@ const buildRecurringPattern = ({
                                             value={startTimeStr}
                                             onChange={(v) => setStartTimeStr(v)}
                                             use24Hour={use24Hour}
-                                            outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                                             label="Start time"
                                         />
                                     </div>
@@ -1047,8 +1073,8 @@ const buildRecurringPattern = ({
                                             value={endTimeStr}
                                             onChange={(v) => setEndTimeStr(v)}
                                             use24Hour={use24Hour}
-                                            outerClassName="appointment-time-control mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            outerClassName="appointment-time-control mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                            innerClassName="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                                             label="End time"
                                         />
                                     </div>
@@ -1058,18 +1084,18 @@ const buildRecurringPattern = ({
 
                         {/* separator column centered between left and right on md+ */}
                         <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
-                            <div className="w-px bg-slate-400 my-2" />
+                            <div className="w-px bg-slate-200 my-2" />
                         </div>
 
                         {/* Right column: description, key area, assignee, goal */}
-                        <div className="space-y-3 md:col-span-1">
+                        <div className="grid grid-rows-4 gap-0 md:col-span-1">
                             <div>
                                 <label className="text-sm font-medium text-slate-700">
                                     Description
                                 </label>
                                 <input
                                     name="description"
-                                    className="left-focus mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50"
+                                    className="mt-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500"
                                     placeholder="Brief description"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -1114,7 +1140,7 @@ const buildRecurringPattern = ({
                                 <div className="relative mt-0">
                                     <select
                                         name="assignee"
-                                        className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
+                                        className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500"
                                         value={assignee}
                                         onChange={(e) => setAssignee(e.target.value)}
                                     >
@@ -1627,6 +1653,25 @@ const buildRecurringPattern = ({
                         </div>
                     </div>
                 </form>
+                {/* Right resize handle */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
+                  className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
+                  style={{ zIndex: 40 }}
+                />
+                {/* Bottom resize handle */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')}
+                  className="absolute bottom-0 left-0 w-full h-1 cursor-s-resize hover:bg-blue-500/20 transition-colors"
+                  style={{ zIndex: 40 }}
+                />
+                {/* Corner resize handle (southeast) */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+                  className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/30 transition-colors rounded-tl"
+                  style={{ zIndex: 41 }}
+                  title="Drag to resize"
+                />
             </div>
         </div>
     );
