@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useDraggable } from "../../hooks/useDraggable";
+import { useResizable } from "../../hooks/useResizable";
 
 const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = false }) => {
   // default new-goal dates to today. The validation allows deadline to be
@@ -91,7 +93,25 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
   const startRef = useRef(null);
   const dueRef = useRef(null);
   const rightStartRef = useRef(null);
+
+  const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
+  const { size, isDraggingResize, handleResizeMouseDown } = useResizable(600, 560);
   const milestoneDueRef = useRef(null);
+  
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+  
+  useEffect(() => {
+    if (onClose) resetPosition();
+  }, [resetPosition]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -275,7 +295,6 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-      onClick={() => onClose()}
     >
       <style>{`
         @keyframes fadeIn {
@@ -319,12 +338,23 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       `}</style>
 
       <div
-        className="relative bg-white rounded-xl w-full max-w-3xl shadow-2xl flex flex-col animate-slideUp max-h-[90vh] overflow-hidden border border-gray-200"
+        className="relative bg-white rounded-xl shadow-2xl flex flex-col animate-slideUp overflow-hidden border border-gray-200"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : isDraggingResize ? 'se-resize' : 'default',
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          minWidth: '300px',
+          minHeight: '200px'
+        }}
       >
         
         {/* Header */}
-        <div className="relative flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div 
+          className="relative flex items-center justify-between px-6 py-4 border-b border-gray-200 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+          onMouseDown={handleMouseDown}
+        >
           {/* left spacer so justify-between places close button on the right */}
           <div className="w-10" aria-hidden="true" />
           <h2 className="text-xl font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
@@ -356,7 +386,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4 overflow-y-auto">
+        <div className="px-6 py-4 overflow-y-auto flex-1">
           {errors.general && (
             <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r text-red-700 text-sm">
               <strong className="font-medium">Error:</strong> {errors.general}
@@ -364,9 +394,9 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           )}
 
           {/* Goal name */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gray-700">
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">
                 Goal name <span className="text-red-500">*</span>
               </label>
               <span className={`text-xs font-medium ${
@@ -382,8 +412,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               maxLength="200"
               value={formData.title}
               onChange={(e) => handleInputChange("title", e.target.value)}
-              className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent ${
-                errors.title ? "border-red-300 bg-red-50" : "border-gray-300"
+              className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5 ${
+                errors.title ? "border-red-300 bg-red-50" : ""
               }`}
               placeholder="Enter goal name (max 200 characters)"
             />
@@ -396,23 +426,23 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
           </div>
 
           {/* Two columns with center separator */}
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-6 md:gap-x-0.5">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             {/* Left column */}
-            <div className="space-y-3 md:col-span-1">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="grid gap-3 content-start md:col-span-1">
+              <div className="min-h-[72px]">
+                <label className="block text-sm font-medium text-slate-700">
                   Description
                 </label>
                 <input
                   type="text"
                   value={formData.description}
                   onChange={(e) => handleInputChange("description", e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
                   placeholder="Add a short description (optional)"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Start date
                 </label>
                 <div className="relative mt-0">
@@ -422,7 +452,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => handleInputChange("startDate", e.target.value)}
-                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   />
                   <button
                     type="button"
@@ -434,7 +464,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Deadline <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-0">
@@ -445,7 +475,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => handleInputChange("dueDate", e.target.value)}
-                    className={`left-focus w-full rounded-lg px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 appearance-none pr-11 no-calendar focus:border-green-500 focus:ring-2 focus:ring-green-50 ${
+                    className={`w-full rounded-lg border px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar ${
                       errors.dueDate ? "border-red-300 bg-red-50" : "border-slate-300 bg-white"
                     }`}
                     min={new Date().toISOString().split("T")[0]}
@@ -458,12 +488,12 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   >📅</button>
                 </div>
                 {errors.dueDate && (
-                  <p className="text-red-600 text-xs mt-1">{errors.dueDate}</p>
+                  <p className="text-red-600 text-xs mt-0">{errors.dueDate}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Key Area
                 </label>
                 <select
@@ -471,7 +501,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   onChange={(e) =>
                     handleInputChange("keyAreaId", e.target.value)
                   }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
                   <option value="">Select key area</option>
                   {keyAreas.map((area) => (
@@ -483,15 +513,13 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Visibility
                 </label>
                 <select
                   value={formData.visibility}
-                  onChange={(e) =>
-                    handleInputChange("visibility", e.target.value)
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  onChange={(e) => handleInputChange("visibility", e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
                   <option value="public">Public</option>
                   <option value="private">Private</option>
@@ -499,15 +527,13 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Priority
                 </label>
                 <select
                   value={formData.priority}
-                  onChange={(e) =>
-                    handleInputChange("priority", e.target.value)
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  onChange={(e) => handleInputChange("priority", e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-10 mt-0"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -516,7 +542,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Tags (comma-separated)
                 </label>
                 <input
@@ -526,21 +552,21 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     const tags = e.target.value.split(",").map((t) => t.trim()).filter((t) => t);
                     handleInputChange("tags", tags);
                   }}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  placeholder="e.g., important, urgent, review"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
+                  placeholder="e.g., important, urgent"
                 />
               </div>
             </div>
 
             {/* separator column centered between left and right on md+ */}
             <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
-              <div className="w-px bg-slate-400 my-2" />
+              <div className="w-px bg-slate-200 my-2" />
             </div>
 
             {/* Right column – Milestones */}
-            <div className="space-y-3 md:col-span-1">
+            <div className="grid gap-3 content-start md:col-span-1">
               {/* Header with arrows + label + Add */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between min-h-[72px]">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -551,7 +577,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     <ChevronLeft className="w-3 h-3" />
                   </button>
                   <span className="text-sm font-medium text-gray-800">
-                    Milestones ({activeMilestoneIndex + 1}/10)
+                    Milestones ({activeMilestoneIndex + 1}/{milestones.length})
                   </span>
                   <button
                     type="button"
@@ -573,24 +599,22 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                 </button>
               </div>
 
-
-
               {/* Name of milestone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Name of milestone
                 </label>
                 <input
                   type="text"
                   value={currentMilestone.title}
                   onChange={(e) => handleMilestoneChange("title", e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
                 />
               </div>
 
-              {/* Start date (also available on the right for convenience) - moved below milestone name */}
+              {/* Start date (also available on the right for convenience) */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Start date
                 </label>
                 <div className="relative mt-0">
@@ -600,7 +624,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="date"
                     value={currentMilestone.startDate}
                     onChange={(e) => handleMilestoneChange("startDate", e.target.value)}
-                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-11 no-calendar"
                   />
                   <button
                     type="button"
@@ -613,7 +637,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
               {/* Due date */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Deadline
                 </label>
                 <div className="relative mt-0">
@@ -623,7 +647,7 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                     type="date"
                     value={currentMilestone.dueDate}
                     onChange={(e) => handleMilestoneChange("dueDate", e.target.value)}
-                    className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-11 no-calendar"
                   />
                   <button
                     type="button"
@@ -636,34 +660,34 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
               {/* Weight */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700">
                   Weight
                 </label>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  value={currentMilestone.weight}
-                  onChange={(e) =>
-                    handleMilestoneChange(
-                      "weight",
-                      e.target.value === "" ? "" : parseFloat(e.target.value)
-                    )
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={currentMilestone.weight}
+                    onChange={(e) =>
+                      handleMilestoneChange(
+                        "weight",
+                        e.target.value === "" ? "" : parseFloat(e.target.value)
+                      )
+                    }
+                    className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeCurrentMilestone}
+                    disabled={milestones.length === 1}
+                    className="text-red-600 disabled:opacity-50 disabled:cursor-not-allowed hover:text-red-700"
+                    aria-label="Delete milestone"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-
-              {/* Delete milestone */}
-              <button
-                type="button"
-                onClick={removeCurrentMilestone}
-                disabled={milestones.length === 1}
-                className="inline-flex ml-auto block items-center gap-1 text-xs text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Trash2 className="w-3 h-3" />
-                Delete milestone
-              </button>
             </div>
           </div>
         </div>
@@ -698,6 +722,25 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
             </button>
           </div>
         </div>
+        {/* Right resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
+          className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
+          style={{ zIndex: 40 }}
+        />
+        {/* Bottom resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')}
+          className="absolute bottom-0 left-0 w-full h-1 cursor-s-resize hover:bg-blue-500/20 transition-colors"
+          style={{ zIndex: 40 }}
+        />
+        {/* Corner resize handle (southeast) */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/30 transition-colors rounded-tl"
+          style={{ zIndex: 41 }}
+          title="Drag to resize"
+        />
       </div>
     </div>
   );

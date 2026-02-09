@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import Modal from "../shared/Modal";
 import { useToast } from "../shared/ToastProvider.jsx";
+import { useDraggable } from "../../hooks/useDraggable";
+import { useResizable } from "../../hooks/useResizable";
 // Load services on demand to allow them to be code-split from the main bundle
 let _keyAreaService = null;
 const getKeyAreaService = async () => {
@@ -34,6 +36,24 @@ export default function CreateTaskModal({
     const [listNames, setListNames] = useState({});
     const [loading, setLoading] = useState(false);
     const isEditMode = !!taskId;
+    
+    const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
+    const { size, isDraggingResize, handleResizeMouseDown } = useResizable(500, 490);
+    
+    useEffect(() => {
+        if (isDragging) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            return () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+        }
+    }, [isDragging, handleMouseMove, handleMouseUp]);
+    
+    useEffect(() => {
+        if (isOpen) resetPosition();
+    }, [isOpen, resetPosition]);
     
     const [form, setForm] = useState({
         keyAreaId: preselectedKeyArea || initialData.keyAreaId || "",
@@ -237,55 +257,68 @@ export default function CreateTaskModal({
 
     return (
         <Modal open={isOpen} onClose={onClose}>
-            <div className="relative bg-white border border-slate-300 rounded-xl shadow-2xl w-[95vw] max-w-4xl overflow-hidden">
-                <div className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold">
+            <div 
+                className="relative bg-white border border-slate-300 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+                style={{
+                    transform: `translate(${position.x}px, ${position.y}px)`,
+                    cursor: isDragging ? 'grabbing' : isDraggingResize ? 'se-resize' : 'default',
+                    width: `${size.width}px`,
+                    height: `${size.height}px`,
+                    minWidth: '300px',
+                    minHeight: '200px'
+                }}
+            >
+                <div 
+                    className="bg-white text-slate-900 border-b border-slate-200 py-3 px-4 text-center font-semibold cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+                    onMouseDown={handleMouseDown}
+                >
                     {isEditMode ? "Edit Task" : "Add Task"}
                 </div>
-                <form className="p-4 md:p-6" onSubmit={handleSubmit}>
+                <form className="p-4 md:p-6 overflow-y-auto flex-1" onSubmit={handleSubmit}>
                     <div className="mb-4">
                         <label className="sr-only" htmlFor="ka-task-title">Task name</label>
-                        <input autoFocus id="ka-task-title" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Task name" value={form.title} name="title" onChange={handleInputChange} />
+                        <input autoFocus id="ka-task-title" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" placeholder="Task name" value={form.title} name="title" onChange={handleInputChange} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         <div className="grid gap-3 content-start">
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Description</label>
-                                <input className="mt-1 h-9 rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Brief description" value={form.description} name="description" onChange={handleInputChange} />
+                                <label className="text-sm font-medium text-slate-700">Description</label>
+                                <input className="mt-0 h-9 rounded-lg border border-slate-300 px-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50" placeholder="Brief description" value={form.description} name="description" onChange={handleInputChange} />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Start date</label>
-                                <div className="relative mt-1">
-                                    <input ref={startDateRef} className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon" type="date" value={form.date} name="date" onChange={handleInputChange} />
+                                <label className="text-sm font-medium text-slate-700">Start date</label>
+                                <div className="relative mt-0">
+                                    <input ref={startDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.date} name="date" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(startDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(startDateRef); }}>📅</span>
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">End date</label>
-                                <div className="relative mt-1">
-                                    <input ref={endDateRef} className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon" type="date" value={form.endDate} name="endDate" onChange={handleInputChange} />
+                                <label className="text-sm font-medium text-slate-700">End date</label>
+                                <div className="relative mt-0">
+                                    <input ref={endDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.endDate} name="endDate" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(endDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(endDateRef); }}>📅</span>
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Deadline</label>
-                                <div className="relative mt-1">
-                                    <input ref={dueDateRef} className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hide-native-date-icon" type="date" value={form.dueDate} name="dueDate" onChange={handleInputChange} />
+                                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                                <div className="relative mt-0.5">
+                                    <input ref={dueDateRef} className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 hide-native-date-icon" type="date" value={form.dueDate} name="dueDate" onChange={handleInputChange} />
                                     <span role="button" tabIndex={0} aria-label="Open date picker" className="absolute inset-y-0 right-2 grid place-items-center text-base cursor-pointer select-none" onClick={() => openPicker(dueDateRef)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPicker(dueDateRef); }}>📅</span>
                                 </div>
                                 <p className="mt-1 text-[11px] text-slate-500">No later than</p>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Duration</label>
-                                <div className="relative mt-1">
-                                    <input className="h-9 w-full rounded-md border border-slate-300 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 1h, 1d" value={form.duration || ""} name="duration" onChange={handleInputChange} />
+                                <label className="text-sm font-medium text-slate-700">Duration</label>
+                                <div className="relative mt-0">
+                                    <input className="h-9 w-full rounded-lg border border-slate-300 pr-10 pl-3 text-sm shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" placeholder="e.g., 1h, 1d" value={form.duration || ""} name="duration" onChange={handleInputChange} />
                                     <span className="absolute inset-y-0 right-2 grid place-items-center text-base">📅</span>
                                 </div>
                             </div>
                         </div>
                         <div className="grid gap-3 content-start">
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Key Area</label>
-                                <select name="keyAreaId" className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.keyAreaId} onChange={handleInputChange}>
+                                <label className="text-sm font-medium text-slate-700">Key Area</label>
+                                <select name="keyAreaId" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.keyAreaId} onChange={handleInputChange}>
                                     <option value="">— Select key area —</option>
                                     {keyAreas.map(area => (
                                         <option key={area.id} value={area.id}>{area.title}</option>
@@ -293,10 +326,10 @@ export default function CreateTaskModal({
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">List</label>
+                                <label className="text-sm font-medium text-slate-700">List</label>
                                 <select
                                     name="list_index"
-                                    className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50"
                                     value={form.list_index}
                                     onChange={handleInputChange}
                                     disabled={!form.keyAreaId}
@@ -309,24 +342,24 @@ export default function CreateTaskModal({
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Assignee</label>
-                                <select name="assignee" className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.assignee} onChange={handleInputChange}>
+                                <label className="text-sm font-medium text-slate-700">Assignee</label>
+                                <select name="assignee" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.assignee} onChange={handleInputChange}>
                                     <option value="">— Unassigned —</option>
                                     <option value="Me">Me</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Priority</label>
-                                <select name="priority" className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.priority} onChange={handleInputChange}>
+                                <label className="text-sm font-medium text-slate-700">Priority</label>
+                                <select name="priority" className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" value={form.priority} onChange={handleInputChange}>
                                     <option value="high">High</option>
                                     <option value="normal">Normal</option>
                                     <option value="low">Low</option>
                                 </select>
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-xs font-semibold text-slate-700">Goal</label>
+                                <label className="text-sm font-medium text-slate-700">Goal</label>
                                 <select 
-                                    className="mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    className="mt-0 h-10 rounded-lg border border-slate-300 px-3 text-sm bg-white shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50" 
                                     value={form.goal || ""} 
                                     name="goal" 
                                     onChange={handleInputChange}
@@ -355,6 +388,25 @@ export default function CreateTaskModal({
                 <button type="button" className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onClose}>
                     ✕
                 </button>
+                {/* Right resize handle */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
+                  className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
+                  style={{ zIndex: 40 }}
+                />
+                {/* Bottom resize handle */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')}
+                  className="absolute bottom-0 left-0 w-full h-1 cursor-s-resize hover:bg-blue-500/20 transition-colors"
+                  style={{ zIndex: 40 }}
+                />
+                {/* Corner resize handle (southeast) */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+                  className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/30 transition-colors rounded-tl"
+                  style={{ zIndex: 41 }}
+                  title="Drag to resize"
+                />
             </div>
         </Modal>
     );

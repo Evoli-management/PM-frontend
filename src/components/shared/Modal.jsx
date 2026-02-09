@@ -72,7 +72,7 @@ export default function Modal({ open, onClose, children }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/40" />
             <div ref={containerRef} className="relative" tabIndex={-1} aria-modal="true" role="dialog">
                 {children}
             </div>

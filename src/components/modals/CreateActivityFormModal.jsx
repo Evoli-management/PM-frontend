@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react'
 import Modal from '../shared/Modal'
 import { FaSave } from 'react-icons/fa'
 import { useFormattedDate } from '../../hooks/useFormattedDate'
+import { useDraggable } from '../../hooks/useDraggable'
+import { useResizable } from '../../hooks/useResizable'
 
 // A clean reusable Create Activity form modal. Use this file if the original got corrupted.
 export default function CreateActivityFormModal({
@@ -85,6 +87,24 @@ export default function CreateActivityFormModal({
   const startRef = useRef(null)
   const endRef = useRef(null)
   const deadlineRef = useRef(null)
+
+  const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
+  const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 510);
+  
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+  
+  useEffect(() => {
+    if (isOpen) resetPosition();
+  }, [isOpen, resetPosition]);
 
   useEffect(() => {
     if (!isOpen) return
@@ -213,142 +233,152 @@ export default function CreateActivityFormModal({
   }, [keyAreaId])
 
   const inputCls =
-    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50'
+    'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500'
   const dateCls = `${inputCls} appearance-none pr-11 no-calendar`
   const selectCls = `${inputCls} appearance-none pr-10`
 
   return (
     <Modal open={isOpen} onClose={onCancel}>
-      <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
-        <div className="relative px-5 py-2 border-b border-slate-200 text-center font-semibold text-slate-900">Add Activity</div>
-        <form className="px-4 pb-4 pt-2" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-        <div className="mb-3">
-          <label className="text-sm font-medium text-slate-700 mb-0 block" htmlFor="ka-activity-title">Activity name</label>
+      <div 
+        className="relative z-10 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 flex flex-col overflow-hidden"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : isDraggingResize ? 'se-resize' : 'default',
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          minWidth: '300px',
+          minHeight: '200px'
+        }}
+      >
+        <div 
+          className="relative px-5 py-2 border-b border-slate-200 text-center font-semibold text-slate-900 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+          onMouseDown={handleMouseDown}
+        >
+          Add Activity
+        </div>
+        <form className="px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <style>{`
+          .no-calendar::-webkit-calendar-picker-indicator {
+            opacity: 0;
+            pointer-events: none;
+            display: block;
+            width: 0;
+            height: 0;
+          }
+          .no-calendar::-webkit-clear-button,
+          .no-calendar::-webkit-inner-spin-button {
+            display: none;
+          }
+          .no-calendar { -webkit-appearance: none; appearance: none; }
+          .no-calendar::-moz-focus-inner { border: 0; }
+        `}</style>
+        <div>
+          <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">Activity name</label>
           <input
             id="ka-activity-title"
             required
             name="title"
-            className={`${inputCls} mt-0 h-9 text-sm`}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5"
             placeholder="Activity name"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
 
-  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
-          <div className="grid grid-rows-6 gap-2 md:col-span-1">
-            <div className="flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
+          <div className="grid grid-rows-6 gap-0 md:col-span-1">
+            <div>
               <label className="text-sm font-medium text-slate-700">Description</label>
               <input
                 name="description"
-                className={`${inputCls} mt-0 h-9 text-sm`}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0"
                 placeholder="Brief description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Start date</label>
               <div className="relative mt-0">
                 <input
                   name="start_date"
                   type="date"
-                  className={`${dateCls} h-9 pr-10 pl-3 text-sm hide-native-date-icon`}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   value={startDate}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setStartDate(v)
-                      // auto-fill end date to match start if end is still auto-synced
-                      try { if (endAuto) setEndDate(v) } catch (__) {}
-                    }}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setStartDate(v)
+                    try { if (endAuto) setEndDate(v) } catch (__) {}
+                  }}
                   ref={startRef}
                 />
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open date picker"
-                  className="absolute inset-y-0 right-2 grid place-items-center text-sm cursor-pointer select-none"
-                  onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) {} }}
-                >📅</span>
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) {} }}>
+                  📅
+                </button>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{dateLabel(startDate)}</p>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">End date</label>
               <div className="relative mt-0">
                 <input
                   name="end_date"
                   type="date"
-                  className={`${dateCls} h-9 pr-10 pl-3 text-sm hide-native-date-icon`}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   value={endDate}
                   onChange={(e) => {
                     setEndDate(e.target.value)
-                    // user manually changed end date -> disable auto-sync
                     try { setEndAuto(false) } catch (__) {}
                   }}
                   ref={endRef}
                 />
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open date picker"
-                  className="absolute inset-y-0 right-2 grid place-items-center text-sm cursor-pointer select-none"
-                  onClick={() => { try { endRef.current?.showPicker?.(); endRef.current?.focus(); } catch (__) {} }}
-                >📅</span>
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { endRef.current?.showPicker?.(); endRef.current?.focus(); } catch (__) {} }}>
+                  📅
+                </button>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{dateLabel(endDate)}</p>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Deadline</label>
-              <div className="relative mt-0">
+              <div className="relative mt-0.5">
                 <input
                   name="deadline"
                   type="date"
-                  className={`${dateCls} h-9 pr-10 pl-3 text-sm hide-native-date-icon`}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar"
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                   ref={deadlineRef}
                 />
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Open date picker"
-                  className="absolute inset-y-0 right-2 grid place-items-center text-sm cursor-pointer select-none"
-                  onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}
-                >📅</span>
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker" onClick={() => { try { deadlineRef.current?.showPicker?.(); deadlineRef.current?.focus(); } catch (__) {} }}>
+                  📅
+                </button>
               </div>
               <p className="mt-0 text-xs text-slate-500">No later than</p>
-              <p className="mt-1 text-xs text-slate-500">{dateLabel(deadline)}</p>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Duration</label>
-              <div className="relative mt-0">
-                    <input
-                      name="duration"
-                      className={`${inputCls} h-9 pr-3 pl-3 text-sm`}
-                      placeholder="e.g., 1h, 1d"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                    />
-              </div>
+              <input
+                name="duration"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0"
+                placeholder="e.g., 1h, 1d"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+              />
             </div>
-            {/* spacer to align with right column's extra 'Goal' row */}
-            <div aria-hidden="true" />
           </div>
+
           {/* separator column centered between left and right on md+ */}
           <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
-            <div className="w-px bg-slate-400 my-2" />
+            <div className="w-px bg-slate-200 my-2" />
           </div>
 
-          <div className="grid grid-rows-6 gap-2 content-start md:col-span-1">
-            <div className="flex flex-col">
+          <div className="grid grid-rows-6 gap-0 md:col-span-1">
+            <div>
               <label className="text-sm font-medium text-slate-700">Key Area</label>
               <div className="relative mt-0">
-                <select name="key_area_id" className={`${selectCls} mt-0 h-9`} value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)} required>
+                <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)} required>
                   <option value="">— Select Key Area —</option>
                   {keyAreas.map((ka) => (<option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>))}
                 </select>
@@ -357,10 +387,10 @@ export default function CreateActivityFormModal({
               {keyAreaError ? (<p className="mt-1 text-xs text-red-600">{keyAreaError}</p>) : null}
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">List</label>
               <div className="relative mt-0">
-                <select name="list_index" className={`${selectCls} mt-0 h-9`} value={listIndex} onChange={(e) => setListIndex(e.target.value)} disabled={!keyAreaId} required>
+                <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={listIndex} onChange={(e) => setListIndex(e.target.value)} disabled={!keyAreaId} required>
                   {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (<option value="">— Select List —</option>)}
                   {keyAreaId && localAvailableLists.map((n) => {
                     const label = (localListNames && localListNames[n]) || (normalizedParentListNames && (normalizedParentListNames[n] || normalizedParentListNames[String(n)])) || (parentListNames && parentListNames[n]) || `List ${n}`;
@@ -372,10 +402,10 @@ export default function CreateActivityFormModal({
               {listError ? (<p className="mt-1 text-xs text-red-600">{listError}</p>) : null}
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Task</label>
               <div className="relative mt-0">
-                <select name="task_id" className={`${selectCls} mt-0 h-9`} value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={!keyAreaId || !listIndex}>
+                <select name="task_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={!keyAreaId || !listIndex}>
                   {!keyAreaId ? (<option value="">— Select Key Area first —</option>) : (!listIndex ? (<option value="">— Select List first —</option>) : (<option value="">— Select Task —</option>))}
                   {keyAreaId && listIndex && filteredTasks.map((t) => {
                     const label = t.title || t.name || t.activity_name || t.text || String(t.id);
@@ -386,10 +416,10 @@ export default function CreateActivityFormModal({
               </div>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Responsible</label>
               <div className="relative mt-0">
-                <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+                <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                   <option value="">— Unassigned —</option>
                   <option value="Me">Me</option>
                 </select>
@@ -397,10 +427,10 @@ export default function CreateActivityFormModal({
               </div>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Priority</label>
               <div className="relative mt-0">
-                <select name="priority" className={`${selectCls} mt-0 h-9`} value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <select name="priority" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={priority} onChange={(e) => setPriority(e.target.value)}>
                   <option value="high">High</option>
                   <option value="normal">Normal</option>
                   <option value="low">Low</option>
@@ -409,10 +439,10 @@ export default function CreateActivityFormModal({
               </div>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <label className="text-sm font-medium text-slate-700">Goal</label>
               <div className="relative mt-0">
-                <select name="goal" className={`${selectCls} mt-0 h-9`} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
+                <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
                   <option value="">— Select Goal —</option>
                   {goals.map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
                 </select>
@@ -430,6 +460,25 @@ export default function CreateActivityFormModal({
           <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
         </div>
         </form>
+        {/* Right resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
+          className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors"
+          style={{ zIndex: 40 }}
+        />
+        {/* Bottom resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')}
+          className="absolute bottom-0 left-0 w-full h-1 cursor-s-resize hover:bg-blue-500/20 transition-colors"
+          style={{ zIndex: 40 }}
+        />
+        {/* Corner resize handle (southeast) */}
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/30 transition-colors rounded-tl"
+          style={{ zIndex: 41 }}
+          title="Drag to resize"
+        />
         <button type="button" className="absolute top-2 right-2 p-2 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100" aria-label="Close" onClick={onCancel}>
         <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 352 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"></path></svg>
         </button>
