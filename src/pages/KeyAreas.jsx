@@ -2416,16 +2416,23 @@ export default function KeyAreas() {
                     alert("Could not determine which activity to update.");
                     return;
                 }
-                const mapPriorityToNum = (p) => {
-                    const s = String(p || "normal").toLowerCase();
-                    if (s === "low") return 1;
-                    if (s === "high") return 3;
-                    return 2;
+                const mapPriorityToApi = (p) => {
+                    if (p === undefined || p === null || p === '') return undefined;
+                    const num = Number(p);
+                    if (!Number.isNaN(num)) {
+                        if (num <= 1) return "low";
+                        if (num >= 3) return "high";
+                        return "normal";
+                    }
+                    const s = String(p).toLowerCase();
+                    if (s === "low" || s === "normal" || s === "high") return s;
+                    if (s === "medium" || s === "med") return "normal";
+                    return undefined;
                 };
                 const body = {
                     text: title,
                     completed: (f.get("status") || "open").toString() === "done",
-                    priority: mapPriorityToNum(priority),
+                    priority: mapPriorityToApi(priority),
                 };
                 // attach to task if available
                 const tid = editingActivityViaTaskModal.taskId || activityAttachTaskId || null;
@@ -2575,6 +2582,19 @@ export default function KeyAreas() {
         setIsSavingActivity(true);
         try {
             const svc = await getActivityService();
+            const mapPriorityToApi = (p) => {
+                if (p === undefined || p === null || p === '') return undefined;
+                const num = Number(p);
+                if (!Number.isNaN(num)) {
+                    if (num <= 1) return "low";
+                    if (num >= 3) return "high";
+                    return "normal";
+                }
+                const s = String(p).toLowerCase();
+                if (s === "low" || s === "normal" || s === "high") return s;
+                if (s === "medium" || s === "med") return "normal";
+                return undefined;
+            };
             // Normalize incoming payload for API shape
             const body = {
                 text: (payload.text || payload.activity_name || payload.title || "").trim(),
@@ -2585,12 +2605,9 @@ export default function KeyAreas() {
             if (payload.startDate || payload.start_date || payload.date_start) body.startDate = toDateOnly(payload.startDate || payload.start_date || payload.date_start);
             if (payload.endDate || payload.end_date || payload.date_end) body.endDate = toDateOnly(payload.endDate || payload.end_date || payload.date_end);
             if (payload.deadline || payload.dueDate || payload.due_date) body.deadline = toDateOnly(payload.deadline || payload.dueDate || payload.due_date);
-            if (typeof payload.priority !== 'undefined') body.priority = payload.priority;
-            if (payload.keyAreaId || payload.key_area_id || payload.keyArea) body.keyAreaId = payload.keyAreaId || payload.key_area_id || payload.keyArea;
-            if (payload.list || payload.list_index || payload.listIndex) body.list = payload.list || payload.list_index || payload.listIndex;
-            if (payload.goal || payload.goalId || payload.goal_id) body.goal = payload.goal || payload.goalId || payload.goal_id;
-            if (payload.assignee || payload.responsible) body.assignee = payload.assignee || payload.responsible;
-            if (typeof payload.duration !== 'undefined') body.duration = payload.duration;
+            if (typeof payload.priority !== 'undefined') body.priority = mapPriorityToApi(payload.priority);
+            if (payload.goalId || payload.goal || payload.goal_id) body.goalId = payload.goalId || payload.goal || payload.goal_id;
+            if (payload.completionDate) body.completionDate = payload.completionDate;
             // Allow task attachment if provided
             if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
 

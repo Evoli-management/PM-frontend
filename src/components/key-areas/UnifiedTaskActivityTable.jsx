@@ -213,7 +213,43 @@ export default function UnifiedTaskActivityTable({
         if (item.type === 'task' && onTaskUpdate) {
             onTaskUpdate(item.id || item.task_id, updates);
         } else if (item.type === 'activity' && onActivityUpdate) {
-            onActivityUpdate(item.id || item.activity_id, updates);
+            // For activities, map frontend field names to backend expected names
+            const activityUpdates = { ...updates };
+            
+            // Backend expects 'text' not 'title' or 'name' for activity content
+            if (updates.title !== undefined || updates.name !== undefined) {
+                activityUpdates.text = updates.title || updates.name;
+                delete activityUpdates.title;
+                delete activityUpdates.name;
+            }
+            
+            // Backend expects snake_case for dates
+            if (updates.start_date !== undefined) {
+                activityUpdates.startDate = updates.start_date;
+                delete activityUpdates.start_date;
+            }
+            if (updates.end_date !== undefined) {
+                activityUpdates.endDate = updates.end_date;
+                delete activityUpdates.end_date;
+            }
+            if (updates.due_date !== undefined) {
+                activityUpdates.deadline = updates.due_date;
+                delete activityUpdates.due_date;
+            }
+            
+            // Map key area and assignee IDs (backend might not support these for activities)
+            if (updates.key_area_id !== undefined) {
+                delete activityUpdates.key_area_id;
+                delete activityUpdates.keyAreaId;
+            }
+            if (updates.assignee_id !== undefined || updates.responsible_id !== undefined) {
+                delete activityUpdates.assignee_id;
+                delete activityUpdates.responsible_id;
+                delete activityUpdates.assigneeId;
+                delete activityUpdates.responsibleId;
+            }
+            
+            onActivityUpdate(item.id || item.activity_id, activityUpdates);
         }
         
         setEditingCell(null);
