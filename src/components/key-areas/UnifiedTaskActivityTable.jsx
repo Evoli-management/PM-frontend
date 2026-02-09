@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
+import keyAreaService from '../../services/keyAreaService';
 
 /**
  * UnifiedTaskActivityTable - Displays tasks AND activities in a single table
@@ -42,6 +43,11 @@ export default function UnifiedTaskActivityTable({
     const [showActivities, setShowActivities] = useState(true);
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [acceptingTask, setAcceptingTask] = useState(null);
+    const [userKeyAreas, setUserKeyAreas] = useState([]);
+    const [selectedKeyArea, setSelectedKeyArea] = useState('');
+    const [respondingTaskId, setRespondingTaskId] = useState(null);
 
     // Flatten tasks and activities into single array
     const allItems = useMemo(() => {
@@ -356,6 +362,67 @@ export default function UnifiedTaskActivityTable({
         if (!userId) return '';
         const user = users.find(u => String(u.id || u.member_id) === String(userId));
         return user ? (user.name || `${user.firstname || ''} ${user.lastname || ''}`.trim()) : '';
+    };
+
+    const handleAcceptClick = async (task) => {
+        // Load user's key areas for selection
+        setAcceptingTask(task);
+        setShowAcceptModal(true);
+        
+        try {
+            const areas = await keyAreaService.list();
+            setUserKeyAreas(areas || []);
+        } catch (error) {
+            console.error('Failed to load key areas:', error);
+        }
+    };
+
+    const confirmAcceptDelegation = async () => {
+        if (!selectedKeyArea || !acceptingTask) return;
+        
+        setRespondingTaskId(acceptingTask.id);
+        try {
+            await taskDelegationService.acceptDelegation(acceptingTask.id, {
+                keyAreaId: selectedKeyArea,
+            });
+            
+            // Update local state - mark as accepted
+            if (onTaskUpdate) {
+                onTaskUpdate(acceptingTask.id, { delegationStatus: 'accepted' });
+            }
+            
+            alert('Task accepted successfully! Check your selected Key Area to see the new task.');
+            
+            setShowAcceptModal(false);
+            setAcceptingTask(null);
+            setSelectedKeyArea('');
+        } catch (error) {
+            console.error('Failed to accept delegation:', error);
+            alert(error.response?.data?.message || 'Failed to accept delegation');
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
+    const handleRejectClick = async (task) => {
+        if (!confirm('Are you sure you want to reject this delegation?')) return;
+        
+        setRespondingTaskId(task.id);
+        try {
+            await taskDelegationService.rejectDelegation(task.id);
+            
+            // Update local state - mark as rejected
+            if (onTaskUpdate) {
+                onTaskUpdate(task.id, { delegationStatus: 'rejected' });
+            }
+            
+            alert('Task rejected successfully');
+        } catch (error) {
+            console.error('Failed to reject delegation:', error);
+            alert(error.response?.data?.message || 'Failed to reject delegation');
+        } finally {
+            setRespondingTaskId(null);
+        }
     };
 
     return (
@@ -742,64 +809,104 @@ export default function UnifiedTaskActivityTable({
                                     {/* Action Buttons */}
                                     <td className="p-2 text-center">
                                         <div className="flex items-center justify-center gap-2">
-                                            {/* Open Details Link */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (item.type === 'task' && onTaskClick) {
-                                                        onTaskClick(item);
-                                                    } else if (item.type === 'activity' && onActivityClick) {
-                                                        onActivityClick(item);
-                                                    }
-                                                }}
-                                                className="ta-accent hover:opacity-80 p-1"
-                                                title="Open details"
-                                            >
-                                                <FaExternalLinkAlt size={14} />
-                                            </button>
-
-                                            {/* Toggle Complete */}
-                                            {isCompleted ? (
-                                                <button
-                                                    onClick={(e) => handleCompleteToggle(item, e)}
-                                                    className="text-gray-400 hover:text-red-600 p-1"
-                                                    title="Mark as not completed"
-                                                >
-                                                    <FaTimes size={14} />
-                                                </button>
+                                            {/* Accept/Reject for pending delegations */}
+                                            {(() => {
+                                                console.log('🔍 DEBUG Action buttons:', { 
+                                                    viewTab, 
+                                                    itemType: item.type, 
+                                                    delegationStatus: item.delegationStatus,
+                                                    shouldShowAcceptReject: viewTab === 'delegated' && item.type === 'task' && item.delegationStatus === 'pending',
+                                                    fullItem: item
+                                                });
+                                                return null;
+                                            })()}
+                                            {viewTab === 'delegated' && item.type === 'task' && item.delegationStatus === 'pending' ? (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAcceptClick(item);
+                                                        }}
+                                                        disabled={respondingTaskId === item.id}
+                                                        className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
+                                                        title="Accept this delegation"
+                                                    >
+                                                        <FaCheck size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRejectClick(item);
+                                                        }}
+                                                        disabled={respondingTaskId === item.id}
+                                                        className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50"
+                                                        title="Reject this delegation"
+                                                    >
+                                                        <FaBan size={14} />
+                                                    </button>
+                                                </>
                                             ) : (
-                                                <button
-                                                    onClick={(e) => handleCompleteToggle(item, e)}
-                                                    className="text-gray-400 hover:text-green-600 p-1"
-                                                    title="Mark as completed"
-                                                >
-                                                    <FaCheck size={14} />
-                                                </button>
-                                            )}
+                                                <>
+                                                    {/* Open Details Link */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (item.type === 'task' && onTaskClick) {
+                                                                onTaskClick(item);
+                                                            } else if (item.type === 'activity' && onActivityClick) {
+                                                                onActivityClick(item);
+                                                            }
+                                                        }}
+                                                        className="ta-accent hover:opacity-80 p-1"
+                                                        title="Open details"
+                                                    >
+                                                        <FaExternalLinkAlt size={14} />
+                                                    </button>
 
-                                            {/* Toggle Private/Public */}
-                                            {viewTab !== 'delegated' && (
-                                                <button
-                                                    onClick={(e) => handleTogglePrivate(item, e)}
-                                                    className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
-                                                    title={isPrivate ? 'Mark as public' : 'Mark as private'}
-                                                >
-                                                    {isPrivate ? (
-                                                        <FaLock size={14} />
+                                                    {/* Toggle Complete */}
+                                                    {isCompleted ? (
+                                                        <button
+                                                            onClick={(e) => handleCompleteToggle(item, e)}
+                                                            className="text-gray-400 hover:text-red-600 p-1"
+                                                            title="Mark as not completed"
+                                                        >
+                                                            <FaTimes size={14} />
+                                                        </button>
                                                     ) : (
-                                                        <FaLockOpen size={14} />
+                                                        <button
+                                                            onClick={(e) => handleCompleteToggle(item, e)}
+                                                            className="text-gray-400 hover:text-green-600 p-1"
+                                                            title="Mark as completed"
+                                                        >
+                                                            <FaCheck size={14} />
+                                                        </button>
                                                     )}
-                                                </button>
-                                            )}
 
-                                            {/* Delete */}
-                                            <button
-                                                onClick={(e) => handleDelete(item, e)}
-                                                className="text-gray-400 hover:text-red-700 p-1"
-                                                title="Delete"
-                                            >
-                                                <FaTrash size={14} />
-                                            </button>
+                                                    {/* Toggle Private/Public */}
+                                                    {viewTab !== 'delegated' && (
+                                                        <button
+                                                            onClick={(e) => handleTogglePrivate(item, e)}
+                                                            className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
+                                                            title={isPrivate ? 'Mark as public' : 'Mark as private'}
+                                                        >
+                                                            {isPrivate ? (
+                                                                <FaLock size={14} />
+                                                            ) : (
+                                                                <FaLockOpen size={14} />
+                                                            )}
+                                                        </button>
+                                                    )}
+
+                                                    {/* Delete */}
+                                                    <button
+                                                        onClick={(e) => handleDelete(item, e)}
+                                                        className="text-gray-400 hover:text-red-700 p-1"
+                                                        title="Delete"
+                                                    >
+                                                        <FaTrash size={14} />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -814,6 +921,91 @@ export default function UnifiedTaskActivityTable({
                     </div>
                 )}
             </div>
+
+            {/* Accept Delegation Modal */}
+            {showAcceptModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2">
+                                <FaCheck className="text-green-600" />
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    Accept Delegation
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowAcceptModal(false);
+                                    setAcceptingTask(null);
+                                    setSelectedKeyArea('');
+                                }}
+                                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                                <FaTimes />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-4">
+                            {acceptingTask && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Task:</p>
+                                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                                        {acceptingTask.title}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Select Key Area <span className="text-red-500">*</span>
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                    Choose which Key Area to add this task to
+                                </p>
+                                <select
+                                    value={selectedKeyArea}
+                                    onChange={(e) => setSelectedKeyArea(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                             rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                             focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="">-- Select a Key Area --</option>
+                                    {userKeyAreas.map((area) => (
+                                        <option key={area.id} value={area.id}>
+                                            {area.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                                onClick={() => {
+                                    setShowAcceptModal(false);
+                                    setAcceptingTask(null);
+                                    setSelectedKeyArea('');
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
+                                         hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmAcceptDelegation}
+                                disabled={!selectedKeyArea || respondingTaskId}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 
+                                         rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {respondingTaskId ? 'Accepting...' : 'Accept Task'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
