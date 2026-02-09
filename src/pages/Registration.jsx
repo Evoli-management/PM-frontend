@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, User, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
+import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
+import TermsOfServiceModal from "../components/modals/TermsOfServiceModal";
+import PrivacyPolicyModal from "../components/modals/PrivacyPolicyModal";
 // authService is imported dynamically at call sites to allow code-splitting
 
 export default function Registration() {
@@ -12,6 +15,8 @@ export default function Registration() {
     const [invitedEmail, setInvitedEmail] = useState(null);
     const [loadingInvitation, setLoadingInvitation] = useState(invitationToken ? true : false);
     const [invitationError, setInvitationError] = useState(null);
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -54,6 +59,58 @@ export default function Registration() {
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+        
+        // TC027: Clear field-specific error on input
+        if (formErrors[name]) {
+            setFormErrors((prev) => ({ ...prev, [name]: '' }));
+        }
+    };
+    
+    // TC027: Validate individual field on blur
+    const handleFieldBlur = (e) => {
+        const { name, value } = e.target;
+        const errors = {};
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        switch (name) {
+            case 'firstName':
+                if (!value.trim()) errors.firstName = "First name is required.";
+                break;
+            case 'lastName':
+                if (!value.trim()) errors.lastName = "Last name is required.";
+                break;
+            case 'email':
+                if (!value.trim()) {
+                    errors.email = "Email is required.";
+                } else if (!emailRegex.test(value)) {
+                    errors.email = "Email must be an email.";
+                } else if (value.length > 255) {
+                    errors.email = "Email must not exceed 255 characters.";
+                } else if (invitedEmail && value.toLowerCase() !== invitedEmail.toLowerCase()) {
+                    errors.email = `You must use the invited email: ${invitedEmail}`;
+                }
+                break;
+            case 'password':
+                if (!value) {
+                    errors.password = "Password is required.";
+                } else if (value.length < 8) {
+                    errors.password = "Password must be at least 8 characters.";
+                } else if (!/[A-Z]/.test(value)) {
+                    errors.password = "Password must contain at least one uppercase letter.";
+                } else if (!/\d/.test(value)) {
+                    errors.password = "Password must contain at least one number.";
+                }
+                break;
+            case 'confirmPassword':
+                if (value !== formData.password) {
+                    errors.confirmPassword = "Passwords do not match.";
+                }
+                break;
+            default:
+                break;
+        }
+        
+        setFormErrors((prev) => ({ ...prev, ...errors }));
     };
 
     const validateForm = () => {
@@ -64,7 +121,7 @@ export default function Registration() {
         if (!formData.email.trim()) {
             errors.email = "Email is required.";
         } else if (!emailRegex.test(formData.email)) {
-            errors.email = "Please enter a valid email address.";
+            errors.email = "Email must be an email.";
         } else if (invitedEmail && formData.email.toLowerCase() !== invitedEmail.toLowerCase()) {
             errors.email = `You must use the invited email: ${invitedEmail}`;
         }
@@ -124,8 +181,9 @@ export default function Registration() {
             const status = err?.response?.status;
             const msg = err?.response?.data?.message;
             const errors = {};
+            
             if (status === 409) {
-                errors.email = "Email already in use.";
+                errors.email = "An account with this email already exists. Would you like to sign in instead?";
             } else if (Array.isArray(msg)) {
                 const text = msg.join(" \n ").toLowerCase();
                 if (text.includes("email")) errors.email = "Please enter a valid email address.";
@@ -134,7 +192,7 @@ export default function Registration() {
                     errors.password = "Password must contain at least one uppercase letter.";
                 if (text.includes("number")) errors.password = "Password must contain at least one number.";
             } else if (typeof msg === "string") {
-                errors.general = msg;
+                errors.general = getFriendlyErrorMessage(msg);
             } else {
                 errors.general = "Registration failed. Please try again.";
             }
@@ -161,8 +219,9 @@ export default function Registration() {
     const strength = getPasswordStrength(password);
 
     return (
-        <div className="min-h-screen flex items-center w-full max-w-6xl mx-auto">
-                <div className="relative grid md:grid-cols-2 items-center rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
+        <>
+            <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto px-4">
+                <div className="relative grid md:grid-cols-2 w-full items-center rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
                     {/* Left pane: fixed image + text (horizontal to avoid wrapping) */}
                     <div
                         className="p-8 flex flex-col items-center justify-center"
@@ -249,6 +308,7 @@ export default function Registration() {
                                             placeholder="First name"
                                             value={formData.firstName}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.firstName ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -270,6 +330,7 @@ export default function Registration() {
                                             placeholder="Last name"
                                             value={formData.lastName}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.lastName ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -291,6 +352,7 @@ export default function Registration() {
                                         placeholder="Enter your email"
                                         value={formData.email}
                                         onChange={invitedEmail ? undefined : handleInputChange}
+                                        onBlur={invitedEmail ? undefined : handleFieldBlur}
                                         disabled={!!invitedEmail}
                                         className={`w-full pl-10 pr-4 h-10 sm:h-12 box-border border rounded-lg focus:outline-none ${
                                             invitedEmail ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-green-400'
@@ -318,6 +380,7 @@ export default function Registration() {
                                             placeholder="Enter password"
                                             value={formData.password}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.password ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -345,6 +408,7 @@ export default function Registration() {
                                             placeholder="Confirm password"
                                             value={formData.confirmPassword}
                                             onChange={handleInputChange}
+                                            onBlur={handleFieldBlur}
                                             className={`w-full pl-10 pr-10 h-10 sm:h-12 box-border border rounded-lg focus:outline-none focus:ring-1 focus:ring-green-400 ${
                                                 formErrors.confirmPassword ? "border-red-500" : "border-gray-200"
                                             }`}
@@ -382,8 +446,8 @@ export default function Registration() {
                                                 <p className={/[^A-Za-z0-9]/.test(password) ? "text-green-400" : ""}>
                                                     • At least one special character
                                                 </p>
-                                                <p className={password.length >= 6 ? "text-green-400" : ""}>
-                                                    • Minimum 6 characters
+                                                <p className={password.length >= 8 ? "text-green-400" : ""}>
+                                                    • Minimum 8 characters
                                                 </p>
                                             </div>
                                         )}
@@ -401,13 +465,21 @@ export default function Registration() {
                                     />
                                     <label htmlFor="terms" className="text-gray-600 leading-tight">
                                         I agree to the{" "}
-                                        <a href="#" className="text-blue-600 underline">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTermsModal(true)}
+                                            className="text-blue-600 underline hover:text-blue-800"
+                                        >
                                             Terms of Service
-                                        </a>{" "}
+                                        </button>{" "}
                                         and{" "}
-                                        <a href="#" className="text-blue-600 underline">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPrivacyModal(true)}
+                                            className="text-blue-600 underline hover:text-blue-800"
+                                        >
                                             privacy policy
-                                        </a>
+                                        </button>
                                     </label>
                                 </div>
                                 {formErrors.agreedToTerms && (
@@ -477,5 +549,16 @@ export default function Registration() {
                     </div>
                 </div>
             </div>
+            
+            {/* Modals */}
+            <TermsOfServiceModal 
+                isOpen={showTermsModal} 
+                onClose={() => setShowTermsModal(false)} 
+            />
+            <PrivacyPolicyModal 
+                isOpen={showPrivacyModal} 
+                onClose={() => setShowPrivacyModal(false)} 
+            />
+        </>
     );
 }

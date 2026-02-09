@@ -18,6 +18,29 @@ const safeDate = (v) => {
   }
 };
 
+// Validate date range: end date must be >= start date
+const validateDateRange = (startDate, endDate) => {
+  if (!startDate || !endDate) return { valid: true }; // Allow if either empty
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return { valid: true };
+  if (end < start) {
+    return { valid: false, error: 'End date must be after or equal to start date' };
+  }
+  return { valid: true };
+};
+
+// Validate duration format: must be like 2h, 30m, 2h30m, etc
+const validateDuration = (value) => {
+  if (!value) return { valid: true }; // Optional field
+  if (typeof value !== 'string') return { valid: true };
+  const trimmed = value.trim();
+  if (!trimmed) return { valid: true }; // Empty after trim
+  const durationRegex = /^(\d+[hm])+$/i; // Matches: 2h, 30m, 2h30m, etc
+  if (durationRegex.test(trimmed)) return { valid: true };
+  return { valid: false, error: 'Duration must be in format like 2h, 30m, or 2h30m' };
+};
+
 const now = new Date();
 const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -105,7 +128,7 @@ export default function CreateTaskModal({
   const [listIndex, setListIndex] = useState(
     initialData.list || initialData.list_index || ''
   );
-  const [goal, setGoal] = useState(initialData.goal || '');
+  const [goal, setGoal] = useState(initialData.goalId || initialData.goal_id || initialData.goal || '');
   const [usersList, setUsersList] = useState(users || []);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [allTasks, setAllTasks] = useState([]);
@@ -148,7 +171,7 @@ export default function CreateTaskModal({
     if (String(keyAreaId) !== String(nextKA)) setKeyAreaId(nextKA);
     const nextList = initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1;
     if (listIndex !== nextList) setListIndex(nextList);
-    const nextGoal = initialData.goal || '';
+    const nextGoal = initialData.goalId || initialData.goal_id || initialData.goal || '';
     if (goal !== nextGoal) setGoal(nextGoal);
 
     (async () => {
@@ -341,6 +364,20 @@ export default function CreateTaskModal({
   if (!isOpen) return null;
 
   const handleSave = () => {
+    // T500.4: Validate date range
+    const dateValidation = validateDateRange(startDate, endDate);
+    if (!dateValidation.valid) {
+      console.warn('Date validation failed:', dateValidation.error);
+      return;
+    }
+
+    // T500.5: Validate duration format
+    const durationValidation = validateDuration(duration);
+    if (!durationValidation.valid) {
+      console.warn('Duration validation failed:', durationValidation.error);
+      return;
+    }
+
     const payload = {
       title: (title || '').trim(),
       description: (description || '').trim(),
@@ -353,12 +390,13 @@ export default function CreateTaskModal({
       end_time: endTime || null,
       deadline: deadline || null,
       duration: duration || null,
-      priority,
+      priority: priority || 'medium',
       status,
       key_area_id: keyAreaId || null,
       // include both snake_case and camelCase for compatibility; prefer camelCase server-side
       list_index: listIndex,
       listIndex: listIndex,
+      goalId: goal || null,
       goal_id: goal || null,
     };
     if (!onSave) {
@@ -424,7 +462,7 @@ export default function CreateTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div ref={firstRowRef} style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
@@ -509,7 +547,7 @@ export default function CreateTaskModal({
 
             {/* separator column centered between left and right on md+ */}
             <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
-              <div className="w-px bg-slate-400 my-2" />
+              <div className="w-px bg-slate-200 my-2" />
             </div>
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
               <div style={firstRowHeight ? { minHeight: `${firstRowHeight}px` } : undefined}>

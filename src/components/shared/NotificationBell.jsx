@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaTimes } from 'react-icons/fa';
 import notificationsService from '../../services/notificationsService';
+import recognitionsService from '../../services/recognitionsService';
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -8,6 +9,7 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [strokeDetails, setStrokeDetails] = useState({}); // Map of notificationId -> stroke data
   const dropdownRef = useRef(null);
 
   // Load unread count on mount and periodically
@@ -46,6 +48,20 @@ export default function NotificationBell() {
       setLoading(true);
       const data = await notificationsService.getNotifications(10); // Last 10 notifications
       setNotifications(data);
+      
+      // Load stroke details for any stroke_received notifications
+      const newStrokeDetails = { ...strokeDetails };
+      for (const notif of data) {
+        if (notif.type === 'stroke_received' && notif.entityId && !newStrokeDetails[notif.id]) {
+          try {
+            const strokeData = await recognitionsService.getRecognition(notif.entityId);
+            newStrokeDetails[notif.id] = strokeData;
+          } catch (err) {
+            console.error(`Failed to load stroke ${notif.entityId}:`, err);
+          }
+        }
+      }
+      setStrokeDetails(newStrokeDetails);
       setError(null);
     } catch (err) {
       console.error('Failed to load notifications:', err);
@@ -107,6 +123,74 @@ export default function NotificationBell() {
       default:
         return '📢';
     }
+  };
+
+  const getStrokeTypeLabel = (type) => {
+    switch (type) {
+      case 'employeeship':
+        return 'Employeeship';
+      case 'performance':
+        return 'Performance';
+      case 'achievement':
+        return 'Achievement';
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  const renderStrokeCard = (stroke) => {
+    if (!stroke) return null;
+    
+    return (
+      <div className="mt-2 p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded border border-purple-200">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
+            {getStrokeTypeLabel(stroke.type)} Recognition
+          </span>
+          <span className="text-xs text-gray-500">+{stroke.recipientPoints || 2} pts</span>
+        </div>
+        
+        {stroke.cultureValue && (
+          <div className="text-xs text-gray-700 mb-1">
+            <span className="font-semibold">Value:</span> {stroke.cultureValue.heading}
+          </div>
+        )}
+        
+        {stroke.keyArea && (
+          <div className="text-xs text-gray-700 mb-1">
+            <span className="font-semibold">Area:</span> {stroke.keyArea.name}
+          </div>
+        )}
+        
+        {stroke.goal && (
+          <div className="text-xs text-gray-700 mb-1">
+            <span className="font-semibold">Goal:</span> {stroke.goal.title}
+          </div>
+        )}
+        
+        {stroke.milestone && (
+          <div className="text-xs text-gray-700 mb-1">
+            <span className="font-semibold">Milestone:</span> {stroke.milestone.title}
+          </div>
+        )}
+        
+        {stroke.selectedBehaviors && stroke.selectedBehaviors.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {stroke.selectedBehaviors.map((behavior, idx) => (
+              <span key={idx} className="px-1.5 py-0.5 bg-purple-200 text-purple-800 text-xs rounded">
+                {behavior}
+              </span>
+            ))}
+          </div>
+        )}
+        
+        {stroke.personalNote && (
+          <div className="mt-2 pt-2 border-t border-purple-200">
+            <p className="text-xs text-gray-700 italic">"{stroke.personalNote}"</p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const getNotificationTitle = (notification) => {
@@ -200,6 +284,10 @@ export default function NotificationBell() {
                               {notification.message}
                             </p>
                           )}
+                            {/* Display stroke card if this is a stroke notification */}
+                            {notification.type === 'stroke_received' && strokeDetails[notification.id] && (
+                              renderStrokeCard(strokeDetails[notification.id])
+                            )}
                           <p className="text-xs text-gray-500 mt-1">
                             {formatTime(notification.createdAt)}
                           </p>

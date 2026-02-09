@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import Modal from '../shared/Modal'
 import { FaSave } from 'react-icons/fa'
+import { useFormattedDate } from '../../hooks/useFormattedDate'
 
 // A clean reusable Create Activity form modal. Use this file if the original got corrupted.
 export default function CreateActivityFormModal({
@@ -74,6 +75,12 @@ export default function CreateActivityFormModal({
   const [duration, setDuration] = useState(initialData.duration || '')
   const [keyAreaError, setKeyAreaError] = useState('')
   const [listError, setListError] = useState('')
+
+  const { formatDate, dateFormat } = useFormattedDate()
+  const dateLabel = (value) => {
+    if (!value) return `Format: ${dateFormat}`
+    return `${formatDate(value)} (Format: ${dateFormat})`
+  }
 
   const startRef = useRef(null)
   const endRef = useRef(null)
@@ -265,6 +272,7 @@ export default function CreateActivityFormModal({
                   onClick={() => { try { startRef.current?.showPicker?.(); startRef.current?.focus(); } catch (__) {} }}
                 >📅</span>
               </div>
+              <p className="mt-1 text-xs text-slate-500">{dateLabel(startDate)}</p>
             </div>
 
             <div className="flex flex-col">
@@ -290,6 +298,7 @@ export default function CreateActivityFormModal({
                   onClick={() => { try { endRef.current?.showPicker?.(); endRef.current?.focus(); } catch (__) {} }}
                 >📅</span>
               </div>
+              <p className="mt-1 text-xs text-slate-500">{dateLabel(endDate)}</p>
             </div>
 
             <div className="flex flex-col">
@@ -312,6 +321,7 @@ export default function CreateActivityFormModal({
                 >📅</span>
               </div>
               <p className="mt-0 text-xs text-slate-500">No later than</p>
+              <p className="mt-1 text-xs text-slate-500">{dateLabel(deadline)}</p>
             </div>
 
             <div className="flex flex-col">

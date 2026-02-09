@@ -209,7 +209,8 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                         </div>
 
                         <h3
-                            className="font-semibold text-gray-900 text-base mb-2 leading-tight hover:text-blue-600 transition-colors line-clamp-2"
+                            title={goal.title.length > 60 ? goal.title : ""}
+                            className="font-semibold text-gray-900 text-base mb-2 leading-tight hover:text-blue-600 transition-colors line-clamp-2 break-words"
                         >
                             {goal.title}
                         </h3>

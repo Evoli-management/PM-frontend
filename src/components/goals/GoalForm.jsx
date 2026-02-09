@@ -11,6 +11,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
   const [formData, setFormData] = useState({
     title: goal?.title || "",
     description: goal?.description || "",
+    priority: goal?.priority || "medium",
+    tags: goal?.tags || [],
     startDate: goal?.startDate
       ? new Date(goal.startDate).toISOString().split("T")[0]
       : defaultDate,
@@ -44,6 +46,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
     setFormData({
       title: goal?.title || "",
       description: goal?.description || "",
+      priority: goal?.priority || "medium",
+      tags: goal?.tags || [],
       startDate: goal?.startDate
         ? new Date(goal.startDate).toISOString().split("T")[0]
         : defaultDate,
@@ -194,6 +198,8 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       newErrors.title = "Title is required";
     } else if (formData.title.length < 3) {
       newErrors.title = "Title must be at least 3 characters";
+    } else if (formData.title.length > 200) {
+      newErrors.title = "Title must be less than 200 characters (current: " + formData.title.length + ")";
     }
 
     if (!formData.dueDate) {
@@ -206,6 +212,15 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
       // allow deadline to be today or in the future for new goals
       if (dueDate < today && !isEditing) {
         newErrors.dueDate = "Deadline must be today or in the future";
+      }
+    }
+
+    // Validate start date <= due date
+    if (formData.startDate && formData.dueDate) {
+      const startDate = new Date(formData.startDate);
+      const dueDate = new Date(formData.dueDate);
+      if (startDate > dueDate) {
+        newErrors.startDate = "Start date must be before or equal to due date";
       }
     }
 
@@ -350,18 +365,31 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
 
           {/* Goal name */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Goal name <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                Goal name <span className="text-red-500">*</span>
+              </label>
+              <span className={`text-xs font-medium ${
+                formData.title.length > 150 ? 'text-red-600' :
+                formData.title.length > 100 ? 'text-yellow-600' :
+                'text-gray-400'
+              }`}>
+                {formData.title.length}/200
+              </span>
+            </div>
             <input
               type="text"
+              maxLength="200"
               value={formData.title}
               onChange={(e) => handleInputChange("title", e.target.value)}
               className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent ${
                 errors.title ? "border-red-300 bg-red-50" : "border-gray-300"
               }`}
-              placeholder=""
+              placeholder="Enter goal name (max 200 characters)"
             />
+            {formData.title.length > 150 && !errors.title && (
+              <p className="text-yellow-700 text-xs mt-1">⚠️ Long names may be truncated in some views</p>
+            )}
             {errors.title && (
               <p className="text-red-600 text-xs mt-1">{errors.title}</p>
             )}
@@ -468,6 +496,39 @@ const GoalForm = ({ onClose, onGoalCreated, keyAreas = [], goal, isEditing = fal
                   <option value="public">Public</option>
                   <option value="private">Private</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) =>
+                    handleInputChange("priority", e.target.value)
+                  }
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={Array.isArray(formData.tags) ? formData.tags.join(", ") : ""}
+                  onChange={(e) => {
+                    const tags = e.target.value.split(",").map((t) => t.trim()).filter((t) => t);
+                    handleInputChange("tags", tags);
+                  }}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  placeholder="e.g., important, urgent, review"
+                />
               </div>
             </div>
 

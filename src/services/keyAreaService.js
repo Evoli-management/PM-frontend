@@ -18,6 +18,7 @@ const toFE = (area) => ({
 const toBECreate = (data) => ({
     name: data.title?.trim() || "",
     description: data.description ?? undefined,
+    color: data.color ?? undefined,
     sortOrder: data.position ?? undefined,
 });
 

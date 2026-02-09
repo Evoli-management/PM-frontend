@@ -21,4 +21,5 @@ export { OrganizationInvitations } from './OrganizationInvitations';
 export { ManageTeams } from './ManageTeams';
 export { ManageMembers } from './ManageMembers';
 export { CultureAndValues } from './CultureAndValues';
+export { CultureAndValues as CultureAndValuesSplitPanel } from './CultureAndValuesSplitPanel';
 export { OrganizationSettings } from './OrganizationSettings';

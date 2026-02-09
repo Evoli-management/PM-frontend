@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FaSave } from 'react-icons/fa';
 import usersService from '../../services/usersService';
+import { useFormattedDate } from '../../hooks/useFormattedDate';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -51,9 +52,29 @@ export default function EditTaskModal({
   // When true, editing a Don't Forget task (no Key Area required)
   isDontForgetMode = false,
 }) {
+  // Helper to find user ID from assignee name or ID
+  const getInitialAssigneeId = () => {
+    const initial = initialData.assignee || initialData.assigneeId || initialData.assignee_id || '';
+    if (!initial) return '';
+    
+    // If it's already a UUID, return it
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initial)) {
+      return initial;
+    }
+    
+    // Try to find user by name
+    const user = (users || []).find(u => 
+      u.name === initial || 
+      `${u.name || ''} ${u.lastname || ''}`.trim() === initial ||
+      String(u.id) === String(initial)
+    );
+    
+    return user?.id || '';
+  };
+  
   const [title, setTitle] = useState(initialData.title || '');
   const [description, setDescription] = useState(initialData.description || '');
-  const [assignee, setAssignee] = useState(initialData.assignee || '');
+  const [assignee, setAssignee] = useState(getInitialAssigneeId());
   const [startDate, setStartDate] = useState(safeDate(initialData.start_date || initialData.startDate) || defaultDate);
   const [endDate, setEndDate] = useState(safeDate(initialData.end_date || initialData.endDate) || defaultDate);
   const [keyAreaError, setKeyAreaError] = useState('');
@@ -68,8 +89,14 @@ export default function EditTaskModal({
   const [listIndex, setListIndex] = useState(
     initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1
   );
+  const { formatDate, dateFormat } = useFormattedDate();
+
+  const dateLabel = (value) => {
+    if (!value) return `Format: ${dateFormat}`;
+    return `${formatDate(value)} (Format: ${dateFormat})`;
+  };
   // taskId removed per UX request; tasks selection no longer shown
-  const [goal, setGoal] = useState(initialData.goal || '');
+  const [goal, setGoal] = useState(initialData.goalId || initialData.goal_id || initialData.goal || '');
   const [usersList, setUsersList] = useState(users || []);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [allTasks, setAllTasks] = useState([]);
@@ -87,7 +114,26 @@ export default function EditTaskModal({
     if (title !== nextTitle) setTitle(nextTitle);
     const nextDescription = initialData.description || '';
     if (description !== nextDescription) setDescription(nextDescription);
-    const nextAssignee = initialData.assignee || '';
+    
+    // Convert assignee name to user ID for select dropdown
+    const initialAssigneeValue = initialData.assignee || initialData.assigneeId || initialData.assignee_id || '';
+    let nextAssignee = '';
+    
+    if (initialAssigneeValue) {
+      // Check if it's already a UUID
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
+        nextAssignee = initialAssigneeValue;
+      } else {
+        // Try to find user by name
+        const user = usersList.find(u => 
+          u.name === initialAssigneeValue || 
+          `${u.name || ''} ${u.lastname || ''}`.trim() === initialAssigneeValue ||
+          String(u.id) === String(initialAssigneeValue)
+        );
+        nextAssignee = user?.id || '';
+      }
+    }
+    
     if (assignee !== nextAssignee) setAssignee(nextAssignee);
   const nextStart = safeDate(initialData.start_date || initialData.startDate) || defaultDate;
   if (startDate !== nextStart) setStartDate(nextStart);
@@ -108,7 +154,7 @@ export default function EditTaskModal({
   const nextList = initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1;
   if (listIndex !== nextList) setListIndex(nextList);
   // taskId removed per UX request; tasks selection no longer shown
-  const nextGoal = initialData.goal || '';
+  const nextGoal = initialData.goalId || initialData.goal_id || initialData.goal || '';
   if (goal !== nextGoal) setGoal(nextGoal);
     // load users if none provided so the assignee dropdown always contains at least the current user
     (async () => {
@@ -311,13 +357,34 @@ export default function EditTaskModal({
       return;
     }
 
+    // Handle assignee - convert user ID to name and add delegatedToUserId for auto-delegation
+    let assigneeName = null;
+    let delegatedToUserId = null;
+    
+    if (assignee) {
+      const selectedUser = usersList.find(u => String(u.id) === String(assignee));
+      if (selectedUser) {
+        const userId = selectedUser.id;
+        
+        // Set assignee name for display
+        if (String(userId) === String(currentUserId)) {
+          assigneeName = 'Me';
+        } else {
+          assigneeName = selectedUser.name;
+          // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
+          delegatedToUserId = userId;
+        }
+      }
+    }
+    
     const payload = {
       ...initialData,
       // ensure we include a usable id for update flows
       id: initialData.id || initialData.taskId || initialData.task_id || initialData._id || undefined,
       title: (title || '').trim(),
       description: (description || '').trim(),
-      assignee: assignee || null,
+      assignee: assigneeName,
+      delegatedToUserId: delegatedToUserId,
       start_date: startDate || null,
       end_date: endDate || null,
       deadline: deadline || null,
@@ -443,6 +510,7 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
+                <p className="mt-1 text-xs text-slate-500">{dateLabel(startDate)}</p>
               </div>
 
               <div>
@@ -476,6 +544,7 @@ export default function EditTaskModal({
                     📅
                   </button>
                 </div>
+                <p className="mt-1 text-xs text-slate-500">{dateLabel(endDate)}</p>
               </div>
 
               <div>
@@ -510,6 +579,7 @@ export default function EditTaskModal({
                   </button>
                 </div>
                 <p className="mt-0 text-xs text-slate-500">No later than</p>
+                <p className="mt-1 text-xs text-slate-500">{dateLabel(deadline)}</p>
               </div>
 
               <div>
@@ -604,7 +674,7 @@ export default function EditTaskModal({
                   >
                     <option value="">— Unassigned —</option>
                     {usersList.map((u) => (
-                      <option key={u.id} value={u.name}>{u.name}</option>
+                      <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />

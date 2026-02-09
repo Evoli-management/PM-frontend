@@ -1,45 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Section, Field, Toggle, LoadingButton } from './UIComponents';
+import { useNavigate } from 'react-router-dom';
+import { Section, Field, LoadingButton } from './UIComponents';
+import userProfileService from '../../services/userProfileService';
+import authService from '../../services/authService';
+import privacyService from '../../services/privacyService';
 
 export const Privacy = ({ showToast }) => {
+    const navigate = useNavigate();
     const [privacy, setPrivacy] = useState({
         // Profile Visibility
         profileVisibility: 'team', // public, team, private
-        showEmail: false,
-        showPhone: false,
-        showLocation: false,
-        
-        // Activity Visibility
-        showOnlineStatus: true,
-        showLastActivity: false,
-        showWorkingHours: true,
-        showCurrentProject: false,
-        
-        // Data & Analytics
-        allowAnalytics: true,
-        allowUsageData: false,
-        allowCrashReports: true,
-        allowPersonalization: true,
-        
-        // Communication
-        allowDirectMessages: true,
-        allowMentions: true,
-        allowCalendarInvites: true,
-        allowNotifications: true,
-        
+
         // Data Export & Deletion
         dataRetentionPeriod: 365, // days
         allowDataExport: true,
-        
-        // Third-party Access
-        allowThirdPartyApps: false,
-        allowAPIAccess: false
     });
     
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showDeactivateModal, setShowDeactivateModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deactivatePassword, setDeactivatePassword] = useState('');
+    const [showDeletePassword, setShowDeletePassword] = useState(false);
+    const [showDeactivatePassword, setShowDeactivatePassword] = useState(false);
+    const [actionLoading, setActionLoading] = useState({ deactivate: false, delete: false });
     
     useEffect(() => {
         loadPrivacySettings();
@@ -48,11 +34,18 @@ export const Privacy = ({ showToast }) => {
     const loadPrivacySettings = async () => {
         setLoading(true);
         try {
-            // Load from localStorage for now - replace with API call
-            const saved = localStorage.getItem('userPrivacySettings');
-            if (saved) {
-                setPrivacy(prev => ({ ...prev, ...JSON.parse(saved) }));
-            }
+            const prefs = await privacyService.getPreferences();
+            const profileVisibility = prefs.profileVisibility || (prefs.profilePublic ? 'public' : 'team');
+            const dataRetentionDays = typeof prefs.dataRetentionDays === 'number'
+                ? prefs.dataRetentionDays
+                : parseInt(prefs.dataRetentionDays || '365', 10);
+
+            setPrivacy(prev => ({
+                ...prev,
+                profileVisibility,
+                dataRetentionPeriod: Number.isNaN(dataRetentionDays) ? 365 : dataRetentionDays,
+                allowDataExport: prefs.allowDataExport ?? true,
+            }));
         } catch (error) {
             showToast('Failed to load privacy settings', 'error');
         } finally {
@@ -63,11 +56,29 @@ export const Privacy = ({ showToast }) => {
     const savePrivacySettings = async () => {
         setSaving(true);
         try {
-            // Save to localStorage for now - replace with API call
-            localStorage.setItem('userPrivacySettings', JSON.stringify(privacy));
-            showToast('Privacy settings saved successfully');
+            const payload = {
+                profileVisibility: privacy.profileVisibility,
+                dataRetentionDays: privacy.dataRetentionPeriod,
+                allowDataExport: privacy.allowDataExport,
+            };
+
+            const res = await privacyService.updatePreferences(payload);
+            const updated = res.preferences || {};
+            const profileVisibility = updated.profileVisibility || (updated.profilePublic ? 'public' : privacy.profileVisibility);
+            const dataRetentionDays = typeof updated.dataRetentionDays === 'number'
+                ? updated.dataRetentionDays
+                : parseInt(updated.dataRetentionDays || `${privacy.dataRetentionPeriod}`, 10);
+
+            setPrivacy(prev => ({
+                ...prev,
+                profileVisibility,
+                dataRetentionPeriod: Number.isNaN(dataRetentionDays) ? prev.dataRetentionPeriod : dataRetentionDays,
+                allowDataExport: updated.allowDataExport ?? prev.allowDataExport,
+            }));
+            showToast(res.message || 'Privacy settings saved successfully');
         } catch (error) {
-            showToast('Failed to save privacy settings', 'error');
+            const message = error.response?.data?.message || 'Failed to save privacy settings';
+            showToast(message, 'error');
         } finally {
             setSaving(false);
         }
@@ -79,21 +90,56 @@ export const Privacy = ({ showToast }) => {
     
     const exportData = async () => {
         try {
-            // Simulate data export - replace with actual API call
-            showToast('Data export initiated. You will receive an email when ready.', 'info');
+            const res = await privacyService.requestDataExport();
+            showToast(res.message || 'Data export initiated. You will receive an email when ready.', 'info');
             setShowExportModal(false);
         } catch (error) {
-            showToast('Failed to initiate data export', 'error');
+            const message = error.response?.data?.message || 'Failed to initiate data export';
+            showToast(message, 'error');
         }
     };
     
     const deleteAccount = async () => {
+        if (!deletePassword.trim()) {
+            showToast('Please enter your password to delete your account', 'error');
+            return;
+        }
+
+        setActionLoading(prev => ({ ...prev, delete: true }));
         try {
-            // Simulate account deletion - replace with actual API call
-            showToast('Account deletion request submitted', 'info');
+            await userProfileService.deleteAccount(deletePassword);
+            showToast('Your account has been deleted', 'info');
             setShowDeleteModal(false);
+            setDeletePassword('');
+            await authService.logout();
+            navigate('/login?reason=deleted');
         } catch (error) {
-            showToast('Failed to submit deletion request', 'error');
+            const message = error.response?.data?.message || 'Failed to delete account';
+            showToast(message, 'error');
+        } finally {
+            setActionLoading(prev => ({ ...prev, delete: false }));
+        }
+    };
+
+    const deactivateAccount = async () => {
+        if (!deactivatePassword.trim()) {
+            showToast('Please enter your password to deactivate your account', 'error');
+            return;
+        }
+
+        setActionLoading(prev => ({ ...prev, deactivate: true }));
+        try {
+            await userProfileService.deactivateAccount(deactivatePassword);
+            showToast('Your account has been deactivated', 'info');
+            setShowDeactivateModal(false);
+            setDeactivatePassword('');
+            await authService.logout();
+            navigate('/login?reason=deactivated');
+        } catch (error) {
+            const message = error.response?.data?.message || 'Failed to deactivate account';
+            showToast(message, 'error');
+        } finally {
+            setActionLoading(prev => ({ ...prev, deactivate: false }));
         }
     };
     
@@ -124,126 +170,6 @@ export const Privacy = ({ showToast }) => {
                             <option value="private">Private - Only you</option>
                         </select>
                     </Field>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Toggle
-                            label="Show Email Address"
-                            description="Display email in your profile"
-                            checked={privacy.showEmail}
-                            onChange={(checked) => updatePrivacySetting('showEmail', checked)}
-                        />
-                        <Toggle
-                            label="Show Phone Number"
-                            description="Display phone in your profile"
-                            checked={privacy.showPhone}
-                            onChange={(checked) => updatePrivacySetting('showPhone', checked)}
-                        />
-                        <Toggle
-                            label="Show Location"
-                            description="Display your location"
-                            checked={privacy.showLocation}
-                            onChange={(checked) => updatePrivacySetting('showLocation', checked)}
-                        />
-                    </div>
-                </div>
-            </Section>
-            
-            {/* Activity Visibility */}
-            <Section 
-                title="Activity Visibility" 
-                description="Control what activity information others can see"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Show Online Status"
-                        description="Let others see when you're online"
-                        checked={privacy.showOnlineStatus}
-                        onChange={(checked) => updatePrivacySetting('showOnlineStatus', checked)}
-                    />
-                    <Toggle
-                        label="Show Last Activity"
-                        description="Display when you were last active"
-                        checked={privacy.showLastActivity}
-                        onChange={(checked) => updatePrivacySetting('showLastActivity', checked)}
-                    />
-                    <Toggle
-                        label="Show Working Hours"
-                        description="Display your working hours"
-                        checked={privacy.showWorkingHours}
-                        onChange={(checked) => updatePrivacySetting('showWorkingHours', checked)}
-                    />
-                    <Toggle
-                        label="Show Current Project"
-                        description="Display what project you're working on"
-                        checked={privacy.showCurrentProject}
-                        onChange={(checked) => updatePrivacySetting('showCurrentProject', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Data & Analytics */}
-            <Section 
-                title="Data & Analytics" 
-                description="Control how your data is used for analytics and improvements"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Allow Analytics"
-                        description="Help improve the app with usage analytics"
-                        checked={privacy.allowAnalytics}
-                        onChange={(checked) => updatePrivacySetting('allowAnalytics', checked)}
-                    />
-                    <Toggle
-                        label="Share Usage Data"
-                        description="Share anonymized usage statistics"
-                        checked={privacy.allowUsageData}
-                        onChange={(checked) => updatePrivacySetting('allowUsageData', checked)}
-                    />
-                    <Toggle
-                        label="Allow Crash Reports"
-                        description="Send crash reports to help fix bugs"
-                        checked={privacy.allowCrashReports}
-                        onChange={(checked) => updatePrivacySetting('allowCrashReports', checked)}
-                    />
-                    <Toggle
-                        label="Allow Personalization"
-                        description="Use data to personalize your experience"
-                        checked={privacy.allowPersonalization}
-                        onChange={(checked) => updatePrivacySetting('allowPersonalization', checked)}
-                    />
-                </div>
-            </Section>
-            
-            {/* Communication */}
-            <Section 
-                title="Communication Preferences" 
-                description="Control how others can communicate with you"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Toggle
-                        label="Allow Direct Messages"
-                        description="Let team members message you directly"
-                        checked={privacy.allowDirectMessages}
-                        onChange={(checked) => updatePrivacySetting('allowDirectMessages', checked)}
-                    />
-                    <Toggle
-                        label="Allow Mentions"
-                        description="Allow others to mention you in comments"
-                        checked={privacy.allowMentions}
-                        onChange={(checked) => updatePrivacySetting('allowMentions', checked)}
-                    />
-                    <Toggle
-                        label="Allow Calendar Invites"
-                        description="Let others send you meeting invites"
-                        checked={privacy.allowCalendarInvites}
-                        onChange={(checked) => updatePrivacySetting('allowCalendarInvites', checked)}
-                    />
-                    <Toggle
-                        label="Allow Notifications"
-                        description="Receive notifications from the platform"
-                        checked={privacy.allowNotifications}
-                        onChange={(checked) => updatePrivacySetting('allowNotifications', checked)}
-                    />
                 </div>
             </Section>
             
@@ -270,20 +196,6 @@ export const Privacy = ({ showToast }) => {
                         </p>
                     </Field>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Toggle
-                            label="Allow Third-party Apps"
-                            description="Let third-party apps access your data"
-                            checked={privacy.allowThirdPartyApps}
-                            onChange={(checked) => updatePrivacySetting('allowThirdPartyApps', checked)}
-                        />
-                        <Toggle
-                            label="Allow API Access"
-                            description="Enable API access to your account"
-                            checked={privacy.allowAPIAccess}
-                            onChange={(checked) => updatePrivacySetting('allowAPIAccess', checked)}
-                        />
-                    </div>
                 </div>
             </Section>
             
@@ -303,6 +215,19 @@ export const Privacy = ({ showToast }) => {
                             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
                         >
                             Export Data
+                        </button>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="font-medium text-amber-900 mb-2">Deactivate Account</h4>
+                        <p className="text-sm text-amber-700 mb-3">
+                            Temporarily disable your account. You can contact support to reactivate it later.
+                        </p>
+                        <button
+                            onClick={() => setShowDeactivateModal(true)}
+                            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+                        >
+                            Deactivate Account
                         </button>
                     </div>
                     
@@ -358,6 +283,56 @@ export const Privacy = ({ showToast }) => {
                     </div>
                 </div>
             )}
+
+            {/* Deactivate Account Modal */}
+            {showDeactivateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-md w-full p-6">
+                        <h3 className="text-lg font-semibold text-amber-900 mb-4">Deactivate Account</h3>
+                        <p className="text-gray-600 mb-4">
+                            Your account will be disabled and you will be logged out. You can contact support to reactivate it.
+                        </p>
+                        <div className="mb-4">
+                            <label className="text-sm font-medium text-gray-700">Confirm your password</label>
+                            <div className="relative mt-1">
+                                <input
+                                    type={showDeactivatePassword ? 'text' : 'password'}
+                                    value={deactivatePassword}
+                                    onChange={(e) => setDeactivatePassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    placeholder="Enter your password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeactivatePassword(prev => !prev)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                                >
+                                    {showDeactivatePassword ? 'Hide' : 'Show'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowDeactivateModal(false);
+                                    setDeactivatePassword('');
+                                }}
+                                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                                disabled={actionLoading.deactivate}
+                            >
+                                Cancel
+                            </button>
+                            <LoadingButton
+                                onClick={deactivateAccount}
+                                loading={actionLoading.deactivate}
+                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg"
+                            >
+                                Deactivate Account
+                            </LoadingButton>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Delete Account Modal */}
             {showDeleteModal && (
@@ -376,15 +351,39 @@ export const Privacy = ({ showToast }) => {
                         <p className="text-sm text-red-600 font-medium mb-6">
                             This action cannot be undone.
                         </p>
+                        <div className="mb-4">
+                            <label className="text-sm font-medium text-gray-700">Confirm your password</label>
+                            <div className="relative mt-1">
+                                <input
+                                    type={showDeletePassword ? 'text' : 'password'}
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    placeholder="Enter your password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeletePassword(prev => !prev)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                                >
+                                    {showDeletePassword ? 'Hide' : 'Show'}
+                                </button>
+                            </div>
+                        </div>
                         <div className="flex justify-end space-x-3">
                             <button
-                                onClick={() => setShowDeleteModal(false)}
+                                onClick={() => {
+                                    setShowDeleteModal(false);
+                                    setDeletePassword('');
+                                }}
                                 className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                                disabled={actionLoading.delete}
                             >
                                 Cancel
                             </button>
                             <LoadingButton
                                 onClick={deleteAccount}
+                                loading={actionLoading.delete}
                                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
                             >
                                 Delete Account

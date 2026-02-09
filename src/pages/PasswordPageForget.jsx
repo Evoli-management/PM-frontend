@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ const ForgotPasswordPage = () => {
             return;
         }
         if (!email.includes("@") || !email.includes(".")) {
-            setError("Please enter a valid email address");
+            setError("Email must be an email.");
             return;
         }
         if (cooldown > 0) return;
@@ -38,7 +39,7 @@ const ForgotPasswordPage = () => {
                 })
                 .catch((err) => {
                     const msg = err?.response?.data?.message || "Failed to send reset email.";
-                    setError(typeof msg === "string" ? msg : "Failed to send reset email.");
+                    setError(getFriendlyErrorMessage(msg));
                 })
                 .finally(() => setIsLoading(false));
         });

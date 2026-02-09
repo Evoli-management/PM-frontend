@@ -43,6 +43,31 @@ body {
     margin-bottom: calc(var(--layout-panel-gap) + 8px);
 }
 
+/* Responsive sidebar: adjust main content margin when sidebar collapses */
+@media (min-width: 768px) {
+    main.flex-grow {
+        transition: margin-left 300ms ease;
+    }
+    
+    /* Default: sidebar expanded (256px = 64 * 4 = w-64) */
+    main.flex-grow:not(.public-route) {
+        margin-left: 16rem; /* 256px */
+    }
+    
+    /* When sidebar collapsed: reduce to 80px (w-20) */
+    html.sidebar-collapsed main.flex-grow:not(.public-route) {
+        margin-left: 5rem; /* 80px */
+    }
+
+    /* Align Key Areas navbar tabs with content area (after sidebar) */
+    .navbar-keyarea-tabs {
+        margin-left: 16rem; /* 256px */
+    }
+    html.sidebar-collapsed .navbar-keyarea-tabs {
+        margin-left: 5rem; /* 80px */
+    }
+}
+
 /* Hide scrollbars but keep scroll functionality */
 .no-scrollbar {
     -ms-overflow-style: none; /* IE and Edge */
@@ -127,4 +152,147 @@ input[type="date"].hide-native-date-icon {
     transform: translateY(-4px) scale(1.02);
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
     border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* TC011: Idle warning modal animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease;
+}
+
+.animate-slideUp {
+    animation: slideUp 0.3s ease;
+}
+
+/* Soften modal backdrops to keep page visible */
+.fixed.inset-0.bg-black.bg-opacity-50,
+.fixed.inset-0.bg-black\/50 {
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+
+/* Legacy-inspired Tasks & Activities layout (page_id 3/4/5) */
+.ta-legacy {
+    --ta-accent: #2563eb;
+}
+
+.ta-legacy .ta-accent {
+    color: var(--ta-accent);
+}
+
+.ta-legacy .ta-filters-row {
+    background: #fff;
+    border-bottom: 1px solid #d5d5d5;
+}
+
+.ta-legacy .ta-filter-label {
+    font-size: 13px;
+    color: #333;
+}
+
+.ta-legacy .ta-filter-control {
+    height: 26px;
+    border: 1px solid #cfcfcf;
+    border-radius: 3px;
+    padding: 0 8px;
+    font-size: 12px;
+    background: #fff;
+    color: #333;
+}
+
+.ta-legacy .ta-filter-control:focus {
+    outline: none;
+    border-color: var(--ta-accent);
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+.ta-legacy .ta-search-input {
+    width: 190px;
+}
+
+.ta-legacy .ta-toggle-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    border: 1px solid #cfcfcf;
+    background: #fff;
+    color: #9aa0a6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ta-legacy .ta-toggle-btn.is-active {
+    border-color: var(--ta-accent);
+    color: var(--ta-accent);
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.ta-legacy .ta-selected-count {
+    font-size: 12px;
+    color: #555;
+}
+
+.ta-legacy .ta-mass-edit-btn {
+    height: 26px;
+    border-radius: 3px;
+    padding: 0 10px;
+    font-size: 12px;
+    border: 1px solid var(--ta-accent);
+    color: #fff;
+    background: var(--ta-accent);
+}
+
+.ta-legacy .ta-mass-edit-btn:hover {
+    filter: brightness(0.95);
+}
+
+.ta-legacy .ta-mass-edit-btn.is-disabled {
+    border-color: #d0d0d0;
+    background: #e5e7eb;
+    color: #9aa0a6;
+    cursor: not-allowed;
+}
+
+.ta-legacy .ta-table {
+    border-collapse: collapse;
+}
+
+.ta-legacy .ta-thead th {
+    background: #f5f5f5;
+    border-bottom: 1px solid #d5d5d5;
+    font-size: 12px;
+    color: #555;
+    padding: 6px 8px;
+}
+
+.ta-legacy .ta-table tbody td {
+    border-bottom: 1px solid #e1e1e1;
+    font-size: 12px;
+    padding: 6px 8px;
+    color: #333;
+}
+
+.ta-legacy .ta-priority {
+    color: var(--ta-accent);
 }

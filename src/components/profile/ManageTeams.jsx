@@ -1,35 +1,45 @@
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaPlus, FaTimes } from "react-icons/fa";
+import { FaEdit, FaTrash, FaPlus, FaTimes, FaKey } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import { TeamLeadModal } from "./TeamLeadModal";
 
 export function ManageTeams({ showToast }) {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showTeamLeadModal, setShowTeamLeadModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
   const [canManage, setCanManage] = useState(false);
+  const [usage, setUsage] = useState(null); // Plan usage and limits
 
   useEffect(() => {
     checkPermissions();
     loadTeams();
     loadOrgMembers();
+    loadUsage();
   }, []);
 
   const checkPermissions = async () => {
     try {
-      const profile = await userProfileService.getProfile();
-      const orgService = await import("../../services/organizationService");
-      const org = await orgService.default.getCurrentOrganization();
-      
-      // User can manage teams if they are admin, superuser, or organization owner
-      const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
-      const isOwner = org?.contactEmail === profile?.email;
-      setCanManage(isAdmin || isOwner);
+      // All authenticated users (members, admins, owners) can create teams
+      // Backend only requires authentication, no role-based restrictions
+      setCanManage(true);
     } catch (e) {
       console.log("Could not check permissions:", e);
       setCanManage(false);
+    }
+  };
+
+  const loadUsage = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const usageData = await orgService.default.getCurrentUsage();
+      setUsage(usageData);
+    } catch (error) {
+      console.log("Could not load usage:", error);
     }
   };
 
@@ -69,6 +79,10 @@ export function ManageTeams({ showToast }) {
   };
 
   const handleCreateTeam = () => {
+    if (usage && !usage.canAddTeams) {
+      showToast?.(`Cannot create team: You have ${usage.currentTeams} team(s) but ${usage.planName} plan allows only ${usage.maxTeams}. Upgrade your plan to add more teams.`, 'error');
+      return;
+    }
     setSelectedTeam(null);
     setShowCreateModal(true);
   };
@@ -76,6 +90,24 @@ export function ManageTeams({ showToast }) {
   const handleEditTeam = (team) => {
     setSelectedTeam(team);
     setShowEditModal(true);
+  };
+
+  const handleAssignTeamLead = async (team) => {
+    setSelectedTeam(team);
+    
+    // Load team members
+    try {
+      const teamsService = await import("../../services/teamsService");
+      const teamData = await teamsService.default.getTeamMembers(team.id);
+      // API may return array or object with members property
+      const membersList = Array.isArray(teamData) ? teamData : (teamData?.members || []);
+      setSelectedTeamMembers(membersList);
+    } catch (error) {
+      showToast?.("Failed to load team members", "error");
+      return;
+    }
+
+    setShowTeamLeadModal(true);
   };
 
   const handleDeleteTeam = async (teamId) => {
@@ -93,16 +125,44 @@ export function ManageTeams({ showToast }) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-4 border-b flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Manage Teams</h3>
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Manage Teams</h3>
           {canManage && (
             <button
               onClick={handleCreateTeam}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm"
+              disabled={usage && !usage.canAddTeams}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
+              title={usage && !usage.canAddTeams ? `Team limit reached (${usage.currentTeams}/${usage.maxTeams} on ${usage.planName} plan). Upgrade to add more teams.` : "Create a new team"}
             >
-              Create new team
+              <FaPlus /> Create new team
             </button>
           )}
+        </div>
+
+        {/* Usage Stats */}
+        {usage && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-slate-700">
+                <strong>{usage.currentMembers}</strong> / {usage.maxMembers} members
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-700">
+                <strong>{usage.currentTeams}</strong> / {usage.maxTeams} teams
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-xs px-2 py-1 bg-slate-200 text-slate-700 rounded-full font-medium">
+                {usage.planName} plan
+              </span>
+            </div>
+            {!usage.canAddTeams && (
+              <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                Team limit reached
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -116,14 +176,27 @@ export function ManageTeams({ showToast }) {
           {teams.map((team) => (
             <div key={team.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
               <div className="flex-1">
-                <div className="font-medium text-gray-900">{team.name}</div>
-                <div className="text-sm text-gray-600">
+                <div className="font-medium text-gray-900 flex items-center gap-2">
+                  {team.name}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
                   Members: {team.memberCount || 0}
-                  {team.leadName && <span className="ml-3">Lead: {team.leadName}</span>}
+                  {team.teamLeadName && (
+                    <span className="ml-3 inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold">
+                      Lead: {team.teamLeadName}
+                    </span>
+                  )}
                 </div>
               </div>
                 {canManage && (
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAssignTeamLead(team)}
+                      className="p-2 text-amber-600 hover:bg-amber-50 rounded"
+                      title="Assign team lead"
+                    >
+                      <FaKey />
+                    </button>
                     <button
                       onClick={() => handleEditTeam(team)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"
@@ -151,6 +224,7 @@ export function ManageTeams({ showToast }) {
           onSuccess={() => {
             setShowCreateModal(false);
             loadTeams();
+            loadUsage();
           }}
           showToast={showToast}
           members={members}
@@ -167,6 +241,19 @@ export function ManageTeams({ showToast }) {
           }}
           showToast={showToast}
           members={members}
+        />
+      )}
+
+      {showTeamLeadModal && selectedTeam && (
+        <TeamLeadModal
+          team={selectedTeam}
+          teamMembers={selectedTeamMembers}
+          onClose={() => setShowTeamLeadModal(false)}
+          onSuccess={() => {
+            setShowTeamLeadModal(false);
+            loadTeams();
+          }}
+          showToast={showToast}
         />
       )}
     </div>
@@ -190,21 +277,19 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
     setSaving(true);
     try {
       const teamsService = await import("../../services/teamsService");
-      // Create team with basic info
-      const response = await teamsService.default.createTeam({
+      const memberIds = Array.from(
+        new Set([
+          ...selectedMembers,
+          ...(leadId ? [leadId] : []),
+        ])
+      );
+
+      await teamsService.default.createTeam({
         name: name.trim(),
         description: description.trim(),
+        leadId: leadId || undefined,
+        memberIds: memberIds.length > 0 ? memberIds : undefined,
       });
-      
-      const teamId = response.id;
-      
-      // Add members if any selected
-      if (selectedMembers.length > 0) {
-        for (const memberId of selectedMembers) {
-          const role = memberId === leadId ? 'lead' : 'member';
-          await teamsService.default.addTeamMember(teamId, memberId, role);
-        }
-      }
       
       showToast?.("Team created successfully");
       onSuccess();
@@ -293,22 +378,28 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
               Team Members
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
-              {members.map((member) => (
-                <label
-                  key={member.id}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                >
+              {members.map((member) => {
+                const isSelected = selectedMembers.includes(member.id);
+                return (
+                  <label
+                    key={member.id}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  >
                   <input
                     type="checkbox"
-                    checked={selectedMembers.includes(member.id)}
+                      checked={isSelected}
                     onChange={() => toggleMember(member.id)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm">
-                    {member.firstName} {member.lastName}
-                  </span>
-                </label>
-              ))}
+                    <span className="text-sm flex-1">
+                      {member.firstName} {member.lastName}
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                      {isSelected ? 'Selected' : 'Not selected'}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -337,9 +428,42 @@ function CreateTeamModal({ onClose, onSuccess, showToast, members }) {
 function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
   const [name, setName] = useState(team.name || "");
   const [description, setDescription] = useState(team.description || "");
-  const [leadId, setLeadId] = useState(team.leadId || "");
-  const [selectedMembers, setSelectedMembers] = useState(team.memberIds || []);
+  const [leadId, setLeadId] = useState(team.leadId || team.teamLeadUserId || "");
+  const [selectedMembers, setSelectedMembers] = useState(
+    team.memberIds || team.members?.map((m) => m.id) || []
+  );
+  const [currentMembers, setCurrentMembers] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCurrentMembers = async () => {
+      try {
+        const teamsService = await import("../../services/teamsService");
+        const teamData = await teamsService.default.getTeamMembers(team.id);
+        const list = Array.isArray(teamData) ? teamData : (teamData?.members || []);
+        const ids = list.map((m) => m.id || m.userId).filter(Boolean);
+        if (isMounted) {
+          setCurrentMembers(list);
+          setSelectedMembers(ids);
+        }
+      } catch (e) {
+        // Fallback to existing selection if fetch fails
+      }
+    };
+
+    if (team?.id) {
+      loadCurrentMembers();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [team?.id]);
+
+  const currentMemberIds = new Set(
+    currentMembers.map((m) => m.id || m.userId).filter(Boolean)
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -359,11 +483,14 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
       });
       
       // Get current members
-      const currentMembers = team.members?.map(m => m.id) || [];
+      const currentMemberIdsList = currentMembers.length
+        ? currentMembers.map((m) => m.id || m.userId).filter(Boolean)
+        : [];
+      const currentLeadId = team.leadId || team.teamLeadUserId || "";
       const newMembers = selectedMembers;
       
       // Remove members that were deselected
-      for (const memberId of currentMembers) {
+      for (const memberId of currentMemberIdsList) {
         if (!newMembers.includes(memberId)) {
           await teamsService.default.removeTeamMember(team.id, memberId);
         }
@@ -371,12 +498,18 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
       
       // Add new members
       for (const memberId of newMembers) {
-        if (!currentMembers.includes(memberId)) {
-          const role = memberId === leadId ? 'lead' : 'member';
-          await teamsService.default.addTeamMember(team.id, memberId, role);
-        } else if (memberId === leadId) {
-          // Update role to lead if changed
-          await teamsService.default.updateTeamMemberRole(team.id, memberId, 'lead');
+        if (!currentMemberIdsList.includes(memberId)) {
+          await teamsService.default.addTeamMember(team.id, memberId, 'member');
+        }
+      }
+
+      if (leadId) {
+        if (!newMembers.includes(leadId) && !currentMemberIdsList.includes(leadId)) {
+          await teamsService.default.addTeamMember(team.id, leadId, 'member');
+        }
+
+        if (leadId !== currentLeadId) {
+          await teamsService.default.assignTeamLead(team.id, leadId);
         }
       }
       
@@ -465,22 +598,29 @@ function EditTeamModal({ team, onClose, onSuccess, showToast, members }) {
               Team Members
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
-              {members.map((member) => (
-                <label
-                  key={member.id}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                >
+              {members.map((member) => {
+                const isSelected = selectedMembers.includes(member.id);
+                const isCurrent = currentMemberIds.has(member.id);
+                return (
+                  <label
+                    key={member.id}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  >
                   <input
                     type="checkbox"
-                    checked={selectedMembers.includes(member.id)}
+                      checked={isSelected}
                     onChange={() => toggleMember(member.id)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm">
-                    {member.firstName} {member.lastName}
-                  </span>
-                </label>
-              ))}
+                    <span className="text-sm flex-1">
+                      {member.firstName} {member.lastName}
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${isCurrent ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {isCurrent ? 'In team' : 'Not in team'}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 

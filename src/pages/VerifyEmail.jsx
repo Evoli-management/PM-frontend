@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 export default function VerifyEmail() {
     const { search } = useLocation();
@@ -70,7 +71,8 @@ export default function VerifyEmail() {
             } catch (e) {
                 console.error("[VerifyEmail] Verification error:", e);
                 const msg = e?.response?.data?.message || "Verification failed";
-                setStatus(typeof msg === "string" ? msg : "Verification failed");
+                const friendlyMsg = getFriendlyErrorMessage(msg);
+                setStatus(friendlyMsg);
             }
         })();
     }, [search, navigate]);
@@ -91,7 +93,8 @@ export default function VerifyEmail() {
             setCooldown(30); // 30 seconds cooldown
         } catch (err) {
             const msg = err?.response?.data?.message || "Failed to resend email";
-            setResendMsg(typeof msg === "string" ? msg : "Failed to resend email");
+            const friendlyMsg = getFriendlyErrorMessage(msg);
+            setResendMsg(friendlyMsg);
         } finally {
             setResending(false);
         }

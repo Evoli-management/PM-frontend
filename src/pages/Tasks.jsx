@@ -6,6 +6,7 @@ import { useToast } from "../components/shared/ToastProvider.jsx";
 import { FiAlertTriangle, FiClock } from "react-icons/fi";
 import { FaCheck, FaExclamation, FaLongArrowAltDown, FaTimes, FaTrash, FaBars } from "react-icons/fa";
 const DontForgetComposer = React.lazy(() => import("../components/tasks/DontForgetComposer.jsx"));
+const DelegatedTasksPanel = React.lazy(() => import("../components/tasks/DelegatedTasksPanel.jsx"));
 
 // Lazy getters for services to allow code-splitting
 let _taskService = null;
@@ -144,6 +145,11 @@ export default function Tasks() {
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
     const [showMassEdit, setShowMassEdit] = useState(false);
+    // T501.1: Search state for filtering tasks
+    const [siteSearch, setSiteSearch] = useState("");
+    // T501.7: Pagination state for 50+ tasks performance
+    const [currentPage, setCurrentPage] = useState(1);
+    const tasksPerPage = 25;
     // Editor modal for DF task details
     const [editModal, setEditModal] = useState({ open: false, id: null, form: null });
     const [massEdit, setMassEdit] = useState({
@@ -163,9 +169,39 @@ export default function Tasks() {
     });
 
     const dontForgetTasks = useMemo(
-        () => tasks.filter((t) => !t.keyArea && (showImported || !t.imported) && (showCompleted || !t.completed)),
-        [tasks, showImported, showCompleted],
+        () => tasks.filter((t) => {
+            // Base filters
+            if (t.keyArea) return false;
+            if (!(showImported || !t.imported)) return false;
+            if (!(showCompleted || !t.completed)) return false;
+            // T501.1: Filter by search term
+            if (siteSearch.trim()) {
+                const searchLower = siteSearch.toLowerCase();
+                const matches =
+                    (t.name || "").toLowerCase().includes(searchLower) ||
+                    (t.notes || "").toLowerCase().includes(searchLower);
+                if (!matches) return false;
+            }
+            return true;
+        }),
+        [tasks, showImported, showCompleted, siteSearch],
     );
+
+    // T501.7: Pagination computed values for 50+ tasks
+    const totalPages = Math.ceil(dontForgetTasks.length / tasksPerPage);
+    const paginatedTasks = useMemo(
+        () => {
+            const start = (currentPage - 1) * tasksPerPage;
+            const end = start + tasksPerPage;
+            return dontForgetTasks.slice(start, end);
+        },
+        [dontForgetTasks, currentPage, tasksPerPage],
+    );
+    
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [siteSearch]);
 
     // DF lists available = union of explicit names and any task listIndex values
     const availableDfLists = useMemo(() => {
@@ -246,6 +282,7 @@ export default function Tasks() {
                 endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : undefined,
                 dueDate: payload?.dueDate ? new Date(payload.dueDate).toISOString() : undefined,
                 duration: payload?.duration ? String(payload.duration) : undefined,
+                goalId: payload?.goal_id || payload?.goalId || payload?.goal || null,
                 // Only include status/priority if provided, else let backend defaults apply
                 ...(mappedStatus ? { status: mappedStatus } : {}),
                 ...(mappedPriority ? { priority: mappedPriority } : {}),
@@ -311,7 +348,7 @@ export default function Tasks() {
     const clearSelection = () => setSelectedIds(new Set());
     const toggleSelectAllVisible = () => {
         const all = new Set(selectedIds);
-        const visible = dontForgetTasks.map((t) => t.id);
+        const visible = paginatedTasks.map((t) => t.id);
         const allSelected = visible.length > 0 && visible.every((id) => all.has(id));
         if (allSelected) visible.forEach((id) => all.delete(id));
         else visible.forEach((id) => all.add(id));
@@ -639,6 +676,18 @@ export default function Tasks() {
                                 <h2 className="text-xl font-semibold text-slate-900">Don't Forget</h2>
                             </div>
                             <div className="rounded-xl border border-slate-100 bg-white shadow-sm p-6 space-y-6">
+                                <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading delegated tasks…</div>}>
+                                    <DelegatedTasksPanel
+                                        onTaskClick={(task) => {
+                                            if (!task?.id) return;
+                                            try {
+                                                navigate({ pathname: "/key-areas", search: `?task=${task.id}` });
+                                            } catch (e) {
+                                                console.warn('Unable to open delegated task', e);
+                                            }
+                                        }}
+                                    />
+                                </Suspense>
                                 {/* Header area */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="col-span-3 md:col-span-2">
@@ -983,8 +1032,8 @@ export default function Tasks() {
                                                         type="checkbox"
                                                         onChange={toggleSelectAllVisible}
                                                         checked={
-                                                            dontForgetTasks.length > 0 &&
-                                                            dontForgetTasks.every((t) => isSelected(t.id))
+                                                            paginatedTasks.length > 0 &&
+                                                            paginatedTasks.every((t) => isSelected(t.id))
                                                         }
                                                     />
                                                 </th>
@@ -1002,7 +1051,7 @@ export default function Tasks() {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
-                                            {dontForgetTasks.map((task) => (
+                                            {paginatedTasks.map((task) => (
                                                 <React.Fragment key={task.id}>
                                                     <tr className="border-t border-slate-200 hover:bg-slate-50">
                                                         <td className="px-2 sm:px-3 py-2 align-top">
@@ -1131,13 +1180,36 @@ export default function Tasks() {
                                             {dontForgetTasks.length === 0 && (
                                                 <tr>
                                                     <td className="px-6 py-8 text-gray-500" colSpan={4}>
-                                                        No items yet
+                                                        {siteSearch.trim()
+                                                            ? `No tasks found matching "${siteSearch}".`
+                                                            : "No items yet"}
                                                     </td>
                                                 </tr>
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
+                                {totalPages > 1 && (
+                                    <div className="flex justify-center gap-2 py-4">
+                                        <button
+                                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-3 py-2 rounded border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                                        >
+                                            Previous
+                                        </button>
+                                        <span className="px-3 py-2 text-sm text-gray-600">
+                                            Page {currentPage} of {totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="px-3 py-2 rounded border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                )}
                                 <Suspense fallback={<div role="status" aria-live="polite" className="p-4">Loading…</div>}>
                                     <DontForgetComposer
                                         open={showComposer}

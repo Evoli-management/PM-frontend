@@ -11,10 +11,13 @@ import EditTaskModal from '../components/key-areas/EditTaskModal';
 import EditActivityModal from '../components/key-areas/EditActivityModal';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
+import ViewTabsNavigation from '../components/key-areas/ViewTabsNavigation';
 import { FaCog } from 'react-icons/fa';
 import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
+import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
+import taskDelegationService from '../services/taskDelegationService';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
     safeParseDate,
@@ -100,10 +103,10 @@ const api = {
         await (await getKeyAreaService()).remove(id);
         return true;
     },
-    async listTasks(keyAreaId) {
+    async listTasks(keyAreaId, opts = {}) {
         // Fetch from backend and normalize for UI
         try {
-            const rows = await (await getTaskService()).list({ keyAreaId });
+            const rows = await (await getTaskService()).list({ keyAreaId, withoutGoal: opts.withoutGoal });
             return (Array.isArray(rows) ? rows : []).map((t) => ({
                 ...t,
                 // `taskService.list` already maps backend enums to FE-friendly values
@@ -171,6 +174,7 @@ const api = {
     async updateTask(id, task) {
         const payload = {
             keyAreaId: task.key_area_id || task.keyAreaId || task.key_area || task.keyArea,
+            goalId: task.goal_id || task.goalId || task.goal || null,
             title: task.title,
             description: nullableString(task.description, true),
             assignee: nullableString(task.assignee, true),
@@ -425,6 +429,11 @@ export default function KeyAreas() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const [taskTab, setTaskTab] = useState(1);
+    // Main view tab: 'active-tasks' | 'delegated' | 'todo' | 'activity-trap' | 'my-focus'
+    const [viewTab, setViewTab] = useState('active-tasks');
+    // Sub-filter for ACTIVE TASKS view: 'active' (no completed) or 'all' (including completed)
+    const [activeFilter, setActiveFilter] = useState('active');
+    const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
@@ -505,6 +514,10 @@ export default function KeyAreas() {
         deadline: "",
         end_date: "",
     });
+    const [sortBy, setSortBy] = useState("manual");
+    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterAssignee, setFilterAssignee] = useState("");
+    const [filterTag, setFilterTag] = useState("");
     const [view, setView] = useState("list");
     const defaultVisible = {
         responsible: true,
@@ -595,7 +608,6 @@ export default function KeyAreas() {
     const [showActivityComposer, setShowActivityComposer] = useState(false);
     const [editingActivityId, setEditingActivityId] = useState(null);
     const [showTaskHelp, setShowTaskHelp] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = useRef(null);
@@ -641,6 +653,171 @@ export default function KeyAreas() {
             }
         } catch (_) {}
     }, [goals.length]);
+
+    // Sync view tab and active filter from URL params
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || "");
+        const viewParam = params.get('view');
+        const activeParam = params.get('active');
+        const allowedViews = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
+        if (viewParam && allowedViews.has(viewParam) && viewParam !== viewTab) {
+            setViewTab(viewParam);
+        }
+        if (activeParam && (activeParam === 'active' || activeParam === 'all') && activeParam !== activeFilter) {
+            setActiveFilter(activeParam);
+        }
+    }, [location.search]);
+
+    // Persist view tab and active filter to URL (keep other params intact)
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || "");
+        let changed = false;
+        if (params.get('view') !== viewTab) {
+            params.set('view', viewTab);
+            changed = true;
+        }
+        if (viewTab === 'active-tasks') {
+            if (params.get('active') !== activeFilter) {
+                params.set('active', activeFilter);
+                changed = true;
+            }
+        } else if (params.has('active')) {
+            params.delete('active');
+            changed = true;
+        }
+        if (changed) {
+            navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+        }
+    }, [viewTab, activeFilter]);
+
+    // Reload tasks when viewTab or activeFilter changes
+    useEffect(() => {
+        // Handle MY FOCUS tab - navigate to separate page
+        if (viewTab === 'my-focus') {
+            navigate('/my-focus');
+            return;
+        }
+        
+        // Handle DELEGATED tab - show delegated tasks
+        if (viewTab === 'delegated') {
+            (async () => {
+                try {
+                    let delegatedToMe = [];
+                    try {
+                        delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                        console.log('✅ Delegated tasks from taskDelegationService.getDelegatedToMe():', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                    } catch (err) {
+                        console.warn('❌ taskDelegationService.getDelegatedToMe() failed:', err);
+                        const svc = await getTaskService();
+                        delegatedToMe = await svc.list({ delegatedTo: true });
+                        console.log('✅ Fallback to taskService.list({ delegatedTo: true }):', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                    }
+
+                    setAllTasks(delegatedToMe || []);
+                    
+                    // Load activities for delegated tasks
+                    const actSvc = await getActivityService();
+                    const entries = await Promise.all(
+                        (delegatedToMe || []).map(async (row) => {
+                            try {
+                                const list = await actSvc.list({ taskId: row.id });
+                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                            } catch {
+                                return [String(row.id), []];
+                            }
+                        }),
+                    );
+                    setActivitiesByTask(Object.fromEntries(entries));
+                } catch (e) {
+                    console.error('Failed to load delegated tasks', e);
+                }
+            })();
+            return;
+        }
+        
+        // Handle TODO tab - show all tasks across all key areas (no key area filter)
+        if (viewTab === 'todo') {
+            (async () => {
+                try {
+                    const svc = await getTaskService();
+                    // Load ALL user tasks (empty opts = all tasks owned by user)
+                    const allUserTasks = await svc.list({});
+                    setAllTasks(allUserTasks || []);
+                    
+                    // Load activities for all tasks
+                    const actSvc = await getActivityService();
+                    const entries = await Promise.all(
+                        (allUserTasks || []).map(async (row) => {
+                            try {
+                                const list = await actSvc.list({ taskId: row.id });
+                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                            } catch {
+                                return [String(row.id), []];
+                            }
+                        }),
+                    );
+                    setActivitiesByTask(Object.fromEntries(entries));
+                } catch (e) {
+                    console.error('Failed to load all tasks', e);
+                }
+            })();
+            return;
+        }
+
+        // Handle ACTIVITY TRAP tab - show tasks without goals from ALL key areas (no key area filter)
+        if (viewTab === 'activity-trap') {
+            (async () => {
+                try {
+                    const svc = await getTaskService();
+                    // Load all tasks without goals (empty keyAreaId = all key areas)
+                    const trapTasks = await svc.list({ withoutGoal: true });
+                    setAllTasks(trapTasks || []);
+                    
+                    // Load activities for all trap tasks
+                    const actSvc = await getActivityService();
+                    const entries = await Promise.all(
+                        (trapTasks || []).map(async (row) => {
+                            try {
+                                const list = await actSvc.list({ taskId: row.id });
+                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                            } catch {
+                                return [String(row.id), []];
+                            }
+                        }),
+                    );
+                    setActivitiesByTask(Object.fromEntries(entries));
+                } catch (e) {
+                    console.error('Failed to load activity trap tasks', e);
+                }
+            })();
+            return;
+        }
+        
+        // For ACTIVE TASKS - require selected key area
+        if (!selectedKA) return;
+        (async () => {
+            const opts = { keyAreaId: selectedKA.id };
+            const t = await api.listTasks(selectedKA.id, opts);
+            setAllTasks(t);
+            // Reload activities for the filtered tasks
+            try {
+                const svc = await getActivityService();
+                const entries = await Promise.all(
+                    (t || []).map(async (row) => {
+                        try {
+                            const list = await svc.list({ taskId: row.id });
+                            return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                        } catch {
+                            return [String(row.id), []];
+                        }
+                    }),
+                );
+                setActivitiesByTask(Object.fromEntries(entries));
+            } catch (e) {
+                // ignore activity load failures
+            }
+        })();
+    }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate]);
     
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
     // Toasts and saving state for activity updates
@@ -924,6 +1101,9 @@ export default function KeyAreas() {
             const updated = await api.updateTask(id, patch);
             // api.updateTask returns normalized UI-friendly task shape
             setAllTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+            setSelectedTaskFull((prevFull) =>
+                prevFull && String(prevFull.id) === String(id) ? { ...prevFull, ...updated } : prevFull,
+            );
             markSaving(id);
         } catch (err) {
             console.error('[KeyAreas] Failed to update task field', err);
@@ -1476,6 +1656,29 @@ export default function KeyAreas() {
 
         window.addEventListener("sidebar-keyareas-click", showAll);
         window.addEventListener("sidebar-ideas-click", selectIdeas);
+        
+        // Listen for reorder events from sidebar drag-drop
+        const handleSidebarReorder = async (e) => {
+            const reorderedKAs = e?.detail?.keyAreas;
+            if (Array.isArray(reorderedKAs)) {
+                // Update local keyAreas state with the new order from sidebar
+                setKeyAreas(reorderedKAs);
+                // Persist the new order to backend
+                try {
+                    const svc = await getKeyAreaService();
+                    const changed = reorderedKAs.filter((ka, idx) => {
+                        const oldKa = keyAreas[idx];
+                        return !oldKa || oldKa.id !== ka.id || oldKa.position !== ka.position;
+                    });
+                    if (changed.length > 0) {
+                        await svc.reorder(changed);
+                    }
+                } catch (err) {
+                    console.warn("Failed to persist sidebar reorder:", err);
+                }
+            }
+        };
+        window.addEventListener("sidebar-keyareas-reorder", handleSidebarReorder);
 
         // also respect query params when navigated via Link
         const params = new URLSearchParams(location.search);
@@ -1485,6 +1688,7 @@ export default function KeyAreas() {
         return () => {
             window.removeEventListener("sidebar-keyareas-click", showAll);
             window.removeEventListener("sidebar-ideas-click", selectIdeas);
+            window.removeEventListener("sidebar-keyareas-reorder", handleSidebarReorder);
         };
     }, [keyAreas, loading, location.search]);
 
@@ -1760,8 +1964,13 @@ export default function KeyAreas() {
         // Close any open task full view when switching Key Areas
         setSelectedTaskFull(null);
         setSelectedKA(ka);
-        const t = await api.listTasks(ka.id);
-        try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0 }); } catch (__) {}
+        // Load tasks based on the view mode (all vs activity-trap)
+        const opts = {};
+        if (viewTab === 'activity-trap') {
+            opts.withoutGoal = true;
+        }
+        const t = await api.listTasks(ka.id, opts);
+        try { console.info('KeyAreas.openKA loaded tasks', { kaId: String(ka.id), count: Array.isArray(t) ? t.length : 0, viewTab }); } catch (__) {}
         setAllTasks(t);
         // refresh activities for these tasks
         try {
@@ -1781,6 +1990,8 @@ export default function KeyAreas() {
             // ignore activity load failures; UI will show zeroes
         }
         setTaskTab(1);
+        // Reset view tab to 'all' when opening a new key area
+        setViewTab('all');
     setSearchTerm("");
     setSiteSearch("");
         setQuadrant("all");
@@ -1837,15 +2048,41 @@ export default function KeyAreas() {
     const renameList = async (n) => {
         if (!selectedKA) return;
         const current = getListName(selectedKA.id, n);
-        const val = prompt("Rename list", current);
-        if (val === null) return; // cancelled
-        const newMap = { ...(listNames[String(selectedKA.id)] || {}), [String(n)]: val };
+        const raw = prompt("Rename list", current);
+        if (raw === null) return; // cancelled
+        const val = String(raw || "").trim();
+        if (!val) {
+            alert("List name cannot be empty.");
+            return;
+        }
+        const existingNames = Object.values(listNames[String(selectedKA.id)] || {});
+        const hasDuplicate = existingNames.some(
+            (name) => String(name || "").toLowerCase() === val.toLowerCase() && String(name) !== String(current),
+        );
+        if (hasDuplicate) {
+            alert("A list with this name already exists in this Key Area.");
+            return;
+        }
+
+        const prevMap = { ...(listNames[String(selectedKA.id)] || {}) };
+        const newMap = { ...prevMap, [String(n)]: val };
         setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: newMap }));
+        setKeyAreas((prev) =>
+            (prev || []).map((ka) =>
+                String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: newMap } : ka,
+            ),
+        );
         try {
             const svc = await getKeyAreaService();
             await svc.update(selectedKA.id, { listNames: newMap });
         } catch (e) {
             console.error("Failed to persist list names", e);
+            setListNames((prev) => ({ ...prev, [String(selectedKA.id)]: prevMap }));
+            setKeyAreas((prev) =>
+                (prev || []).map((ka) =>
+                    String(ka.id) === String(selectedKA.id) ? { ...ka, listNames: prevMap } : ka,
+                ),
+            );
             alert("Failed to save list name. Please try again.");
         }
     };
@@ -1868,14 +2105,28 @@ export default function KeyAreas() {
             : `Remove list ${n}? It will disappear since it has no tasks.`;
         if (!confirm(msg)) return;
         const { [String(n)]: _rem, ...rest } = names;
+        const prevMap = { ...names };
+        const prevTab = taskTab;
         const newMap = { ...rest };
         setListNames((prev) => ({ ...prev, [String(kaId)]: newMap }));
+        setKeyAreas((prev) =>
+            (prev || []).map((ka) =>
+                String(ka.id) === String(kaId) ? { ...ka, listNames: newMap } : ka,
+            ),
+        );
         if (taskTab === n) setTaskTab(1);
         try {
             const svc = await getKeyAreaService();
             await svc.update(kaId, { listNames: newMap });
         } catch (e) {
             console.error("Failed to persist list names", e);
+            setListNames((prev) => ({ ...prev, [String(kaId)]: prevMap }));
+            setKeyAreas((prev) =>
+                (prev || []).map((ka) =>
+                    String(ka.id) === String(kaId) ? { ...ka, listNames: prevMap } : ka,
+                ),
+            );
+            setTaskTab(prevTab);
             alert("Failed to delete list. Please try again.");
         }
     };
@@ -1884,7 +2135,8 @@ export default function KeyAreas() {
         const isSearch = String(siteSearch || "").trim().length >= 2;
         let arr = isSearch ? (searchResults || []) : allTasks.filter((t) => (t.list_index || 1) === taskTab);
         // If not showing completed items, filter them out
-        if (!showCompleted) {
+        // ALSO: if in 'active-tasks' tab and activeFilter is 'active', filter out completed tasks
+        if (!showCompleted || (viewTab === 'active-tasks' && activeFilter === 'active')) {
             arr = arr.filter((t) => {
                 const s = String((t.status || "").toLowerCase());
                 const completed = s === 'done' || s === 'completed' || Boolean(t.completionDate);
@@ -1897,10 +2149,54 @@ export default function KeyAreas() {
                 (t) => (t.title || "").toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q),
             );
         }
+        if (filterStatus && filterStatus !== "all") {
+            const fs = String(filterStatus).toLowerCase();
+            arr = arr.filter((t) => String(t.status || "").toLowerCase() === fs);
+        }
+        if (filterAssignee) {
+            const fa = String(filterAssignee).toLowerCase();
+            arr = arr.filter((t) => String(t.assignee || t.responsible || "").toLowerCase() === fa);
+        }
+        if (filterTag.trim()) {
+            const ft = filterTag.trim().toLowerCase();
+            arr = arr.filter((t) => String(t.tags || "").toLowerCase().includes(ft));
+        }
         // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
         if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
         return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted]);
+    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter]);
+
+    const sortedTasks = useMemo(() => {
+        const arr = Array.isArray(visibleTasks) ? visibleTasks.slice() : [];
+        switch (sortBy) {
+            case "date":
+                arr.sort((a, b) => {
+                    const ad = a.deadline || a.due_date || a.dueDate || a.end_date || null;
+                    const bd = b.deadline || b.due_date || b.dueDate || b.end_date || null;
+                    if (!ad && !bd) return 0;
+                    if (!ad) return 1;
+                    if (!bd) return -1;
+                    return new Date(ad).getTime() - new Date(bd).getTime();
+                });
+                break;
+            case "priority":
+                arr.sort((a, b) => getPriorityLevel(b.priority) - getPriorityLevel(a.priority));
+                break;
+            case "status":
+                {
+                    const order = { open: 0, in_progress: 1, done: 2, completed: 2, cancelled: 3, blocked: 3 };
+                    arr.sort(
+                        (a, b) =>
+                            (order[String(a.status || "").toLowerCase()] ?? 99) -
+                            (order[String(b.status || "").toLowerCase()] ?? 99),
+                    );
+                }
+                break;
+            default:
+                break;
+        }
+        return arr;
+    }, [visibleTasks, sortBy]);
 
     // Debug traces removed: temporary logging used during goal/title load debugging cleared.
 
@@ -1955,15 +2251,20 @@ export default function KeyAreas() {
     const clearSelection = () => setSelectedIds(new Set());
     const selectAllVisible = () => {
         const all = new Set(selectedIds);
-        const allSelected = visibleTasks.every((t) => all.has(t.id));
+        const allSelected = sortedTasks.every((t) => all.has(t.id));
         if (allSelected) {
             // unselect all visible
-            visibleTasks.forEach((t) => all.delete(t.id));
+            sortedTasks.forEach((t) => all.delete(t.id));
         } else {
-            visibleTasks.forEach((t) => all.add(t.id));
+            sortedTasks.forEach((t) => all.add(t.id));
         }
         setSelectedIds(all);
     };
+
+    const selectedTasks = useMemo(
+        () => (Array.isArray(sortedTasks) ? sortedTasks.filter((t) => selectedIds.has(t.id)) : []),
+        [sortedTasks, selectedIds],
+    );
 
     const applyBulkEdit = async (e) => {
         e.preventDefault();
@@ -2344,8 +2645,6 @@ export default function KeyAreas() {
             <div className="flex w-full min-h-screen">
                 <Sidebar
                     user={{ name: "User" }}
-                    collapsed={sidebarCollapsed}
-                    onCollapseToggle={() => setSidebarCollapsed((c) => !c)}
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />
@@ -2415,6 +2714,16 @@ export default function KeyAreas() {
                     />
                 )}
                 <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
+                    {/* Main View Tabs (legacy pattern - at top like legacy UI) */}
+                    <div className="md:hidden">
+                        <ViewTabsNavigation 
+                            viewTab={viewTab}
+                            setViewTab={setViewTab}
+                            activeFilter={activeFilter}
+                            setActiveFilter={setActiveFilter}
+                        />
+                    </div>
+                    
                     <div className="max-w-full overflow-x-hidden pb-1 min-h-full">
                         <div className="flex items-center justify-between gap-4 mb-0 p-0 pb-0">
                             <div className="flex items-center gap-4">
@@ -2433,7 +2742,7 @@ export default function KeyAreas() {
                                 className="flex items-center justify-between gap-3 mb-4"
                                 style={{ display: selectedTaskFull ? "none" : undefined }}
                             >
-                            {!selectedKA ? (
+                            {!selectedKA && !isGlobalTasksView ? (
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-2xl font-bold text-slate-900">Key Areas</h1>
                                     {!showOnlyIdeas && (
@@ -2445,6 +2754,15 @@ export default function KeyAreas() {
                                                     className="bg-transparent outline-none text-sm w-56"
                                                     value={filter}
                                                     onChange={(e) => setFilter(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
+                                                <FaSearch className="text-slate-700 mr-2" />
+                                                <input
+                                                    placeholder="Search tasks across all key areas..."
+                                                    className="bg-transparent outline-none text-sm w-64"
+                                                    value={siteSearch}
+                                                    onChange={(e) => setSiteSearch(e.target.value)}
                                                 />
                                             </div>
                                             <button
@@ -2463,6 +2781,9 @@ export default function KeyAreas() {
                                             >
                                                New Key Area
                                             </button>
+                                            {!canAdd && (
+                                                <span className="text-xs text-slate-500">Max 10 Key Areas reached.</span>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -2476,22 +2797,24 @@ export default function KeyAreas() {
                                     >
                                         <FaBars />
                                     </button>
-                                    <button
-                                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                                        aria-label="Back"
-                                        style={{ minWidth: 36, minHeight: 36 }}
-                                        onClick={() => {
-                                            setSelectedKA(null);
-                                            setAllTasks([]);
-                                            // Clear any URL params (like ?select=ideas) to show full list
-                                            navigate("/key-areas", { replace: true });
-                                        }}
-                                    >
-                                        <FaChevronLeft />
-                                    </button>
-
-                                    {/* Show selected KA icon then title inline */}
                                     {selectedKA && (
+                                        <button
+                                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                                            aria-label="Back"
+                                            style={{ minWidth: 36, minHeight: 36 }}
+                                            onClick={() => {
+                                                setSelectedKA(null);
+                                                setAllTasks([]);
+                                                // Clear any URL params (like ?select=ideas) to show full list
+                                                navigate("/key-areas", { replace: true });
+                                            }}
+                                        >
+                                            <FaChevronLeft />
+                                        </button>
+                                    )}
+
+                                    {/* Show selected KA icon then title inline - or special views */}
+                                    {(selectedKA || isGlobalTasksView) && (
                                         <div className="inline-flex items-center gap-1">
                                             <img
                                                 alt="Key Areas"
@@ -2503,80 +2826,17 @@ export default function KeyAreas() {
                                             />
                                             <span 
                                                 className="relative text-base md:text-lg font-bold text-slate-900 truncate px-1"
-                                                style={{ color: selectedKA.color || '#1F2937' }}
+                                                style={{ color: (selectedKA && selectedKA.color) || '#1F2937' }}
                                             >
-                                                {selectedKA.title}
+                                                {viewTab === 'delegated' ? 'Delegated Tasks' : 
+                                                 viewTab === 'todo' ? 'To-Do (All Tasks)' :
+                                                 viewTab === 'activity-trap' ? 'Activity Trap' :
+                                                 selectedKA?.title || ''}
                                             </span>
                                         </div>
                                     )}
 
-                                    <div className="ml-auto flex items-center gap-2">
-                                        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow border border-slate-200">
-                                            <FaSearch className="text-slate-700 mr-2" />
-                                            <input
-                                                placeholder={`Search tasks in "${selectedKA.title}"…`}
-                                                className="bg-transparent outline-none text-sm w-40 sm:w-56"
-                                                value={siteSearch}
-                                                onChange={(e) => setSiteSearch(e.target.value)}
-                                            />
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate('/my-focus')}
-                                            className="bg-white rounded-lg border border-slate-200 px-3 py-1 text-sm font-semibold hover:bg-slate-50"
-                                        >
-                                            My Focus
-                                        </button>
-
-                                        {/* View dropdown */}
-                                        <div className="relative" ref={viewMenuRef}>
-                                            <button
-                                                onClick={() => setShowViewMenu((s) => !s)}
-                                                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-50"
-                                                aria-haspopup="menu"
-                                                aria-expanded={showViewMenu ? "true" : "false"}
-                                            >
-                                                View
-                                                <svg
-                                                    className={`w-4 h-4 transition-transform ${showViewMenu ? "rotate-180" : "rotate-0"}`}
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                >
-                                                    <path d="M6 9l6 6 6-6" />
-                                                </svg>
-                                            </button>
-                                            {showViewMenu && (
-                                                <div
-                                                    role="menu"
-                                                    className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow z-50"
-                                                >
-                                                    {[
-                                                        { key: "list", label: "List" },
-                                                    ].map((opt) => (
-                                                        <button
-                                                            key={opt.key}
-                                                            role="menuitem"
-                                                            onClick={() => {
-                                                                setView(opt.key);
-                                                                setShowViewMenu(false);
-                                                            }}
-                                                            className={`block w-full text-left px-3 py-2 text-sm ${
-                                                                view === opt.key
-                                                                    ? "bg-blue-100 text-blue-700 font-semibold"
-                                                                    : "text-slate-800 hover:bg-slate-50"
-                                                            }`}
-                                                        >
-                                                            {opt.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
+                                    <div className="ml-auto flex items-center gap-1.5">
                                         {/* Columns (gear) placed beside View in header */}
                                         <div className="relative ml-1" ref={columnsMenuRef}>
                                             <button
@@ -2697,13 +2957,17 @@ export default function KeyAreas() {
                                 />
                             </div>
                         )}
-                        {selectedKA && (
+                        {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap') && (
                             <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
                                         <div className="flex items-center justify-between border-b pb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-700">Task Lists:</span>
+                                                <span className="font-medium text-slate-700">
+                                                    {viewTab === 'delegated' ? 'Delegated Tasks:' :
+                                                     viewTab === 'todo' ? 'All Tasks:' :
+                                                     'Task Lists:'}
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-3 text-sm">
                                                 <span className="text-slate-500" aria-live="polite">
@@ -2738,8 +3002,59 @@ export default function KeyAreas() {
                                                 </button>
                                             </div>
                                         </div>
-                                        
-                                        {/* Tabs Section */}
+
+                                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Sort by:</span>
+                                                <select
+                                                    value={sortBy}
+                                                    onChange={(e) => setSortBy(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                >
+                                                    <option value="manual">Manual</option>
+                                                    <option value="date">Due Date</option>
+                                                    <option value="priority">Priority</option>
+                                                    <option value="status">Status</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Status:</span>
+                                                <select
+                                                    value={filterStatus}
+                                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                >
+                                                    <option value="all">All</option>
+                                                    <option value="open">Open</option>
+                                                    <option value="in_progress">In Progress</option>
+                                                    <option value="done">Done</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Owner:</span>
+                                                <select
+                                                    value={filterAssignee}
+                                                    onChange={(e) => setFilterAssignee(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                >
+                                                    <option value="">All</option>
+                                                    {(users || []).map((u) => (
+                                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600">Tag:</span>
+                                                <input
+                                                    value={filterTag}
+                                                    onChange={(e) => setFilterTag(e.target.value)}
+                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                    placeholder="Tag"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* List Tabs Section (left sidebar lists within the view) */}
                                         <div className="pt-3">
                                             <div
                                                 ref={tabsRef}
@@ -3047,7 +3362,7 @@ export default function KeyAreas() {
                                                 </form>
                                             )}
                                             {view === "list" ? (
-                                                visibleTasks.length === 0 ? (
+                                                sortedTasks.length === 0 ? (
                                                     <EmptyState
                                                         title="List is empty."
                                                         hint="Use the 'Add Task' button below to create your first task."
@@ -3062,8 +3377,8 @@ export default function KeyAreas() {
                                                                             type="checkbox"
                                                                             aria-label="Select all visible"
                                                                             checked={
-                                                                                visibleTasks.length > 0 &&
-                                                                                visibleTasks.every((t) =>
+                                                                                sortedTasks.length > 0 &&
+                                                                                sortedTasks.every((t) =>
                                                                                     selectedIds.has(t.id),
                                                                                 )
                                                                             }
@@ -3121,7 +3436,7 @@ export default function KeyAreas() {
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="bg-white">
-                                                                {visibleTasks.map((t) => {
+                                                                {sortedTasks.map((t) => {
                                                                     const q = computeEisenhowerQuadrant({
                                                                         deadline: t.deadline,
                                                                         end_date: t.end_date,
@@ -3291,6 +3606,108 @@ export default function KeyAreas() {
                                     </div>
                             </div>
                         )}
+
+                        {/* Unified Table View for DELEGATED, TODO, ACTIVITY TRAP tabs */}
+                        {(viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap') && (
+                            <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                                <UnifiedTaskActivityTable
+                                    viewTab={viewTab}
+                                    tasks={allTasks}
+                                    activities={Object.values(activitiesByTask).flat()}
+                                    keyAreas={keyAreas}
+                                    users={users}
+                                    goals={goals}
+                                    currentUserId={currentUserId}
+                                    onTaskClick={(task) => {
+                                        setSelectedTaskFull(task);
+                                        setTaskFullInitialTab("activities");
+                                    }}
+                                    onActivityClick={(activity) => {
+                                        const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                        if (task) {
+                                            setSelectedTaskFull(task);
+                                            setTaskFullInitialTab("activities");
+                                        }
+                                    }}
+                                    onTaskUpdate={async (id, updatedTask) => {
+                                        try {
+                                            // If delegation happened, refresh the task list for the current view
+                                            if (updatedTask.delegatedToUserId) {
+                                                // Task was delegated, reload the appropriate view
+                                                if (viewTab === 'delegated') {
+                                                    const svc = await getTaskService();
+                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
+                                                    setAllTasks(delegatedToMe || []);
+                                                } else if (viewTab === 'todo') {
+                                                    const svc = await getTaskService();
+                                                    const allUserTasks = await svc.list({});
+                                                    setAllTasks(allUserTasks || []);
+                                                } else if (viewTab === 'activity-trap') {
+                                                    const svc = await getTaskService();
+                                                    const trapTasks = await svc.list({ withoutGoal: true });
+                                                    setAllTasks(trapTasks || []);
+                                                } else if (selectedKA) {
+                                                    // Active tasks view - reload selected key area tasks
+                                                    const rows = await api.listTasks(selectedKA.id);
+                                                    setAllTasks(rows || []);
+                                                }
+                                            } else {
+                                                // Normal update
+                                                const result = await api.updateTask(id, updatedTask);
+                                                setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                            }
+                                        } catch (error) {
+                                            console.error('Failed to update task:', error);
+                                        }
+                                    }}
+                                    onTaskDelete={async (id) => {
+                                        try {
+                                            await api.deleteTask(id);
+                                            setAllTasks(prev => prev.filter(t => t.id !== id));
+                                        } catch (error) {
+                                            console.error('Failed to delete task:', error);
+                                        }
+                                    }}
+                                    onActivityUpdate={async (id, updatedActivity) => {
+                                        try {
+                                            const activityService = await getActivityService();
+                                            const result = await activityService.update(id, updatedActivity);
+                                            // Update the activities in state
+                                            setActivitiesByTask(prev => {
+                                                const updated = { ...prev };
+                                                for (let key in updated) {
+                                                    updated[key] = updated[key].map(a => a.id === id ? result : a);
+                                                }
+                                                return updated;
+                                            });
+                                        } catch (error) {
+                                            console.error('Failed to update activity:', error);
+                                        }
+                                    }}
+                                    onActivityDelete={async (id) => {
+                                        try {
+                                            const activityService = await getActivityService();
+                                            await activityService.remove(id);
+                                            // Remove the activity from state
+                                            setActivitiesByTask(prev => {
+                                                const updated = { ...prev };
+                                                for (let key in updated) {
+                                                    updated[key] = updated[key].filter(a => a.id !== id);
+                                                }
+                                                return updated;
+                                            });
+                                        } catch (error) {
+                                            console.error('Failed to delete activity:', error);
+                                        }
+                                    }}
+                                    onMassEdit={(selected) => {
+                                        // TODO: Implement mass edit modal
+                                        console.log('Mass edit:', selected);
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         {/* Global Activities popover (attached to hamburger) */}
                         {openActivitiesMenu && (
                             <>
@@ -3356,20 +3773,48 @@ export default function KeyAreas() {
                                 </div>
                             </>
                         )}
-                        {!selectedKA && (
-                            <KeyAreasList
-                                loading={loading}
-                                showOnlyIdeas={showOnlyIdeas}
-                                ideaForShow={ideaForShow}
-                                filteredKAs={filteredKAs}
-                                dragKAId={dragKAId}
-                                openKA={openKA}
-                                reorderByDrop={reorderByDrop}
-                                setDragKAId={setDragKAId}
-                                setEditing={setEditing}
-                                setShowForm={setShowForm}
-                                onDeleteKA={onDeleteKA}
-                            />
+                        {!selectedKA && !isGlobalTasksView && (
+                            <>
+                                {String(siteSearch || "").trim().length >= 2 && (
+                                    <div className="mb-4 bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+                                        <div className="text-sm font-semibold text-slate-700 mb-2">
+                                            Search results for “{siteSearch.trim()}”
+                                        </div>
+                                        {isSearching ? (
+                                            <div className="text-sm text-slate-500">Searching…</div>
+                                        ) : (searchResults && searchResults.length ? (
+                                            <ul className="space-y-2">
+                                                {searchResults.map((t) => {
+                                                    const ka = (keyAreas || []).find((k) => String(k.id) === String(t.key_area_id || t.keyAreaId || t.key_area));
+                                                    return (
+                                                        <li key={t.id} className="text-sm">
+                                                            <span className="font-semibold text-slate-900">{t.title || t.name}</span>
+                                                            {ka ? (
+                                                                <span className="text-slate-500"> — {ka.title || ka.name}</span>
+                                                            ) : null}
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <div className="text-sm text-slate-500">No matching tasks found.</div>
+                                        ))}
+                                    </div>
+                                )}
+                                <KeyAreasList
+                                    loading={loading}
+                                    showOnlyIdeas={showOnlyIdeas}
+                                    ideaForShow={ideaForShow}
+                                    filteredKAs={filteredKAs}
+                                    dragKAId={dragKAId}
+                                    openKA={openKA}
+                                    reorderByDrop={reorderByDrop}
+                                    setDragKAId={setDragKAId}
+                                    setEditing={setEditing}
+                                    setShowForm={setShowForm}
+                                    onDeleteKA={onDeleteKA}
+                                />
+                            </>
                         )}
                         {/* DETAIL: Tabs */}
                         {selectedKA && (
@@ -3457,6 +3902,7 @@ export default function KeyAreas() {
                                                 users={users}
                                                 goals={goals}
                                                 availableLists={availableListNumbers}
+                                                parentListNames={selectedKA ? listNames[selectedKA.id] : null}
                                                 onSave={async (payload) => {
                                                     try {
                                                         const created = await api.createTask(payload);

@@ -188,6 +188,7 @@ export default function CreateTaskModal({
             // Prepare task data
             const taskData = {
                 keyAreaId: form.keyAreaId,
+                goalId: form.goal || null,
                 title: form.title.trim(),
                 description: form.description.trim() || null,
                 assignee: form.assignee.trim() || null,

@@ -106,6 +106,7 @@ const CalendarContainer = () => {
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [appointmentModalOpen, setAppointmentModalOpen] = useState(false);
     const [appointmentInitialStart, setAppointmentInitialStart] = useState(null);
+    const [appointmentInitialAllDay, setAppointmentInitialAllDay] = useState(false);
     const [filterType, setFilterType] = useState("all");
     const [showViewMenu, setShowViewMenu] = useState(false);
     const viewMenuRef = React.useRef(null);
@@ -122,6 +123,28 @@ const CalendarContainer = () => {
     // Real-time refresh support (polling when external sync is enabled)
     const [syncActive, setSyncActive] = useState(false);
     const [refreshTick, setRefreshTick] = useState(0);
+
+    // Listen for global appointment create requests (Quick Actions)
+    useEffect(() => {
+        const handler = (e) => {
+            try {
+                const start = e?.detail?.start ? new Date(e.detail.start) : new Date();
+                if (isNaN(start.getTime())) {
+                    setAppointmentInitialStart(new Date());
+                } else {
+                    setAppointmentInitialStart(start);
+                }
+                setAppointmentInitialAllDay(false);
+                setAppointmentModalOpen(true);
+            } catch (_) {
+                setAppointmentInitialStart(new Date());
+                setAppointmentInitialAllDay(false);
+                setAppointmentModalOpen(true);
+            }
+        };
+        window.addEventListener('open-create-appointment', handler);
+        return () => window.removeEventListener('open-create-appointment', handler);
+    }, []);
 
     // Load persisted view/date on mount
     useEffect(() => {
@@ -558,6 +581,8 @@ const CalendarContainer = () => {
             if (import.meta.env.DEV) {
                 try { console.debug('Creating appointment payload', payload); } catch (_) {}
             }
+            // Show progress while creating appointment
+            try { setLoading(true); } catch (_) {}
             const created = await calendarService.createAppointment(payload);
             if (import.meta.env.DEV) {
                 try { console.debug('Appointment created (server response)', created); } catch (_) {}
@@ -578,6 +603,7 @@ const CalendarContainer = () => {
                 description: `${title} at ${formatTime(`${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`)} — click the event to edit`,
                 variant: "success",
             });
+            try { setLoading(false); } catch (_) {}
         } catch (err) {
             console.warn("Failed to create calendar event from drop", err);
             // Try to extract server-provided details for better user feedback
@@ -590,6 +616,8 @@ const CalendarContainer = () => {
                 }
             } catch (_) {}
             addToast({ title: "Failed to create event", description: details, variant: "error" });
+        } finally {
+            try { setLoading(false); } catch (_) {}
         }
     };
 
@@ -1229,10 +1257,15 @@ const CalendarContainer = () => {
     };
 
     // Double-click now opens appointment modal instead of auto-creating
-    const handleQuickCreate = (date) => {
+    const handleQuickCreate = (date, opts = {}) => {
         const start = new Date(date);
-        // Allow quick-create at any time
+        const isAllDay = Boolean(opts && opts.allDay);
+        if (isAllDay) {
+            // normalize to start of day
+            start.setHours(0, 0, 0, 0);
+        }
         setAppointmentInitialStart(start);
+        setAppointmentInitialAllDay(isAllDay);
         setAppointmentModalOpen(true);
     };
 
@@ -1790,6 +1823,7 @@ const CalendarContainer = () => {
             {appointmentModalOpen && appointmentInitialStart && (
                 <AppointmentModal
                     startDate={appointmentInitialStart}
+                    allDayDefault={appointmentInitialAllDay}
                     defaultDurationMinutes={30}
                     users={usersList}
                     goals={goalsList}
@@ -1797,12 +1831,14 @@ const CalendarContainer = () => {
                     onClose={() => {
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
+                        setAppointmentInitialAllDay(false);
                     }}
                     onCreated={(created) => {
                         setEvents((prev) => [...prev, created]);
                         addToast({ title: "Appointment created", variant: "success" });
                         setAppointmentModalOpen(false);
                         setAppointmentInitialStart(null);
+                        setAppointmentInitialAllDay(false);
                     }}
                 />
             )}

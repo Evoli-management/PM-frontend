@@ -64,16 +64,24 @@ const MilestoneItem = ({ milestone, onUpdate }) => {
                     )}
                 </div>
 
-                {/* Due date if exists */}
-                {milestone.dueDate && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Clock className="w-3 h-3" />
-                        <span>Due {new Date(milestone.dueDate).toLocaleDateString()}</span>
-                        {!milestone.done && new Date(milestone.dueDate) < new Date() && (
-                            <span className="text-red-600 font-semibold">(Overdue)</span>
-                        )}
-                    </div>
-                )}
+                {/* Date range: start date and due date */}
+                <div className="flex flex-col gap-2">
+                    {milestone.startDate && (
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Clock className="w-3 h-3" />
+                            <span>Start {new Date(milestone.startDate).toLocaleDateString()}</span>
+                        </div>
+                    )}
+                    {milestone.dueDate && (
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Clock className="w-3 h-3" />
+                            <span>Due {new Date(milestone.dueDate).toLocaleDateString()}</span>
+                            {!milestone.done && new Date(milestone.dueDate) < new Date() && (
+                                <span className="text-red-600 font-semibold">(Overdue)</span>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 {/* Score if partial completion */}
                 {milestone.score && !milestone.done && (

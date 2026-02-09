@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { getFriendlyErrorMessage, getErrorSuggestion } from "../utils/errorMessages";
 // authService is imported dynamically at call sites to allow code-splitting
 
 const LoginPage = () => {
@@ -13,7 +14,6 @@ const LoginPage = () => {
     const [formData, setFormData] = useState({
         email: prefilledEmail || "",
         password: "",
-        rememberMe: false,
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -24,10 +24,10 @@ const LoginPage = () => {
     };
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
-            [name]: type === "checkbox" ? checked : value,
+            [name]: value,
         }));
         setError("");
     };
@@ -35,6 +35,13 @@ const LoginPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
+        
+        // TC022: Client-side email length validation
+        if (formData.email.length > 255) {
+            setError("Email must not exceed 255 characters");
+            return;
+        }
+        
         setLoading(true);
         try {
             const { email, password } = formData;
@@ -73,22 +80,39 @@ const LoginPage = () => {
             }
         } catch (err) {
             console.error("Login error:", err);
-            const msg = err.response?.data?.message || "Login failed";
-            // Detect unverified user error (customize if backend uses a different message)
+            
+            // Extract error message - handle arrays, strings, and network errors
+            let msg;
+            if (err.response?.data?.message) {
+                msg = err.response.data.message;
+                // If backend returns array of validation errors, join them
+                if (Array.isArray(msg)) {
+                    msg = msg[0]; // Use first error message
+                }
+            } else if (err.message) {
+                // Network errors (no response from server)
+                msg = err.message;
+            } else {
+                msg = "Login failed";
+            }
+            
+            const friendlyMsg = getFriendlyErrorMessage(msg);
+            
+            // Detect unverified user error
             if (typeof msg === "string" && msg.toLowerCase().includes("verify your email")) {
                 setError(
                     <span>
-                        Your email is not verified. <br />
+                        {friendlyMsg} <br />
                         <button
                             type="button"
-                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer"
+                            className="underline text-blue-700 font-semibold bg-transparent border-none cursor-pointer mt-2"
                             onClick={async () => {
                                 try {
                                     const authService = await import("../services/authService").then((m) => m.default);
                                     await authService.resendVerification(formData.email);
-                                    alert("Verification email resent! Please check your inbox.");
-                                } catch {
-                                    alert("Failed to resend verification email. Try again later.");
+                                    setError("Verification email resent! Check your inbox (including spam folder).");
+                                } catch (resendErr) {
+                                    setError(getFriendlyErrorMessage(resendErr));
                                 }
                             }}
                         >
@@ -97,7 +121,7 @@ const LoginPage = () => {
                     </span>,
                 );
             } else {
-                setError(Array.isArray(msg) ? msg.join(", ") : msg);
+                setError(friendlyMsg);
             }
         } finally {
             setLoading(false);
@@ -118,8 +142,8 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto">
-            <div className="grid grid-cols-2 rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
+        <div className="min-h-screen flex items-center justify-center w-full max-w-6xl mx-auto px-4">
+            <div className="grid md:grid-cols-2 w-full rounded-xl shadow-[0_-6px_20px_rgba(2,6,23,0.06)]">
                 {/* <div className="absolute top-0 left-0 right-0 h-4 -translate-y-2 bg-gradient-to-b from-black/10 to-transparent pointer-events-none z-10" /> */}
                 {/* Left: form pane */}
                 <div className="p-8 flex flex-col justify-center">
@@ -173,18 +197,7 @@ const LoginPage = () => {
                                 <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} className="text-lg" />
                             </span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-2">
-                            <label className="flex items-center text-sm text-black">
-                                <input
-                                    type="checkbox"
-                                    name="rememberMe"
-                                    checked={formData.rememberMe}
-                                    onChange={handleInputChange}
-                                    className="mr-2"
-                                    aria-label="Remember me"
-                                />
-                                Remember me!
-                            </label>
+                        <div className="flex flex-col sm:flex-row items-center justify-end w-full gap-2">
                             <Link
                                 to="/PasswordPageForget"
                                 className="text-sm text-blue-700 underline font-semibold bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"

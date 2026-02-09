@@ -87,6 +87,16 @@ class UserProfileService {
     }
 
     /**
+     * Deactivate user account
+     * @param {string} password - Current password for verification
+     * @returns {Promise<Object>} - Deactivation confirmation
+     */
+    async deactivateAccount(password) {
+        const res = await apiClient.patch("/user/profile/deactivate", { password });
+        return res.data;
+    }
+
+    /**
      * Request email change
      * @param {string} newEmail - New email address
      * @param {string} password - Current password for verification
@@ -187,7 +197,7 @@ class UserProfileService {
             if (!profileData.email || profileData.email.trim().length === 0) {
                 errors.email = 'Email is required';
             } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileData.email)) {
-                errors.email = 'Invalid email format';
+                errors.email = 'Email must be an email.';
             }
         }
 

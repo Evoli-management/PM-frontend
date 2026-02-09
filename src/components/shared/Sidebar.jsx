@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
     FaHome,
@@ -8,6 +8,15 @@ import {
     FaGripVertical,
 } from "react-icons/fa";
 import { isFeatureEnabled } from "../../utils/flags.js";
+
+// Lazy load keyAreaService for reordering
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod.default || mod;
+    return _keyAreaService;
+};
 
 const navItems = [
     { label: "Dashboard", icon: <FaHome />, to: "/dashboard", section: "Main" },
@@ -77,12 +86,38 @@ export default function Sidebar({
 }) {
     const location = useLocation();
     const [keyAreasList, setKeyAreasList] = useState([]);
-    const [internalCollapsed, setInternalCollapsed] = useState(false);
+    // Initialize from localStorage to persist across page navigation
+    const [internalCollapsed, setInternalCollapsed] = useState(() => {
+        try {
+            const saved = localStorage.getItem('sidebar-collapsed');
+            return saved ? JSON.parse(saved) : false;
+        } catch {
+            return false;
+        }
+    });
     const [keyAreasOpen, setKeyAreasOpen] = useState(false);
     const [draggedItem, setDraggedItem] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const openFirstKARef = useRef(false);
     const collapsed = typeof collapsedProp === "boolean" ? collapsedProp : internalCollapsed;
+
+    // Sync collapsed state with document for main content margin adjustment
+    useEffect(() => {
+        if (collapsed) {
+            document.documentElement.classList.add('sidebar-collapsed');
+        } else {
+            document.documentElement.classList.remove('sidebar-collapsed');
+        }
+    }, [collapsed]);
+
+    // Persist collapsed state to localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem('sidebar-collapsed', JSON.stringify(internalCollapsed));
+        } catch {
+            // Silently fail if localStorage is unavailable
+        }
+    }, [internalCollapsed]);
 
     const navigate = useNavigate();
     const calendarEnabled = isFeatureEnabled("calendar");
@@ -131,11 +166,14 @@ export default function Sidebar({
         // Insert at new position
         newKeyAreasList.splice(targetIndex, 0, draggedKa);
         
-        // Update the positions for all key areas
-        const updatedKeyAreas = newKeyAreasList.map((ka, index) => ({
-            ...ka,
-            position: index
-        }));
+        // Update the positions for all key areas (1-indexed for Ideas, 1-9 for others)
+        const updatedKeyAreas = newKeyAreasList.map((ka, index) => {
+            const isIdeas = (ka.title || "").trim().toLowerCase() === "ideas" || ka.is_default;
+            return {
+                ...ka,
+                position: isIdeas ? 10 : index + 1
+            };
+        });
         
         // Update local state immediately for UI responsiveness
         setKeyAreasList(updatedKeyAreas);
@@ -150,6 +188,16 @@ export default function Sidebar({
         }
         
         setDraggedItem(null);
+
+        // Persist reordering to backend
+        (async () => {
+            try {
+                const keyAreaService = await getKeyAreaService();
+                await keyAreaService.reorder(updatedKeyAreas);
+            } catch (err) {
+                console.error("Failed to persist key area reordering:", err);
+            }
+        })();
     };
 
     const handleKeyAreasClick = (e, item) => {
@@ -381,20 +429,20 @@ export default function Sidebar({
                                                 <button
                                                     onClick={(e) => handleKeyAreasClick(e, item)}
                                                     aria-expanded={keyAreasOpen}
-                                                    className={`relative flex items-center gap-3 w-full px-3 py-2 rounded transition group focus:outline-none ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                                    className={`relative flex items-center w-full py-2 rounded transition group focus:outline-none ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                                 >
                                                     <span className="text-xl flex items-center justify-center" title={item.label}>
                                                         {renderedIcon}
                                                     </span>
                                                     {!collapsed && <span>{item.label}</span>}
-                                                    {item.badge && (
+                                                    {!collapsed && item.badge && (
                                                         <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
                                                             {item.badge}
                                                         </span>
                                                     )}
-                                                    <FaChevronDown
+                                                    {!collapsed && <FaChevronDown
                                                         className={`ml-auto ${keyAreasOpen ? "rotate-180" : "rotate-0"}`}
-                                                    />
+                                                    />}
                                                 </button>
 
                                                 {!collapsed && keyAreasOpen && (
@@ -496,13 +544,13 @@ export default function Sidebar({
                                     <div key={item.label} className="mb-2">
                                     <Link
                                         to={item.to}
-                                        className={`relative flex items-center gap-3 px-3 py-2 rounded transition group ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
+                                        className={`relative flex items-center py-2 rounded transition group ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'} ${isActive ? `bg-white ${colorClass} shadow-inner font-semibold` : `text-gray-800 hover:bg-white ${hoverColor}`}`}
                                     >
                                                 <span className="text-xl flex items-center justify-center" title={item.label}>
                                                     {renderedIcon}
                                                 </span>
                                                 {!collapsed && <span>{item.label}</span>}
-                                                {item.badge && (
+                                                {!collapsed && item.badge && (
                                                     <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold group-hover:bg-red-600">
                                                         {item.badge}
                                                     </span>

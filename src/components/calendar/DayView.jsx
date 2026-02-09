@@ -92,7 +92,11 @@ export default function DayView({
     isWorkingTime,
   } = useCalendarPreferences(slotMinutes);
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const hours = Array.from({ length: 24 }, (_, i) => i).filter((hour) => {
+    const start = (workingHours && typeof workingHours.start === 'number') ? workingHours.start : 0;
+    const end = (workingHours && typeof workingHours.end === 'number') ? workingHours.end : 24;
+    return hour >= start && hour < end;
+  });
 
   const HOUR_HEIGHT = hourHeight;
 
@@ -660,12 +664,12 @@ export default function DayView({
               {/* CALENDAR CARD */}
               <div
             className="bg-white border border-blue-50 rounded-lg shadow-sm p-3 pr-2 overflow-hidden"
-            style={{ height: 600 }}
+            style={{ height: 'calc(100vh - 180px)', minHeight: 500 }}
           >
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
               <div className="flex">
-                <div className="w-20 bg-white text-xs text-gray-500">
+                <div className="w-16 bg-white text-xs text-gray-500">
                   <div className="h-10 flex items-center">
                     <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">
                       All-Day
@@ -674,7 +678,32 @@ export default function DayView({
                 </div>
                 <div className="flex-1">
                   {/* make all-day area able to stack full-width bars for multi-day tasks */}
-                  <div className="border-b border-gray-200 px-2 py-1">
+                  <div
+                    className="border-b border-gray-200 px-2 py-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Click to create all-day event"
+                    title="Click to create all-day event"
+                    onClick={(e) => {
+                      try { e.stopPropagation(); } catch (_) {}
+                      if (typeof onQuickCreate === "function") {
+                        const base = currentDate || new Date();
+                        const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+                        onQuickCreate(dt, { allDay: true });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        try { e.stopPropagation(); } catch (_) {}
+                        if (typeof onQuickCreate === "function") {
+                          const base = currentDate || new Date();
+                          const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+                          onQuickCreate(dt, { allDay: true });
+                        }
+                      }
+                    }}
+                  >
                     <div className="flex flex-col gap-1 max-h-28 overflow-y-auto">
                       {(() => {
                         try {
@@ -758,7 +787,7 @@ export default function DayView({
                                 <div key={`allday-${t.id || title}`} className="w-full">
                                   <button
                                     type="button"
-                                    onClick={() => onTaskClick && onTaskClick(t)}
+                                    onClick={(e) => { try { e.stopPropagation(); } catch (_) {}; onTaskClick && onTaskClick(t); }}
                                     className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs truncate ${bgClass || ''}`}
                                     style={{ ...(styleBar || {}), width: '100%' }}
                                     title={title}
@@ -793,7 +822,7 @@ export default function DayView({
               {/* MAIN SCROLL AREA */}
               <div className="flex-1 flex min-h-0" style={{ overflowX: "hidden", overflowY: "auto" }}>
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
-                <div className="w-20 bg-white text-xs text-gray-500 min-h-0">
+                <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
                   <div
                     className="relative border-r border-gray-200"
                     style={{ height: HOUR_HEIGHT * hours.length }}
@@ -1100,7 +1129,7 @@ export default function DayView({
         </div>
 
   {/* Sidebar: Quick actions panel */}
-  <div className="w-80 md:w-96 flex-shrink-0 mr-0">
+  <div className="w-64 md:w-72 flex-shrink-0 mr-0">
           <div className="sticky top-2">
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 mb-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-stretch">

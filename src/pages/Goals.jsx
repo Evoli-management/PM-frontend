@@ -35,11 +35,13 @@ const Goals = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [sortBy, setSortBy] = useState("dueDate");
+    const [tagFilter, setTagFilter] = useState("");
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [keyAreas, setKeyAreas] = useState([]);
     const [toast, setToast] = useState(null);
     const [currentView, setCurrentView] = useState("grid");
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [selectedGoals, setSelectedGoals] = useState(new Set());
     const navigate = useNavigate();
     // route params handled by dedicated GoalDetail page; this list page only navigates to it
 
@@ -119,6 +121,14 @@ const Goals = () => {
             filtered = filtered.filter((goal) => goal.status === statusFilter);
         }
 
+        if (tagFilter) {
+            filtered = filtered.filter((goal) =>
+                Array.isArray(goal.tags) && goal.tags.some((tag) =>
+                    tag.toLowerCase().includes(tagFilter.toLowerCase())
+                )
+            );
+        }
+
         filtered.sort((a, b) => {
             switch (sortBy) {
                 case "dueDate":
@@ -127,6 +137,9 @@ const Goals = () => {
                     return (b.progressPercent || 0) - (a.progressPercent || 0);
                 case "title":
                     return a.title.localeCompare(b.title);
+                case "priority":
+                    const priorityOrder = { high: 0, medium: 1, low: 2 };
+                    return (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
                 case "created":
                     return new Date(b.createdAt) - new Date(a.createdAt);
                 default:
@@ -135,7 +148,7 @@ const Goals = () => {
         });
 
         setFilteredGoals(filtered);
-    }, [goals, searchTerm, statusFilter, sortBy]);
+    }, [goals, searchTerm, statusFilter, sortBy, tagFilter]);
 
     const handleCreateGoal = async (goalData) => {
         try {
@@ -212,6 +225,78 @@ const Goals = () => {
         }
     };
 
+    const handleBulkAction = async (action) => {
+        const selectedIds = Array.from(selectedGoals);
+        if (selectedIds.length === 0) {
+            showToast("error", "No goals selected");
+            return;
+        }
+
+        try {
+            let updates = {};
+            let confirmMessage = "";
+
+            switch (action) {
+                case "complete":
+                    updates = { status: "completed" };
+                    confirmMessage = `Mark ${selectedIds.length} goal(s) as completed?`;
+                    break;
+                case "archive":
+                    updates = { status: "archived" };
+                    confirmMessage = `Archive ${selectedIds.length} goal(s)?`;
+                    break;
+                case "activate":
+                    updates = { status: "active" };
+                    confirmMessage = `Activate ${selectedIds.length} goal(s)?`;
+                    break;
+                case "delete":
+                    confirmMessage = `Delete ${selectedIds.length} goal(s)? This action cannot be undone.`;
+                    if (window.confirm(confirmMessage)) {
+                        await Promise.all(selectedIds.map((id) => goalService.deleteGoal(id)));
+                        setGoals((prev) => prev.filter((g) => !selectedIds.includes(g.id)));
+                        setFilteredGoals((prev) => prev.filter((g) => !selectedIds.includes(g.id)));
+                        setSelectedGoals(new Set());
+                        showToast("success", `${selectedIds.length} goal(s) deleted`);
+                    }
+                    return;
+                default:
+                    return;
+            }
+
+            if (confirmMessage && !window.confirm(confirmMessage)) {
+                return;
+            }
+
+            await goalService.bulkUpdateGoals(selectedIds, updates);
+            await fetchGoals(statusFilter);
+            setSelectedGoals(new Set());
+            showToast("success", `${selectedIds.length} goal(s) updated`);
+        } catch (error) {
+            console.error("Bulk action failed:", error);
+            showToast("error", `Bulk action failed: ${error.message}`);
+        }
+    };
+
+    const handleToggleSelection = (goalId) => {
+        setSelectedGoals((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(goalId)) {
+                newSet.delete(goalId);
+            } else {
+                newSet.add(goalId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedGoals.size === filteredGoals.length) {
+            setSelectedGoals(new Set());
+        } else {
+            setSelectedGoals(new Set(filteredGoals.map((g) => g.id)));
+        }
+    };
+
     const getGoalStats = () => {
         const total = goals.length;
         const active = goals.filter((g) => g.status === "active").length;
@@ -254,6 +339,8 @@ const Goals = () => {
                         onGoalClick={handleOpenGoal}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
+                        selectedGoals={selectedGoals}
+                        onToggleSelection={handleToggleSelection}
                     />
                 );
             case "kanban":
@@ -282,6 +369,8 @@ const Goals = () => {
                         onGoalEdit={handleEditGoal}
                         onUpdate={handleUpdateGoal}
                         onDelete={handleDeleteGoal}
+                        selectedGoals={selectedGoals}
+                        onToggleSelection={handleToggleSelection}
                     />
                 );
         }
@@ -484,6 +573,14 @@ const Goals = () => {
                                                         </select>
                                                     </div>
 
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Filter by tag..."
+                                                        value={tagFilter}
+                                                        onChange={(e) => setTagFilter(e.target.value)}
+                                                        className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 focus:bg-white transition-colors min-w-[120px]"
+                                                    />
+
                                                     <div className="relative">
                                                         <FaSortAmountDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" />
                                                         <select
@@ -492,6 +589,7 @@ const Goals = () => {
                                                             className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-slate-50 focus:bg-white transition-colors min-w-[140px]"
                                                         >
                                                             <option value="dueDate">Due Date</option>
+                                                            <option value="priority">Priority</option>
                                                             <option value="progress">Progress</option>
                                                             <option value="title">Title</option>
                                                             <option value="created">Recently Created</option>
@@ -504,6 +602,54 @@ const Goals = () => {
                                 </div>
 
                             {/* Main Content */}
+                            {/* Bulk Action Bar */}
+                            {selectedGoals.size > 0 && (
+                                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                                                <span className="text-sm font-bold text-blue-600">{selectedGoals.size}</span>
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-700">
+                                                {selectedGoals.size} goal{selectedGoals.size !== 1 ? "s" : ""} selected
+                                            </span>
+                                            <button
+                                                onClick={handleSelectAll}
+                                                className="ml-2 text-sm text-blue-600 hover:text-blue-700 font-medium underline"
+                                            >
+                                                {selectedGoals.size === filteredGoals.length ? "Deselect All" : "Select All"}
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                onClick={() => handleBulkAction("complete")}
+                                                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                                            >
+                                                Mark Complete
+                                            </button>
+                                            <button
+                                                onClick={() => handleBulkAction("activate")}
+                                                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                            >
+                                                Activate
+                                            </button>
+                                            <button
+                                                onClick={() => handleBulkAction("archive")}
+                                                className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
+                                            >
+                                                Archive
+                                            </button>
+                                            <button
+                                                onClick={() => handleBulkAction("delete")}
+                                                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="goals-content">{renderContent()}</div>
 
                             {/* Modal */}

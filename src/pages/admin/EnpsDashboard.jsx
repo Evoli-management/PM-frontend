@@ -15,6 +15,35 @@ export default function EnpsDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState('');
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [allTeams, setAllTeams] = useState([]);
+  const [sendingEmails, setSendingEmails] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(null);
+
+  const handleSendEnpsEmails = async () => {
+    if (!window.confirm('Send eNPS survey emails to all users? This action will trigger email notifications.')) {
+      return;
+    }
+    setSendingEmails(true);
+    setEmailStatus(null);
+    try {
+      const response = await apiClient.post('/enps/send-survey-emails');
+      setEmailStatus({
+        type: 'success',
+        message: `eNPS survey emails sent successfully to ${response.data.count || 'users'}`
+      });
+      // Refresh data after sending
+      setTimeout(async () => {
+        const cur = await getCurrentEnpsScore();
+        setCurrent(cur);
+      }, 1000);
+    } catch (error) {
+      setEmailStatus({
+        type: 'error',
+        message: error.response?.data?.message || 'Failed to send eNPS survey emails'
+      });
+    } finally {
+      setSendingEmails(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -82,6 +111,13 @@ export default function EnpsDashboard() {
         <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-400 mb-2">eNPS Admin Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-300">Organization eNPS overview, trend, and team breakdown.</p>
 
+        {/* Email Status Message */}
+        {emailStatus && (
+          <div className={`mt-4 p-4 rounded-lg ${emailStatus.type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700'}`}>
+            {emailStatus.message}
+          </div>
+        )}
+
         {/* Filters */}
         <div className="mt-4 bg-white border rounded-2xl p-4 shadow">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -105,11 +141,26 @@ export default function EnpsDashboard() {
             <div className="flex items-end">
               <button onClick={handleApplyFilters} className="px-4 py-2 bg-blue-600 text-white rounded">Apply</button>
             </div>
+            <div className="flex items-end md:col-span-4">
+              <button 
+                onClick={handleSendEnpsEmails}
+                disabled={sendingEmails}
+                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded font-semibold transition"
+              >
+                {sendingEmails ? 'Sending Survey Emails...' : 'Send eNPS Survey Emails'}
+              </button>
+            </div>
           </div>
         </div>
 
         {loading ? (
           <div className="mt-6 p-6 bg-white rounded-2xl shadow">Loading…</div>
+        ) : !current || current.totalResponses === 0 ? (
+          <div className="mt-6 p-6 bg-yellow-50 border border-yellow-200 rounded-2xl shadow text-center">
+            <p className="text-yellow-800 font-semibold mb-3">No eNPS responses yet</p>
+            <p className="text-yellow-700 text-sm mb-4">The chart will populate as soon as users start responding to the eNPS survey.</p>
+            <p className="text-yellow-700 text-sm">Use the button above to send eNPS survey emails to your team members.</p>
+          </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
             <section className="bg-white border rounded-2xl p-6 shadow col-span-1">

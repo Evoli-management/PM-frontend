@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader, AlertCircle } from "lucide-react";
 import organizationService from "../services/organizationService";
 import authService from "../services/authService";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 export default function InvitationEntry() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function InvitationEntry() {
           // User is already logged in - show accept page
           navigate(`/join?token=${token}`);
         } else {
-          // User is not logged in - check if email exists in database
+          // User is not logged in
           const invitedEmail = info?.invitedEmail;
           if (!invitedEmail) {
             setError("Invalid invitation - no email found");
@@ -49,25 +50,12 @@ export default function InvitationEntry() {
             return;
           }
 
-          // Check if email exists in database
-          try {
-            const emailExists = await authService.checkEmailExists(invitedEmail);
-            
-            if (emailExists) {
-              // Email exists - redirect to login page with invitation token
-              navigate(`/login?invitationToken=${token}&email=${encodeURIComponent(invitedEmail)}`);
-            } else {
-              // Email doesn't exist - redirect to registration with invitation token
-              navigate(`/registration?token=${token}`);
-            }
-          } catch (err) {
-            // If we can't check, default to registration (safer option)
-            console.warn("Could not check email existence, defaulting to registration");
-            navigate(`/registration?token=${token}`);
-          }
+          // Redirect to registration with invitation token pre-filled
+          // The registration page will handle email verification and auto-join the org
+          navigate(`/registration?token=${token}&email=${encodeURIComponent(invitedEmail)}`);
         }
       } catch (err) {
-        setError(err?.response?.data?.message || err.message || "Failed to process invitation");
+        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to process invitation"));
         setState("error");
       }
     };

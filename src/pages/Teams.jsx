@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/shared/Sidebar";
-import { FaBars, FaEdit, FaTrash, FaEye } from "react-icons/fa";
+import { FaBars, FaEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
 import teamsService from "../services/teamsService";
 import userProfileService from "../services/userProfileService";
 import organizationService from "../services/organizationService";
@@ -16,20 +16,29 @@ export default function Teams() {
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
     const [hasOrganization, setHasOrganization] = useState(true); // Track if user has organization
+    const [usage, setUsage] = useState(null); // Plan usage and limits
 
     // ============ UI STATE ============
     const [teamsSearch, setTeamsSearch] = useState("");
+    const [memberSearch, setMemberSearch] = useState("");
+    const [teamsFilter, setTeamsFilter] = useState("all");
     const [draggingMember, setDraggingMember] = useState(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [selectedTeamForMembers, setSelectedTeamForMembers] = useState(null);
     const [canManage, setCanManage] = useState(false);
+    const [orgName, setOrgName] = useState("");
+    const location = useLocation();
     const [view, setView] = useState('list'); // 'list' or 'reports'
     const [reportLevel, setReportLevel] = useState('organization'); // 'organization', 'myteams', 'myself'
     const [selectedItems, setSelectedItems] = useState([]);
+    const [compareMode, setCompareMode] = useState(false);
     const [matrixData, setMatrixData] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
+    const [orgMembers, setOrgMembers] = useState([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
     const [employeeshipMetrics, setEmployeeshipMetrics] = useState([]);
     const [performanceMetrics, setPerformanceMetrics] = useState([]);
+    const [mySelfReport, setMySelfReport] = useState(null);
 
     // ============ TOAST/NOTIFICATIONS ============
     const [toast, setToast] = useState({ message: '', visible: false });
@@ -38,15 +47,39 @@ export default function Teams() {
         setTimeout(() => setToast({ visible: false }), 3000);
     };
 
+    const loadUsage = async () => {
+        try {
+            const usageData = await organizationService.getCurrentUsage();
+            setUsage(usageData);
+        } catch (error) {
+            console.log('Could not load usage:', error);
+        }
+    };
+
+    const loadMembers = async () => {
+        try {
+            setLoadingMembers(true);
+            const members = await organizationService.getOrganizationMembers();
+            setOrgMembers(Array.isArray(members) ? members : []);
+        } catch (error) {
+            console.log('Could not load organization members:', error);
+            setOrgMembers([]);
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
+
     const checkPermissions = async () => {
         try {
             const profile = await userProfileService.getProfile();
-            const org = await organizationService.getCurrentOrganization();
-            const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
-            const isOwner = org?.contactEmail === profile?.email;
-            setCanManage(isAdmin || isOwner);
+            // All authenticated users can create teams per backend permissions
+            setCanManage(true);
             setUserProfile(profile);
             setHasOrganization(true);
+            try {
+                const org = await organizationService.getCurrentOrganization();
+                setOrgName(org?.name || "");
+            } catch {}
             return true;
         } catch (e) {
             // User has no organization yet
@@ -62,7 +95,7 @@ export default function Teams() {
         const init = async () => {
             const hasOrg = await checkPermissions();
             if (hasOrg) {
-                await loadTeams();
+                await Promise.all([loadTeams(), loadUsage(), loadMembers()]);
             } else {
                 // No org: stop loading so empty state renders
                 setLoading(false);
@@ -70,6 +103,23 @@ export default function Teams() {
         };
         init();
     }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || '');
+        const tab = params.get('tab') || 'teams-members';
+        if (tab === 'teams-members') {
+            setView('list');
+        } else if (tab === 'organization') {
+            setView('reports');
+            setReportLevel('organization');
+        } else if (tab === 'myteams') {
+            setView('reports');
+            setReportLevel('myteams');
+        } else if (tab === 'myreport') {
+            setView('reports');
+            setReportLevel('myself');
+        }
+    }, [location.search]);
 
     const loadTeams = async () => {
         try {
@@ -95,14 +145,18 @@ export default function Teams() {
     // ============ TEAM OPERATIONS ============
     const createTeam = async (name) => {
         if (!canManage) return;
-        if (!name || !name.trim()) return;
+        if (!name || !name.trim()) {
+            showToast('Team name is required', 'error');
+            return;
+        }
         setSaving(true);
         try {
             const newTeam = await teamsService.createTeam({
                 name: name.trim(),
             });
-            setTeamsData([...teamsData, newTeam]);
+            setTeamsData((prev) => [...prev, newTeam]);
             showToast('Team created successfully');
+            loadUsage(); // Reload usage stats
         } catch (err) {
             const message = err?.response?.data?.message || 'Failed to create team';
             showToast(message, 'error');
@@ -181,9 +235,7 @@ export default function Teams() {
         if (!canManage) return;
         setSaving(true);
         try {
-            await teamsService.updateTeam(teamId, {
-                leadId: userId,
-            });
+            await teamsService.assignTeamLead(teamId, userId);
             await loadTeams();
             showToast('Team leader updated successfully');
         } catch (err) {
@@ -222,6 +274,7 @@ export default function Teams() {
                 }));
             } else if (reportLevel === 'myself') {
                 const report = await teamsService.getMySelfReport();
+                setMySelfReport(report);
                 data = [
                     {
                         id: report.user.id,
@@ -278,48 +331,399 @@ export default function Teams() {
                 { key: 'energy', label: 'Energy', value: empMetrics.energy },
             ]);
             
-            setPerformanceMetrics([
-                { key: 'overall', label: 'Overall Performance', value: perfMetrics.overall },
-            ]);
+            const performanceList = Array.isArray(perfMetrics?.metrics) && perfMetrics.metrics.length > 0
+                ? perfMetrics.metrics
+                : [{ key: 'overall', label: 'Overall Performance', value: perfMetrics?.overall || 0 }];
+
+            setPerformanceMetrics(performanceList);
         } catch (err) {
             console.error('Failed to load metrics:', err);
-            // Use default/fallback values
-            setEmployeeshipMetrics(getDefaultEmployeeshipMetrics());
-            setPerformanceMetrics(getDefaultPerformanceMetrics());
+            setEmployeeshipMetrics([]);
+            setPerformanceMetrics([]);
         }
     };
 
     const handleItemSelect = (itemId) => {
         if (!canManage && reportLevel !== 'myself') return;
-        
+
         setSelectedItems(prev => {
-            if (prev.includes(itemId)) {
-                return prev.filter(id => id !== itemId);
+            const alreadySelected = prev.includes(itemId);
+            if (compareMode && reportLevel === 'organization') {
+                if (alreadySelected) {
+                    return prev.filter(id => id !== itemId);
+                }
+                return [...prev, itemId];
             }
-            return [...prev, itemId];
+            if (alreadySelected) {
+                return [];
+            }
+            return [itemId];
         });
     };
 
-    const getDefaultEmployeeshipMetrics = () => {
-        return [
-            { key: 'commitment', label: 'Commitment', value: 75 },
-            { key: 'responsibility', label: 'Responsibility', value: 68 },
-            { key: 'loyalty', label: 'Loyalty', value: 82 },
-            { key: 'initiative', label: 'Initiative', value: 71 },
-            { key: 'productivity', label: 'Productivity', value: 79 },
-            { key: 'relations', label: 'Relations', value: 73 },
-            { key: 'quality', label: 'Quality', value: 85 },
-            { key: 'competence', label: 'Professional Competence', value: 77 },
-            { key: 'flexibility', label: 'Flexibility', value: 69 },
-            { key: 'implementation', label: 'Implementation', value: 74 },
-            { key: 'energy', label: 'Energy', value: 80 },
-        ];
+    const getDefaultEmployeeshipMetrics = () => [];
+
+    const getDefaultPerformanceMetrics = () => [];
+
+    const organizationName = useMemo(() => {
+        return orgName || userProfile?.organizationName || userProfile?.companyName || userProfile?.organization?.name || 'My Organization';
+    }, [orgName, userProfile]);
+
+    const currentUserId = userProfile?.id;
+
+    const filteredTeams = useMemo(() => {
+        const base = teamsData.filter(t => t.name.toLowerCase().includes(teamsSearch.toLowerCase()));
+        if (teamsFilter === 'all') return base;
+        if (teamsFilter === 'empty') {
+            return base.filter(t => {
+                const count = Number.isFinite(t.memberCount)
+                    ? t.memberCount
+                    : (Array.isArray(t.members) ? t.members.length : 0);
+                return count === 0;
+            });
+        }
+        if (teamsFilter === 'lead') {
+            return base.filter(t => String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId || ''));
+        }
+        if (teamsFilter === 'mine') {
+            return base.filter(t => {
+                const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
+                const members = Array.isArray(t.members) ? t.members : [];
+                const inIds = currentUserId && memberIds.some(id => String(id) === String(currentUserId));
+                const inMembers = currentUserId && members.some(m => String(m.id || m.userId) === String(currentUserId));
+                return Boolean(inIds || inMembers);
+            });
+        }
+        return base;
+    }, [teamsData, teamsSearch, teamsFilter, currentUserId]);
+
+    const filteredMembers = useMemo(() => {
+        return orgMembers.filter(m => {
+            const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.name || '';
+            return name.toLowerCase().includes(memberSearch.toLowerCase());
+        });
+    }, [orgMembers, memberSearch]);
+
+    const getMemberRoleLabel = (member) => {
+        const role = (member.role || member.orgRole || member.accessRole || '').toLowerCase();
+        if (role.includes('admin') || role.includes('owner')) return 'Admin';
+        if (role.includes('lead')) return 'Lead';
+        return 'Member';
     };
 
-    const getDefaultPerformanceMetrics = () => {
-        return [
-            { key: 'overall', label: 'Overall Performance', value: 76 },
-        ];
+    const getTeamRiskLabel = (team) => {
+        const count = Number.isFinite(team.memberCount)
+            ? team.memberCount
+            : (Array.isArray(team.members) ? team.members.length : 0);
+        const hasLead = Boolean(team.leadId || team.leaderId || team.teamLeadUserId || team.lead?.id);
+        if (count === 0 && !hasLead) return 'No lead & no members';
+        if (count === 0) return 'No members';
+        if (!hasLead) return 'No lead';
+        return 'At risk';
+    };
+
+    const myTeams = useMemo(() => {
+        if (!currentUserId) return [];
+        return teamsData.filter(t => {
+            const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
+            const members = Array.isArray(t.members) ? t.members : [];
+            const isLead = String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId);
+            const inIds = memberIds.some(id => String(id) === String(currentUserId));
+            const inMembers = members.some(m => String(m.id || m.userId) === String(currentUserId));
+            return isLead || inIds || inMembers;
+        }).slice(0, 4);
+    }, [teamsData, currentUserId]);
+
+    const hasLeadTeams = useMemo(() => {
+        if (!currentUserId) return false;
+        return teamsData.some(t => String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(currentUserId));
+    }, [teamsData, currentUserId]);
+
+    useEffect(() => {
+        if (view === 'reports' && reportLevel === 'myteams' && !hasLeadTeams) {
+            setReportLevel('organization');
+        }
+    }, [view, reportLevel, hasLeadTeams]);
+
+    const atRiskTeams = useMemo(() => {
+        return teamsData.filter(t => {
+            const count = Number.isFinite(t.memberCount)
+                ? t.memberCount
+                : (Array.isArray(t.members) ? t.members.length : 0);
+            const hasLead = Boolean(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id);
+            return count === 0 || !hasLead;
+        }).slice(0, 4);
+    }, [teamsData]);
+
+    const recentActivity = useMemo(() => {
+        const entries = teamsData.map(t => {
+            const timestamp = t.lastActivityAt || t.last_activity_at || t.updatedAt || t.updated_at || t.lastActivity;
+            return {
+                id: t.id,
+                name: t.name,
+                timestamp: timestamp ? new Date(timestamp) : null,
+            };
+        }).filter(e => e.timestamp instanceof Date && !Number.isNaN(e.timestamp.getTime()));
+        return entries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 4);
+    }, [teamsData]);
+
+    const activeTeamsCount = useMemo(() => {
+        return teamsData.filter(t => {
+            const count = Number.isFinite(t.memberCount)
+                ? t.memberCount
+                : (Array.isArray(t.members) ? t.members.length : 0);
+            return count > 0;
+        }).length;
+    }, [teamsData]);
+
+    const employeeshipAverage = useMemo(() => {
+        const metrics = employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics();
+        const values = metrics.map((m) => Number(m.value) || 0);
+        const sum = values.reduce((acc, v) => acc + v, 0);
+        return values.length ? sum / values.length : 0;
+    }, [employeeshipMetrics]);
+
+    const performanceOverall = useMemo(() => {
+        const metrics = performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics();
+        const overall = metrics.find((m) => m.key === 'overall');
+        return Number(overall?.value) || 0;
+    }, [performanceMetrics]);
+
+    const profileStars = useMemo(() => {
+        const avg = (employeeshipAverage + performanceOverall) / 2;
+        if (avg >= 80) return 3;
+        if (avg >= 60) return 2;
+        if (avg >= 40) return 1;
+        return 0;
+    }, [employeeshipAverage, performanceOverall]);
+
+    const profileStatus = useMemo(() => {
+        if (profileStars >= 3) return 'Star Double Bagger';
+        if (profileStars === 2) return 'Star Performer';
+        if (profileStars === 1) return 'Double Bagger';
+        return '';
+    }, [profileStars]);
+
+    const strongestWeakest = useMemo(() => {
+        const metrics = employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics();
+        if (!metrics.length) return { strongest: null, weakest: null };
+        const sorted = [...metrics].sort((a, b) => (b.value || 0) - (a.value || 0));
+        return { strongest: sorted[0], weakest: sorted[sorted.length - 1] };
+    }, [employeeshipMetrics]);
+
+    const renderReportSidePanel = () => {
+        if (reportLevel === 'myself') {
+            const avatarUrl = userProfile?.avatarUrl || userProfile?.avatar || '';
+            const displayName = userProfile?.fullName || userProfile?.name || 'Profile';
+            const teamEmployeeship = Number(mySelfReport?.teamAverage?.canScore) || 0;
+            const teamPerformance = Number(mySelfReport?.teamAverage?.overallScore) || 0;
+            const hasMetrics = employeeshipMetrics.length > 0 || performanceMetrics.length > 0;
+            const personalOverall = (employeeshipAverage + performanceOverall) / 2;
+            const trendDirection = teamPerformance
+                ? (personalOverall >= teamPerformance ? 'up' : 'down')
+                : 'neutral';
+            const trendLabel = trendDirection === 'up'
+                ? 'Trending up vs team avg'
+                : trendDirection === 'down'
+                    ? 'Below team avg'
+                    : 'No team average yet';
+
+            return (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex flex-col items-center gap-3 text-center">
+                        {avatarUrl ? (
+                            <img
+                                src={avatarUrl}
+                                alt={displayName}
+                                className="h-20 w-20 rounded-full object-cover border"
+                            />
+                        ) : (
+                            <div className="h-20 w-20 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-3xl">
+                                {displayName.charAt(0)}
+                            </div>
+                        )}
+                        {profileStatus && (
+                            <div className="text-sm text-gray-700">Profile status: {profileStatus}</div>
+                        )}
+                        <div className="flex items-center gap-1 text-blue-600">
+                            {[1, 2, 3].map((i) => (
+                                <span key={i} className={i <= profileStars ? 'text-blue-600' : 'text-gray-300'}>
+                                    ★
+                                </span>
+                            ))}
+                        </div>
+                        <div className={`text-xs font-medium ${trendDirection === 'up' ? 'text-green-600' : trendDirection === 'down' ? 'text-red-600' : 'text-gray-500'}`}>
+                            {trendDirection === 'up' ? '▲' : trendDirection === 'down' ? '▼' : '•'} {trendLabel}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3 text-left">
+                        {hasMetrics ? (
+                            <>
+                                <div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">Employeeship</div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">You</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(employeeshipAverage, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{employeeshipAverage.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamEmployeeship, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{teamEmployeeship.toFixed(1)}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-1">Performance</div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">You</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(performanceOverall, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{performanceOverall.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-gray-500 w-16">Team avg</span>
+                                            <div className="flex-1 bg-gray-200 h-2 rounded-full">
+                                                <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${Math.min(teamPerformance, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-[11px] text-gray-600 w-10 text-right">{teamPerformance.toFixed(1)}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {strongestWeakest.strongest && strongestWeakest.weakest && (
+                                    <div className="rounded-md bg-slate-50 border border-slate-200 p-2 text-xs text-gray-700">
+                                        <div><span className="font-semibold">Strongest:</span> {strongestWeakest.strongest.label}</div>
+                                        <div><span className="font-semibold">Next focus:</span> {strongestWeakest.weakest.label}</div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="text-xs text-gray-500">Metrics are not available yet.</div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const listTitle = reportLevel === 'organization'
+            ? 'Select a team you lead to see the report:'
+            : 'Select team member to see his/her report:';
+        const listItems = matrixData || [];
+        const averageScore = listItems.length
+            ? listItems.reduce((acc, item) => acc + (Number(item.score) || 0), 0) / listItems.length
+            : 0;
+
+        return (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="text-sm text-gray-700 mb-2">{listTitle}</div>
+                {reportLevel === 'organization' && listItems.length > 0 && (
+                    <div className="flex items-center justify-between mb-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-600">
+                            <input
+                                type="checkbox"
+                                checked={compareMode}
+                                onChange={(e) => setCompareMode(e.target.checked)}
+                            />
+                            Compare mode
+                        </label>
+                        <span className="text-[11px] text-gray-500">Avg score: {averageScore.toFixed(1)}</span>
+                    </div>
+                )}
+
+                {listItems.length === 0 ? (
+                    <div className="text-xs text-gray-500">
+                        {reportLevel === 'organization' ? 'No teams led yet.' : 'No items available.'}
+                        {reportLevel === 'organization' && (
+                            <div className="mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/teams?tab=teams-members')}
+                                    className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700"
+                                >
+                                    Create team
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ) : reportLevel === 'organization' ? (
+                    <div className="space-y-2">
+                        {listItems.map((item) => {
+                            const score = Number(item.score) || 0;
+                            const trendUp = score >= averageScore;
+                            const team = teamsData.find(t => String(t.id) === String(item.id));
+                            const memberCount = Number.isFinite(team?.memberCount)
+                                ? team.memberCount
+                                : (Array.isArray(team?.members) ? team.members.length : 0);
+
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleItemSelect(item.id)}
+                                    className={`w-full text-left px-2 py-2 text-xs rounded border ${
+                                        selectedItems.includes(item.id)
+                                            ? 'border-blue-600 text-blue-700 bg-blue-50'
+                                            : 'border-gray-200 text-gray-600 hover:text-gray-800 hover:border-gray-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-semibold">{item.name}</span>
+                                        <span className={`text-[11px] ${trendUp ? 'text-green-600' : 'text-red-600'}`}>{trendUp ? '▲' : '▼'}</span>
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <div className="flex-1 h-1.5 rounded-full bg-gray-200">
+                                            <div className="h-1.5 rounded-full bg-blue-600" style={{ width: `${Math.min(score, 100)}%` }}></div>
+                                        </div>
+                                        <span className="text-[11px] text-gray-500">{score.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
+                                        <span>{memberCount} members</span>
+                                        <span>{trendUp ? 'Above avg' : 'Below avg'}</span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap gap-2">
+                        {listItems.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => handleItemSelect(item.id)}
+                                className={`px-2 py-1 text-xs rounded border ${
+                                    selectedItems.includes(item.id)
+                                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                                        : 'border-gray-200 text-gray-600 hover:text-gray-800 hover:border-gray-300'
+                                }`}
+                            >
+                                {item.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {reportLevel === 'myteams' && (
+                    <div className="mt-3">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/teams?tab=organization')}
+                            className="px-3 py-1.5 text-xs rounded bg-red-500 text-white hover:bg-red-600"
+                        >
+                            Back
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     const Section = ({ title, children, divider = true }) => (
@@ -358,41 +762,15 @@ export default function Teams() {
                         </div>
                         <div>
                             <div className="rounded-lg bg-white p-3 shadow-sm sm:p-4">
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
-                                        
-                                        {/* View Toggle */}
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setView('list')}
-                                                className={`px-4 py-2 text-sm rounded ${
-                                                    view === 'list'
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                }`}
-                                            >
-                                                Team List
-                                            </button>
-                                            <button
-                                                onClick={() => setView('reports')}
-                                                className={`px-4 py-2 text-sm rounded ${
-                                                    view === 'reports'
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                }`}
-                                            >
-                                                CAN-WILL Reports
-                                            </button>
+                                <div className="space-y-3">
+                                    {view === 'list' && (
+                                        <div className="flex flex-col gap-3 mb-3">
+                                            <h1 className="text-lg font-semibold text-gray-600 sm:text-xl">{canManage ? 'Teams & Members' : 'Teams'}</h1>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {view === 'list' ? (
                                         <>
-                                            <div className="mb-3 rounded bg-[#EDEDED] px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                                {canManage ? 'TEAM MANAGEMENT' : 'TEAM DIRECTORY'}
-                                            </div>
-
                                     {toast.visible && (
                                         <div className={`p-3 rounded text-sm ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                                             {toast.message}
@@ -400,9 +778,28 @@ export default function Teams() {
                                     )}
 
                                     {loading ? (
-                                        <div className="text-center py-12 text-gray-500">
-                                            <div className="text-4xl mb-2">⏳</div>
-                                            <p>Loading teams...</p>
+                                        <div className="animate-pulse space-y-4">
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                <div className="h-20 rounded-lg bg-slate-100"></div>
+                                                <div className="h-20 rounded-lg bg-slate-100"></div>
+                                                <div className="h-20 rounded-lg bg-slate-100"></div>
+                                            </div>
+                                            <div className="grid gap-4 lg:grid-cols-3">
+                                                <div className="lg:col-span-2 space-y-4">
+                                                    <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                    <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="h-28 rounded-lg bg-slate-100"></div>
+                                                    <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                </div>
+                                            </div>
+                                            <div className="h-10 rounded bg-slate-100"></div>
+                                            <div className="h-12 rounded bg-slate-100"></div>
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="h-28 rounded bg-slate-100"></div>
+                                                <div className="h-28 rounded bg-slate-100"></div>
+                                            </div>
                                         </div>
                                     ) : !hasOrganization ? (
                                         <div className="text-center py-12">
@@ -461,31 +858,151 @@ export default function Teams() {
                                         </div>
                                     ) : (
                                         <Section title="Teams & Members">
-                                            <div className="space-y-4">
+                                            <div className="space-y-3">
+                                                <div className="grid gap-2 md:grid-cols-3">
+                                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                        <div className="text-xs text-gray-500">Organization</div>
+                                                        <div className="text-sm font-semibold text-gray-800">{organizationName}</div>
+                                                        <div className="mt-2 text-[11px] text-gray-500">Plan: {usage?.planName || '—'}</div>
+                                                    </div>
+                                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                        <div className="text-xs text-gray-500">Members</div>
+                                                        <div className="text-sm font-semibold text-gray-800">
+                                                            {usage?.currentMembers ?? orgMembers.length} / {usage?.maxMembers ?? '—'}
+                                                        </div>
+                                                        <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                                                            <div
+                                                                className="h-2 rounded-full bg-blue-600"
+                                                                style={{ width: `${usage?.maxMembers ? Math.min((usage.currentMembers / usage.maxMembers) * 100, 100) : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                        <div className="text-xs text-gray-500">Teams</div>
+                                                        <div className="text-sm font-semibold text-gray-800">
+                                                            {usage?.currentTeams ?? teamsData.length} / {usage?.maxTeams ?? '—'}
+                                                        </div>
+                                                        <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                                                            <div
+                                                                className="h-2 rounded-full bg-blue-600"
+                                                                style={{ width: `${usage?.maxTeams ? Math.min((usage.currentTeams / usage.maxTeams) * 100, 100) : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid gap-3 lg:grid-cols-3">
+                                                    <div className="lg:col-span-2 space-y-3">
+                                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="text-sm font-semibold text-gray-800">Your Teams</div>
+                                                                <span className="text-xs text-gray-500">{myTeams.length} pinned</span>
+                                                            </div>
+                                                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                                                {myTeams.length === 0 ? (
+                                                                    <div className="text-xs text-gray-500">No teams assigned yet.</div>
+                                                                ) : (
+                                                                    myTeams.map(team => (
+                                                                        <div key={team.id} className="rounded border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                                                                            <div className="font-semibold text-gray-800">{team.name}</div>
+                                                                            <div className="mt-1 text-[11px] text-gray-500">
+                                                                                {Number.isFinite(team.memberCount)
+                                                                                    ? `${team.memberCount} members`
+                                                                                    : `${Array.isArray(team.members) ? team.members.length : 0} members`}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="text-sm font-semibold text-gray-800">Recent Activity</div>
+                                                                <span className="text-xs text-gray-500">Latest updates</span>
+                                                            </div>
+                                                            <div className="mt-2 space-y-2">
+                                                                {recentActivity.length === 0 ? (
+                                                                    <div className="text-xs text-gray-500">No recent activity yet.</div>
+                                                                ) : (
+                                                                    recentActivity.map((entry) => (
+                                                                        <div key={entry.id} className="flex items-center justify-between text-xs text-gray-600">
+                                                                            <span className="font-medium text-gray-800">{entry.name}</span>
+                                                                            <span>{entry.timestamp.toLocaleDateString()}</span>
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-3 lg:sticky lg:top-20 self-start">
+                                                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="text-sm font-semibold text-gray-800">Quick Actions</div>
+                                                            <div className="mt-2 flex flex-col gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => document.getElementById('newTeamName')?.focus()}
+                                                                    className="px-3 py-2 text-xs rounded bg-green-600 text-white hover:bg-green-700"
+                                                                >
+                                                                    Create team
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        const email = prompt('Invite member email:', '');
+                                                                        if (!email?.trim()) return;
+                                                                        try {
+                                                                            await organizationService.inviteUser(email.trim());
+                                                                            showToast('Invitation sent');
+                                                                        } catch (err) {
+                                                                            const message = err?.response?.data?.message || 'Failed to invite member';
+                                                                            showToast(message, 'error');
+                                                                        }
+                                                                    }}
+                                                                    className="px-3 py-2 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                                                                >
+                                                                    Invite member
+                                                                </button>
+                                                                <div className="mt-1 text-[11px] text-gray-500">
+                                                                    Active teams: {activeTeamsCount} • Open slots: {usage?.maxMembers ? Math.max(usage.maxMembers - (usage.currentMembers || 0), 0) : '—'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+                                                
                                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                                     <input
                                                         value={teamsSearch}
                                                         onChange={(e) => setTeamsSearch(e.target.value)}
-                                                        placeholder="Search members or teams..."
+                                                        placeholder="Search teams..."
                                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                                     />
                                                     {canManage && (
                                                         <div className="flex gap-2">
                                                             <input 
                                                                 id="newTeamName" 
-                                                                placeholder="Enter new team name" 
-                                                                className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500" 
+                                                                placeholder={usage && !usage.canAddTeams ? `Team limit reached (${usage.maxTeams} max)` : "Enter new team name"}
+                                                                className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                                                                disabled={usage && !usage.canAddTeams}
                                                             />
                                                             <button
                                                                 onClick={() => {
+                                                                    if (usage && !usage.canAddTeams) {
+                                                                        showToast(`Cannot create team: You have ${usage.currentTeams} team(s) but ${usage.planName} plan allows only ${usage.maxTeams}. Upgrade your plan to add more teams.`, 'error');
+                                                                        return;
+                                                                    }
                                                                     const el = document.getElementById('newTeamName');
                                                                     const val = el?.value?.trim();
                                                                     if (!val) return;
                                                                     createTeam(val);
                                                                     if (el) el.value = '';
                                                                 }}
-                                                                disabled={saving}
-                                                                className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60"
+                                                                disabled={saving || (usage && !usage.canAddTeams)}
+                                                                className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                                title={usage && !usage.canAddTeams ? `Team limit reached (${usage.currentTeams}/${usage.maxTeams} on ${usage.planName} plan). Upgrade to add more teams.` : "Create a new team"}
                                                             >
                                                                 {saving ? 'Creating...' : 'Create Team'}
                                                             </button>
@@ -493,28 +1010,91 @@ export default function Teams() {
                                                     )}
                                                 </div>
 
+                                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                    <button
+                                                        onClick={() => setTeamsFilter('all')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'all' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        All Teams
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamsFilter('mine')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'mine' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        My Teams
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamsFilter('lead')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'lead' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        Teams I Lead
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamsFilter('empty')}
+                                                        className={`px-3 py-1 rounded-full border ${teamsFilter === 'empty' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-600 hover:text-gray-800'}`}
+                                                    >
+                                                        Empty Teams
+                                                    </button>
+                                                </div>
+
+                                                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-sm font-semibold text-gray-800">Members</div>
+                                                        <span className="text-xs text-gray-500">{orgMembers.length} total</span>
+                                                    </div>
+                                                    <div className="mt-2">
+                                                        <div className="relative">
+                                                            <FaSearch className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+                                                            <input
+                                                                value={memberSearch}
+                                                                onChange={(e) => setMemberSearch(e.target.value)}
+                                                                placeholder="Search members..."
+                                                                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded"
+                                                            />
+                                                        </div>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {loadingMembers ? (
+                                                                <span className="text-xs text-gray-500">Loading members...</span>
+                                                            ) : filteredMembers.length === 0 ? (
+                                                                <span className="text-xs text-gray-500">No members found.</span>
+                                                            ) : (
+                                                                filteredMembers.slice(0, 12).map((m) => (
+                                                                    <div key={m.id || m.member_id} className="flex items-center gap-2 rounded-full border border-gray-200 px-2 py-1 text-xs text-gray-700">
+                                                                        <span className="h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-600">
+                                                                            {(m.firstName || m.name || 'U').charAt(0)}
+                                                                        </span>
+                                                                        <span>{`${m.firstName || ''} ${m.lastName || ''}`.trim() || m.name}</span>
+                                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${getMemberRoleLabel(m) === 'Admin' ? 'bg-purple-600 text-white' : getMemberRoleLabel(m) === 'Lead' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                                                            {getMemberRoleLabel(m)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
                                                 <div className="grid md:grid-cols-2 gap-4">
-                                                    {teamsData.length === 0 ? (
+                                                    {filteredTeams.length === 0 ? (
                                                         <div className="col-span-full text-center py-12 text-gray-500 border border-gray-200 rounded">
                                                             <div className="text-4xl mb-2">👥</div>
                                                             <p>No teams yet. Create your first team!</p>
                                                         </div>
                                                     ) : (
-                                                        teamsData
-                                                            .filter(t => t.name.toLowerCase().includes(teamsSearch.toLowerCase()))
-                                                            .map((team) => (
-                                                                <TeamCard
-                                                                    key={team.id}
-                                                                    team={team}
-                                                                    onRename={renameTeam}
-                                                                    onDelete={deleteTeam}
-                                                                    onAddMember={addMemberToTeam}
-                                                                    onRemoveMember={removeMemberFromTeam}
-                                                                    onSetLead={setTeamLead}
-                                                                    saving={saving}
-                                                                    canManage={canManage}
-                                                                />
-                                                            ))
+                                                        filteredTeams.map((team) => (
+                                                            <TeamCard
+                                                                key={team.id}
+                                                                team={team}
+                                                                onRename={renameTeam}
+                                                                onDelete={deleteTeam}
+                                                                onAddMember={addMemberToTeam}
+                                                                onRemoveMember={removeMemberFromTeam}
+                                                                onSetLead={setTeamLead}
+                                                                saving={saving}
+                                                                canManage={canManage}
+                                                                orgMembers={orgMembers}
+                                                            />
+                                                        ))
                                                     )}
                                                 </div>
                                             </div>
@@ -524,82 +1104,53 @@ export default function Teams() {
                                     ) : (
                                         // Reports View
                                         <>
-                                            {/* Report Level Selector */}
-                                            <div className="flex gap-2 mb-4">
-                                                <button
-                                                    onClick={() => setReportLevel('organization')}
-                                                    className={`px-4 py-2 text-sm rounded ${
-                                                        reportLevel === 'organization'
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                                >
-                                                    Organization
-                                                </button>
-                                                <button
-                                                    onClick={() => setReportLevel('myteams')}
-                                                    className={`px-4 py-2 text-sm rounded ${
-                                                        reportLevel === 'myteams'
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                                >
-                                                    My Teams
-                                                </button>
-                                                <button
-                                                    onClick={() => setReportLevel('myself')}
-                                                    className={`px-4 py-2 text-sm rounded ${
-                                                        reportLevel === 'myself'
-                                                            ? 'bg-green-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                                >
-                                                    My Self
-                                                </button>
-                                            </div>
-
-                                            {/* Report Description */}
-                                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                                                {reportLevel === 'organization' && "Viewing organization-wide summary: all teams' scores in the CAN-WILL matrix"}
-                                                {reportLevel === 'myteams' && "Viewing your main team: scores of users in your team"}
-                                                {reportLevel === 'myself' && "Viewing your personal position compared to your team's average score"}
-                                            </div>
-
-                                            {/* Reports Grid */}
-                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                                {/* Left column: Matrix + Selection */}
-                                                <div className="lg:col-span-2 space-y-4">
-                                                    <CanWillMatrix
-                                                        data={matrixData}
-                                                        selectedItems={selectedItems}
-                                                        onItemClick={(item) => handleItemSelect(item.id)}
-                                                    />
-                                                    
-                                                    {(canManage || reportLevel === 'myself') && (
-                                                        <SelectionPane
-                                                            title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
-                                                            items={matrixData}
+                                            {loading ? (
+                                                <div className="animate-pulse grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                    <div className="lg:col-span-2 space-y-4">
+                                                        <div className="h-80 rounded-lg bg-slate-100"></div>
+                                                        <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        <div className="h-40 rounded-lg bg-slate-100"></div>
+                                                        <div className="h-48 rounded-lg bg-slate-100"></div>
+                                                        <div className="h-24 rounded-lg bg-slate-100"></div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                    <div className="lg:col-span-2 space-y-4">
+                                                        <CanWillMatrix
+                                                            data={matrixData}
                                                             selectedItems={selectedItems}
-                                                            onSelect={handleItemSelect}
-                                                            canSelect={canManage || reportLevel === 'myself'}
+                                                            onItemClick={(item) => handleItemSelect(item.id)}
                                                         />
-                                                    )}
-                                                </div>
+                                                        
+                                                        {(canManage || reportLevel === 'myself') && (
+                                                            <SelectionPane
+                                                                title={`Select ${reportLevel === 'organization' ? 'Teams' : 'Users'} to View`}
+                                                                items={matrixData}
+                                                                selectedItems={selectedItems}
+                                                                onSelect={handleItemSelect}
+                                                                canSelect={canManage || reportLevel === 'myself'}
+                                                            />
+                                                        )}
+                                                    </div>
 
-                                                {/* Right column: Indices */}
-                                                <div className="space-y-4">
-                                                    <IndexPanel
-                                                        title="Employeeship Index"
-                                                        metrics={employeeshipMetrics.length > 0 ? employeeshipMetrics : getDefaultEmployeeshipMetrics()}
-                                                    />
-                                                    
-                                                    <IndexPanel
-                                                        title="Performance Index"
-                                                        metrics={performanceMetrics.length > 0 ? performanceMetrics : getDefaultPerformanceMetrics()}
-                                                        highlightedMetric="overall"
-                                                    />
+                                                    <div className="space-y-4 lg:sticky lg:top-20 self-start">
+                                                        {renderReportSidePanel()}
+                                                        <IndexPanel
+                                                            title="Employeeship Index"
+                                                            metrics={employeeshipMetrics}
+                                                        />
+                                                        
+                                                        <IndexPanel
+                                                            title="Performance Index"
+                                                            metrics={performanceMetrics}
+                                                            highlightedMetric="overall"
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -612,7 +1163,7 @@ export default function Teams() {
     );
 }
 
-function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage }) {
+function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSetLead, saving, canManage, orgMembers }) {
     const [showRenameInput, setShowRenameInput] = useState(false);
     const [renameValue, setRenameValue] = useState(team.name);
     const navigate = useNavigate();
@@ -634,6 +1185,13 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
             setDetailsLoading(false);
         }
     };
+
+    const leadId = team.leadId || team.leaderId || team.lead?.id;
+    const leadUser = orgMembers?.find(m => String(m.id || m.member_id) === String(leadId)) || null;
+    const leadName = leadUser ? `${leadUser.firstName || ''} ${leadUser.lastName || ''}`.trim() : team.leadName || team.leaderName || '';
+    const leadInitial = (leadName || team.name || 'T').charAt(0);
+    const lastActivity = team.lastActivityAt || team.last_activity_at || team.updatedAt || team.updated_at || team.lastActivity;
+    const lastActivityLabel = lastActivity ? new Date(lastActivity).toLocaleDateString() : '—';
 
     return (
         <div className="rounded border p-3 bg-white hover:shadow-md transition-shadow">
@@ -694,6 +1252,16 @@ function TeamCard({ team, onRename, onDelete, onAddMember, onRemoveMember, onSet
                         </button>
                     </div>
                 )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-600">
+                        {leadInitial}
+                    </div>
+                    <span>{leadName ? `Lead: ${leadName}` : 'Lead: —'}</span>
+                </div>
+                <span>Last activity: {lastActivityLabel}</span>
             </div>
 
             {canManage && showRenameInput && (

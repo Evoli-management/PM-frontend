@@ -708,3 +708,22 @@ export const adminUpdateGoal = async (goalId, updateData) => {
         handleError(`admin updating goal ${goalId}`, error);
     }
 };
+
+/**
+ * Bulk update multiple goals at once
+ * @param {string[]} goalIds - Array of goal IDs to update
+ * @param {object} updates - The updates to apply to all selected goals
+ * @returns {Promise<object>} A promise that resolves to the result
+ */
+export const bulkUpdateGoals = async (goalIds, updates) => {
+    try {
+        console.log("Bulk updating goals:", goalIds, "with:", updates);
+        const response = await apiClient.patch("/goals/bulk-update", {
+            ids: goalIds,
+            updates,
+        });
+        return response.data;
+    } catch (error) {
+        handleError("bulk updating goals", error);
+    }
+};

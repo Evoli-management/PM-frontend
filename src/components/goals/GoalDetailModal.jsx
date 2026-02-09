@@ -7,6 +7,7 @@ import {
     FaEllipsisV,
     FaTrash,
 } from "react-icons/fa";
+import { useFormattedDate } from "../../hooks/useFormattedDate";
 
 const GoalForm = React.lazy(() => import("./GoalForm"));
 import GoalGauge from "./GoalGauge";
@@ -23,6 +24,12 @@ const GoalDetailModal = ({
     const [isEditing, setIsEditing] = useState(false);
     const [localGoal, setLocalGoal] = useState(goal);
     const [updatingMilestone, setUpdatingMilestone] = useState(null);
+    const { formatDate, dateFormat } = useFormattedDate();
+
+    const formatDateLabel = (value) => {
+        if (!value) return `Format: ${dateFormat}`;
+        return `${formatDate(value)} (Format: ${dateFormat})`;
+    };
 
     React.useEffect(() => {
         // Initialize localGoal from prop when modal opens or goal changes,
@@ -606,6 +613,9 @@ const GoalDetailModal = ({
                                     >
                                         📅
                                     </button>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {formatDateLabel(localGoal?.startDate)}
+                                    </p>
                                 </div>
                             </div>
 
@@ -648,6 +658,9 @@ const GoalDetailModal = ({
                                     >
                                         📅
                                     </button>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {formatDateLabel(localGoal?.dueDate)}
+                                    </p>
                                 </div>
                             </div>
 
@@ -1126,6 +1139,9 @@ const GoalDetailModal = ({
                                                         >
                                                             📅
                                                         </button>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            {formatDateLabel(m.startDate)}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-2">
@@ -1253,6 +1269,9 @@ const GoalDetailModal = ({
                                                         >
                                                             📅
                                                         </button>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            {formatDateLabel(m.dueDate)}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>

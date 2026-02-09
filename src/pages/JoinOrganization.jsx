@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle, AlertCircle, Loader } from "lucide-react";
 import organizationService from "../services/organizationService";
 import authService from "../services/authService";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 export default function JoinOrganization() {
   const navigate = useNavigate();
@@ -76,7 +77,7 @@ export default function JoinOrganization() {
             }, 2000);
           } catch (acceptErr) {
             console.error("[JoinOrganization] Failed to accept invitation:", acceptErr);
-            setError(acceptErr?.response?.data?.message || acceptErr.message || "Failed to accept invitation");
+            setError(getFriendlyErrorMessage(acceptErr?.response?.data?.message || acceptErr.message || "Failed to accept invitation"));
             setState("pending"); // Fall back to pending state if acceptance fails
           }
         } else {
@@ -86,7 +87,7 @@ export default function JoinOrganization() {
         }
       } catch (err) {
         console.error("[JoinOrganization] Error in loadInvitation:", err);
-        setError(err?.response?.data?.message || err.message || "Failed to load invitation");
+        setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to load invitation"));
         setState("error");
       }
     };
@@ -104,7 +105,7 @@ export default function JoinOrganization() {
         navigate("/dashboard");
       }, 2000);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || "Failed to accept invitation");
+      setError(getFriendlyErrorMessage(err?.response?.data?.message || err.message || "Failed to accept invitation"));
       setState("error");
     }
   };

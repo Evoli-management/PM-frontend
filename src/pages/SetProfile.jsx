@@ -4,9 +4,11 @@ import { ProfileLayout } from '../components/profile/ProfileLayout';
 import { PersonalInformation } from '../components/profile/PersonalInformation';
 import { SecuritySettings } from '../components/profile/SecuritySettings';
 import { Preferences } from '../components/profile/Preferences';
+import { Privacy } from '../components/profile/Privacy';
 import { Integrations } from '../components/profile/Integrations';
 import { Toast } from '../components/profile/UIComponents';
-import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations, ManageTeams, ManageMembers, CultureAndValues, OrganizationSettings } from '../components/profile';
+import { OrganizationOverview, OrganizationMembers, InviteModal, OrganizationInvitations, ManageTeams, ManageMembers, OrganizationSettings } from '../components/profile';
+import { CultureAndValues } from '../components/profile/CultureAndValuesSplitPanel';
 import { FaBars } from 'react-icons/fa';
 import userProfileService from '../services/userProfileService';
 import organizationService from '../services/organizationService';
@@ -41,7 +43,12 @@ const OrganizationTab = ({ showToast }) => {
     const renderSubTabContent = () => {
         switch (activeSubTab) {
             case "overview":
-                return <OrganizationOverview showToast={showToast} />;
+                return (
+                    <OrganizationOverview
+                        showToast={showToast}
+                        onTransferOwnership={() => setActiveSubTab("members")}
+                    />
+                );
             case "teams":
                 return <ManageTeams showToast={showToast} />;
             case "members":
@@ -51,7 +58,12 @@ const OrganizationTab = ({ showToast }) => {
             case "settings":
                 return <OrganizationSettings showToast={showToast} />;
             default:
-                return <OrganizationOverview showToast={showToast} />;
+                return (
+                    <OrganizationOverview
+                        showToast={showToast}
+                        onTransferOwnership={() => setActiveSubTab("members")}
+                    />
+                );
         }
     };
 
@@ -115,6 +127,8 @@ export default function ProfileSetting() {
                 return <SecuritySettings showToast={showToast} />;
             case "Preferences":
                 return <Preferences showToast={showToast} />;
+            case "Privacy":
+                return <Privacy showToast={showToast} />;
             case "Integrations":
                 return <Integrations showToast={showToast} />;
             case "Organization":

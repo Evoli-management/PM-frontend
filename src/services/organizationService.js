@@ -16,6 +16,19 @@ class OrganizationService {
   }
 
   /**
+   * Get all organizations for current user
+   */
+  async getUserOrganizations() {
+    try {
+      const res = await apiClient.get("/organizations");
+      return res.data || [];
+    } catch (error) {
+      console.error("Failed to fetch user organizations:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all members in current organization
    */
   async getOrganizationMembers() {
@@ -217,6 +230,130 @@ class OrganizationService {
       return res.data;
     } catch (error) {
       console.error("Failed to leave organization:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all organizations for current user
+   * Used for organization switcher
+   */
+  async getUserOrganizations() {
+    try {
+      const res = await apiClient.get("/organizations");
+      return res.data || [];
+    } catch (error) {
+      console.error("Failed to fetch user organizations:", error);
+      // Fallback to current organization if endpoint not available
+      try {
+        const current = await this.getCurrentOrganization();
+        return current ? [current] : [];
+      } catch {
+        return [];
+      }
+    }
+  }
+
+  /**
+   * Get current subscription manager for organization
+   */
+  async getSubscriptionManager() {
+    try {
+      const res = await apiClient.get("/organizations/current/subscription-manager");
+      return res.data?.manager || null;
+    } catch (error) {
+      console.error("Failed to fetch subscription manager:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Assign subscription manager to a member
+   * Only one subscription manager per organization
+   * @param {string} memberId - User ID to assign as subscription manager
+   */
+  async assignSubscriptionManager(memberId) {
+    try {
+      if (!memberId) {
+        throw new Error("Member ID is required");
+      }
+      const res = await apiClient.patch("/organizations/current/subscription-manager", {
+        memberId,
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Failed to assign subscription manager:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get current subscription usage (members and teams count vs limits)
+   */
+  async getCurrentUsage() {
+    try {
+      const res = await apiClient.get("/organizations/current/usage");
+      return res.data?.usage || null;
+    } catch (error) {
+      console.error("Failed to fetch usage:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get trial status for current organization
+   * Returns trial info including days remaining
+   */
+  async getTrialStatus() {
+    try {
+      const res = await apiClient.get("/organizations/current/trial-status");
+      return res.data?.trial || null;
+    } catch (error) {
+      console.error("Failed to fetch trial status:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start 14-day trial of BUSINESS plan
+   * Only owners, admins, or subscription managers can start trial
+   */
+  async startTrial() {
+    try {
+      const res = await apiClient.post("/organizations/current/start-trial");
+      return res.data;
+    } catch (error) {
+      console.error("Failed to start trial:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get active subscription plans
+   */
+  async getPlans() {
+    try {
+      const res = await apiClient.get("/organizations/plans");
+      return res.data?.plans || [];
+    } catch (error) {
+      console.error("Failed to fetch plans:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update subscription plan for current organization
+   * @param {string} planId
+   */
+  async updateSubscriptionPlan(planId) {
+    try {
+      if (!planId) {
+        throw new Error("Plan ID is required");
+      }
+      const res = await apiClient.patch("/organizations/current/plan", { planId });
+      return res.data;
+    } catch (error) {
+      console.error("Failed to update subscription plan:", error);
       throw error;
     }
   }

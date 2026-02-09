@@ -5,6 +5,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
         "My Profile",
         "Security",
         "Preferences",
+        "Privacy",
         "Integrations",
         "Organization",
     ];
@@ -22,6 +23,7 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                     "my-profile": "My Profile",
                     "security": "Security",
                     "preferences": "Preferences",
+                    "privacy": "Privacy",
                     "integrations": "Integrations",
                     "organization": "Organization",
                 };
@@ -55,10 +57,6 @@ const ProfileLayout = ({ children, activeTab, setActiveTab }) => {
                                 <div className="flex gap-2">
                                     {/* action buttons can go here if needed */}
                                 </div>
-                            </div>
-
-                            <div className="mb-3 rounded bg-[#EDEDED] px-2 py-1 text-center text-[11px] font-semibold tracking-wide text-gray-700 sm:text-[12px]">
-                                PROFILE SETTINGS
                             </div>
 
                             <section className="mt-5 border-t border-gray-200 pt-5">

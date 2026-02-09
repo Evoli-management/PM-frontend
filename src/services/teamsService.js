@@ -166,6 +166,25 @@ const teamsService = {
     });
     return response.data;
   },
+
+  // Team Lead Methods
+  async getTeamLead(teamId) {
+    const response = await axios.get(`${API_URL}/teams/${teamId}/lead`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    return response.data?.lead || null;
+  },
+
+  async assignTeamLead(teamId, userId) {
+    const response = await axios.patch(
+      `${API_URL}/teams/${teamId}/lead`,
+      { userId },
+      {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      }
+    );
+    return response.data;
+  },
 };
 
 export default teamsService;

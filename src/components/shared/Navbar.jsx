@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUser, FaBolt, FaTh, FaSearch } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import teamsService from "../../services/teamsService";
 import taskService from "../../services/taskService";
 import activityService from "../../services/activityService";
 import * as goalService from "../../services/goalService";
@@ -12,20 +13,25 @@ import calendarService from "../../services/calendarService";
 import ReminderBell from "./ReminderBell";
 import NotificationBell from "./NotificationBell";
 import ReminderModal from "../reminders/ReminderModal";
+import OrganizationSwitcher from "./OrganizationSwitcher";
 
 export default function Navbar() {
     const [open, setOpen] = useState(false);
     const [openQuick, setOpenQuick] = useState(false);
+    const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
+    const [hasLeadTeams, setHasLeadTeams] = useState(false);
     const menuRef = useRef(null);
     const quickRef = useRef(null);
     const quickButtonRef = useRef(null);
+    const activeMenuRef = useRef(null);
 
     // Close the profile/settings popover when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
             const node = menuRef.current;
             const qnode = quickRef.current;
+            const activeNode = activeMenuRef.current;
             // Close profile menu if click outside
             if (open && node && !node.contains(e.target)) {
                 setOpen(false);
@@ -34,14 +40,20 @@ export default function Navbar() {
             if (openQuick && qnode && !qnode.contains(e.target)) {
                 setOpenQuick(false);
             }
+            if (openActiveMenu && activeNode && !activeNode.contains(e.target)) {
+                setOpenActiveMenu(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [open, openQuick]);
+    }, [open, openQuick, openActiveMenu]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
     const [openWidgets, setOpenWidgets] = useState(false);
+    const showKeyAreaTabs = location.pathname.startsWith('/key-areas') || location.pathname === '/my-focus';
+    const showTeamsTabs = location.pathname.startsWith('/teams');
+    const showGiveStrokesTabs = location.pathname.startsWith('/give-strokes');
     const widgetsRef = useRef(null);
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -356,10 +368,57 @@ export default function Navbar() {
         }
     };
 
+    useEffect(() => {
+        let isActive = true;
+        const loadLeadTeams = async () => {
+            if (!showTeamsTabs || !userProfile?.id) return;
+            try {
+                const teams = await teamsService.getTeams();
+                const list = Array.isArray(teams)
+                    ? teams
+                    : Array.isArray(teams?.teams)
+                        ? teams.teams
+                        : [];
+                const lead = list.some((t) =>
+                    String(t.leadId || t.leaderId || t.teamLeadUserId || t.lead?.id || '') === String(userProfile.id)
+                );
+                if (isActive) setHasLeadTeams(lead);
+            } catch (e) {
+                if (isActive) setHasLeadTeams(false);
+            }
+        };
+        loadLeadTeams();
+        return () => {
+            isActive = false;
+        };
+    }, [showTeamsTabs, userProfile?.id]);
+
     // Helper: open a modal globally via event so we reuse existing modal UI
     const openCreateModal = (type) => {
         try {
             setOpenQuick(false);
+
+            if (type === 'dontforget') {
+                navigate('/tasks?dontforget=1');
+                setTimeout(() => {
+                    try { window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type: 'dontforget' } })); } catch (_) {}
+                }, 50);
+                return;
+            }
+
+            if (type === 'appointment') {
+                navigate('/calendar');
+                setTimeout(() => {
+                    try { window.dispatchEvent(new CustomEvent('open-create-appointment', { detail: { start: new Date().toISOString() } })); } catch (_) {}
+                }, 50);
+                return;
+            }
+
+            if (type === 'stroke') {
+                navigate('/give-strokes?tab=give');
+                return;
+            }
+
             window.dispatchEvent(new CustomEvent('open-create-modal', { detail: { type } }));
         } catch (err) {
             console.warn('openCreateModal handler error', err);
@@ -443,6 +502,25 @@ export default function Navbar() {
         return null;
     }
 
+    const activeKeyAreaView = (() => {
+        if (location.pathname === '/my-focus') return 'my-focus';
+        const params = new URLSearchParams(location.search || '');
+        return params.get('view') || 'active-tasks';
+    })();
+    const activeKeyAreaFilter = (() => {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('active') || 'active';
+    })();
+    const activeTasksLabel = activeKeyAreaFilter === 'all' ? 'ALL TASKS' : 'ACTIVE TASKS';
+    const activeTeamsTab = (() => {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('tab') || 'teams-members';
+    })();
+    const activeGiveStrokesTab = (() => {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('tab') || 'give';
+    })();
+
     return (
         <header
             className="bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
@@ -450,7 +528,7 @@ export default function Navbar() {
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
         >
-            <div className="w-full px-2 md:px-4 h-full flex items-center justify-between">
+            <div className="w-full px-2 md:px-4 h-16 flex items-center gap-4">
                     <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
@@ -464,6 +542,182 @@ export default function Navbar() {
                     {/* Compact search icon (replaces large centered search bar) */}
                     {/* Placed visually with other header actions for a cleaner layout */}
                     
+                {showKeyAreaTabs && (
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <div className="relative" ref={activeMenuRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenActiveMenu((prev) => !prev)}
+                                    className={`px-2 py-2 rounded transition flex items-center gap-1 ${
+                                        activeKeyAreaView === 'active-tasks'
+                                            ? 'text-blue-600 border-b-2 border-blue-600'
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    {activeTasksLabel}
+                                    <span className="text-[10px]">▾</span>
+                                </button>
+                                {openActiveMenu && (
+                                    <div className="absolute left-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-50">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigate('/key-areas?view=active-tasks&active=active');
+                                                setOpenActiveMenu(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                                activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'active'
+                                                    ? 'text-blue-600'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            ACTIVE TASKS
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigate('/key-areas?view=active-tasks&active=all');
+                                                setOpenActiveMenu(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                                                activeKeyAreaView === 'active-tasks' && activeKeyAreaFilter === 'all'
+                                                    ? 'text-blue-600'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            ALL TASKS
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=delegated')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'delegated'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                DELEGATED
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=todo')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'todo'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                TO-DO (RED)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/key-areas?view=activity-trap')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'activity-trap'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                ACTIVITY TRAP
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/my-focus')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeKeyAreaView === 'my-focus'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY FOCUS
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {showTeamsTabs && !showKeyAreaTabs && (
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=teams-members')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'teams-members'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                OVERVIEW
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=organization')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'organization'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY ORGANISATION
+                            </button>
+                            {hasLeadTeams && (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/teams?tab=myteams')}
+                                    className={`px-2 py-2 rounded transition ${
+                                        activeTeamsTab === 'myteams'
+                                            ? 'text-blue-600 border-b-2 border-blue-600'
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    MY TEAMS
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => navigate('/teams?tab=myreport')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeTeamsTab === 'myreport'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                MY REPORT
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {showGiveStrokesTabs && !showKeyAreaTabs && !showTeamsTabs && (
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/give-strokes?tab=give')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeGiveStrokesTab === 'give'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                GIVE STROKES
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/give-strokes?tab=account')}
+                                className={`px-2 py-2 rounded transition ${
+                                    activeGiveStrokesTab === 'account'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                STROKE ACCOUNT
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     <div className="relative">
                         <button
@@ -672,6 +926,9 @@ export default function Navbar() {
                         onClose={handleGlobalReminderClose}
                         onSave={handleGlobalReminderSave}
                     />
+
+                    {/* Organization Switcher - for multi-org users */}
+                    {isAuthenticated && <OrganizationSwitcher />}
 
                     <div className="relative" ref={menuRef}>
                         <button

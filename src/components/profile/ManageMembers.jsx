@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes, FaBullseye, FaThLarge, FaUsers } from "react-icons/fa";
+import { FaEdit, FaTrash, FaEye, FaUserPlus, FaTimes, FaBullseye, FaThLarge, FaUsers, FaKey } from "react-icons/fa";
 import userProfileService from "../../services/userProfileService";
+import { SubscriptionManagerModal } from "./SubscriptionManagerModal";
+import { TrialStatusBanner } from "./TrialStatusBanner";
 
 export function ManageMembers({ showToast }) {
   const [members, setMembers] = useState([]);
@@ -9,15 +11,53 @@ export function ManageMembers({ showToast }) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showSubscriptionManagerModal, setShowSubscriptionManagerModal] = useState(false);
   const [teams, setTeams] = useState([]);
   const [canManage, setCanManage] = useState(false);
+  const [canInvite, setCanInvite] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [currentSubscriptionManager, setCurrentSubscriptionManager] = useState(null);
+  const [usage, setUsage] = useState(null);
+  const [trialStatus, setTrialStatus] = useState(null);
 
   useEffect(() => {
     checkPermissions();
     loadMembers();
     loadTeams();
+    loadSubscriptionManager();
+    loadUsage();
+    loadTrialStatus();
   }, []);
+
+  const loadTrialStatus = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const trial = await orgService.default.getTrialStatus();
+      setTrialStatus(trial);
+    } catch (error) {
+      console.log("Could not load trial status:", error);
+    }
+  };
+
+  const loadUsage = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const usageData = await orgService.default.getCurrentUsage();
+      setUsage(usageData);
+    } catch (error) {
+      console.log("Could not load usage:", error);
+    }
+  };
+
+  const loadSubscriptionManager = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      const manager = await orgService.default.getSubscriptionManager();
+      setCurrentSubscriptionManager(manager);
+    } catch (error) {
+      console.log("Could not load subscription manager:", error);
+    }
+  };
 
   const checkPermissions = async () => {
     try {
@@ -30,9 +70,13 @@ export function ManageMembers({ showToast }) {
       const isAdmin = profile?.role === 'admin' || profile?.isSuperUser === true;
       const isOwner = org?.contactEmail === profile?.email;
       setCanManage(isAdmin || isOwner);
+
+      // Any authenticated org member can invite; backend now permits all roles
+      setCanInvite(!!org?.id);
     } catch (e) {
       console.log("Could not check permissions:", e);
       setCanManage(false);
+      setCanInvite(false);
     }
   };
 
@@ -99,6 +143,7 @@ export function ManageMembers({ showToast }) {
       const orgService = await import("../../services/organizationService");
       const { inviteUrl } = await orgService.default.inviteUser(email);
       showToast?.("Invitation sent successfully");
+      loadUsage(); // Reload usage stats
       return { inviteUrl };
     } catch (e) {
       showToast?.(e?.response?.data?.message || "Failed to send invitation", "error");
@@ -106,18 +151,87 @@ export function ManageMembers({ showToast }) {
     }
   };
 
+  const handleStartTrial = async () => {
+    try {
+      const orgService = await import("../../services/organizationService");
+      await orgService.default.startTrial();
+      showToast?.("Trial started successfully! You now have 14 days of Business plan access.");
+      // Reload trial status and usage
+      loadTrialStatus();
+      loadUsage();
+    } catch (e) {
+      showToast?.(e?.response?.data?.message || "Failed to start trial", "error");
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-4 border-b flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Manage Members/Users</h3>
-          {canManage && (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
-            >
-              <FaUserPlus /> Invite new user
-            </button>
-          )}
+      {/* Trial Status Banner */}
+      {trialStatus && (
+        <div className="p-4">
+          <TrialStatusBanner 
+            trial={trialStatus} 
+            canManage={canManage}
+            onStartTrial={handleStartTrial}
+          />
+        </div>
+      )}
+      
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Manage Members/Users</h3>
+            <div className="flex items-center gap-2">
+              {canManage && (
+                <button
+                  onClick={() => setShowSubscriptionManagerModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
+                  title="Assign subscription manager"
+                >
+                  <FaKey /> Subscription Manager
+                </button>
+              )}
+              {canInvite && (
+                <button
+                  onClick={() => {
+                    if (usage && !usage.canAddMembers) {
+                      showToast?.(`Cannot add member: You have ${usage.currentMembers} member(s) but ${usage.planName} plan allows only ${usage.maxMembers}. Upgrade your plan to add more members.`, 'error');
+                      return;
+                    }
+                    setShowInviteModal(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm"
+                  disabled={usage && !usage.canAddMembers}
+                  title={usage && !usage.canAddMembers ? `Member limit reached (${usage.currentMembers}/${usage.maxMembers} on ${usage.planName} plan). Upgrade to add more members.` : "Invite new user"}
+                >
+                  <FaUserPlus /> Invite new user
+                </button>
+              )}
+            </div>
+        </div>
+        
+        {/* Usage Stats */}
+        {usage && (
+          <div className="flex items-center gap-4 text-sm">
+            <div className={`flex items-center gap-2 ${usage.canAddMembers ? 'text-gray-600' : 'text-red-600'}`}>
+              <FaUsers />
+              <span>
+                <strong>{usage.currentMembers}/{usage.maxMembers}</strong> members
+              </span>
+              {!usage.canAddMembers && (
+                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">Limit reached</span>
+              )}
+            </div>
+            <div className={`flex items-center gap-2 ${usage.canAddTeams ? 'text-gray-600' : 'text-red-600'}`}>
+              <FaThLarge />
+              <span>
+                <strong>{usage.currentTeams}/{usage.maxTeams}</strong> teams
+              </span>
+            </div>
+            <div className="text-gray-500 text-xs">
+              Plan: <strong>{usage.planName}</strong>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -129,8 +243,13 @@ export function ManageMembers({ showToast }) {
           {members.map((member) => (
             <div key={member.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
               <div className="flex-1">
-                <div className="font-medium text-gray-900">
+                <div className="font-medium text-gray-900 flex items-center gap-2">
                   {member.firstName} {member.lastName}
+                  {currentSubscriptionManager?.id === member.id && (
+                    <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded">
+                      Subscription Manager
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-gray-600">{member.email}</div>
                 <div className="text-xs text-gray-500 mt-1">
@@ -198,6 +317,20 @@ export function ManageMembers({ showToast }) {
           onInvite={handleInviteUser}
         />
       )}
+
+      {showSubscriptionManagerModal && (
+        <SubscriptionManagerModal
+          members={members}
+          currentManager={currentSubscriptionManager}
+          onClose={() => setShowSubscriptionManagerModal(false)}
+          onSuccess={() => {
+            setShowSubscriptionManagerModal(false);
+            loadSubscriptionManager();
+            loadMembers();
+          }}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
@@ -205,7 +338,7 @@ export function ManageMembers({ showToast }) {
 function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
   const [firstName, setFirstName] = useState(member.firstName || "");
   const [lastName, setLastName] = useState(member.lastName || "");
-  const [role, setRole] = useState(member.role || "user");
+  const [role, setRole] = useState(member.role || "member");
   const [selectedTeams, setSelectedTeams] = useState(member.teamIds || []);
   const [saving, setSaving] = useState(false);
 
@@ -281,11 +414,12 @@ function EditMemberModal({ member, teams, onClose, onSuccess, showToast }) {
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="user">User</option>
+              <option value="member">Member</option>
               <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Only admins can edit other users' goals and key areas
+              Role defines member's permissions in the organization
             </p>
           </div>
 
