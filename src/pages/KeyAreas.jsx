@@ -3606,7 +3606,7 @@ export default function KeyAreas() {
 
                         {/* Unified Table View for DELEGATED, TODO, ACTIVITY TRAP tabs */}
                         {(viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap') && (
-                            <div className="flex-1 overflow-auto px-4 py-4">
+                            <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <UnifiedTaskActivityTable
                                     viewTab={viewTab}
                                     tasks={allTasks}
