@@ -239,43 +239,6 @@ export default function UnifiedTaskActivityTable({
     const saveEdit = async (item, field, value) => {
         const updates = {};
         
-        // Handle delegation when changing responsible person
-        if (field === 'responsibleId' && item.type === 'task' && value && currentUserId) {
-            // Check if we're assigning to someone other than current user (i.e., delegating)
-            const newResponsibleId = value;
-            const currentOwner = item.userId || item.user_id;
-            
-            // Only delegate if:
-            // 1. New responsible is different from current user
-            // 2. Current user is the owner OR already delegated to them
-            if (String(newResponsibleId) !== String(currentUserId)) {
-                try {
-                    // Call delegation API
-                    await taskDelegationService.delegateTask(item.id, {
-                        delegatedToUserId: newResponsibleId,
-                        notes: `Task delegated via inline edit`
-                    });
-                    
-                    console.log('Task delegated successfully');
-                    
-                    // Update will be handled by the parent refresh
-                    setEditingCell(null);
-                    setEditValue('');
-                    
-                    // Trigger parent callback to refresh data
-                    if (onTaskUpdate) {
-                        onTaskUpdate(item.id, { delegatedToUserId: newResponsibleId });
-                    }
-                    return;
-                } catch (error) {
-                    console.error('Failed to delegate task:', error);
-                    alert(error.response?.data?.message || 'Failed to delegate task. Please try again.');
-                    cancelEdit();
-                    return;
-                }
-            }
-        }
-        
         // Standard field updates
         if (field === 'title') {
             updates.title = value;
@@ -297,10 +260,33 @@ export default function UnifiedTaskActivityTable({
             updates.keyAreaId = value || null;
             updates.key_area_id = value || null;
         } else if (field === 'responsibleId') {
-            updates.assigneeId = value || null;
-            updates.assignee_id = value || null;
-            updates.responsibleId = value || null;
-            updates.responsible_id = value || null;
+            // Handle responsible/assignee changes with auto-delegation
+            if (item.type === 'task' && value) {
+                // Find the selected user to get both ID and name
+                const selectedUser = users.find(u => String(u.id || u.member_id) === String(value));
+                
+                if (selectedUser) {
+                    const userId = selectedUser.id || selectedUser.member_id;
+                    
+                    // Set assignee name for display
+                    if (String(userId) === String(currentUserId)) {
+                        updates.assignee = 'Me';
+                    } else {
+                        updates.assignee = `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim();
+                    }
+                    
+                    // Add delegatedToUserId to auto-create delegation (only if different user)
+                    if (String(userId) !== String(currentUserId)) {
+                        updates.delegatedToUserId = userId;
+                    }
+                }
+            } else {
+                // Fallback for activities or empty value
+                updates.assigneeId = value || null;
+                updates.assignee_id = value || null;
+                updates.responsibleId = value || null;
+                updates.responsible_id = value || null;
+            }
         } else if (field === 'goalId') {
             updates.goalId = value || null;
             updates.goal_id = value || null;
