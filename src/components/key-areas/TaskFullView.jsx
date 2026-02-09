@@ -387,14 +387,40 @@ export default function TaskFullView({
             const ts = await getTaskService();
             // sel may be user id; map to name or 'Me' when possible
             let valueToSend = sel;
-            try {
-                const { selectedUserIdToPersistValue } = await import('../../utils/keyareasHelpers');
-                valueToSend = selectedUserIdToPersistValue(sel, localUsers.length ? localUsers : users, currentUserId);
-            } catch (e) {}
-            // Update the task's assignee (task API accepts `assignee`)
+            let userIdToDelegate = null;
+            
+            // Check if sel is a user ID and get both name and ID
+            const selectedUser = localUsers.length 
+                ? localUsers.find(u => String(u.id || u.member_id) === String(sel))
+                : users.find(u => String(u.id || u.member_id) === String(sel));
+            
+            if (selectedUser) {
+                userIdToDelegate = selectedUser.id || selectedUser.member_id;
+                // Convert ID to name for display
+                if (String(userIdToDelegate) === String(currentUserId)) {
+                    valueToSend = 'Me';
+                } else {
+                    valueToSend = `${selectedUser.name || selectedUser.firstname || ''} ${selectedUser.lastname || ''}`.trim();
+                }
+            }
+            
+            // Update the task with both assignee name and delegatedToUserId (auto-creates delegation)
             // eslint-disable-next-line no-console
-            console.debug('[TaskFullView] updating task assignee', task.id, { assignee: valueToSend });
-            const updatedTask = await ts.update(task.id, { assignee: valueToSend });
+            console.debug('[TaskFullView] updating task assignee', task.id, { 
+                assignee: valueToSend,
+                delegatedToUserId: userIdToDelegate 
+            });
+            
+            const updatePayload = { 
+                assignee: valueToSend 
+            };
+            
+            // Only add delegatedToUserId if it's a different user (creates delegation with accept/reject)
+            if (userIdToDelegate && String(userIdToDelegate) !== String(currentUserId)) {
+                updatePayload.delegatedToUserId = userIdToDelegate;
+            }
+            
+            const updatedTask = await ts.update(task.id, updatePayload);
             // eslint-disable-next-line no-console
             console.debug('[TaskFullView] task update response', updatedTask);
             // Also apply the normalized assignee value into the local activity list
