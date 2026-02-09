@@ -705,9 +705,12 @@ export default function KeyAreas() {
                     let delegatedToMe = [];
                     try {
                         delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                        console.log('✅ Delegated tasks from taskDelegationService.getDelegatedToMe():', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
                     } catch (err) {
+                        console.warn('❌ taskDelegationService.getDelegatedToMe() failed:', err);
                         const svc = await getTaskService();
                         delegatedToMe = await svc.list({ delegatedTo: true });
+                        console.log('✅ Fallback to taskService.list({ delegatedTo: true }):', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
                     }
 
                     setAllTasks(delegatedToMe || []);
