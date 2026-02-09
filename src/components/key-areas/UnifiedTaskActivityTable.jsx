@@ -371,19 +371,10 @@ export default function UnifiedTaskActivityTable({
         
         try {
             const areas = await keyAreaService.list();
-            // Add system key areas at the beginning
-            const systemAreas = [
-                { id: 'dont-forget', name: "Don't Forget", isSystem: true },
-                { id: 'bright-ideas', name: 'Bright Ideas', isSystem: true }
-            ];
-            setUserKeyAreas([...systemAreas, ...(areas || [])]);
+            setUserKeyAreas(areas || []);
         } catch (error) {
             console.error('Failed to load key areas:', error);
-            // Fallback to just system areas
-            setUserKeyAreas([
-                { id: 'dont-forget', name: "Don't Forget", isSystem: true },
-                { id: 'bright-ideas', name: 'Bright Ideas', isSystem: true }
-            ]);
+            setUserKeyAreas([]);
         }
     };
 
@@ -398,13 +389,13 @@ export default function UnifiedTaskActivityTable({
             
             alert('Task accepted successfully! The new task has been added to your selected Key Area.');
             
-            // Close modal and refresh the page to show updated list
+            // Close modal
             setShowAcceptModal(false);
             setAcceptingTask(null);
             setSelectedKeyArea('');
             
-            // Reload the page to show fresh delegation list
-            window.location.reload();
+            // Redirect to the selected key area to view the new task (matching legacy behavior)
+            window.location.href = `/key-areas?id=${selectedKeyArea}`;
         } catch (error) {
             console.error('Failed to accept delegation:', error);
             alert(error.response?.data?.message || 'Failed to accept delegation');
@@ -973,7 +964,7 @@ export default function UnifiedTaskActivityTable({
                                     <option value="">-- Select a Key Area --</option>
                                     {userKeyAreas.map((area) => (
                                         <option key={area.id} value={area.id}>
-                                            {area.name}
+                                            {area.title || area.name}
                                         </option>
                                     ))}
                                 </select>
