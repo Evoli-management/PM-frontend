@@ -371,9 +371,19 @@ export default function UnifiedTaskActivityTable({
         
         try {
             const areas = await keyAreaService.list();
-            setUserKeyAreas(areas || []);
+            // Add system key areas at the beginning
+            const systemAreas = [
+                { id: 'dont-forget', name: "Don't Forget", isSystem: true },
+                { id: 'bright-ideas', name: 'Bright Ideas', isSystem: true }
+            ];
+            setUserKeyAreas([...systemAreas, ...(areas || [])]);
         } catch (error) {
             console.error('Failed to load key areas:', error);
+            // Fallback to just system areas
+            setUserKeyAreas([
+                { id: 'dont-forget', name: "Don't Forget", isSystem: true },
+                { id: 'bright-ideas', name: 'Bright Ideas', isSystem: true }
+            ]);
         }
     };
 
@@ -386,16 +396,15 @@ export default function UnifiedTaskActivityTable({
                 keyAreaId: selectedKeyArea,
             });
             
-            // Update local state - mark as accepted
-            if (onTaskUpdate) {
-                onTaskUpdate(acceptingTask.id, { delegationStatus: 'accepted' });
-            }
+            alert('Task accepted successfully! The new task has been added to your selected Key Area.');
             
-            alert('Task accepted successfully! Check your selected Key Area to see the new task.');
-            
+            // Close modal and refresh the page to show updated list
             setShowAcceptModal(false);
             setAcceptingTask(null);
             setSelectedKeyArea('');
+            
+            // Reload the page to show fresh delegation list
+            window.location.reload();
         } catch (error) {
             console.error('Failed to accept delegation:', error);
             alert(error.response?.data?.message || 'Failed to accept delegation');
@@ -810,16 +819,6 @@ export default function UnifiedTaskActivityTable({
                                     <td className="p-2 text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             {/* Accept/Reject for pending delegations */}
-                                            {(() => {
-                                                console.log('🔍 DEBUG Action buttons:', { 
-                                                    viewTab, 
-                                                    itemType: item.type, 
-                                                    delegationStatus: item.delegationStatus,
-                                                    shouldShowAcceptReject: viewTab === 'delegated' && item.type === 'task' && item.delegationStatus === 'pending',
-                                                    fullItem: item
-                                                });
-                                                return null;
-                                            })()}
                                             {viewTab === 'delegated' && item.type === 'task' && item.delegationStatus === 'pending' ? (
                                                 <>
                                                     <button
@@ -922,15 +921,15 @@ export default function UnifiedTaskActivityTable({
                 )}
             </div>
 
-            {/* Accept Delegation Modal */}
+            {/* Accept Delegation Modal - Styled to match app theme */}
             {showAcceptModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+                    <div className="bg-[#2c3e50] rounded-lg shadow-2xl w-full max-w-md border border-gray-600">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-600">
                             <div className="flex items-center gap-2">
-                                <FaCheck className="text-green-600" />
-                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                <FaCheck className="text-green-400" />
+                                <h2 className="text-lg font-semibold text-white">
                                     Accept Delegation
                                 </h2>
                             </div>
@@ -940,7 +939,7 @@ export default function UnifiedTaskActivityTable({
                                     setAcceptingTask(null);
                                     setSelectedKeyArea('');
                                 }}
-                                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                className="text-gray-400 hover:text-white"
                             >
                                 <FaTimes />
                             </button>
@@ -949,27 +948,27 @@ export default function UnifiedTaskActivityTable({
                         {/* Body */}
                         <div className="p-4">
                             {acceptingTask && (
-                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Task:</p>
-                                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                                <div className="bg-[#34495e] p-3 rounded-lg mb-4 border border-gray-600">
+                                    <p className="text-sm text-gray-400 mb-1">Task:</p>
+                                    <p className="font-medium text-white">
                                         {acceptingTask.title}
                                     </p>
                                 </div>
                             )}
 
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Select Key Area <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Select Key Area <span className="text-red-400">*</span>
                                 </label>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                <p className="text-xs text-gray-400 mb-2">
                                     Choose which Key Area to add this task to
                                 </p>
                                 <select
                                     value={selectedKeyArea}
                                     onChange={(e) => setSelectedKeyArea(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
-                                             rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                                             focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-600 rounded-lg 
+                                             bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
+                                             focus:border-transparent"
                                 >
                                     <option value="">-- Select a Key Area --</option>
                                     {userKeyAreas.map((area) => (
@@ -982,15 +981,15 @@ export default function UnifiedTaskActivityTable({
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-600">
                             <button
                                 onClick={() => {
                                     setShowAcceptModal(false);
                                     setAcceptingTask(null);
                                     setSelectedKeyArea('');
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
-                                         hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                                className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-[#34495e] 
+                                         rounded-lg transition"
                             >
                                 Cancel
                             </button>
