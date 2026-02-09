@@ -531,6 +531,7 @@ export default function UnifiedTaskActivityTable({
                             const deadlineValueInput = toDateOnly(deadlineValue);
                             const keyAreaIdValue = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || '';
                             const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || '';
+                            const responsibleNameValue = item.assignee || item.responsible || getUserName(responsibleIdValue);
                             const goalIdValue = item.goalId || item.goal_id || '';
                             
                             return (
@@ -748,7 +749,7 @@ export default function UnifiedTaskActivityTable({
                                                     ))}
                                                 </select>
                                             ) : (
-                                                <span>{getUserName(responsibleIdValue)}</span>
+                                                <span>{responsibleNameValue || '—'}</span>
                                             )}
                                         </td>
                                     )}
