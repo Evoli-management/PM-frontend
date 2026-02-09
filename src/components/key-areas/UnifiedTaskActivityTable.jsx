@@ -366,6 +366,12 @@ export default function UnifiedTaskActivityTable({
         return goal?.title || goal?.name || '';
     };
 
+    const getUserName = (userId) => {
+        if (!userId) return '';
+        const user = users.find(u => String(u.id || u.member_id) === String(userId));
+        return user ? (user.name || `${user.firstname || ''} ${user.lastname || ''}`.trim()) : '';
+    };
+
     return (
         <div className="flex flex-col h-full ta-legacy">
             {/* Special Header for Delegated View */}
@@ -718,20 +724,32 @@ export default function UnifiedTaskActivityTable({
                                         </td>
                                     )}
                                     {columns.includes('responsible') && (
-                                        <td className="p-2 text-xs">
-                                            <select
-                                                className="w-full border rounded px-2 py-1 text-xs bg-white"
-                                                value={String(responsibleIdValue || '')}
-                                                onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <option value="">Responsible</option>
-                                                {users.map((user) => (
-                                                    <option key={user.id || user.member_id} value={user.id || user.member_id}>
-                                                        {user.name || user.firstname} {user.lastname || ''}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                        <td
+                                            className="p-2 text-xs"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'responsibleId', String(responsibleIdValue || ''));
+                                            }}
+                                        >
+                                            {editingCell === responsibleKey ? (
+                                                <select
+                                                    autoFocus
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => saveEdit(item, 'responsibleId', e.target.value)}
+                                                    onBlur={cancelEdit}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="">Responsible</option>
+                                                    {users.map((user) => (
+                                                        <option key={user.id || user.member_id} value={user.id || user.member_id}>
+                                                            {user.name || user.firstname} {user.lastname || ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span>{getUserName(responsibleIdValue)}</span>
+                                            )}
                                         </td>
                                     )}
                                     {/* Action Buttons */}
