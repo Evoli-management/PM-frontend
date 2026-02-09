@@ -729,9 +729,9 @@ export default function TaskFullView({
                                         return (<span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>);
                                     })()
                                 }</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.start_date) || '—'}</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.end_date) || '—'}</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.deadline) || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.start_date || task.startDate) || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.end_date || task.endDate) || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.deadline || task.dueDate || task.due_date) || '—'}</div>
                                 <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{(() => {
                                     const td = (formatDuration && (formatDuration(task.start_date || task.startDate, task.end_date || task.endDate))) || '';
                                     return td || (task.duration || '—');
