@@ -685,7 +685,7 @@ export default function TaskFullView({
                                 <div className="text-[11px] uppercase tracking-wide text-slate-500">Completed</div>
                             </div>
                             <div className="grid grid-cols-9 gap-x-1 mt-0.5">
-                                <div className="text-slate-900 truncate min-w-0">{task.assignee || '—'}</div>
+                                <div className="text-slate-900 truncate min-w-0">{task.assignee || task.responsible || '—'}</div>
                                 {(() => {
                                     const statusUi = mapServerStatusToUi(task.status || '');
                                     const statusColors = getStatusColorClass(statusUi);
