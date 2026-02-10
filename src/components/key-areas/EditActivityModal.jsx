@@ -3,6 +3,7 @@ import { toDateOnly } from '../../utils/keyareasHelpers';
 import { FaSave } from 'react-icons/fa';
 import Modal from '../shared/Modal';
 import { getPriorityLevel } from '../../utils/keyareasHelpers';
+import usersService from '../../services/usersService';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -47,9 +48,11 @@ export default function EditActivityModal({
   availableLists = [1],
   currentUserId = null,
 }) {
+  const usersLoadedRef = useRef(false);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [localTasks, setLocalTasks] = useState(tasks || []);
   const [localGoals, setLocalGoals] = useState(goals || []);
+  const [usersList, setUsersList] = useState(users || []);
   const [listNamesMap, setListNamesMap] = useState({});
   const [title, setTitle] = useState(initialData.text || initialData.activity_name || '');
   const [description, setDescription] = useState(initialData.notes || initialData.description || '');
@@ -87,15 +90,56 @@ export default function EditActivityModal({
     setListIndex(initialData.list || initialData.list_index || (availableLists && availableLists[0]) || 1);
   setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
     // If activity doesn't carry an assignee, prefer the parent task's assignee (if available)
-    const initialAssignee = initialData.responsible || initialData.assignee || '';
-    if (initialAssignee) setAssignee(initialAssignee);
+    const initialAssigneeValue = initialData.responsible || initialData.assignee || '';
+    let nextAssignee = '';
+    if (initialAssigneeValue) {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
+        nextAssignee = initialAssigneeValue;
+      } else {
+        const user = usersList.find((u) => {
+          const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
+          const email = u.email || '';
+          const initialLower = String(initialAssigneeValue).toLowerCase();
+          return (
+            String(u.id) === String(initialAssigneeValue) ||
+            u.name === initialAssigneeValue ||
+            fullName === initialAssigneeValue ||
+            email === initialAssigneeValue ||
+            initialLower.includes(email.toLowerCase()) ||
+            initialLower.includes(u.name?.toLowerCase() || '')
+          );
+        });
+        nextAssignee = user?.id || '';
+      }
+    }
+    if (nextAssignee) setAssignee(nextAssignee);
     else {
       try {
         const lookupTasks = (localTasks && localTasks.length) ? localTasks : (tasks && tasks.length ? tasks : []);
         const tid = initialData.taskId || initialData.task_id || initialData.task || null;
         if (tid) {
           const parent = lookupTasks.find((t) => String(t.id) === String(tid));
-          if (parent && (parent.assignee || parent.responsible)) setAssignee(parent.assignee || parent.responsible || '');
+          if (parent && (parent.assignee || parent.responsible)) {
+            const parentAssignee = parent.assignee || parent.responsible || '';
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parentAssignee)) {
+              setAssignee(parentAssignee);
+            } else {
+              const parentUser = usersList.find((u) => {
+                const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
+                const email = u.email || '';
+                const parentLower = String(parentAssignee).toLowerCase();
+                return (
+                  String(u.id) === String(parentAssignee) ||
+                  u.name === parentAssignee ||
+                  fullName === parentAssignee ||
+                  email === parentAssignee ||
+                  parentLower.includes(email.toLowerCase()) ||
+                  parentLower.includes(u.name?.toLowerCase() || '')
+                );
+              });
+              if (parentUser?.id) setAssignee(parentUser.id);
+            }
+          }
         }
       } catch (e) {}
     }
@@ -139,6 +183,49 @@ export default function EditActivityModal({
     return () => { ignore = true; };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        if (users && users.length) {
+          if (!usersLoadedRef.current) {
+            const me = await usersService.list();
+            usersLoadedRef.current = true;
+            if (me && me.length) {
+              const existingIds = new Set((users || []).map((u) => String(u.id)));
+              const merged = [...users];
+              me.forEach((m) => {
+                if (!existingIds.has(String(m.id))) merged.push(m);
+              });
+              const prevIds = (usersList || []).map((u) => String(u.id)).join(',');
+              const newIds = (merged || []).map((u) => String(u.id)).join(',');
+              if (prevIds !== newIds) setUsersList(merged);
+            } else {
+              const prevIds = (usersList || []).map((u) => String(u.id)).join(',');
+              const newIds = (users || []).map((u) => String(u.id)).join(',');
+              if (prevIds !== newIds) setUsersList(users || []);
+            }
+          } else {
+            const prevIds = (usersList || []).map((u) => String(u.id)).join(',');
+            const merged = (usersList || []).slice();
+            const existingIdsSet = new Set((usersList || []).map((u) => String(u.id)));
+            (users || []).forEach((u) => {
+              if (!existingIdsSet.has(String(u.id))) merged.push(u);
+            });
+            const newIds = (merged || []).map((u) => String(u.id)).join(',');
+            if (prevIds !== newIds) setUsersList(merged);
+          }
+        } else if (!usersLoadedRef.current) {
+          const me = await usersService.list();
+          usersLoadedRef.current = true;
+          setUsersList(me || []);
+        }
+      } catch (e) {
+        if (users && users.length) setUsersList(users || []);
+      }
+    })();
+  }, [isOpen, users]);
+
   if (!isOpen) return null;
 
   const handleSave = () => {
@@ -163,7 +250,7 @@ export default function EditActivityModal({
   let delegatedToUserId = null;
   
   if (assignee) {
-    const selectedUser = users.find(u => String(u.id) === String(assignee));
+    const selectedUser = usersList.find(u => String(u.id) === String(assignee));
     if (selectedUser) {
       const userId = selectedUser.id;
       
@@ -384,7 +471,11 @@ export default function EditActivityModal({
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
-                    {users.map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
+                    {usersList.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.firstname} {u.lastname || ''}
+                      </option>
+                    ))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
