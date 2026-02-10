@@ -350,6 +350,17 @@ export default function UnifiedTaskActivityTable({
     };
 
     const getResponsibleLabel = (item) => {
+        // For delegated view, show who delegated the task (delegatedBy)
+        if (viewTab === 'delegated') {
+            const delegatorId = item.delegatedByUserId || item.delegated_by_user_id;
+            if (delegatorId) {
+                const user = users.find(u => String(u.id || u.member_id) === String(delegatorId));
+                if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
+            }
+            return '';
+        }
+        
+        // For other views, show assignee/responsible
         const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
         const user = users.find(u => String(u.id || u.member_id) === String(id));
         if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
@@ -606,7 +617,7 @@ export default function UnifiedTaskActivityTable({
                                 <th className="w-32 p-2">Key Area</th>
                             )}
                             {columns.includes('responsible') && (
-                                <th className="w-32 p-2">Responsible</th>
+                                <th className="w-32 p-2">{viewTab === 'delegated' ? 'Received From' : 'Responsible'}</th>
                             )}
                             <th className="w-24 p-2 text-center">Actions</th>
                         </tr>

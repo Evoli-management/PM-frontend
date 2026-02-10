@@ -741,19 +741,22 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle DELEGATED tab - show delegated tasks
+        // Handle DELEGATED tab - show pending delegated tasks only (like legacy)
         if (viewTab === 'delegated') {
             (async () => {
                 try {
                     let delegatedToMe = [];
                     try {
-                        delegatedToMe = await taskDelegationService.getDelegatedToMe();
-                        console.log('✅ Delegated tasks from taskDelegationService.getDelegatedToMe():', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                        // Get pending delegated tasks (matching legacy WHERE accepted IS NULL)
+                        delegatedToMe = await taskDelegationService.getDelegatedToMe('pending');
+                        console.log('✅ Pending delegated tasks from taskDelegationService.getDelegatedToMe(pending):', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
                     } catch (err) {
                         console.warn('❌ taskDelegationService.getDelegatedToMe() failed:', err);
                         const svc = await getTaskService();
                         delegatedToMe = await svc.list({ delegatedTo: true });
-                        console.log('✅ Fallback to taskService.list({ delegatedTo: true }):', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                        // Filter to pending only
+                        delegatedToMe = (delegatedToMe || []).filter(t => t.delegationStatus === 'pending' || t.delegation_status === 'pending');
+                        console.log('✅ Fallback to taskService.list({ delegatedTo: true }) filtered to pending:', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
                     }
 
                     setAllTasks(delegatedToMe || []);
