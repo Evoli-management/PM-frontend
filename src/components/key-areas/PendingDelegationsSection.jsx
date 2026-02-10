@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaCheck, FaBan, FaSquare, FaListUl } from 'react-icons/fa';
+import { FaCheck, FaBan, FaSquare, FaListUl, FaExclamation, FaArrowDown } from 'react-icons/fa';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
 
@@ -20,6 +20,8 @@ export default function PendingDelegationsSection({
   const [selectedTaskForActivity, setSelectedTaskForActivity] = useState('');
   const [availableTasks, setAvailableTasks] = useState([]);
   const [taskError, setTaskError] = useState('');
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [rejectingItem, setRejectingItem] = useState(null);
 
   const loadKeyAreas = async () => {
     try {
@@ -113,25 +115,28 @@ export default function PendingDelegationsSection({
   };
 
   const handleRejectClick = async (item) => {
-    const message = `Are you sure you want to reject this ${item.type} delegation?`;
-    
-    if (!window.confirm(message)) {
-      return;
-    }
+    setRejectingItem(item);
+    setShowRejectConfirm(true);
+  };
 
-    setRespondingItemId(item.id);
+  const confirmReject = async () => {
+    if (!rejectingItem) return;
+
+    setRespondingItemId(rejectingItem.id);
     try {
-      if (item.type === 'task') {
-        await taskDelegationService.rejectDelegation(item.id);
+      if (rejectingItem.type === 'task') {
+        await taskDelegationService.rejectDelegation(rejectingItem.id);
       } else {
-        await activityDelegationService.rejectDelegation(item.id);
+        await activityDelegationService.rejectDelegation(rejectingItem.id);
       }
-      onTaskReject?.(item.id);
+      onTaskReject?.(rejectingItem.id);
     } catch (error) {
       console.error('Failed to reject delegation:', error);
       alert('Failed to reject. Please try again.');
     } finally {
       setRespondingItemId(null);
+      setShowRejectConfirm(false);
+      setRejectingItem(null);
     }
   };
 
@@ -163,6 +168,7 @@ export default function PendingDelegationsSection({
               <thead className="bg-yellow-100 border-b border-yellow-200">
                 <tr>
                   <th className="px-2 py-2 text-center w-8 font-semibold text-gray-700">Type</th>
+                  <th className="px-2 py-2 text-center w-6 font-semibold text-gray-700">Prior</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-700">Title</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-700">Deadline</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-700">Received From</th>
@@ -177,6 +183,23 @@ export default function PendingDelegationsSection({
                         <FaSquare title="Task" className="text-blue-600 mx-auto" />
                       ) : (
                         <FaListUl title="Activity" className="text-purple-600 mx-auto" />
+                      )}
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      {item.priority === 'high' && (
+                        <FaExclamation 
+                          title="High Priority" 
+                          className="text-red-600 mx-auto inline-block" 
+                        />
+                      )}
+                      {item.priority === 'low' && (
+                        <FaArrowDown 
+                          title="Low Priority" 
+                          className="text-blue-600 mx-auto inline-block" 
+                        />
+                      )}
+                      {(!item.priority || item.priority === 'normal') && (
+                        <div className="text-gray-400 mx-auto text-xs">—</div>
                       )}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">{item.title}</td>
@@ -361,6 +384,41 @@ export default function PendingDelegationsSection({
                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50"
               >
                 {respondingItemId ? `Accepting ${acceptingItem?.type}...` : 'Accept'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Reject Confirmation Modal */}
+      {showRejectConfirm && rejectingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Reject Delegation?
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to reject this {rejectingItem.type} delegation?
+              </p>
+              <p className="text-sm text-blue-600 mb-4">
+                <strong>{rejectingItem.title}</strong>
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowRejectConfirm(false);
+                  setRejectingItem(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmReject}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg"
+              >
+                Reject
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaExclamation, FaArrowDown } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
@@ -699,9 +699,16 @@ export default function UnifiedTaskActivityTable({
                                 </th>
                             )}
                             {columns.includes('title') && (
-                                <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('title')}>
-                                    Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                </th>
+                                <>
+                                  {viewTab === 'delegated' && (
+                                    <th className="px-2 py-2 text-center w-6 font-semibold text-gray-700">
+                                      Prior
+                                    </th>
+                                  )}
+                                  <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('title')}>
+                                      Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                  </th>
+                                </>
                             )}
                             {columns.includes('tab') && (
                                 <th className="w-20 p-2">Tab</th>
@@ -728,7 +735,7 @@ export default function UnifiedTaskActivityTable({
                                 <th className="w-32 p-2">Key Area</th>
                             )}
                             {columns.includes('responsible') && (
-                                <th className="w-32 p-2">{viewTab === 'delegated' ? 'Received From' : 'Responsible'}</th>
+                                <th className="w-40 p-2">{viewTab === 'delegated' ? 'Received From' : 'Responsible'}</th>
                             )}
                             <th className="w-24 p-2 text-center">Actions</th>
                         </tr>
@@ -776,6 +783,25 @@ export default function UnifiedTaskActivityTable({
                                             {getPriorityIcon(item.priority)}
                                         </td>
                                     )}
+                                    {viewTab === 'delegated' && (
+                                        <td className="px-2 py-3 text-center">
+                                          {item.priority === 'high' && (
+                                            <FaExclamation 
+                                              title="High Priority" 
+                                              className="text-red-600 mx-auto inline-block" 
+                                            />
+                                          )}
+                                          {item.priority === 'low' && (
+                                            <FaArrowDown 
+                                              title="Low Priority" 
+                                              className="text-blue-600 mx-auto inline-block" 
+                                            />
+                                          )}
+                                          {(!item.priority || item.priority === 'normal') && (
+                                            <div className="text-gray-400 mx-auto text-xs">—</div>
+                                          )}
+                                        </td>
+                                      )}
                                     {columns.includes('title') && (
                                         <td 
                                             className="p-2 hover:bg-blue-100"
@@ -794,29 +820,37 @@ export default function UnifiedTaskActivityTable({
                                         >
                                             <div className="flex items-center gap-2">
                                                 {viewTab === 'delegated' ? (
-                                                    item.type === 'task' ? (
+                                                    <>
+                                                      {item.type === 'task' ? (
                                                         <FaSquare title="Task" className="text-blue-600 flex-shrink-0" />
-                                                    ) : (
+                                                      ) : (
                                                         <FaListUl title="Activity" className="text-purple-600 flex-shrink-0" />
-                                                    )
+                                                      )}
+                                                      <div className="flex-grow min-w-0">
+                                                        <p className="font-medium text-gray-900 truncate">{titleValue || 'Untitled'}</p>
+                                                        <p className="text-xs text-gray-500">From: {responsibleNameValue || '—'}</p>
+                                                      </div>
+                                                    </>
                                                 ) : (
-                                                    item.type === 'task' ? '📦' : '📋'
-                                                )}
-                                                {editingCell === titleKey ? (
-                                                    <input
-                                                        autoFocus
-                                                        className="w-full border rounded px-2 py-1 text-sm"
-                                                        value={editValue}
-                                                        onChange={(e) => setEditValue(e.target.value)}
-                                                        onBlur={() => saveEdit(item, 'title', editValue)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') saveEdit(item, 'title', editValue);
-                                                            if (e.key === 'Escape') cancelEdit();
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                ) : (
-                                                    <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
+                                                    <>
+                                                      {item.type === 'task' ? '📦' : '📋'}
+                                                      {editingCell === titleKey ? (
+                                                        <input
+                                                            autoFocus
+                                                            className="w-full border rounded px-2 py-1 text-sm"
+                                                            value={editValue}
+                                                            onChange={(e) => setEditValue(e.target.value)}
+                                                            onBlur={() => saveEdit(item, 'title', editValue)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') saveEdit(item, 'title', editValue);
+                                                                if (e.key === 'Escape') cancelEdit();
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                      ) : (
+                                                        <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
+                                                      )}
+                                                    </>
                                                 )}
                                             </div>
                                         </td>
@@ -953,7 +987,7 @@ export default function UnifiedTaskActivityTable({
                                             )}
                                         </td>
                                     )}
-                                    {columns.includes('responsible') && (
+                                    {columns.includes('responsible') && viewTab !== 'delegated' && (
                                         <td
                                             className="p-2 text-xs"
                                             onDoubleClick={(e) => {
