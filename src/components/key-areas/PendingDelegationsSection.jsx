@@ -25,6 +25,9 @@ export default function PendingDelegationsSection({
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [rejectingItem, setRejectingItem] = useState(null);
 
+  const normalizeKeyAreaTitle = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const getKeyAreaLabel = (area) => area?.name || area?.title || 'Untitled';
+
   // Format date as dd.mm.yyyy
   const formatDate = (date) => {
     if (!date) return '-';
@@ -41,9 +44,15 @@ export default function PendingDelegationsSection({
 
   const loadKeyAreas = async () => {
     try {
-      const { get } = await import('../../services/keyAreaService');
-      const areas = await get();
-      setKeyAreas(areas || []);
+      const mod = await import('../../services/keyAreaService');
+      const svc = mod.default || mod;
+      let areas = [];
+      if (typeof svc.list === 'function') {
+        areas = await svc.list({ includeTaskCount: false });
+      } else if (typeof mod.get === 'function') {
+        areas = await mod.get();
+      }
+      setKeyAreas(Array.isArray(areas) ? areas : []);
     } catch (error) {
       console.error('Failed to load key areas:', error);
     }
@@ -52,6 +61,10 @@ export default function PendingDelegationsSection({
   const loadTasksForKeyArea = async (keyAreaId) => {
     try {
       if (!keyAreaId) {
+        setAvailableTasks([]);
+        return;
+      }
+      if (String(keyAreaId).startsWith('__missing_')) {
         setAvailableTasks([]);
         return;
       }
@@ -84,6 +97,10 @@ export default function PendingDelegationsSection({
     // Validate key area
     if (!selectedKeyArea) {
       setKeyAreaError('Key area selection is required');
+      return;
+    }
+    if (String(selectedKeyArea).startsWith('__missing_')) {
+      setKeyAreaError('This key area is not available for selection yet');
       return;
     }
 
@@ -168,6 +185,31 @@ export default function PendingDelegationsSection({
       </div>
     );
   }
+
+  const normalizedTitles = new Set(
+    keyAreas.map((area) => normalizeKeyAreaTitle(getKeyAreaLabel(area)))
+  );
+  const keyAreaOptions = keyAreas.map((ka) => ({
+    value: ka.id,
+    label: getKeyAreaLabel(ka),
+  }));
+  if (!normalizedTitles.has('ideas')) {
+    keyAreaOptions.push({
+      value: '__missing_ideas',
+      label: 'Ideas (unavailable)',
+      isDisabled: true,
+    });
+  }
+  if (!normalizedTitles.has('dontforget')) {
+    keyAreaOptions.push({
+      value: '__missing_dont_forget',
+      label: "Don't Forget (create key area first)",
+      isDisabled: true,
+    });
+  }
+  const selectedKeyAreaOption = keyAreaOptions.find(
+    (option) => String(option.value) === String(selectedKeyArea)
+  );
 
   return (
     <>
@@ -310,14 +352,8 @@ export default function PendingDelegationsSection({
                   Choose which Key Area to add this {acceptingItem?.type === 'task' ? 'task' : 'activity'} to
                 </p>
                 <Select
-                  options={keyAreas.map(ka => ({
-                    value: ka.id,
-                    label: ka.name
-                  }))}
-                  value={selectedKeyArea ? {
-                    value: selectedKeyArea,
-                    label: keyAreas.find(ka => ka.id === selectedKeyArea)?.name
-                  } : null}
+                  options={keyAreaOptions}
+                  value={selectedKeyArea ? selectedKeyAreaOption : null}
                   onChange={(option) => {
                     setSelectedKeyArea(option?.value || '');
                     setKeyAreaError('');
