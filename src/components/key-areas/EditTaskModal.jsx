@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FaSave } from 'react-icons/fa';
+import Modal from '../shared/Modal';
 import usersService from '../../services/usersService';
 import { useFormattedDate } from '../../hooks/useFormattedDate';
+import { useDraggable } from '../../hooks/useDraggable';
+import { useResizable } from '../../hooks/useResizable';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -52,6 +55,35 @@ export default function EditTaskModal({
   // When true, editing a Don't Forget task (no Key Area required)
   isDontForgetMode = false,
 }) {
+  // Draggable and resizable hooks for modern modal
+  const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
+  const { size, isDraggingResize, handleResizeMouseDown } = useResizable(500, 490);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    if (isDraggingResize) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDraggingResize, handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    if (isOpen) resetPosition();
+  }, [isOpen, resetPosition]);
   // Helper to find user ID from assignee name or ID
   const getInitialAssigneeId = () => {
     const initial = initialData.assignee || initialData.assigneeId || initialData.assignee_id || '';
@@ -418,331 +450,159 @@ export default function EditTaskModal({
   const selectCls = `${inputCls} appearance-none pr-10`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* overlay */}
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      {/* dialog */}
-  <div className="relative z-10 w-[640px] max-w-[95vw] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
-        {/* hide native date picker icons for inputs with .no-calendar */}
-        <style>{`
+    <Modal open={isOpen} onClose={onCancel}>
+      <style>{`
           .no-calendar::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
           .no-calendar::-webkit-clear-button, .no-calendar::-webkit-inner-spin-button { display: none; -webkit-appearance: none; }
           .no-calendar::-ms-clear { display: none; }
         `}</style>
-  {/* header - title centered, divider gray */}
-  <div className="relative px-5 py-2 border-b border-slate-200">
+      <div 
+        className="relative z-10 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 flex flex-col overflow-hidden"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : isDraggingResize ? 'se-resize' : 'default',
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          minWidth: '300px',
+          minHeight: '200px'
+        }}
+      >
+        <div 
+          className="relative px-5 py-2 border-b border-slate-200 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={handleMouseDown}
+        >
           <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-semibold text-slate-900">
             {modalTitle || 'Edit Task'}
           </h3>
           <div className="flex items-center justify-end">
-            <button
-              type="button"
-              className="p-2 rounded-full text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
-              onClick={onCancel}
+            <button 
+              type="button" 
+              className="p-2 rounded-full text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600" 
               aria-label="Close"
+              onClick={onCancel}
             >
               ✕
             </button>
           </div>
         </div>
-
-  {/* body */}
-  <form onSubmit={onSubmit} className="px-4 pb-4 pt-2 space-y-2">
-          {/* Title */}
+        <form className="px-4 pb-4 pt-2 space-y-2 overflow-y-auto flex-1" onSubmit={onSubmit}>
           <div>
-            <label className="text-sm font-medium text-slate-700" htmlFor="ka-task-title">Task name</label>
-            <input
-              id="ka-task-title"
-              name="title"
-              required
-              className={`${inputCls} mt-0.5`}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Task name"
-            />
+            <label className="text-sm font-medium text-slate-700" htmlFor="edit-task-title">Task name</label>
+            <input autoFocus id="edit-task-title" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5" placeholder="Task name" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-2 md:gap-x-0.5">
-            {/* LEFT column */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-y-4 md:gap-x-6">
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Description</label>
-                <input
-                  name="description"
-                  className={`${inputCls} mt-0`}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Brief description"
-                />
+                <input className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 mt-0" placeholder="Brief description" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Start date</label>
                 <div className="relative mt-0">
-                  <input
-                    ref={startRef}
-                    name="start_date"
-                    type="date"
-                    className={dateCls}
-                    value={startDate}
-                    onChange={(e) => { setStartDate(e.target.value); }}
-                    // onInput helps catch native picker changes in some browsers
-                    onInput={(e) => { setStartDate(e.target.value); }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        // If no date is set, prefill with today's date so the native
-                        // showPicker opens with a sensible value instead of empty.
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!startRef.current?.value) {
-                          setStartDate(todayStr);
-                        }
-                        startRef.current?.showPicker?.();
-                        startRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
+                  <input ref={startRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">{dateLabel(startDate)}</p>
               </div>
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">End date</label>
-                <div className="relative mt-0.5">
-                  <input
-                    ref={endRef}
-                    name="end_date"
-                    type="date"
-                    className={dateCls}
-                    value={endDate}
-                    onChange={(e) => { setEndDate(e.target.value); }}
-                    onInput={(e) => { setEndDate(e.target.value); }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!endRef.current?.value) {
-                          setEndDate(todayStr);
-                        }
-                        endRef.current?.showPicker?.();
-                        endRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{dateLabel(endDate)}</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">Deadline</label>
                 <div className="relative mt-0">
-                  <input
-                    ref={deadlineRef}
-                    name="deadline"
-                    type="date"
-                    className={dateCls}
-                    value={deadline}
-                    onChange={(e) => { setDeadline(e.target.value); }}
-                    onInput={(e) => { setDeadline(e.target.value); }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        const today = new Date();
-                        const todayStr = today.toISOString().slice(0, 10);
-                        if (!deadlineRef.current?.value) {
-                          setDeadline(todayStr);
-                        }
-                        deadlineRef.current?.showPicker?.();
-                        deadlineRef.current?.focus();
-                      } catch (e) {}
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                    aria-label="Open date picker"
-                  >
-                    📅
-                  </button>
+                  <input ref={endRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
+                </div>
+              </div>
+              <div style={{ minHeight: '83.7639px' }}>
+                <label className="text-sm font-medium text-slate-700">Deadline</label>
+                <div className="relative mt-0.5">
+                  <input ref={deadlineRef} className="left-focus w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-50 appearance-none pr-11 no-calendar" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600" aria-label="Open date picker">📅</button>
                 </div>
                 <p className="mt-0 text-xs text-slate-500">No later than</p>
-                <p className="mt-1 text-xs text-slate-500">{dateLabel(deadline)}</p>
               </div>
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Duration</label>
-                <input
-                  name="duration"
-                  className={`${inputCls} mt-0.5`}
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="e.g., 1h, 1d"
-                />
+                <input className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0" placeholder="e.g., 1h, 1d" value={duration || ""} onChange={(e) => setDuration(e.target.value)} />
               </div>
             </div>
-            {/* separator column centered between left and right on md+ */}
+
             <div className="hidden md:flex md:items-stretch md:justify-center md:col-span-1">
-              <div className="w-px bg-slate-400 my-2" />
+              <div className="w-px bg-slate-200 my-2"></div>
             </div>
 
-            {/* RIGHT column */}
             <div className="grid grid-rows-5 gap-0 md:col-span-1">
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Key Area</label>
                 <div className="relative mt-0">
-                  <select
-                    name="key_area_id"
-                    className={selectCls}
-                    value={keyAreaId}
-                    onChange={(e) => { setKeyAreaId(e.target.value); setKeyAreaError(''); }}
-                    required={!isDontForgetMode}
-                  >
+                  <select name="key_area_id" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={keyAreaId} onChange={(e) => setKeyAreaId(e.target.value)}>
                     <option value="">— Select Key Area —</option>
-                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map((ka) => (
-                      <option key={ka.id} value={ka.id}>{ka.title || ka.name}</option>
+                    {(localKeyAreas && localKeyAreas.length ? localKeyAreas : keyAreas).map(area => (
+                      <option key={area.id} value={area.id}>{area.title}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-                {keyAreaError ? (<p className="mt-1 text-xs text-red-600">{keyAreaError}</p>) : null}
               </div>
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
-                  <select
-                    name="list_index"
-                    className={selectCls}
-                    value={listIndex}
-                    onChange={(e) => { setListIndex(Number(e.target.value)); setListError(''); }}
-                    required
-                  >
-                      {// compute available lists using listNames and allTasks similar to other modals
-                        (() => {
-                          try {
-                            // Debug: log which listNames/availableLists are being used when the modal is open
-                            // eslint-disable-next-line no-console
-                            console.log('[EditTaskModal] keyAreaId, parentListNames, listNames, availableLists:', keyAreaId, parentListNames, listNames, availableLists);
-                          } catch (e) {}
-                          // prefer listNames for the selected key area
-                          const named = Object.keys(listNames || {})
-                            .map(Number)
-                            .filter((idx) => listNames[idx] && String(listNames[idx]).trim() !== '');
-                          const listsWithTasks = (allTasks || [])
-                            .filter((t) => String(t.keyAreaId) === String(keyAreaId) && t.list_index)
-                            .map((t) => t.list_index)
-                            .filter((v, i, arr) => arr.indexOf(v) === i);
-                          const combined = [1, ...named, ...listsWithTasks];
-                          const uniq = [...new Set(combined)].sort((a, b) => a - b);
-                          const toUse = (uniq && uniq.length) ? uniq : (availableLists || [1]);
-                          try {
-                            // eslint-disable-next-line no-console
-                            console.log('[EditTaskModal] computed lists toUse:', toUse);
-                          } catch (e) {}
-                          return toUse.map((n) => (
-                            <option key={n} value={n}>{(listNames && listNames[n]) || `List ${n}`}</option>
-                          ));
-                        })()
-                    }
+                  <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))} disabled={!keyAreaId}>
+                    {(availableLists || [1]).map((idx) => (
+                      <option key={idx} value={idx}>
+                        {(listNames && listNames[idx]) || `List ${idx}`}
+                      </option>
+                    ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
-                {listError ? (<p className="mt-1 text-xs text-red-600">{listError}</p>) : null}
               </div>
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Responsible</label>
                 <div className="relative mt-0">
-                  <select
-                    name="assignee"
-                    className={selectCls}
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                  >
+                  <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10 mt-0 h-9" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
                     {usersList.map((u) => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
-
-              {/* Task field removed per request */}
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Priority</label>
                 <div className="relative mt-0">
-                  <select
-                    name="priority"
-                    className={selectCls}
-                    value={String(priority)}
-                    onChange={(e) => setPriority(Number(e.target.value))}
-                  >
-                    <option value={1}>Low</option>
-                    <option value={2}>Normal</option>
-                    <option value={3}>High</option>
+                  <select name="priority" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
+                    <option value="1">Low</option>
+                    <option value="2">Normal</option>
+                    <option value="3">High</option>
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
-
-              <div>
+              <div style={{ minHeight: '83.7639px' }}>
                 <label className="text-sm font-medium text-slate-700">Goal</label>
                 <div className="relative mt-0">
-                  <select
-                    name="goal"
-                    className={selectCls}
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                  >
+                  <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goal || ""} onChange={(e) => setGoal(e.target.value)}>
                     <option value="">— Select Goal —</option>
                     {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
-                      <option key={g.id} value={g.id}>{g.title}</option>
+                      <option key={g.id} value={g.id}>
+                        {g.title}
+                      </option>
                     ))}
                   </select>
-                  <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* footer */}
           <div className="flex items-center justify-end gap-2 w-full">
-            <button
-              type="submit"
-              disabled={isSaving || !title.trim()}
-              onClick={(e) => {
-                e.preventDefault();
-                if (!isSaving && title.trim()) {
-                  handleSave();
-                } else if (!title.trim()) {
-                  console.warn('EditTaskModal: Save not triggered because title is empty');
-                }
-              }}
-              className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"
-            >
-              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>
-              Save
-            </button>
-            <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled>Help</button>
+            <button type="submit" className="rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-2 px-4 py-2 text-sm"><svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path></svg>Save</button>
+            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button>
+            <button type="button" className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" disabled="">Help</button>
           </div>
         </form>
+        <div className="absolute top-0 right-0 w-1 h-full cursor-e-resize hover:bg-blue-500/20 transition-colors" style={{ zIndex: 40 }} onMouseDown={(e) => handleResizeMouseDown(e, 'right')} />
+        <div className="absolute bottom-0 left-0 w-full h-1 cursor-s-resize hover:bg-blue-500/20 transition-colors" style={{ zIndex: 40 }} onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')} />
+        <div className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/30 transition-colors rounded-tl" title="Drag to resize" style={{ zIndex: 41 }} onMouseDown={(e) => handleResizeMouseDown(e, 'se')} />
       </div>
-    </div>
+    </Modal>
   );
 }

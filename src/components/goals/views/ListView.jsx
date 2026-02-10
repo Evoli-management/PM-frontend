@@ -8,6 +8,7 @@ import {
     MoreHorizontal,
     Calendar,
     Flag,
+    Eye,
     EyeOff,
     Archive,
     Clock,
@@ -151,7 +152,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new 
     }
 
     return (
-        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-visible">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                 <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-slate-600">
@@ -166,7 +167,7 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new 
 
             {/* Goals List */}
             <div className="divide-y divide-slate-200">
-                {(localGoals || goals).map((goal) => {
+                {(localGoals || goals).map((goal, index) => {
                     const completedMilestones =
                         (goal.milestones || []).filter((m) => {
                             if (m && m.done) return true;
@@ -334,101 +335,189 @@ const ListView = ({ goals, onGoalClick, onUpdate, onDelete, selectedGoals = new 
                                 {/* Actions */}
                                 <div className="col-span-2">
                                     <div className="flex items-center gap-1">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onGoalClick(goal);
-                                            }}
-                                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                            title="Edit Goal"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
-
-                                        {goal.status === "active" && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleComplete(goal.id);
-                                                }}
-                                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                                title="Mark Complete"
-                                            >
-                                                <CheckCircle className="w-4 h-4" />
-                                            </button>
-                                        )}
-
-                                        <div className="relative">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setActionGoal(actionGoal === goal.id ? null : goal.id);
-                                                }}
-                                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-                                            >
-                                                <MoreHorizontal className="w-4 h-4" />
-                                            </button>
-
-                                            {actionGoal === goal.id && (
-                                                <>
-                                                    <div
-                                                        className="fixed inset-0 z-10"
+                                        {goal.status === "completed" ? (
+                                            <>
+                                                <button
+                                                    onClick={(e) => handleStartEdit(goal, e)}
+                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Edit goal"
+                                                >
+                                                    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 576 512" className="w-4 h-4 text-slate-600" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path></svg>
+                                                </button>
+                                                <div className="relative">
+                                                    <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setActionGoal(null);
+                                                            setActionGoal(actionGoal === goal.id ? null : goal.id);
                                                         }}
-                                                    />
-                                                    <div className="absolute right-0 top-10 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-20">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleToggleVisibility(goal.id);
-                                                                setActionGoal(null);
-                                                            }}
-                                                            className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm"
+                                                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                                                        aria-label="More actions"
+                                                    >
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            width="24"
+                                                            height="24"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            className="lucide lucide-ellipsis w-4 h-4"
+                                                            aria-hidden="true"
                                                         >
-                                                            Make {goal.visibility === "public" ? "Private" : "Public"}
-                                                        </button>
+                                                            <circle cx="12" cy="12" r="1"></circle>
+                                                            <circle cx="19" cy="12" r="1"></circle>
+                                                            <circle cx="5" cy="12" r="1"></circle>
+                                                        </svg>
+                                                    </button>
 
-                                                        {goal.status !== "archived" ? (
-                                                            <button
+                                                    {actionGoal === goal.id && (
+                                                        <>
+                                                            <div
+                                                                className="fixed inset-0 z-10"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    handleArchive(goal.id);
                                                                     setActionGoal(null);
                                                                 }}
-                                                                className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm"
-                                                            >
-                                                                Archive
-                                                            </button>
-                                                        ) : (
-                                                            <button
+                                                            />
+                                                            <div className="absolute right-0 top-10 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-20">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleToggleVisibility(goal.id);
+                                                                        setActionGoal(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-3"
+                                                                >
+                                                                    {goal.visibility === "private" ? (
+                                                                        <EyeOff className="w-4 h-4 text-slate-600" />
+                                                                    ) : (
+                                                                        <Eye className="w-4 h-4 text-slate-600" />
+                                                                    )}
+                                                                    {goal.visibility === "private" ? "Make Public" : "Make Private"}
+                                                                </button>
+
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleArchive(goal.id);
+                                                                        setActionGoal(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-3"
+                                                                >
+                                                                    <Archive className="w-4 h-4 text-slate-600" />
+                                                                    Archive
+                                                                </button>
+
+                                                                <hr className="my-2 border-slate-100" />
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(goal.id);
+                                                                        setActionGoal(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 text-sm flex items-center gap-3"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={(e) => handleStartEdit(goal, e)}
+                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Edit goal"
+                                                >
+                                                    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 576 512" className="w-4 h-4 text-slate-600" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path></svg>
+                                                </button>
+
+                                                {goal.status === "active" && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleComplete(goal.id);
+                                                        }}
+                                                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                        title="Mark Complete"
+                                                    >
+                                                        <CheckCircle className="w-4 h-4" />
+                                                    </button>
+                                                )}
+
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActionGoal(actionGoal === goal.id ? null : goal.id);
+                                                        }}
+                                                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                                                        aria-label="More actions"
+                                                    >
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </button>
+
+                                                    {actionGoal === goal.id && (
+                                                        <>
+                                                            <div
+                                                                className="fixed inset-0 z-10"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    handleUnarchive(goal.id);
                                                                     setActionGoal(null);
                                                                 }}
-                                                                className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm"
-                                                            >
-                                                                Unarchive
-                                                            </button>
-                                                        )}
+                                                            />
+                                                            <div className="absolute right-0 top-10 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-20">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleToggleVisibility(goal.id);
+                                                                        setActionGoal(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-3"
+                                                                >
+                                                                    {goal.visibility === "private" ? (
+                                                                        <EyeOff className="w-4 h-4 text-slate-600" />
+                                                                    ) : (
+                                                                        <Eye className="w-4 h-4 text-slate-600" />
+                                                                    )}
+                                                                    {goal.visibility === "private" ? "Make Public" : "Make Private"}
+                                                                </button>
 
-                                                        <hr className="my-2 border-slate-100" />
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(goal.id);
-                                                                setActionGoal(null);
-                                                            }}
-                                                            className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 text-sm"
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleArchive(goal.id);
+                                                                        setActionGoal(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-3"
+                                                                >
+                                                                    <Archive className="w-4 h-4 text-slate-600" />
+                                                                    Archive
+                                                                </button>
+
+                                                                <hr className="my-2 border-slate-100" />
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(goal.id);
+                                                                        setActionGoal(null);
+                                                                    }}
+                                                                    className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 text-sm flex items-center gap-3"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>

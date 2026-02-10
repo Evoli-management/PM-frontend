@@ -29,11 +29,14 @@ const ActivityRow = ({
   const [localValue, setLocalValue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const menuBtnRef = useRef(null);
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e) => {
       if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) setMenuOpen(false);
+      if (menuRef.current.contains(e.target)) return;
+      if (menuBtnRef.current && menuBtnRef.current.contains(e.target)) return;
+      setMenuOpen(false);
     };
     const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
     document.addEventListener('mousedown', onDown);
@@ -45,91 +48,118 @@ const ActivityRow = ({
   }, [menuOpen]);
   return (
     <div key={a.id} className="bg-white rounded border border-slate-200 p-2 mb-2">
-      <div className="flex items-center">
-        <button
-          type="button"
-          disabled={isSaving}
-          className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500'} ${isSaving ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
-          title={isSaving ? 'Saving...' : (a.completed ? 'Unmark' : 'Mark completed')}
-          onClick={() => toggleComplete && toggleComplete(a.id)}
-        >
-          {isSaving ? (
-            <FaSpinner className="animate-spin" />
-          ) : a.completed ? (
-            <FaCheckCircle />
-          ) : (
-            <FaRegCircle />
-          )}
-        </button>
-        <button
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={(e) => { e.stopPropagation(); setMenuOpen((s) => !s); }}
-          className="p-1 rounded hover:bg-slate-100 text-slate-600 mr-2"
-          title="More actions"
-        >
-          <FaEllipsisV />
-        </button>
-        <span className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]" title="Drag handle">
-          <FaAlignJustify />
-        </span>
-        <div className="relative flex-1">
-          <div className={`w-full border rounded px-2 py-1 pr-16 bg-white ${a.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-            {enableInlineEditing ? (
-              editingKey === 'text' ? (
-                <input
-                  autoFocus
-                  className="border rounded px-1 py-0.5 text-sm w-full"
-                  value={localValue}
-                  onChange={(e) => setLocalValue(e.target.value)}
-                  onBlur={async () => {
-                    setEditingKey(null);
-                    if (typeof updateField === 'function' && localValue !== (a.text || a.activity_name || '')) {
-                      try { await updateField(a.id, 'text', localValue); } catch (e) { console.error(e); }
-                    }
-                  }}
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
-                    else if (e.key === 'Escape') { setLocalValue(a.text || a.activity_name || ''); setEditingKey(null); }
-                  }}
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="text-slate-800 text-left w-full"
-                  title="Click to edit"
-                  onClick={(e) => { e.stopPropagation(); setLocalValue((a.text || a.activity_name || '').trim()); setEditingKey('text'); }}
-                >
-                  {(a.text || a.activity_name || '').trim() || 'Untitled activity'}
-                </button>
-              )
+      <div className="flex flex-col">
+        <div className="flex items-center">
+          <button
+            type="button"
+            disabled={isSaving}
+            className={`${a.completed ? 'mr-2 text-blue-600' : 'mr-2 text-slate-500'} ${isSaving ? 'opacity-60 cursor-wait' : 'hover:text-blue-600'}`}
+            title={isSaving ? 'Saving...' : (a.completed ? 'Unmark' : 'Mark completed')}
+            onClick={() => toggleComplete && toggleComplete(a.id)}
+          >
+            {isSaving ? (
+              <FaSpinner className="animate-spin" />
+            ) : a.completed ? (
+              <FaCheckCircle />
             ) : (
-              (a.text || a.activity_name || '').trim() || 'Untitled activity'
+              <FaRegCircle />
+            )}
+          </button>
+          <div className="relative mr-2">
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              ref={menuBtnRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((s) => !s);
+              }}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600"
+              title="More actions"
+            >
+              <FaEllipsisV />
+            </button>
+            {menuOpen && (
+              <div
+                ref={menuRef}
+                className="absolute top-full left-0 mt-1 z-50 min-w-[176px] bg-white border border-slate-200 rounded shadow-lg"
+              >
+                <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit && onEdit(a); }}>
+                  <FaEdit className="text-slate-600" />
+                  <span>Edit</span>
+                </button>
+                <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); if (confirm(`Delete activity \"${(a.text||a.activity_name||'Untitled activity')}\"?`)) remove && remove(a.id); }}>
+                  <FaTrash />
+                  <span>Delete</span>
+                </button>
+                <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCreateAsTask && onCreateAsTask(a); }}>
+                  <FaAngleDoubleRight />
+                  <span>Convert to task</span>
+                </button>
+              </div>
             )}
           </div>
-          <button type="button" className="absolute right-14 top-1.5 text-[#4DC3D8]" title="Tag">
-            <FaTag />
-          </button>
-        </div>
-        <div className="ml-2 flex items-center gap-2 text-slate-600">
-          {(() => {
-            if (lvl === 2) return null;
-            const cls = lvl === 3 ? 'text-red-600' : 'text-emerald-600';
-            return (
-              <span className={`inline-block text-sm font-bold ${cls}`} title={`Priority: ${lvl === 3 ? 'high' : 'low'}`}>
-                !
-              </span>
-            );
-          })()}
-          {/* menu moved to the left after the complete button to match TaskRow placement */}
-          <div className="flex flex-col ml-1">
-            <button type="button" className="text-slate-500 disabled:opacity-40" title="Move up" onClick={() => move && move(a.id, 'up')} disabled={index === 0}>
-              <FaChevronUp />
+          <span className="inline-flex items-center justify-center w-9 h-8 border rounded mr-2 text-[#4DC3D8]" title="Drag handle">
+            <FaAlignJustify />
+          </span>
+          <div className="relative flex-1">
+            <div className={`w-full border rounded px-2 py-1 pr-16 bg-white ${a.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
+              {enableInlineEditing ? (
+                editingKey === 'text' ? (
+                  <input
+                    autoFocus
+                    className="border rounded px-1 py-0.5 text-sm w-full"
+                    value={localValue}
+                    onChange={(e) => setLocalValue(e.target.value)}
+                    onBlur={async () => {
+                      setEditingKey(null);
+                      if (typeof updateField === 'function' && localValue !== (a.text || a.activity_name || '')) {
+                        try { await updateField(a.id, 'text', localValue); } catch (e) { console.error(e); }
+                      }
+                    }}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+                      else if (e.key === 'Escape') { setLocalValue(a.text || a.activity_name || ''); setEditingKey(null); }
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="text-slate-800 text-left w-full cursor-pointer"
+                    title="Double click to edit"
+                    onClick={(e) => { e.stopPropagation(); setLocalValue((a.text || a.activity_name || '').trim()); setEditingKey('text'); }}
+                    onDoubleClick={(e) => { e.stopPropagation(); setLocalValue((a.text || a.activity_name || '').trim()); setEditingKey('text'); }}
+                  >
+                    {(a.text || a.activity_name || '').trim() || 'Untitled activity'}
+                  </button>
+                )
+              ) : (
+                (a.text || a.activity_name || '').trim() || 'Untitled activity'
+              )}
+            </div>
+            <button type="button" className="absolute right-14 top-1.5 text-[#4DC3D8]" title="Tag">
+              <FaTag />
             </button>
-            <button type="button" className="text-slate-500 disabled:opacity-40" title="Move down" onClick={() => move && move(a.id, 'down')} disabled={index === listLength - 1}>
-              <FaChevronDown />
-            </button>
+          </div>
+          <div className="ml-2 flex items-center gap-2 text-slate-600">
+            {(() => {
+              if (lvl === 2) return null;
+              const cls = lvl === 3 ? 'text-red-600' : 'text-emerald-600';
+              return (
+                <span className={`inline-block text-sm font-bold ${cls}`} title={`Priority: ${lvl === 3 ? 'high' : 'low'}`}>
+                  !
+                </span>
+              );
+            })()}
+            <div className="flex flex-col ml-1">
+              <button type="button" className="text-slate-500 disabled:opacity-40" title="Move up" onClick={() => move && move(a.id, 'up')} disabled={index === 0}>
+                <FaChevronUp />
+              </button>
+              <button type="button" className="text-slate-500 disabled:opacity-40" title="Move down" onClick={() => move && move(a.id, 'down')} disabled={index === listLength - 1}>
+                <FaChevronDown />
+              </button>
+            </div>
           </div>
         </div>
       </div>

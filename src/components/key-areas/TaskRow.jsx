@@ -33,6 +33,7 @@ const TaskRow = ({
   expandedActivity,
   onEditClick,
   onDeleteClick,
+  onRowClick,
   disableOpen = false,
   visibleColumns = null,
 }) => {
@@ -47,7 +48,6 @@ const TaskRow = ({
     completed: true,
   };
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState(null);
   const menuBtnRef = useRef(null);
   const [editingKey, setEditingKey] = useState(null);
   const [localValue, setLocalValue] = useState("");
@@ -74,8 +74,9 @@ const TaskRow = ({
   
   return (
     <tr
-      className="border-t border-slate-200 hover:bg-slate-50"
+      className="border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors"
       onMouseEnter={onMouseEnter}
+      onClick={() => onRowClick && onRowClick(t)}
     >
       <td className="px-3 py-2 align-top">
         <div className="relative inline-flex items-center gap-2">
@@ -84,36 +85,42 @@ const TaskRow = ({
             aria-label={`Select ${t.title}`}
             checked={!!isSelected}
             onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
           />
 
-          <button
-            ref={menuBtnRef}
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={(e) => {
-              try { e.stopPropagation(); e.preventDefault(); } catch (__) {}
-              const rect = e.currentTarget.getBoundingClientRect();
-              setMenuAnchor({ top: rect.bottom + window.scrollY + 6, left: rect.left + window.scrollX });
-              setMenuOpen((s) => !s);
-            }}
-            className="p-1 rounded hover:bg-slate-100 text-slate-600"
-            title="More actions"
-          >
-            <FaEllipsisV />
-          </button>
-          {menuOpen && menuAnchor && (
-            <div ref={menuRef} id={`task-row-menu-${t.id}`} style={{ position: 'fixed', top: menuAnchor.top, left: menuAnchor.left, zIndex: 9999, minWidth: 160 }} className="bg-white border border-slate-200 rounded shadow">
+          <div className="relative">
+            <button
+              ref={menuBtnRef}
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={(e) => {
+                try { e.stopPropagation(); e.preventDefault(); } catch (__) {}
+                setMenuOpen((s) => !s);
+              }}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600"
+              title="More actions"
+            >
+              <FaEllipsisV />
+            </button>
+            {menuOpen && (
+              <div 
+                ref={menuRef} 
+                id={`task-row-menu-${t.id}`} 
+                style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, minWidth: 160, marginTop: '0.25rem' }} 
+                className="bg-white border border-slate-200 rounded shadow"
+              >
               <button
                 type="button"
-                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
                 onClick={(e) => { try { e.stopPropagation(); } catch (__) {} setMenuOpen(false); onEditClick && onEditClick(); }}
               >
+                <FaEdit className="w-3 h-3" />
                 Edit
               </button>
               <button
                 type="button"
-                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                 onClick={async (e) => {
                   try { e.stopPropagation(); } catch (__) {}
                   setMenuOpen(false);
@@ -129,23 +136,16 @@ const TaskRow = ({
                   }
                 }}
               >
+                <FaTrash className="w-3 h-3" />
                 Delete
               </button>
             </div>
-          )}
+            )}
+          </div>
         </div>
       </td>
       <td
-        className={`px-3 py-2 align-top ${disableOpen ? '' : 'cursor-pointer'}`}
-        onClick={(e) => {
-          if (disableOpen) return;
-          // debounce single-click so double-click can be detected reliably
-          try { if (clickTimer.current) clearTimeout(clickTimer.current); } catch (__) {}
-          clickTimer.current = setTimeout(() => {
-            onOpenTask && onOpenTask(t);
-            clickTimer.current = null;
-          }, 200);
-        }}
+        className={`px-3 py-2 align-top`}
         onDoubleClick={(e) => {
           // Allow double-click to enter inline edit even when disableOpen is true.
           // Clear any pending single-click action and open the inline editor.
@@ -156,7 +156,7 @@ const TaskRow = ({
             setEditingKey('name');
           }
         }}
-        title={disableOpen ? (enableInlineEditing ? 'Double-click to edit' : undefined) : (enableInlineEditing ? 'Single click to open, double-click to edit' : 'Open task')}
+        title={enableInlineEditing ? 'Double-click to edit' : undefined}
       >
         <div className="flex items-start gap-2">
           {(() => {
@@ -197,42 +197,22 @@ const TaskRow = ({
                 }}
               />
             ) : (
-              <button
-                type="button"
+              <span
                 className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
-                title={disableOpen ? 'Double-click to edit' : 'Single click to open, double-click to edit'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // When opening is disabled (e.g., Don't Forget mode), prevent single-click from opening.
-                  if (disableOpen) return;
-                  try { if (clickTimer.current) clearTimeout(clickTimer.current); } catch (__) {}
-                  clickTimer.current = setTimeout(() => { onOpenTask && onOpenTask(t); clickTimer.current = null; }, 200);
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
-                  setLocalValue(t.title || '');
-                  setEditingKey('name');
-                }}
+                title={disableOpen ? 'Double-click to edit' : undefined}
               >
                 {t.title}
-              </button>
+              </span>
             )
           ) : (
             disableOpen ? (
               <span className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 font-semibold'}`}>{t.title}</span>
             ) : (
-              <button
-                type="button"
+              <span
                 className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
-                title="Click to open task"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenTask && onOpenTask(t);
-                }}
               >
                 {t.title}
-              </button>
+              </span>
             )
           )}
           {isSaving && (

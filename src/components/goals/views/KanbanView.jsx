@@ -1,6 +1,7 @@
 // src/components/goals/views/KanbanView.jsx - Professional Kanban Board with Drag & Drop
 import React, { useState, useEffect } from "react";
 import { calculateGoalProgress } from "../../../utils/goalUtils";
+import { Archive, Trash2 } from "lucide-react";
 import {
     FaEdit,
     FaCheckCircle,
@@ -35,6 +36,21 @@ import { CSS } from "@dnd-kit/utilities";
 const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
     const [actionGoal, setActionGoal] = useState(null);
     const [localGoals, setLocalGoals] = useState(goals || []);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            // Only close if clicking outside the menu and not on an ellipsis button
+            if (actionGoal !== null && !e.target.closest('[data-ellipsis-button]')) {
+                setActionGoal(null);
+            }
+        };
+
+        if (actionGoal !== null) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [actionGoal]);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -240,7 +256,9 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                     <h4 title={goal.title.length > 50 ? goal.title : ""} className="font-semibold text-gray-900 text-sm line-clamp-2 break-words">{goal.title}</h4>
                     <div className="relative">
                         <button
-                            onClick={(e) => {
+                            data-ellipsis-button
+                            onMouseDown={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation();
                                 setActionGoal(actionGoal === goal.id ? null : goal.id);
                             }}
@@ -250,25 +268,18 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                         </button>
 
                         {actionGoal === goal.id && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-10"
+                            <div className="absolute right-0 top-6 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
+                                <button
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        onGoalClick(goal, "edit");
                                         setActionGoal(null);
                                     }}
-                                />
-                                <div className="absolute right-0 top-6 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onGoalClick(goal, "edit");
-                                            setActionGoal(null);
-                                        }}
-                                        className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
-                                    >
-                                        Edit
-                                    </button>
+                                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm flex items-center gap-2"
+                                >
+                                    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 576 512" className="w-4 h-4 text-slate-600" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"></path></svg>
+                                    Edit
+                                </button>
 
                                     {goal.status === "active" && (
                                         <button
@@ -301,8 +312,9 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                                                 handleArchive(goal.id);
                                                 setActionGoal(null);
                                             }}
-                                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm"
+                                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 text-sm flex items-center gap-2"
                                         >
+                                            <Archive className="w-4 h-4 text-slate-600" />
                                             Archive
                                         </button>
                                     ) : (
@@ -325,12 +337,12 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                                             handleDelete(goal.id);
                                             setActionGoal(null);
                                         }}
-                                        className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 text-sm"
+                                        className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 text-sm flex items-center gap-2"
                                     >
+                                        <Trash2 className="w-4 h-4" />
                                         Delete
                                     </button>
                                 </div>
-                            </>
                         )}
                     </div>
                 </div>
@@ -412,25 +424,27 @@ const KanbanView = ({ goals = [], onGoalClick, onUpdate, onDelete }) => {
                             </div>
 
                             {/* Column Content - Fixed height with scrolling */}
-                            <DroppableColumn id={`droppable-${column.id}`}>
-                                <SortableContext
-                                    items={column.goals.map((g) => g.id)}
-                                    strategy={verticalListSortingStrategy}
-                                >
-                                    <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
-                                        {column.goals.map((goal) => (
-                                            <SortableGoalCard key={goal.id} goal={goal} />
-                                        ))}
+                            <div className="max-h-[600px] overflow-y-auto">
+                                <DroppableColumn id={`droppable-${column.id}`}>
+                                    <SortableContext
+                                        items={column.goals.map((g) => g.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="p-4 space-y-3 overflow-visible">
+                                            {column.goals.map((goal) => (
+                                                <SortableGoalCard key={goal.id} goal={goal} />
+                                            ))}
 
-                                        {column.goals.length === 0 && (
-                                            <div className="text-center py-8 text-gray-400">
-                                                <p className="text-sm">No {column.title.toLowerCase()}</p>
-                                                <p className="text-xs mt-2">Drag goals here</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </SortableContext>
-                            </DroppableColumn>
+                                            {column.goals.length === 0 && (
+                                                <div className="text-center py-8 text-gray-400">
+                                                    <p className="text-sm">No {column.title.toLowerCase()}</p>
+                                                    <p className="text-xs mt-2">Drag goals here</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </SortableContext>
+                                </DroppableColumn>
+                            </div>
                         </div>
                     </div>
                 ))}
