@@ -71,6 +71,14 @@ const getUsersService = async () => {
     return _usersService;
 };
 
+let _userProfileService = null;
+const getUserProfileService = async () => {
+    if (_userProfileService) return _userProfileService;
+    const mod = await import('../services/userProfileService');
+    _userProfileService = mod.default || mod;
+    return _userProfileService;
+};
+
 const api = {
     async listKeyAreas() {
         try {
@@ -796,8 +804,7 @@ export default function KeyAreas() {
     const [showMassEditModal, setShowMassEditModal] = useState(false);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
-    // Don't use users[0] - let CreateTaskModal fetch the actual logged-in user's ID from profile endpoint
-    const currentUserId = null;
+    const [currentUserId, setCurrentUserId] = useState(null);
 
     // Build a stable lookup map from any possible goal id key to the goal title.
     // This avoids repeated array scans in TaskRow and makes lookups resilient
@@ -922,7 +929,15 @@ export default function KeyAreas() {
                         (delegatedToMe || []).map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                                const filtered = Array.isArray(list)
+                                    ? list.filter((activity) => {
+                                          if (!currentUserId) return true;
+                                          const delegatedTo = activity.delegatedToUserId || activity.delegated_to_user_id;
+                                          if (!delegatedTo) return true;
+                                          return String(delegatedTo) === String(currentUserId);
+                                      })
+                                    : [];
+                                return [String(row.id), filtered.map(normalizeActivity)];
                             } catch {
                                 return [String(row.id), []];
                             }
@@ -1258,6 +1273,19 @@ export default function KeyAreas() {
                 setUsers(Array.isArray(list) ? list : []);
             } catch {
                 setUsers([]);
+            }
+        })();
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const pSvc = await getUserProfileService();
+                const profile = await pSvc.getProfile();
+                const id = profile?.id || profile?.userId || profile?.sub || null;
+                if (id) setCurrentUserId(id);
+            } catch {
+                // Keep null if profile fetch fails; auth guard will redirect on 401.
             }
         })();
     }, []);
