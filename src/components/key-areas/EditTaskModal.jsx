@@ -45,6 +45,7 @@ export default function EditTaskModal({
   users = [],
   goals = [],
   availableLists = [1],
+  currentUserId = null,
   // optional mapping of parent list names (used by DontForget)
   parentListNames = {},
   // optional custom modal title (used for mass-editing banner)
