@@ -77,6 +77,7 @@ export default function CreateActivityFormModal({
   // map of list number => display name for the currently selected key area
   const [localListNames, setLocalListNames] = useState({})
   const [usersList, setUsersList] = useState(users || [])
+  const [localGoals, setLocalGoals] = useState(goals || [])
   const [assignee, setAssignee] = useState(initialData.assignee || initialData.responsible || '')
   const [duration, setDuration] = useState(initialData.duration || '')
   const [keyAreaError, setKeyAreaError] = useState('')
@@ -153,6 +154,25 @@ export default function CreateActivityFormModal({
     setAssignee(nextAssignee)
     setDuration(initialData.duration || '')
   }, [isOpen, initialData])
+
+  useEffect(() => {
+    if (!isOpen) return
+    ;(async () => {
+      try {
+        if (goals && goals.length) {
+          setLocalGoals(goals)
+          return
+        }
+        const mod = await import('../../services/goalService').catch(() => null)
+        if (mod && mod.getGoals) {
+          const fetched = await mod.getGoals().catch(() => [])
+          setLocalGoals(Array.isArray(fetched) ? fetched : [])
+        }
+      } catch (e) {
+        if (goals && goals.length) setLocalGoals(goals)
+      }
+    })()
+  }, [isOpen, goals])
 
   useEffect(() => {
     if (!isOpen) return
@@ -533,7 +553,9 @@ export default function CreateActivityFormModal({
               <div className="relative mt-0">
                 <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
                   <option value="">— Select Goal —</option>
-                  {goals.map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
+                  {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
+                    <option key={g.id} value={g.id}>{g.title}</option>
+                  ))}
                 </select>
                 <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               </div>

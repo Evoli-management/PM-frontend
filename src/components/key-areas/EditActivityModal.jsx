@@ -498,7 +498,9 @@ export default function EditActivityModal({
                 <div className="relative mt-0">
                   <select name="goal" className={`${selectCls} mt-0 h-9`} value={goal} onChange={(e) => setGoal(e.target.value)}>
                     <option value="">— Select Goal —</option>
-                    {goals.map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
+                    {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
+                      <option key={g.id} value={g.id}>{g.title}</option>
+                    ))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
