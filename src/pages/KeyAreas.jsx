@@ -19,6 +19,7 @@ import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
 import PendingDelegationsSection from '../components/key-areas/PendingDelegationsSection';
 import taskDelegationService from '../services/taskDelegationService';
+import activityDelegationService from '../services/activityDelegationService';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
     safeParseDate,
@@ -748,27 +749,43 @@ export default function KeyAreas() {
             (async () => {
                 try {
                     let delegatedToMe = [];
+                    let delegatedActivities = [];
                     try {
                         // Get ALL delegated tasks (both pending and accepted)
                         delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                        
+                        // Get ALL delegated activities (both pending and accepted)
+                        delegatedActivities = await activityDelegationService.getDelegatedToMe();
+                        
                         console.log('✅ getDelegatedToMe() returned:', { 
-                            count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
-                            pending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
-                            accepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
+                            tasks: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
+                            tasksPending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
+                            tasksAccepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
+                            activities: Array.isArray(delegatedActivities) ? delegatedActivities.length : 0,
+                            activitiesPending: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'pending').length,
+                            activitiesAccepted: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted').length,
                         });
                         
+                        // Normalize both tasks and activities with type indicator
+                        const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
+                        const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));
+                        
+                        // Combine all delegated items
+                        const allDelegated = [...normalizedTasks, ...normalizedActivities];
+                        
                         // Separate pending delegations for top section
-                        const pending = (delegatedToMe || []).filter(t => 
-                            (t.delegationStatus || t.delegation_status) === 'pending' || 
-                            !(t.delegationStatus || t.delegation_status)
+                        const pending = allDelegated.filter(item => 
+                            (item.delegationStatus || item.delegation_status) === 'pending' || 
+                            !(item.delegationStatus || item.delegation_status)
                         );
                         setPendingDelegations(pending);
                         
-                        // Set all tasks for the bottom section (with filters)
-                        setAllTasks(delegatedToMe || []);
+                        // Set all items for the bottom section (with filters)
+                        setAllTasks(allDelegated);
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
+                        delegatedActivities = [];
                         setPendingDelegations([]);
                     }
 

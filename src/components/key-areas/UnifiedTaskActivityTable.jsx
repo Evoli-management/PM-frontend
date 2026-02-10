@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
@@ -793,7 +793,15 @@ export default function UnifiedTaskActivityTable({
                                             }}
                                         >
                                             <div className="flex items-center gap-2">
-                                                {item.type === 'task' ? '📦' : '📋'}
+                                                {viewTab === 'delegated' ? (
+                                                    item.type === 'task' ? (
+                                                        <FaSquare title="Task" className="text-blue-600 flex-shrink-0" />
+                                                    ) : (
+                                                        <FaListUl title="Activity" className="text-purple-600 flex-shrink-0" />
+                                                    )
+                                                ) : (
+                                                    item.type === 'task' ? '📦' : '📋'
+                                                )}
                                                 {editingCell === titleKey ? (
                                                     <input
                                                         autoFocus
