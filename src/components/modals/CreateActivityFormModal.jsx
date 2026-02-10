@@ -4,6 +4,7 @@ import { FaSave } from 'react-icons/fa'
 import { useFormattedDate } from '../../hooks/useFormattedDate'
 import { useDraggable } from '../../hooks/useDraggable'
 import { useResizable } from '../../hooks/useResizable'
+import usersService from '../../services/usersService'
 
 // A clean reusable Create Activity form modal. Use this file if the original got corrupted.
 export default function CreateActivityFormModal({
@@ -18,7 +19,9 @@ export default function CreateActivityFormModal({
   tasks = [],
   availableLists = [1],
   parentListNames = {},
+  currentUserId = null,
 }) {
+  const usersLoadedRef = useRef(false)
   // Normalize parentListNames keys to numbers for robust lookup (parents may store keys as strings)
   const normalizedParentListNames = {};
   try {
@@ -73,6 +76,8 @@ export default function CreateActivityFormModal({
   const [localAvailableLists, setLocalAvailableLists] = useState(Array.isArray(availableLists) ? availableLists : [1])
   // map of list number => display name for the currently selected key area
   const [localListNames, setLocalListNames] = useState({})
+  const [usersList, setUsersList] = useState(users || [])
+  const [localGoals, setLocalGoals] = useState(goals || [])
   const [assignee, setAssignee] = useState(initialData.assignee || initialData.responsible || '')
   const [duration, setDuration] = useState(initialData.duration || '')
   const [keyAreaError, setKeyAreaError] = useState('')
@@ -123,9 +128,94 @@ export default function CreateActivityFormModal({
     setKeyAreaId(initialData.keyAreaId || initialData.key_area_id || initialData.keyArea || initialData.key_area || '')
     // Only prefill listIndex when the caller explicitly provided one; otherwise leave empty
   setListIndex(initialData.list || initialData.list_index || '')
-    setAssignee(initialData.assignee || initialData.responsible || '')
+    // Convert assignee name/email to user id for select dropdown
+    const initialAssigneeValue = initialData.assignee || initialData.responsible || ''
+    let nextAssignee = ''
+    if (initialAssigneeValue) {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
+        nextAssignee = initialAssigneeValue
+      } else {
+        const user = usersList.find((u) => {
+          const fullName = `${u.name || ''} ${u.lastname || ''}`.trim()
+          const email = u.email || ''
+          const initialLower = String(initialAssigneeValue).toLowerCase()
+          return (
+            String(u.id) === String(initialAssigneeValue) ||
+            u.name === initialAssigneeValue ||
+            fullName === initialAssigneeValue ||
+            email === initialAssigneeValue ||
+            initialLower.includes(email.toLowerCase()) ||
+            initialLower.includes(u.name?.toLowerCase() || '')
+          )
+        })
+        nextAssignee = user?.id || ''
+      }
+    }
+    setAssignee(nextAssignee)
     setDuration(initialData.duration || '')
   }, [isOpen, initialData])
+
+  useEffect(() => {
+    if (!isOpen) return
+    ;(async () => {
+      try {
+        if (goals && goals.length) {
+          setLocalGoals(goals)
+          return
+        }
+        const mod = await import('../../services/goalService').catch(() => null)
+        if (mod && mod.getGoals) {
+          const fetched = await mod.getGoals().catch(() => [])
+          setLocalGoals(Array.isArray(fetched) ? fetched : [])
+        }
+      } catch (e) {
+        if (goals && goals.length) setLocalGoals(goals)
+      }
+    })()
+  }, [isOpen, goals])
+
+  useEffect(() => {
+    if (!isOpen) return
+    ;(async () => {
+      try {
+        if (users && users.length) {
+          if (!usersLoadedRef.current) {
+            const me = await usersService.list()
+            usersLoadedRef.current = true
+            if (me && me.length) {
+              const existingIds = new Set((users || []).map((u) => String(u.id)))
+              const merged = [...users]
+              me.forEach((m) => {
+                if (!existingIds.has(String(m.id))) merged.push(m)
+              })
+              const prevIds = (usersList || []).map((u) => String(u.id)).join(',')
+              const newIds = (merged || []).map((u) => String(u.id)).join(',')
+              if (prevIds !== newIds) setUsersList(merged)
+            } else {
+              const prevIds = (usersList || []).map((u) => String(u.id)).join(',')
+              const newIds = (users || []).map((u) => String(u.id)).join(',')
+              if (prevIds !== newIds) setUsersList(users || [])
+            }
+          } else {
+            const prevIds = (usersList || []).map((u) => String(u.id)).join(',')
+            const merged = (usersList || []).slice()
+            const existingIdsSet = new Set((usersList || []).map((u) => String(u.id)))
+            ;(users || []).forEach((u) => {
+              if (!existingIdsSet.has(String(u.id))) merged.push(u)
+            })
+            const newIds = (merged || []).map((u) => String(u.id)).join(',')
+            if (prevIds !== newIds) setUsersList(merged)
+          }
+        } else if (!usersLoadedRef.current) {
+          const me = await usersService.list()
+          usersLoadedRef.current = true
+          setUsersList(me || [])
+        }
+      } catch (e) {
+        if (users && users.length) setUsersList(users)
+      }
+    })()
+  }, [isOpen, users])
 
   // When the selected key area changes, populate the available lists for that area
   useEffect(() => {
@@ -211,6 +301,20 @@ export default function CreateActivityFormModal({
       try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (__) {}
       return
     }
+
+    // Handle assignee - add delegatedToUserId for auto-delegation if assigning to different user
+    let delegatedToUserId = null;
+    if (assignee) {
+      const selectedUser = usersList.find(u => String(u.id) === String(assignee));
+      if (selectedUser) {
+        const userId = selectedUser.id;
+        // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
+        if (String(userId) !== String(currentUserId)) {
+          delegatedToUserId = userId;
+        }
+      }
+    }
+
     const payload = {
       text: (title || '').trim(),
       priority: priority || undefined,
@@ -223,6 +327,7 @@ export default function CreateActivityFormModal({
       taskId: taskId || undefined,
       listIndex: listIndex || undefined,
       assignee: assignee || undefined,
+      delegatedToUserId: delegatedToUserId,
       duration: duration || undefined,
     }
     onSave && onSave(payload)
@@ -421,7 +526,11 @@ export default function CreateActivityFormModal({
               <div className="relative mt-0">
                 <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                   <option value="">— Unassigned —</option>
-                  <option value="Me">Me</option>
+                  {usersList.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.firstname} {u.lastname || ''}
+                    </option>
+                  ))}
                 </select>
                 <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               </div>
@@ -444,7 +553,9 @@ export default function CreateActivityFormModal({
               <div className="relative mt-0">
                 <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
                   <option value="">— Select Goal —</option>
-                  {goals.map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
+                  {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
+                    <option key={g.id} value={g.id}>{g.title}</option>
+                  ))}
                 </select>
                 <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               </div>

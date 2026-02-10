@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan, FaSquare, FaListUl, FaExclamation, FaArrowDown } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
+import activityDelegationService from '../../services/activityDelegationService';
 import keyAreaService from '../../services/keyAreaService';
 
 /**
@@ -45,8 +46,11 @@ export default function UnifiedTaskActivityTable({
     const [editValue, setEditValue] = useState('');
     const [showAcceptModal, setShowAcceptModal] = useState(false);
     const [acceptingTask, setAcceptingTask] = useState(null);
+    const [acceptingActivity, setAcceptingActivity] = useState(null); // For activity delegation
     const [userKeyAreas, setUserKeyAreas] = useState([]);
+    const [userTasks, setUserTasks] = useState([]); // For accept-into-task feature
     const [selectedKeyArea, setSelectedKeyArea] = useState('');
+    const [selectedTaskForActivity, setSelectedTaskForActivity] = useState(''); // For accept-into-task
     const [respondingTaskId, setRespondingTaskId] = useState(null);
 
     // Flatten tasks and activities into single array
@@ -77,8 +81,18 @@ export default function UnifiedTaskActivityTable({
             });
         }
         
+        // Debug: Log delegation status for delegated view
+        if (viewTab === 'delegated') {
+            console.log('🔍 Delegated tasks delegation status:', items.filter(i => i.type === 'task').map(t => ({
+                id: t.id,
+                title: t.title,
+                delegationStatus: t.delegationStatus,
+                delegation_status: t.delegation_status
+            })));
+        }
+        
         return items;
-    }, [tasks, activities, showTasks, showActivities]);
+    }, [tasks, activities, showTasks, showActivities, viewTab]);
 
     // Filter items
     const filteredItems = useMemo(() => {
@@ -213,7 +227,43 @@ export default function UnifiedTaskActivityTable({
         if (item.type === 'task' && onTaskUpdate) {
             onTaskUpdate(item.id || item.task_id, updates);
         } else if (item.type === 'activity' && onActivityUpdate) {
-            onActivityUpdate(item.id || item.activity_id, updates);
+            // For activities, map frontend field names to backend expected names
+            const activityUpdates = { ...updates };
+            
+            // Backend expects 'text' not 'title' or 'name' for activity content
+            if (updates.title !== undefined || updates.name !== undefined) {
+                activityUpdates.text = updates.title || updates.name;
+                delete activityUpdates.title;
+                delete activityUpdates.name;
+            }
+            
+            // Backend expects snake_case for dates
+            if (updates.start_date !== undefined) {
+                activityUpdates.startDate = updates.start_date;
+                delete activityUpdates.start_date;
+            }
+            if (updates.end_date !== undefined) {
+                activityUpdates.endDate = updates.end_date;
+                delete activityUpdates.end_date;
+            }
+            if (updates.due_date !== undefined) {
+                activityUpdates.deadline = updates.due_date;
+                delete activityUpdates.due_date;
+            }
+            
+            // Map key area and assignee IDs (backend might not support these for activities)
+            if (updates.key_area_id !== undefined) {
+                delete activityUpdates.key_area_id;
+                delete activityUpdates.keyAreaId;
+            }
+            if (updates.assignee_id !== undefined || updates.responsible_id !== undefined) {
+                delete activityUpdates.assignee_id;
+                delete activityUpdates.responsible_id;
+                delete activityUpdates.assigneeId;
+                delete activityUpdates.responsibleId;
+            }
+            
+            onActivityUpdate(item.id || item.activity_id, activityUpdates);
         }
         
         setEditingCell(null);
@@ -304,6 +354,24 @@ export default function UnifiedTaskActivityTable({
     };
 
     const getResponsibleLabel = (item) => {
+        // For delegated view, show who delegated the task (delegatedBy)
+        if (viewTab === 'delegated') {
+            // First try to get delegator from the delegatedByUser object (enriched by backend)
+            if (item.delegatedByUser) {
+                const delegator = item.delegatedByUser;
+                return `${delegator.firstName || ''} ${delegator.lastName || ''}`.trim();
+            }
+            
+            // Fallback to delegatedByUserId if we have the users list
+            const delegatorId = item.delegatedByUserId || item.delegated_by_user_id;
+            if (delegatorId) {
+                const user = users.find(u => String(u.id || u.member_id) === String(delegatorId));
+                if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
+            }
+            return '';
+        }
+        
+        // For other views, show assignee/responsible
         const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
         const user = users.find(u => String(u.id || u.member_id) === String(id));
         if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
@@ -425,6 +493,108 @@ export default function UnifiedTaskActivityTable({
         }
     };
 
+    // Activity delegation handlers
+    const handleAcceptActivityClick = async (activity) => {
+        // Load user's key areas and tasks for selection
+        setAcceptingActivity(activity);
+        setShowAcceptModal(true);
+        
+        try {
+            const areas = await keyAreaService.list();
+            setUserKeyAreas(areas || []);
+            
+            // Also load user's tasks for the accept-into-task option
+            // This will be populated when a key area is selected
+            setUserTasks([]);
+        } catch (error) {
+            console.error('Failed to load key areas:', error);
+            setUserKeyAreas([]);
+        }
+    };
+
+    const handleKeyAreaChangeForActivity = async (keyAreaId) => {
+        setSelectedKeyArea(keyAreaId);
+        setSelectedTaskForActivity(''); // Reset task selection
+        
+        if (keyAreaId) {
+            try {
+                // Load tasks for the selected key area using service
+                if (String(keyAreaId).startsWith('__missing_')) {
+                    setUserTasks([]);
+                    return;
+                }
+                const { get } = await import('../../services/taskService');
+                const tasks = await get({ keyAreaId });
+                setUserTasks(Array.isArray(tasks) ? tasks : []);
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+                setUserTasks([]);
+            }
+        } else {
+            setUserTasks([]);
+        }
+    };
+
+    const confirmAcceptActivityDelegation = async () => {
+        if (!selectedKeyArea || !acceptingActivity) return;
+        
+        setRespondingTaskId(acceptingActivity.id);
+        try {
+            const payload = {
+                keyAreaId: selectedKeyArea,
+            };
+            
+            // If user selected an existing task, add it to payload
+            if (selectedTaskForActivity) {
+                payload.taskId = selectedTaskForActivity;
+            }
+            
+            const result = await activityDelegationService.acceptDelegation(acceptingActivity.id, payload);
+            
+            if (result.type === 'task') {
+                alert('Activity accepted and converted to a task in your selected Key Area!');
+            } else {
+                alert('Activity accepted and added to the selected task!');
+            }
+            
+            // Close modal
+            setShowAcceptModal(false);
+            setAcceptingActivity(null);
+            setSelectedKeyArea('');
+            setSelectedTaskForActivity('');
+            setUserTasks([]);
+            
+            // Redirect to the selected key area
+            window.location.href = `/key-areas?id=${selectedKeyArea}`;
+        } catch (error) {
+            console.error('Failed to accept activity delegation:', error);
+            alert(error.response?.data?.message || 'Failed to accept activity delegation');
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
+    const handleRejectActivityClick = async (activity) => {
+        if (!confirm('Are you sure you want to reject this activity delegation?')) return;
+        
+        setRespondingTaskId(activity.id);
+        try {
+            await activityDelegationService.rejectDelegation(activity.id);
+            
+            // Update local state - mark as rejected
+            if (onActivityUpdate) {
+                onActivityUpdate(activity.id, { delegationStatus: 'rejected' });
+            }
+            
+            alert('Activity rejected successfully');
+        } catch (error) {
+            console.error('Failed to reject activity delegation:', error);
+            alert(error.response?.data?.message || 'Failed to reject activity delegation');
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full ta-legacy">
             {/* Special Header for Delegated View */}
@@ -531,9 +701,16 @@ export default function UnifiedTaskActivityTable({
                                 </th>
                             )}
                             {columns.includes('title') && (
-                                <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('title')}>
-                                    Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
-                                </th>
+                                <>
+                                  {viewTab === 'delegated' && (
+                                    <th className="px-2 py-2 text-center w-6 font-semibold text-gray-700">
+                                      Prior
+                                    </th>
+                                  )}
+                                  <th className="p-2 text-left cursor-pointer" onClick={() => handleSort('title')}>
+                                      Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                  </th>
+                                </>
                             )}
                             {columns.includes('tab') && (
                                 <th className="w-20 p-2">Tab</th>
@@ -560,9 +737,11 @@ export default function UnifiedTaskActivityTable({
                                 <th className="w-32 p-2">Key Area</th>
                             )}
                             {columns.includes('responsible') && (
-                                <th className="w-32 p-2">Responsible</th>
+                                <th className="w-40 p-2">{viewTab === 'delegated' ? 'Received From' : 'Responsible'}</th>
                             )}
-                            <th className="w-24 p-2 text-center">Actions</th>
+                            {viewTab !== 'delegated' && (
+                                <th className="w-24 p-2 text-center">Actions</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -578,7 +757,7 @@ export default function UnifiedTaskActivityTable({
                             const keyAreaKey = getCellKey(item, 'keyAreaId');
                             const responsibleKey = getCellKey(item, 'responsibleId');
                             const goalKey = getCellKey(item, 'goalId');
-                            const titleValue = item.title || item.name || '';
+                            const titleValue = item.title || item.name || item.text || item.activity_name || '';
                             const startDateValue = toDateOnly(item.startDate || item.start_date);
                             const endDateValue = toDateOnly(item.endDate || item.end_date);
                             const deadlineValueInput = toDateOnly(deadlineValue);
@@ -608,6 +787,25 @@ export default function UnifiedTaskActivityTable({
                                             {getPriorityIcon(item.priority)}
                                         </td>
                                     )}
+                                    {viewTab === 'delegated' && (
+                                        <td className="px-2 py-3 text-center">
+                                          {item.priority === 'high' && (
+                                            <FaExclamation 
+                                              title="High Priority" 
+                                              className="text-red-600 mx-auto inline-block" 
+                                            />
+                                          )}
+                                          {item.priority === 'low' && (
+                                            <FaArrowDown 
+                                              title="Low Priority" 
+                                              className="text-blue-600 mx-auto inline-block" 
+                                            />
+                                          )}
+                                          {(!item.priority || item.priority === 'normal') && (
+                                            <div className="text-gray-400 mx-auto text-xs">—</div>
+                                          )}
+                                        </td>
+                                      )}
                                     {columns.includes('title') && (
                                         <td 
                                             className="p-2 hover:bg-blue-100"
@@ -625,22 +823,38 @@ export default function UnifiedTaskActivityTable({
                                             }}
                                         >
                                             <div className="flex items-center gap-2">
-                                                {item.type === 'task' ? '📦' : '📋'}
-                                                {editingCell === titleKey ? (
-                                                    <input
-                                                        autoFocus
-                                                        className="w-full border rounded px-2 py-1 text-sm"
-                                                        value={editValue}
-                                                        onChange={(e) => setEditValue(e.target.value)}
-                                                        onBlur={() => saveEdit(item, 'title', editValue)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') saveEdit(item, 'title', editValue);
-                                                            if (e.key === 'Escape') cancelEdit();
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
+                                                {viewTab === 'delegated' ? (
+                                                    <>
+                                                      {item.type === 'task' ? (
+                                                        <FaSquare title="Task" className="text-blue-600 flex-shrink-0" />
+                                                      ) : (
+                                                        <FaListUl title="Activity" className="text-purple-600 flex-shrink-0" />
+                                                      )}
+                                                      <div className="flex-grow min-w-0">
+                                                        <p className="font-medium text-gray-900 truncate">{titleValue || 'Untitled'}</p>
+                                                        <p className="text-xs text-gray-500">From: {responsibleNameValue || '—'}</p>
+                                                      </div>
+                                                    </>
                                                 ) : (
-                                                    <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
+                                                    <>
+                                                      {item.type === 'task' ? '📦' : '📋'}
+                                                      {editingCell === titleKey ? (
+                                                        <input
+                                                            autoFocus
+                                                            className="w-full border rounded px-2 py-1 text-sm"
+                                                            value={editValue}
+                                                            onChange={(e) => setEditValue(e.target.value)}
+                                                            onBlur={() => saveEdit(item, 'title', editValue)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') saveEdit(item, 'title', editValue);
+                                                                if (e.key === 'Escape') cancelEdit();
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                      ) : (
+                                                        <span className={isCompleted ? 'line-through text-gray-500' : ''}>{titleValue || 'Untitled'}</span>
+                                                      )}
+                                                    </>
                                                 )}
                                             </div>
                                         </td>
@@ -777,7 +991,7 @@ export default function UnifiedTaskActivityTable({
                                             )}
                                         </td>
                                     )}
-                                    {columns.includes('responsible') && (
+                                    {columns.includes('responsible') && viewTab !== 'delegated' && (
                                         <td
                                             className="p-2 text-xs"
                                             onDoubleClick={(e) => {
@@ -806,99 +1020,68 @@ export default function UnifiedTaskActivityTable({
                                             )}
                                         </td>
                                     )}
-                                    {/* Action Buttons */}
-                                    <td className="p-2 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            {/* Accept/Reject for pending delegations */}
-                                            {viewTab === 'delegated' && item.type === 'task' && item.delegationStatus === 'pending' ? (
-                                                <>
+                                    {viewTab !== 'delegated' && (
+                                        <td className="p-2 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                {/* Open Details Link */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (item.type === 'task' && onTaskClick) {
+                                                            onTaskClick(item);
+                                                        } else if (item.type === 'activity' && onActivityClick) {
+                                                            onActivityClick(item);
+                                                        }
+                                                    }}
+                                                    className="ta-accent hover:opacity-80 p-1"
+                                                    title="Open details"
+                                                >
+                                                    <FaExternalLinkAlt size={14} />
+                                                </button>
+
+                                                {/* Toggle Complete */}
+                                                {isCompleted ? (
                                                     <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleAcceptClick(item);
-                                                        }}
-                                                        disabled={respondingTaskId === item.id}
-                                                        className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
-                                                        title="Accept this delegation"
+                                                        onClick={(e) => handleCompleteToggle(item, e)}
+                                                        className="text-gray-400 hover:text-red-600 p-1"
+                                                        title="Mark as not completed"
+                                                    >
+                                                        <FaTimes size={14} />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={(e) => handleCompleteToggle(item, e)}
+                                                        className="text-gray-400 hover:text-green-600 p-1"
+                                                        title="Mark as completed"
                                                     >
                                                         <FaCheck size={14} />
                                                     </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleRejectClick(item);
-                                                        }}
-                                                        disabled={respondingTaskId === item.id}
-                                                        className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50"
-                                                        title="Reject this delegation"
-                                                    >
-                                                        <FaBan size={14} />
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {/* Open Details Link */}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (item.type === 'task' && onTaskClick) {
-                                                                onTaskClick(item);
-                                                            } else if (item.type === 'activity' && onActivityClick) {
-                                                                onActivityClick(item);
-                                                            }
-                                                        }}
-                                                        className="ta-accent hover:opacity-80 p-1"
-                                                        title="Open details"
-                                                    >
-                                                        <FaExternalLinkAlt size={14} />
-                                                    </button>
+                                                )}
 
-                                                    {/* Toggle Complete */}
-                                                    {isCompleted ? (
-                                                        <button
-                                                            onClick={(e) => handleCompleteToggle(item, e)}
-                                                            className="text-gray-400 hover:text-red-600 p-1"
-                                                            title="Mark as not completed"
-                                                        >
-                                                            <FaTimes size={14} />
-                                                        </button>
+                                                {/* Toggle Private/Public */}
+                                                <button
+                                                    onClick={(e) => handleTogglePrivate(item, e)}
+                                                    className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
+                                                    title={isPrivate ? 'Mark as public' : 'Mark as private'}
+                                                >
+                                                    {isPrivate ? (
+                                                        <FaLock size={14} />
                                                     ) : (
-                                                        <button
-                                                            onClick={(e) => handleCompleteToggle(item, e)}
-                                                            className="text-gray-400 hover:text-green-600 p-1"
-                                                            title="Mark as completed"
-                                                        >
-                                                            <FaCheck size={14} />
-                                                        </button>
+                                                        <FaLockOpen size={14} />
                                                     )}
+                                                </button>
 
-                                                    {/* Toggle Private/Public */}
-                                                    {viewTab !== 'delegated' && (
-                                                        <button
-                                                            onClick={(e) => handleTogglePrivate(item, e)}
-                                                            className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
-                                                            title={isPrivate ? 'Mark as public' : 'Mark as private'}
-                                                        >
-                                                            {isPrivate ? (
-                                                                <FaLock size={14} />
-                                                            ) : (
-                                                                <FaLockOpen size={14} />
-                                                            )}
-                                                        </button>
-                                                    )}
-
-                                                    {/* Delete */}
-                                                    <button
-                                                        onClick={(e) => handleDelete(item, e)}
-                                                        className="text-gray-400 hover:text-red-700 p-1"
-                                                        title="Delete"
-                                                    >
-                                                        <FaTrash size={14} />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
+                                                {/* Delete */}
+                                                <button
+                                                    onClick={(e) => handleDelete(item, e)}
+                                                    className="text-gray-400 hover:text-red-700 p-1"
+                                                    title="Delete"
+                                                >
+                                                    <FaTrash size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
                             );
                         })}
@@ -928,7 +1111,10 @@ export default function UnifiedTaskActivityTable({
                                 onClick={() => {
                                     setShowAcceptModal(false);
                                     setAcceptingTask(null);
+                                    setAcceptingActivity(null);
                                     setSelectedKeyArea('');
+                                    setSelectedTaskForActivity('');
+                                    setUserTasks([]);
                                 }}
                                 className="text-gray-400 hover:text-white"
                             >
@@ -946,17 +1132,26 @@ export default function UnifiedTaskActivityTable({
                                     </p>
                                 </div>
                             )}
+                            
+                            {acceptingActivity && (
+                                <div className="bg-[#34495e] p-3 rounded-lg mb-4 border border-gray-600">
+                                    <p className="text-sm text-gray-400 mb-1">Activity:</p>
+                                    <p className="font-medium text-white">
+                                        {acceptingActivity.text}
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-300 mb-2">
                                     Select Key Area <span className="text-red-400">*</span>
                                 </label>
                                 <p className="text-xs text-gray-400 mb-2">
-                                    Choose which Key Area to add this task to
+                                    Choose which Key Area to add this {acceptingTask ? 'task' : 'activity'} to
                                 </p>
                                 <select
                                     value={selectedKeyArea}
-                                    onChange={(e) => setSelectedKeyArea(e.target.value)}
+                                    onChange={(e) => acceptingActivity ? handleKeyAreaChangeForActivity(e.target.value) : setSelectedKeyArea(e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-600 rounded-lg 
                                              bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
                                              focus:border-transparent"
@@ -969,6 +1164,32 @@ export default function UnifiedTaskActivityTable({
                                     ))}
                                 </select>
                             </div>
+                            
+                            {/* Task selector for activities (accept-into-task feature) */}
+                            {acceptingActivity && selectedKeyArea && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Add to Existing Task (Optional)
+                                    </label>
+                                    <p className="text-xs text-gray-400 mb-2">
+                                        Leave empty to convert activity into a new task, or select a task to add this activity to it
+                                    </p>
+                                    <select
+                                        value={selectedTaskForActivity}
+                                        onChange={(e) => setSelectedTaskForActivity(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-600 rounded-lg 
+                                                 bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
+                                                 focus:border-transparent"
+                                    >
+                                        <option value="">-- Create New Task --</option>
+                                        {userTasks.map((task) => (
+                                            <option key={task.id} value={task.id}>
+                                                {task.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -977,7 +1198,10 @@ export default function UnifiedTaskActivityTable({
                                 onClick={() => {
                                     setShowAcceptModal(false);
                                     setAcceptingTask(null);
+                                    setAcceptingActivity(null);
                                     setSelectedKeyArea('');
+                                    setSelectedTaskForActivity('');
+                                    setUserTasks([]);
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-[#34495e] 
                                          rounded-lg transition"
@@ -985,12 +1209,12 @@ export default function UnifiedTaskActivityTable({
                                 Cancel
                             </button>
                             <button
-                                onClick={confirmAcceptDelegation}
+                                onClick={acceptingTask ? confirmAcceptDelegation : confirmAcceptActivityDelegation}
                                 disabled={!selectedKeyArea || respondingTaskId}
                                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 
                                          rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {respondingTaskId ? 'Accepting...' : 'Accept Task'}
+                                {respondingTaskId ? 'Accepting...' : `Accept ${acceptingTask ? 'Task' : 'Activity'}`}
                             </button>
                         </div>
                     </div>

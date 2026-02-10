@@ -16,12 +16,14 @@ import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
+import PendingDelegationsSection from '../components/key-areas/PendingDelegationsSection';
 import TripleViewLayout from '../components/key-areas/TripleViewLayout';
 import TaskListPanel from '../components/key-areas/TaskListPanel';
 import ActivityListPanel from '../components/key-areas/ActivityListPanel';
 import ResizablePanels from '../components/key-areas/ResizablePanels';
 import KeyAreasTripleView from '../components/key-areas/KeyAreasTripleView';
 import taskDelegationService from '../services/taskDelegationService';
+import activityDelegationService from '../services/activityDelegationService';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import '../styles/triple-view.css';
 import {
@@ -258,6 +260,49 @@ const api = {
     },
 };
 
+const normalizeActivityWithTask = (activity, task) => {
+    const norm = normalizeActivity(activity || {});
+    if (!norm) return norm;
+
+    const taskId = task?.id ?? task?.task_id ?? task?.taskId ?? null;
+    const keyAreaId =
+        norm.key_area_id ??
+        task?.key_area_id ??
+        task?.keyAreaId ??
+        task?.keyArea ??
+        null;
+    const listIndex =
+        norm.list ??
+        task?.list_index ??
+        task?.listIndex ??
+        task?.list ??
+        null;
+    const goalId =
+        norm.goal_id ??
+        norm.goalId ??
+        task?.goal_id ??
+        task?.goalId ??
+        task?.goal ??
+        null;
+    const assignee = norm.assignee ?? task?.assignee ?? null;
+
+    return {
+        ...norm,
+        title: norm.title || norm.text || norm.activity_name || norm.name || '',
+        name: norm.name || norm.title || norm.text || norm.activity_name || '',
+        taskId: norm.taskId || taskId || null,
+        key_area_id: keyAreaId,
+        keyAreaId,
+        list: listIndex,
+        list_index: listIndex,
+        listIndex,
+        goal_id: goalId,
+        goalId,
+        assignee,
+        responsible: norm.responsible ?? assignee ?? null,
+    };
+};
+
 // Shared helpers (imported from utils/keyareasHelpers)
 
 // Minimal placeholders to keep non-list views functional
@@ -440,6 +485,7 @@ export default function KeyAreas() {
     const [activeFilter, setActiveFilter] = useState('active');
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
+    const [pendingDelegations, setPendingDelegations] = useState([]); // For DELEGATED tab - pending only
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
     const handleTaskStatusChange = async (id, uiStatus) => {
@@ -823,23 +869,51 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle DELEGATED tab - show delegated tasks
+        // Handle DELEGATED tab - show TWO sections: pending at top, all delegated below
         if (viewTab === 'delegated') {
             (async () => {
                 try {
                     let delegatedToMe = [];
+                    let delegatedActivities = [];
                     try {
+                        // Get ALL delegated tasks (both pending and accepted)
                         delegatedToMe = await taskDelegationService.getDelegatedToMe();
-                        console.log('✅ Delegated tasks from taskDelegationService.getDelegatedToMe():', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                        
+                        // Get ALL delegated activities (both pending and accepted)
+                        delegatedActivities = await activityDelegationService.getDelegatedToMe();
+                        
+                        console.log('✅ getDelegatedToMe() returned:', { 
+                            tasks: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
+                            tasksPending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
+                            tasksAccepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
+                            activities: Array.isArray(delegatedActivities) ? delegatedActivities.length : 0,
+                            activitiesPending: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'pending').length,
+                            activitiesAccepted: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted').length,
+                        });
+                        
+                        // Normalize both tasks and activities with type indicator
+                        const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
+                        const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));
+                        
+                        // Combine all delegated items
+                        const allDelegated = [...normalizedTasks, ...normalizedActivities];
+                        
+                        // Separate pending delegations for top section
+                        const pending = allDelegated.filter(item => 
+                            (item.delegationStatus || item.delegation_status) === 'pending' || 
+                            !(item.delegationStatus || item.delegation_status)
+                        );
+                        setPendingDelegations(pending);
+                        
+                        // Set all items for the bottom section (with filters)
+                        setAllTasks(allDelegated);
                     } catch (err) {
-                        console.warn('❌ taskDelegationService.getDelegatedToMe() failed:', err);
-                        const svc = await getTaskService();
-                        delegatedToMe = await svc.list({ delegatedTo: true });
-                        console.log('✅ Fallback to taskService.list({ delegatedTo: true }):', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                        console.error('❌ ERROR: getDelegatedToMe() failed:', err);
+                        delegatedToMe = [];
+                        delegatedActivities = [];
+                        setPendingDelegations([]);
                     }
 
-                    setAllTasks(delegatedToMe || []);
-                    
                     // Load activities for delegated tasks
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
@@ -855,6 +929,7 @@ export default function KeyAreas() {
                     setActivitiesByTask(Object.fromEntries(entries));
                 } catch (e) {
                     console.error('Failed to load delegated tasks', e);
+                    setPendingDelegations([]);
                 }
             })();
             return;
@@ -875,7 +950,12 @@ export default function KeyAreas() {
                         (allUserTasks || []).map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                                return [
+                                    String(row.id),
+                                    Array.isArray(list)
+                                        ? list.map((activity) => normalizeActivityWithTask(activity, row))
+                                        : [],
+                                ];
                             } catch {
                                 return [String(row.id), []];
                             }
@@ -904,7 +984,12 @@ export default function KeyAreas() {
                         (trapTasks || []).map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                                return [
+                                    String(row.id),
+                                    Array.isArray(list)
+                                        ? list.map((activity) => normalizeActivityWithTask(activity, row))
+                                        : [],
+                                ];
                             } catch {
                                 return [String(row.id), []];
                             }
@@ -2491,16 +2576,23 @@ export default function KeyAreas() {
                     alert("Could not determine which activity to update.");
                     return;
                 }
-                const mapPriorityToNum = (p) => {
-                    const s = String(p || "normal").toLowerCase();
-                    if (s === "low") return 1;
-                    if (s === "high") return 3;
-                    return 2;
+                const mapPriorityToApi = (p) => {
+                    if (p === undefined || p === null || p === '') return undefined;
+                    const num = Number(p);
+                    if (!Number.isNaN(num)) {
+                        if (num <= 1) return "low";
+                        if (num >= 3) return "high";
+                        return "normal";
+                    }
+                    const s = String(p).toLowerCase();
+                    if (s === "low" || s === "normal" || s === "high") return s;
+                    if (s === "medium" || s === "med") return "normal";
+                    return undefined;
                 };
                 const body = {
                     text: title,
                     completed: (f.get("status") || "open").toString() === "done",
-                    priority: mapPriorityToNum(priority),
+                    priority: mapPriorityToApi(priority),
                 };
                 // attach to task if available
                 const tid = editingActivityViaTaskModal.taskId || activityAttachTaskId || null;
@@ -2650,6 +2742,19 @@ export default function KeyAreas() {
         setIsSavingActivity(true);
         try {
             const svc = await getActivityService();
+            const mapPriorityToApi = (p) => {
+                if (p === undefined || p === null || p === '') return undefined;
+                const num = Number(p);
+                if (!Number.isNaN(num)) {
+                    if (num <= 1) return "low";
+                    if (num >= 3) return "high";
+                    return "normal";
+                }
+                const s = String(p).toLowerCase();
+                if (s === "low" || s === "normal" || s === "high") return s;
+                if (s === "medium" || s === "med") return "normal";
+                return undefined;
+            };
             // Normalize incoming payload for API shape
             const body = {
                 text: (payload.text || payload.activity_name || payload.title || "").trim(),
@@ -2660,12 +2765,9 @@ export default function KeyAreas() {
             if (payload.startDate || payload.start_date || payload.date_start) body.startDate = toDateOnly(payload.startDate || payload.start_date || payload.date_start);
             if (payload.endDate || payload.end_date || payload.date_end) body.endDate = toDateOnly(payload.endDate || payload.end_date || payload.date_end);
             if (payload.deadline || payload.dueDate || payload.due_date) body.deadline = toDateOnly(payload.deadline || payload.dueDate || payload.due_date);
-            if (typeof payload.priority !== 'undefined') body.priority = payload.priority;
-            if (payload.keyAreaId || payload.key_area_id || payload.keyArea) body.keyAreaId = payload.keyAreaId || payload.key_area_id || payload.keyArea;
-            if (payload.list || payload.list_index || payload.listIndex) body.list = payload.list || payload.list_index || payload.listIndex;
-            if (payload.goal || payload.goalId || payload.goal_id) body.goal = payload.goal || payload.goalId || payload.goal_id;
-            if (payload.assignee || payload.responsible) body.assignee = payload.assignee || payload.responsible;
-            if (typeof payload.duration !== 'undefined') body.duration = payload.duration;
+            if (typeof payload.priority !== 'undefined') body.priority = mapPriorityToApi(payload.priority);
+            if (payload.goalId || payload.goal || payload.goal_id) body.goalId = payload.goalId || payload.goal || payload.goal_id;
+            if (payload.completionDate) body.completionDate = payload.completionDate;
             // Allow task attachment if provided
             if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
 
@@ -2786,6 +2888,7 @@ export default function KeyAreas() {
                 {showEditActivityModal && editingActivityViaTaskModal && (
                     <EditActivityModal
                         isOpen={true}
+                        currentUserId={currentUserId}
                         initialData={(function(){
                             try {
                                 const id = editingActivityViaTaskModal.id;
@@ -2849,6 +2952,7 @@ export default function KeyAreas() {
                             setViewTab={setViewTab}
                             activeFilter={activeFilter}
                             setActiveFilter={setActiveFilter}
+                            pendingDelegationsCount={pendingDelegations.length}
                         />
                     </div>
                     
@@ -3861,8 +3965,111 @@ export default function KeyAreas() {
                             </div>
                         )}
 
-                        {/* Unified Table View for DELEGATED, TODO, ACTIVITY TRAP tabs */}
-                        {(viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap') && (
+                        {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
+                        {viewTab === 'delegated' && (
+                            <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                                {/* Section 1: Pending Delegations */}
+                                <PendingDelegationsSection
+                                    pendingTasks={pendingDelegations}
+                                    keyAreas={keyAreas}
+                                    onTaskAccept={async (taskId) => {
+                                        // Remove from pending
+                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
+                                        
+                                        // Reload ALL delegated tasks from backend to show the newly created accepted task with keyAreaId
+                                        try {
+                                            const delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                                            setAllTasks(delegatedToMe || []);
+                                            
+                                            // Update pending list by filtering for pending status only
+                                            const pending = (delegatedToMe || []).filter(t => 
+                                                (t.delegationStatus || t.delegation_status) === 'pending' || 
+                                                !(t.delegationStatus || t.delegation_status)
+                                            );
+                                            setPendingDelegations(pending);
+                                        } catch (error) {
+                                            console.error('Failed to reload delegated tasks after accept:', error);
+                                        }
+                                    }}
+                                    onTaskReject={async (taskId) => {
+                                        // Remove from pending
+                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
+                                        
+                                        // Reload delegated tasks to refresh the list
+                                        try {
+                                            const delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                                            setAllTasks(delegatedToMe || []);
+                                        } catch (error) {
+                                            console.error('Failed to reload delegated tasks after reject:', error);
+                                        }
+                                    }}
+                                    getDelegatorName={(task) => {
+                                        // First try to get from delegatedByUser object (enriched by backend)
+                                        if (task.delegatedByUser) {
+                                            return `${task.delegatedByUser.firstName || ''} ${task.delegatedByUser.lastName || ''}`.trim();
+                                        }
+                                        
+                                        // Fallback to delegatedByUserId with users list
+                                        const delegatorId = task.delegatedByUserId || task.delegated_by_user_id;
+                                        const delegator = users.find(u => u.id === delegatorId);
+                                        return delegator ? `${delegator.firstName} ${delegator.lastName}` : 'Unknown';
+                                    }}
+                                    currentUserId={currentUserId}
+                                />
+
+                                {/* Section 2: All Delegated Tasks with filters */}
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                        All Delegated Tasks ({allTasks.length})
+                                    </h3>
+                                    <UnifiedTaskActivityTable
+                                        viewTab={viewTab}
+                                        tasks={allTasks}
+                                        activities={Object.values(activitiesByTask).flat()}
+                                        keyAreas={keyAreas}
+                                        users={users}
+                                        goals={goals}
+                                        currentUserId={currentUserId}
+                                        onTaskClick={(task) => {
+                                            setSelectedTaskFull(task);
+                                            setTaskFullInitialTab("activities");
+                                        }}
+                                        onActivityClick={(activity) => {
+                                            const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                            if (task) {
+                                                setSelectedTaskFull(task);
+                                                setTaskFullInitialTab("activities");
+                                            }
+                                        }}
+                                        onTaskUpdate={async (id, updatedTask) => {
+                                            try {
+                                                if (updatedTask.delegatedToUserId) {
+                                                    const svc = await getTaskService();
+                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
+                                                    setAllTasks(delegatedToMe || []);
+                                                } else {
+                                                    const result = await api.updateTask(id, updatedTask);
+                                                    setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                                }
+                                            } catch (error) {
+                                                console.error('Failed to update task:', error);
+                                            }
+                                        }}
+                                        onTaskDelete={async (id) => {
+                                            try {
+                                                await api.deleteTask(id);
+                                                setAllTasks(prev => prev.filter(t => t.id !== id));
+                                            } catch (error) {
+                                                console.error('Failed to delete task:', error);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
+                        {(viewTab === 'todo' || viewTab === 'activity-trap') && (
                             <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <UnifiedTaskActivityTable
                                     viewTab={viewTab}
@@ -3888,11 +4095,7 @@ export default function KeyAreas() {
                                             // If delegation happened, refresh the task list for the current view
                                             if (updatedTask.delegatedToUserId) {
                                                 // Task was delegated, reload the appropriate view
-                                                if (viewTab === 'delegated') {
-                                                    const svc = await getTaskService();
-                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
-                                                    setAllTasks(delegatedToMe || []);
-                                                } else if (viewTab === 'todo') {
+                                                if (viewTab === 'todo') {
                                                     const svc = await getTaskService();
                                                     const allUserTasks = await svc.list({});
                                                     setAllTasks(allUserTasks || []);
@@ -4089,6 +4292,11 @@ export default function KeyAreas() {
                                                 }}
                                                 onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); }}
                                                 isSaving={false}
+                                                users={users}
+                                                currentUserId={currentUserId}
+                                                keyAreas={keyAreas}
+                                                goals={goals}
+                                                availableLists={[1]}
                                             />
                                         ) : editingActivityViaTaskModal ? (
                                             // Use external EditActivityModal when editing an activity via task modal
@@ -4178,6 +4386,7 @@ export default function KeyAreas() {
                                 {showActivityComposer && (
                                     <CreateActivityFormModal
                                         isOpen={showActivityComposer}
+                                        currentUserId={currentUserId}
                                         initialData={activityForm}
                                         onSave={handleActivityModalSave}
                                         onCancel={() => { setShowActivityComposer(false); setEditingActivityId(null); setActivityAttachTaskId(null); }}

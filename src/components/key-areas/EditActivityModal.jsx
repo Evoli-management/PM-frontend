@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import Modal from '../shared/Modal';
-import { useDraggable } from '../../hooks/useDraggable';
-import { useResizable } from '../../hooks/useResizable';
+import { getPriorityLevel } from '../../utils/keyareasHelpers';
+import usersService from '../../services/usersService';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -54,10 +54,14 @@ export default function EditActivityModal({
   goals = [],
   tasks = [],
   availableLists = [1],
+  currentUserId = null,
 }) {
+  const usersLoadedRef = useRef(false);
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [localTasks, setLocalTasks] = useState(tasks || []);
   const [localGoals, setLocalGoals] = useState(goals || []);
+  const [usersList, setUsersList] = useState(users || []);
+  const [listNamesMap, setListNamesMap] = useState({});
   const [title, setTitle] = useState(initialData.text || initialData.activity_name || '');
   const [description, setDescription] = useState(initialData.notes || initialData.description || '');
   const [startDate, setStartDate] = useState(safeDate(initialData.date_start || initialData.startDate) || defaultDate);
@@ -116,15 +120,56 @@ export default function EditActivityModal({
     setListIndex(initialData.list || initialData.list_index || '');
     setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
     // If activity doesn't carry an assignee, prefer the parent task's assignee (if available)
-    const initialAssignee = initialData.responsible || initialData.assignee || '';
-    if (initialAssignee) setAssignee(initialAssignee);
+    const initialAssigneeValue = initialData.responsible || initialData.assignee || '';
+    let nextAssignee = '';
+    if (initialAssigneeValue) {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
+        nextAssignee = initialAssigneeValue;
+      } else {
+        const user = usersList.find((u) => {
+          const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
+          const email = u.email || '';
+          const initialLower = String(initialAssigneeValue).toLowerCase();
+          return (
+            String(u.id) === String(initialAssigneeValue) ||
+            u.name === initialAssigneeValue ||
+            fullName === initialAssigneeValue ||
+            email === initialAssigneeValue ||
+            initialLower.includes(email.toLowerCase()) ||
+            initialLower.includes(u.name?.toLowerCase() || '')
+          );
+        });
+        nextAssignee = user?.id || '';
+      }
+    }
+    if (nextAssignee) setAssignee(nextAssignee);
     else {
       try {
         const lookupTasks = (localTasks && localTasks.length) ? localTasks : (tasks && tasks.length ? tasks : []);
         const tid = initialData.taskId || initialData.task_id || initialData.task || null;
         if (tid) {
           const parent = lookupTasks.find((t) => String(t.id) === String(tid));
-          if (parent && (parent.assignee || parent.responsible)) setAssignee(parent.assignee || parent.responsible || '');
+          if (parent && (parent.assignee || parent.responsible)) {
+            const parentAssignee = parent.assignee || parent.responsible || '';
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parentAssignee)) {
+              setAssignee(parentAssignee);
+            } else {
+              const parentUser = usersList.find((u) => {
+                const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
+                const email = u.email || '';
+                const parentLower = String(parentAssignee).toLowerCase();
+                return (
+                  String(u.id) === String(parentAssignee) ||
+                  u.name === parentAssignee ||
+                  fullName === parentAssignee ||
+                  email === parentAssignee ||
+                  parentLower.includes(email.toLowerCase()) ||
+                  parentLower.includes(u.name?.toLowerCase() || '')
+                );
+              });
+              if (parentUser?.id) setAssignee(parentUser.id);
+            }
+          }
         }
       } catch (e) {}
     }
@@ -168,70 +213,48 @@ export default function EditActivityModal({
     return () => { ignore = true; };
   }, [isOpen]);
 
-  // When the selected key area changes, populate the available lists for that area
   useEffect(() => {
-    try {
-      if (!keyAreaId) {
-        setLocalAvailableLists(Array.isArray(availableLists) ? availableLists : [1]);
-        setLocalListNames({});
-        return;
-      }
-      const sourceAreas = (localKeyAreas && localKeyAreas.length) ? localKeyAreas : keyAreas;
-      const selected = (sourceAreas || []).find((k) => String(k.id) === String(keyAreaId));
-      if (selected) {
-        if (selected.listNames && Object.keys(selected.listNames).length) {
-          const nums = Object.keys(selected.listNames)
-            .map((n) => Number(n))
-            .filter((n) => !Number.isNaN(n))
-            .sort((a, b) => a - b);
-          setLocalAvailableLists(nums.length ? nums : (Array.isArray(availableLists) ? availableLists : [1]));
-          setLocalListNames(Object.keys(selected.listNames).reduce((acc, k) => {
-            const num = Number(k);
-            if (!Number.isNaN(num)) acc[num] = selected.listNames[k];
-            else acc[k] = selected.listNames[k];
-            return acc;
-          }, {}));
-        } else if (selected.list_count && Number.isFinite(Number(selected.list_count))) {
-          const count = Number(selected.list_count) || 1;
-          setLocalAvailableLists(Array.from({ length: Math.max(1, count) }, (_, i) => i + 1));
-          setLocalListNames({});
-        } else {
-          setLocalAvailableLists(Array.isArray(availableLists) ? availableLists : [1]);
-          setLocalListNames({});
+    if (!isOpen) return;
+    (async () => {
+      try {
+        if (users && users.length) {
+          if (!usersLoadedRef.current) {
+            const me = await usersService.list();
+            usersLoadedRef.current = true;
+            if (me && me.length) {
+              const existingIds = new Set((users || []).map((u) => String(u.id)));
+              const merged = [...users];
+              me.forEach((m) => {
+                if (!existingIds.has(String(m.id))) merged.push(m);
+              });
+              const prevIds = (usersList || []).map((u) => String(u.id)).join(',');
+              const newIds = (merged || []).map((u) => String(u.id)).join(',');
+              if (prevIds !== newIds) setUsersList(merged);
+            } else {
+              const prevIds = (usersList || []).map((u) => String(u.id)).join(',');
+              const newIds = (users || []).map((u) => String(u.id)).join(',');
+              if (prevIds !== newIds) setUsersList(users || []);
+            }
+          } else {
+            const prevIds = (usersList || []).map((u) => String(u.id)).join(',');
+            const merged = (usersList || []).slice();
+            const existingIdsSet = new Set((usersList || []).map((u) => String(u.id)));
+            (users || []).forEach((u) => {
+              if (!existingIdsSet.has(String(u.id))) merged.push(u);
+            });
+            const newIds = (merged || []).map((u) => String(u.id)).join(',');
+            if (prevIds !== newIds) setUsersList(merged);
+          }
+        } else if (!usersLoadedRef.current) {
+          const me = await usersService.list();
+          usersLoadedRef.current = true;
+          setUsersList(me || []);
         }
-        if (listIndex && !localAvailableLists.includes(Number(listIndex))) setListIndex('');
-      } else {
-        setLocalAvailableLists(Array.isArray(availableLists) ? availableLists : [1]);
-        setLocalListNames({});
+      } catch (e) {
+        if (users && users.length) setUsersList(users || []);
       }
-    } catch (e) {
-      setLocalAvailableLists(Array.isArray(availableLists) ? availableLists : [1]);
-      setLocalListNames({});
-    }
-  }, [keyAreaId, keyAreas, localKeyAreas, availableLists]);
-
-  const filteredTasks = useMemo(() => {
-    try {
-      if (!keyAreaId || !listIndex) return [];
-      const sourceTasks = (localTasks && localTasks.length) ? localTasks : tasks;
-      return (sourceTasks || []).filter((t) => {
-        const taskKA = String(t.key_area_id || t.keyAreaId || t.keyArea || '');
-        if (taskKA !== String(keyAreaId)) return false;
-        const tList = String(t.list || t.list_index || t.listIndex || t.parent_list || '');
-        return String(tList) === String(listIndex);
-      });
-    } catch (e) {
-      return [];
-    }
-  }, [localTasks, tasks, keyAreaId, listIndex]);
-
-  useEffect(() => {
-    try {
-      if (!taskId) return;
-      const exists = (filteredTasks || []).some((t) => String(t.id) === String(taskId));
-      if (!exists) setTaskId('');
-    } catch (e) {}
-  }, [filteredTasks, taskId]);
+    })();
+  }, [isOpen, users]);
 
   if (!isOpen) return null;
 
@@ -252,6 +275,22 @@ export default function EditActivityModal({
     const normEnd = toDateOnly(endDate) || null;
     const normDeadline = toDateOnly(deadline) || null;
 
+  // Handle assignee - convert user ID to assignee and add delegatedToUserId for auto-delegation
+  let assigneeValue = assignee || null;
+  let delegatedToUserId = null;
+  
+  if (assignee) {
+    const selectedUser = usersList.find(u => String(u.id) === String(assignee));
+    if (selectedUser) {
+      const userId = selectedUser.id;
+      
+      // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
+      if (String(userId) !== String(currentUserId)) {
+        delegatedToUserId = userId;
+      }
+    }
+  }
+
     const payload = {
       ...initialData,
       text: (title || '').trim(),
@@ -269,8 +308,9 @@ export default function EditActivityModal({
       list: listIndex || null,
       listIndex: listIndex || null,
       taskId: taskId || null,
-      assignee: assignee || null,
-      priority: priority || 'normal',
+      assignee: assigneeValue,
+      delegatedToUserId: delegatedToUserId,
+      priority,
       goal: goal || null,
       goalId: goal || null,
     };
@@ -468,7 +508,11 @@ export default function EditActivityModal({
                 <div className="relative mt-0">
                   <select name="assignee" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
-                    {users.map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
+                    {usersList.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.firstname} {u.lastname || ''}
+                      </option>
+                    ))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
@@ -491,7 +535,9 @@ export default function EditActivityModal({
                 <div className="relative mt-0">
                   <select name="goal" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" value={goal} onChange={(e) => setGoal(e.target.value)}>
                     <option value="">— Select Goal —</option>
-                    {goals.map((g) => (<option key={g.id} value={g.id}>{g.title}</option>))}
+                    {(localGoals && localGoals.length ? localGoals : goals).map((g) => (
+                      <option key={g.id} value={g.id}>{g.title}</option>
+                    ))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>

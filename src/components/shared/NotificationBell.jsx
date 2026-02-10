@@ -120,6 +120,12 @@ export default function NotificationBell() {
         return '🎯';
       case 'goal_completed':
         return '✅';
+      case 'task_delegated':
+        return '📋';
+      case 'task_accepted':
+        return '✅';
+      case 'task_rejected':
+        return '❌';
       default:
         return '📢';
     }

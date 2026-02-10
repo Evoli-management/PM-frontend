@@ -25,8 +25,9 @@ const taskDelegationService = {
   /**
    * Get all tasks delegated to current user
    */
-  async getDelegatedToMe() {
-    const res = await apiClient.get(`${base}/delegated-to-me`);
+  async getDelegatedToMe(status = null) {
+    const params = status ? { status } : {};
+    const res = await apiClient.get(`${base}/delegated-to-me`, { params });
     return res.data;
   },
 
@@ -40,12 +41,12 @@ const taskDelegationService = {
   },
 
   /**
-   * Accept a delegated task
+   * Accept a delegated task - creates new task in selected key area
+   * @param {string} taskId - Task UUID
+   * @param {Object} payload - { keyAreaId: string (required), reason?: string }
    */
-  async acceptDelegation(taskId, reason = '') {
-    const res = await apiClient.post(`${base}/${taskId}/delegation/accept`, {
-      reason: reason || undefined,
-    });
+  async acceptDelegation(taskId, payload) {
+    const res = await apiClient.post(`${base}/${taskId}/delegation/accept`, payload);
     return res.data;
   },
 

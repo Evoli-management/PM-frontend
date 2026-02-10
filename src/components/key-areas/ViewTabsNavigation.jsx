@@ -7,7 +7,8 @@ export default function ViewTabsNavigation({
     viewTab, 
     setViewTab, 
     activeFilter, 
-    setActiveFilter
+    setActiveFilter,
+    pendingDelegationsCount = 0
 }) {
     const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const activeMenuRef = useRef(null);
@@ -81,7 +82,7 @@ export default function ViewTabsNavigation({
                 <button
                     type="button"
                     onClick={() => setViewTab('delegated')}
-                    className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
+                    className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 ${
                         viewTab === 'delegated'
                             ? 'text-blue-600 border-b-2 border-blue-600'
                             : 'text-slate-600 hover:text-slate-900'
@@ -89,6 +90,11 @@ export default function ViewTabsNavigation({
                     title="Show delegated tasks"
                 >
                     DELEGATED
+                    {pendingDelegationsCount > 0 && (
+                        <span className="inline-block px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold">
+                            {pendingDelegationsCount}
+                        </span>
+                    )}
                 </button>
                 
                 {/* TO-DO Tab */}

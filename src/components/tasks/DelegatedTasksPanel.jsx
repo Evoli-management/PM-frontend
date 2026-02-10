@@ -11,6 +11,12 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
     const [history, setHistory] = useState([]);
     const [filterStatus, setFilterStatus] = useState('pending'); // 'pending', 'accepted', 'rejected', 'all'
     const [respondingTaskId, setRespondingTaskId] = useState(null);
+    
+    // Accept delegation modal states
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [acceptingTask, setAcceptingTask] = useState(null);
+    const [keyAreas, setKeyAreas] = useState([]);
+    const [selectedKeyArea, setSelectedKeyArea] = useState('');
 
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
 
@@ -48,16 +54,49 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
         }
     };
 
-    const handleAcceptDelegation = async (taskId, e) => {
-        e.stopPropagation();
-        setRespondingTaskId(taskId);
+    const loadKeyAreas = async () => {
         try {
-            const result = await taskDelegationService.acceptDelegation(taskId);
+            const { get } = await import('../../services/keyAreaService');
+            const areas = await get();
+            setKeyAreas(areas || []);
+        } catch (error) {
+            console.error('Failed to load key areas:', error);
+            addToast({
+                title: 'Failed to load key areas',
+                variant: 'error',
+            });
+        }
+    };
+
+    const handleAcceptDelegation = async (task, e) => {
+        e.stopPropagation();
+        setAcceptingTask(task);
+        setSelectedKeyArea('');
+        await loadKeyAreas();
+        setShowAcceptModal(true);
+    };
+
+    const confirmAcceptDelegation = async () => {
+        if (!selectedKeyArea) {
+            addToast({
+                title: 'Please select a Key Area',
+                variant: 'error',
+            });
+            return;
+        }
+
+        if (!acceptingTask) return;
+
+        setRespondingTaskId(acceptingTask.id);
+        try {
+            await taskDelegationService.acceptDelegation(acceptingTask.id, {
+                keyAreaId: selectedKeyArea,
+            });
             
-            // Update local state immediately for instant UI feedback
+            // Update local state
             setDelegatedTasks(prevTasks =>
                 prevTasks.map(task =>
-                    task.id === taskId
+                    task.id === acceptingTask.id
                         ? { ...task, delegationStatus: 'accepted' }
                         : task
                 )
@@ -65,8 +104,13 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
             
             addToast({
                 title: 'Task accepted successfully',
+                description: 'Task has been added to your selected Key Area',
                 variant: 'success',
             });
+            
+            setShowAcceptModal(false);
+            setAcceptingTask(null);
+            setSelectedKeyArea('');
         } catch (error) {
             console.error('Failed to accept delegation:', error);
             addToast({
@@ -244,7 +288,7 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                             {task.delegationStatus === 'pending' && (
                                                 <>
                                                     <button
-                                                        onClick={(e) => handleAcceptDelegation(task.id, e)}
+                                                        onClick={(e) => handleAcceptDelegation(task, e)}
                                                         disabled={respondingTaskId === task.id}
                                                         className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition disabled:opacity-50"
                                                         title="Accept this delegation"
@@ -353,6 +397,91 @@ export default function DelegatedTasksPanel({ onTaskClick }) {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Accept Delegation Modal */}
+            {showAcceptModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2">
+                                <FaCheck className="text-green-600" />
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    Accept Delegation
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowAcceptModal(false);
+                                    setAcceptingTask(null);
+                                    setSelectedKeyArea('');
+                                }}
+                                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                                <FaTimes />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-4">
+                            {acceptingTask && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Task:</p>
+                                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                                        {acceptingTask.title}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Select Key Area <span className="text-red-500">*</span>
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                    Choose which Key Area to add this task to
+                                </p>
+                                <select
+                                    value={selectedKeyArea}
+                                    onChange={(e) => setSelectedKeyArea(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                             rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                             focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="">-- Select a Key Area --</option>
+                                    {keyAreas.map((area) => (
+                                        <option key={area.id} value={area.id}>
+                                            {area.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                                onClick={() => {
+                                    setShowAcceptModal(false);
+                                    setAcceptingTask(null);
+                                    setSelectedKeyArea('');
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
+                                         hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmAcceptDelegation}
+                                disabled={!selectedKeyArea || respondingTaskId}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 
+                                         rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {respondingTaskId ? 'Accepting...' : 'Accept Task'}
+                            </button>
                         </div>
                     </div>
                 </div>
