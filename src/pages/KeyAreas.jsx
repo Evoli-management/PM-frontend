@@ -158,6 +158,7 @@ const api = {
                 if (p === "low" || p === "medium" || p === "high") return p;
                 return "medium";
             })(),
+            delegatedToUserId: task.delegatedToUserId ?? null,
             // Accept client-provided list index when creating so server persists list membership
             listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
         };
