@@ -741,22 +741,37 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle DELEGATED tab - show pending delegated tasks only (like legacy)
+        // Handle DELEGATED tab - show pending delegated tasks only (like legacy WHERE accepted IS NULL)
         if (viewTab === 'delegated') {
             (async () => {
                 try {
                     let delegatedToMe = [];
                     try {
-                        // Get pending delegated tasks (matching legacy WHERE accepted IS NULL)
+                        // STRICT: Only get pending delegated tasks from delegation service
                         delegatedToMe = await taskDelegationService.getDelegatedToMe('pending');
-                        console.log('✅ Pending delegated tasks from taskDelegationService.getDelegatedToMe(pending):', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                        console.log('✅ getDelegatedToMe(pending) returned:', { 
+                            count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
+                            tasks: delegatedToMe?.map(t => ({
+                                id: t.id,
+                                title: t.title,
+                                delegationStatus: t.delegationStatus,
+                                delegation_status: t.delegation_status,
+                                delegatedByUserId: t.delegatedByUserId,
+                                delegated_by_user_id: t.delegated_by_user_id
+                            }))
+                        });
+                        
+                        // CRITICAL: Double check - only keep truly pending tasks
+                        delegatedToMe = (delegatedToMe || []).filter(t => {
+                            const status = t.delegationStatus || t.delegation_status;
+                            const isPending = status === 'pending' || status === null;
+                            if (!isPending) console.warn('⚠️ Filtered out non-pending task:', { id: t.id, title: t.title, status });
+                            return isPending;
+                        });
+                        console.log('✅ After pending filter:', { count: delegatedToMe.length });
                     } catch (err) {
-                        console.warn('❌ taskDelegationService.getDelegatedToMe() failed:', err);
-                        const svc = await getTaskService();
-                        delegatedToMe = await svc.list({ delegatedTo: true });
-                        // Filter to pending only
-                        delegatedToMe = (delegatedToMe || []).filter(t => t.delegationStatus === 'pending' || t.delegation_status === 'pending');
-                        console.log('✅ Fallback to taskService.list({ delegatedTo: true }) filtered to pending:', { count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0, data: delegatedToMe });
+                        console.error('❌ ERROR: getDelegatedToMe(pending) failed:', err);
+                        delegatedToMe = [];
                     }
 
                     setAllTasks(delegatedToMe || []);
