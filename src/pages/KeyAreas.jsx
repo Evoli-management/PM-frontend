@@ -741,15 +741,15 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle DELEGATED tab - show pending delegated tasks only (like legacy WHERE accepted IS NULL)
+        // Handle DELEGATED tab - show ALL delegated tasks (pending and accepted) like legacy
         if (viewTab === 'delegated') {
             (async () => {
                 try {
                     let delegatedToMe = [];
                     try {
-                        // STRICT: Only get pending delegated tasks from delegation service
-                        delegatedToMe = await taskDelegationService.getDelegatedToMe('pending');
-                        console.log('✅ getDelegatedToMe(pending) returned:', { 
+                        // Get ALL delegated tasks (both pending and accepted) like legacy app
+                        delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                        console.log('✅ getDelegatedToMe() returned:', { 
                             count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
                             tasks: delegatedToMe?.map(t => ({
                                 id: t.id,
@@ -761,14 +761,7 @@ export default function KeyAreas() {
                             }))
                         });
                         
-                        // CRITICAL: Double check - only keep truly pending tasks
-                        delegatedToMe = (delegatedToMe || []).filter(t => {
-                            const status = t.delegationStatus || t.delegation_status;
-                            const isPending = status === 'pending' || status === null;
-                            if (!isPending) console.warn('⚠️ Filtered out non-pending task:', { id: t.id, title: t.title, status });
-                            return isPending;
-                        });
-                        console.log('✅ After pending filter:', { count: delegatedToMe.length });
+                        console.log('✅ Total delegated tasks (all statuses):', { count: delegatedToMe.length });
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe(pending) failed:', err);
                         delegatedToMe = [];
