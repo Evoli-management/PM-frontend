@@ -692,7 +692,7 @@ export default function CreateTaskModal({
                 <div className="relative mt-0">
                   <select name="assignee" className={`${selectCls} mt-0 h-9`} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                     <option value="">— Unassigned —</option>
-                    {(usersList || []).map((u) => (<option key={u.id} value={u.name}>{u.name}</option>))}
+                    {(usersList || []).map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
                   </select>
                   <IconChevron className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 </div>
