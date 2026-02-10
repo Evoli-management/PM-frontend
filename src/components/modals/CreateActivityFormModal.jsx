@@ -18,6 +18,7 @@ export default function CreateActivityFormModal({
   tasks = [],
   availableLists = [1],
   parentListNames = {},
+  currentUserId = null,
 }) {
   // Normalize parentListNames keys to numbers for robust lookup (parents may store keys as strings)
   const normalizedParentListNames = {};
@@ -211,6 +212,20 @@ export default function CreateActivityFormModal({
       try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (__) {}
       return
     }
+
+    // Handle assignee - add delegatedToUserId for auto-delegation if assigning to different user
+    let delegatedToUserId = null;
+    if (assignee) {
+      const selectedUser = users.find(u => String(u.id) === String(assignee));
+      if (selectedUser) {
+        const userId = selectedUser.id;
+        // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
+        if (String(userId) !== String(currentUserId)) {
+          delegatedToUserId = userId;
+        }
+      }
+    }
+
     const payload = {
       text: (title || '').trim(),
       priority: priority || undefined,
@@ -223,6 +238,7 @@ export default function CreateActivityFormModal({
       taskId: taskId || undefined,
       listIndex: listIndex || undefined,
       assignee: assignee || undefined,
+      delegatedToUserId: delegatedToUserId,
       duration: duration || undefined,
     }
     onSave && onSave(payload)

@@ -2760,6 +2760,7 @@ export default function KeyAreas() {
                 {showEditActivityModal && editingActivityViaTaskModal && (
                     <EditActivityModal
                         isOpen={true}
+                        currentUserId={currentUserId}
                         initialData={(function(){
                             try {
                                 const id = editingActivityViaTaskModal.id;
@@ -4131,6 +4132,7 @@ export default function KeyAreas() {
                                 {showActivityComposer && (
                                     <CreateActivityFormModal
                                         isOpen={showActivityComposer}
+                                        currentUserId={currentUserId}
                                         initialData={activityForm}
                                         onSave={handleActivityModalSave}
                                         onCancel={() => { setShowActivityComposer(false); setEditingActivityId(null); setActivityAttachTaskId(null); }}

@@ -45,6 +45,7 @@ export default function EditActivityModal({
   goals = [],
   tasks = [],
   availableLists = [1],
+  currentUserId = null,
 }) {
   const [localKeyAreas, setLocalKeyAreas] = useState(keyAreas || []);
   const [localTasks, setLocalTasks] = useState(tasks || []);
@@ -157,6 +158,22 @@ export default function EditActivityModal({
   const normEnd = toDateOnly(endDate) || null;
   const normDeadline = toDateOnly(deadline) || null;
 
+  // Handle assignee - convert user ID to assignee and add delegatedToUserId for auto-delegation
+  let assigneeValue = assignee || null;
+  let delegatedToUserId = null;
+  
+  if (assignee) {
+    const selectedUser = users.find(u => String(u.id) === String(assignee));
+    if (selectedUser) {
+      const userId = selectedUser.id;
+      
+      // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
+      if (String(userId) !== String(currentUserId)) {
+        delegatedToUserId = userId;
+      }
+    }
+  }
+
     const payload = {
       ...initialData,
       text: (title || '').trim(),
@@ -172,7 +189,8 @@ export default function EditActivityModal({
       key_area_id: keyAreaId || null,
       list: listIndex,
       taskId: taskId || null,
-      assignee: assignee || null,
+      assignee: assigneeValue,
+      delegatedToUserId: delegatedToUserId,
       priority,
       goal: goal || null,
     };
