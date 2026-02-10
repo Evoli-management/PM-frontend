@@ -9,6 +9,7 @@ const getKeyAreaService = async () => {
     return _keyAreaService;
 };
 import usersService from "../../services/usersService";
+import userProfileService from "../../services/userProfileService";
 
 export default function DontForgetComposer({ open, onClose, onAdd, defaultList = 1 }) {
     const modalRef = useRef(null);
@@ -32,6 +33,7 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
     const [saving, setSaving] = useState(false);
     const [keyAreas, setKeyAreas] = useState([]);
     const [users, setUsers] = useState([]);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [keyAreaId, setKeyAreaId] = useState("");
     // Keep end date synced to start date until user edits end date manually
     const [endAuto, setEndAuto] = useState(true);
@@ -65,12 +67,18 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
             (async () => {
                 try {
                     const kaSvc = await getKeyAreaService();
-                    const [kas, us] = await Promise.all([kaSvc.list({ includeTaskCount: false }), usersService.list()]);
+                    const [kas, us, profile] = await Promise.all([
+                        kaSvc.list({ includeTaskCount: false }),
+                        usersService.list(),
+                        userProfileService.getProfile(),
+                    ]);
                     setKeyAreas(kas);
                     setUsers(us);
+                    setCurrentUserId(profile?.id || null);
                 } catch {
                     setKeyAreas([]);
                     setUsers([]);
+                    setCurrentUserId(null);
                 }
             })();
         }
@@ -95,6 +103,29 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
         if (!name) return;
         try {
             setSaving(true);
+            const assigneeInput = (assignee || "").trim();
+            const assigneeInputLower = assigneeInput.toLowerCase();
+            const selectedUser = assigneeInput
+                ? (users || []).find((u) => {
+                      const userName = (u?.name || "").toLowerCase();
+                      const fullName = `${u?.firstName || ""} ${u?.lastName || ""}`.trim().toLowerCase();
+                      const email = (u?.email || "").toLowerCase();
+                      return (
+                          String(u?.id) === assigneeInput ||
+                          userName === assigneeInputLower ||
+                          fullName === assigneeInputLower ||
+                          email === assigneeInputLower
+                      );
+                  })
+                : null;
+            const selectedUserId = selectedUser?.id ? String(selectedUser.id) : null;
+            const resolvedAssigneeName = selectedUser
+                ? String(selectedUserId) === String(currentUserId)
+                    ? "Me"
+                    : (selectedUser?.name || `${selectedUser?.firstName || ""} ${selectedUser?.lastName || ""}`.trim())
+                : assigneeInput;
+            const delegatedToUserId =
+                selectedUserId && String(selectedUserId) !== String(currentUserId) ? selectedUserId : null;
             await onAdd?.({
                 name,
                 // left column
@@ -106,7 +137,8 @@ export default function DontForgetComposer({ open, onClose, onAdd, defaultList =
                 duration,
                 // right column
                 project,
-                assignee, // Respons.
+                assignee: resolvedAssigneeName, // Respons.
+                delegatedToUserId,
                 priority,
                 goal,
                 ...(keyAreaId ? { keyAreaId } : {}),
