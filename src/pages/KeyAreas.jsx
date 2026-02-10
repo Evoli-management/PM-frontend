@@ -2772,6 +2772,8 @@ export default function KeyAreas() {
             if (payload.completionDate) body.completionDate = payload.completionDate;
             // Allow task attachment if provided
             if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
+            // Allow delegation if provided
+            if (payload.delegatedToUserId) body.delegatedToUserId = payload.delegatedToUserId;
 
             if (payload.id) {
                 // update

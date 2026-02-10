@@ -237,7 +237,7 @@ export default function UnifiedTaskActivityTable({
                 delete activityUpdates.name;
             }
             
-            // Backend expects snake_case for dates
+            // Backend expects camelCase for dates
             if (updates.start_date !== undefined) {
                 activityUpdates.startDate = updates.start_date;
                 delete activityUpdates.start_date;
@@ -251,17 +251,15 @@ export default function UnifiedTaskActivityTable({
                 delete activityUpdates.due_date;
             }
             
-            // Map key area and assignee IDs (backend might not support these for activities)
-            if (updates.key_area_id !== undefined) {
-                delete activityUpdates.key_area_id;
-                delete activityUpdates.keyAreaId;
-            }
-            if (updates.assignee_id !== undefined || updates.responsible_id !== undefined) {
-                delete activityUpdates.assignee_id;
-                delete activityUpdates.responsible_id;
-                delete activityUpdates.assigneeId;
-                delete activityUpdates.responsibleId;
-            }
+            // Activities don't have key_area, list, or assignee fields (they inherit from parent task)
+            // Remove all unsupported fields
+            const unsupportedFields = [
+                'key_area_id', 'keyAreaId', 'keyArea',
+                'list', 'listIndex', 'list_index',
+                'assignee_id', 'responsible_id', 'assigneeId', 'responsibleId',
+                'assignee', 'responsible'
+            ];
+            unsupportedFields.forEach(field => delete activityUpdates[field]);
             
             onActivityUpdate(item.id || item.activity_id, activityUpdates);
         }
