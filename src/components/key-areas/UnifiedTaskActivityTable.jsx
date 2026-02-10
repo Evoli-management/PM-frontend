@@ -739,7 +739,9 @@ export default function UnifiedTaskActivityTable({
                             {columns.includes('responsible') && (
                                 <th className="w-40 p-2">{viewTab === 'delegated' ? 'Received From' : 'Responsible'}</th>
                             )}
-                            <th className="w-24 p-2 text-center">Actions</th>
+                            {viewTab !== 'delegated' && (
+                                <th className="w-24 p-2 text-center">Actions</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -1018,77 +1020,10 @@ export default function UnifiedTaskActivityTable({
                                             )}
                                         </td>
                                     )}
-                                    {/* Action Buttons */}
-                                    <td className="p-2 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            {/* Debug delegation status */}
-                                            {viewTab === 'delegated' && item.type === 'task' && (() => {
-                                                const isPending = item.delegationStatus === 'pending' || item.delegation_status === 'pending';
-                                                if (!isPending) {
-                                                    console.log('⚠️ Task not showing accept/reject buttons:', {
-                                                        id: item.id,
-                                                        title: item.title,
-                                                        viewTab,
-                                                        type: item.type,
-                                                        delegationStatus: item.delegationStatus,
-                                                        delegation_status: item.delegation_status
-                                                    });
-                                                }
-                                                return null;
-                                            })()}
-                                            {/* Accept/Reject for pending delegations */}
-                                            {viewTab === 'delegated' && item.type === 'task' && (item.delegationStatus === 'pending' || item.delegation_status === 'pending') ? (
-                                                <>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleAcceptClick(item);
-                                                        }}
-                                                        disabled={respondingTaskId === item.id}
-                                                        className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
-                                                        title="Accept this delegation"
-                                                    >
-                                                        <FaCheck size={14} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleRejectClick(item);
-                                                        }}
-                                                        disabled={respondingTaskId === item.id}
-                                                        className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50"
-                                                        title="Reject this delegation"
-                                                    >
-                                                        <FaBan size={14} />
-                                                    </button>
-                                                </>
-                                            ) : viewTab === 'delegated' && item.type === 'activity' && (item.delegationStatus === 'pending' || item.delegation_status === 'pending') ? (
-                                                <>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleAcceptActivityClick(item);
-                                                        }}
-                                                        disabled={respondingTaskId === item.id}
-                                                        className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
-                                                        title="Accept this activity delegation"
-                                                    >
-                                                        <FaCheck size={14} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleRejectActivityClick(item);
-                                                        }}
-                                                        disabled={respondingTaskId === item.id}
-                                                        className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50"
-                                                        title="Reject this activity delegation"
-                                                    >
-                                                        <FaBan size={14} />
-                                                    </button>
-                                                </>
-                                            ) : viewTab === 'delegated' ? (
-                                                // For delegated view with accepted/rejected tasks - only show view link
+                                    {viewTab !== 'delegated' && (
+                                        <td className="p-2 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                {/* Open Details Link */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1103,70 +1038,50 @@ export default function UnifiedTaskActivityTable({
                                                 >
                                                     <FaExternalLinkAlt size={14} />
                                                 </button>
-                                            ) : (
-                                                <>
-                                                    {/* Open Details Link */}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (item.type === 'task' && onTaskClick) {
-                                                                onTaskClick(item);
-                                                            } else if (item.type === 'activity' && onActivityClick) {
-                                                                onActivityClick(item);
-                                                            }
-                                                        }}
-                                                        className="ta-accent hover:opacity-80 p-1"
-                                                        title="Open details"
-                                                    >
-                                                        <FaExternalLinkAlt size={14} />
-                                                    </button>
 
-                                                    {/* Toggle Complete */}
-                                                    {isCompleted ? (
-                                                        <button
-                                                            onClick={(e) => handleCompleteToggle(item, e)}
-                                                            className="text-gray-400 hover:text-red-600 p-1"
-                                                            title="Mark as not completed"
-                                                        >
-                                                            <FaTimes size={14} />
-                                                        </button>
+                                                {/* Toggle Complete */}
+                                                {isCompleted ? (
+                                                    <button
+                                                        onClick={(e) => handleCompleteToggle(item, e)}
+                                                        className="text-gray-400 hover:text-red-600 p-1"
+                                                        title="Mark as not completed"
+                                                    >
+                                                        <FaTimes size={14} />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={(e) => handleCompleteToggle(item, e)}
+                                                        className="text-gray-400 hover:text-green-600 p-1"
+                                                        title="Mark as completed"
+                                                    >
+                                                        <FaCheck size={14} />
+                                                    </button>
+                                                )}
+
+                                                {/* Toggle Private/Public */}
+                                                <button
+                                                    onClick={(e) => handleTogglePrivate(item, e)}
+                                                    className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
+                                                    title={isPrivate ? 'Mark as public' : 'Mark as private'}
+                                                >
+                                                    {isPrivate ? (
+                                                        <FaLock size={14} />
                                                     ) : (
-                                                        <button
-                                                            onClick={(e) => handleCompleteToggle(item, e)}
-                                                            className="text-gray-400 hover:text-green-600 p-1"
-                                                            title="Mark as completed"
-                                                        >
-                                                            <FaCheck size={14} />
-                                                        </button>
+                                                        <FaLockOpen size={14} />
                                                     )}
+                                                </button>
 
-                                                    {/* Toggle Private/Public */}
-                                                    {viewTab !== 'delegated' && (
-                                                        <button
-                                                            onClick={(e) => handleTogglePrivate(item, e)}
-                                                            className={`p-1 ${isPrivate ? 'text-yellow-600' : 'text-gray-400'}`}
-                                                            title={isPrivate ? 'Mark as public' : 'Mark as private'}
-                                                        >
-                                                            {isPrivate ? (
-                                                                <FaLock size={14} />
-                                                            ) : (
-                                                                <FaLockOpen size={14} />
-                                                            )}
-                                                        </button>
-                                                    )}
-
-                                                    {/* Delete */}
-                                                    <button
-                                                        onClick={(e) => handleDelete(item, e)}
-                                                        className="text-gray-400 hover:text-red-700 p-1"
-                                                        title="Delete"
-                                                    >
-                                                        <FaTrash size={14} />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
+                                                {/* Delete */}
+                                                <button
+                                                    onClick={(e) => handleDelete(item, e)}
+                                                    className="text-gray-400 hover:text-red-700 p-1"
+                                                    title="Delete"
+                                                >
+                                                    <FaTrash size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
                             );
                         })}
