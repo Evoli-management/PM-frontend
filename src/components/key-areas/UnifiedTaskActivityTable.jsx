@@ -907,6 +907,22 @@ export default function UnifiedTaskActivityTable({
                                                         <FaBan size={14} />
                                                     </button>
                                                 </>
+                                            ) : viewTab === 'delegated' ? (
+                                                // For delegated view with accepted/rejected tasks - only show view link
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (item.type === 'task' && onTaskClick) {
+                                                            onTaskClick(item);
+                                                        } else if (item.type === 'activity' && onActivityClick) {
+                                                            onActivityClick(item);
+                                                        }
+                                                    }}
+                                                    className="ta-accent hover:opacity-80 p-1"
+                                                    title="Open details"
+                                                >
+                                                    <FaExternalLinkAlt size={14} />
+                                                </button>
                                             ) : (
                                                 <>
                                                     {/* Open Details Link */}
