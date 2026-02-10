@@ -3,6 +3,8 @@ import { toDateOnly } from '../../utils/keyareasHelpers';
 import Modal from '../shared/Modal';
 import { getPriorityLevel } from '../../utils/keyareasHelpers';
 import usersService from '../../services/usersService';
+import { useDraggable } from '../../hooks/useDraggable';
+import { useResizable } from '../../hooks/useResizable';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
