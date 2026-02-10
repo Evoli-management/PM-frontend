@@ -1893,6 +1893,7 @@ export default function DontForget() {
                                             users={users}
                                             goals={goals}
                                             isDontForgetMode={true}
+                                            currentUserId={users && users[0] ? users[0].id : null}
                                     />
 
                                 <EditTaskModal

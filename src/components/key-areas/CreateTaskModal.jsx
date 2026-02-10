@@ -71,6 +71,8 @@ export default function CreateTaskModal({
   parentListNames = null,
   // When true, the modal is being used to create a Don't Forget task (DontForget page)
   isDontForgetMode = false,
+  // Current user ID for delegation detection
+  currentUserId = null,
 }) {
   const firstRowRef = useRef(null);
   const [firstRowHeight, setFirstRowHeight] = useState(null);
@@ -136,11 +138,13 @@ export default function CreateTaskModal({
   const [allTasks, setAllTasks] = useState([]);
   const [listNames, setListNames] = useState({});
   const [localGoals, setLocalGoals] = useState(goals || []);
+  const [resolvedCurrentUserId, setResolvedCurrentUserId] = useState(currentUserId || null);
 
   const startRef = useRef(null);
   const endRef = useRef(null);
   const deadlineRef = useRef(null);
   const usersLoadedRef = useRef(false);
+  const currentUserIdRef = useRef(false);
 
   const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
   const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 510);
@@ -246,6 +250,34 @@ export default function CreateTaskModal({
   useEffect(() => {
     if (!isOpen) usersLoadedRef.current = false;
   }, [isOpen]);
+
+  // Fetch current user ID if not provided as prop
+  useEffect(() => {
+    if (!isOpen || resolvedCurrentUserId) return;
+    if (currentUserIdRef.current) return; // Already attempted fetch
+    currentUserIdRef.current = true;
+
+    let ignore = false;
+    (async () => {
+      try {
+        const mod = await import('../../services/userProfileService');
+        const svc = mod?.default || mod;
+        if (svc && typeof svc.getProfile === 'function') {
+          const profile = await svc.getProfile();
+          if (!ignore && profile?.id) {
+            setResolvedCurrentUserId(profile.id);
+          }
+        }
+      } catch (e) {
+        // Silently fail - delegation will just use the unresolved ID
+        if (!ignore) console.debug('Failed to fetch current user profile for delegation detection', e);
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, resolvedCurrentUserId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -398,10 +430,32 @@ export default function CreateTaskModal({
       return;
     }
 
+    // Handle assignee - convert user ID to name and add delegatedToUserId for auto-delegation
+    let assigneeName = assignee;
+    let delegatedToUserId = null;
+    
+    if (assignee) {
+      // Check if assignee is a user ID (UUID format) in usersList
+      const selectedUser = usersList.find(u => String(u.id) === String(assignee));
+      if (selectedUser) {
+        const userId = selectedUser.id;
+        
+        // Set assignee name for display
+        if (String(userId) === String(resolvedCurrentUserId)) {
+          assigneeName = 'Me';
+        } else {
+          assigneeName = selectedUser.name;
+          // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
+          delegatedToUserId = userId;
+        }
+      }
+    }
+
     const payload = {
       title: (title || '').trim(),
       description: (description || '').trim(),
-      assignee: assignee || null,
+      assignee: assigneeName || null,
+      delegatedToUserId: delegatedToUserId,
       start_date: startDate || null,
       time: startTime || null,
       start_time: startTime || null,
