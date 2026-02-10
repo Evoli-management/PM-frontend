@@ -334,8 +334,16 @@ export default function UnifiedTaskActivityTable({
                         updates.delegatedToUserId = userId;
                     }
                 }
+            } else if (item.type === 'activity') {
+                // For activities, use delegatedToUserId (auto-creates delegation)
+                if (value && String(value) !== String(currentUserId)) {
+                    updates.delegatedToUserId = value;
+                } else {
+                    // Clear delegation if assigning to self or empty
+                    updates.delegatedToUserId = null;
+                }
             } else {
-                // Fallback for activities or empty value
+                // Fallback for empty value or unknown types
                 updates.assigneeId = value || null;
                 updates.assignee_id = value || null;
                 updates.responsibleId = value || null;
@@ -370,7 +378,8 @@ export default function UnifiedTaskActivityTable({
         }
         
         // For other views, show assignee/responsible
-        const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
+        // For activities, delegatedToUserId represents the assigned user
+        const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || item.delegatedToUserId || item.delegated_to_user_id;
         const user = users.find(u => String(u.id || u.member_id) === String(id));
         if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
         return item.assignee || item.responsible || '';
@@ -760,7 +769,8 @@ export default function UnifiedTaskActivityTable({
                             const endDateValue = toDateOnly(item.endDate || item.end_date);
                             const deadlineValueInput = toDateOnly(deadlineValue);
                             const keyAreaIdValue = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || '';
-                            const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || '';
+                            // For activities, delegatedToUserId represents the assigned user
+                            const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || item.delegatedToUserId || item.delegated_to_user_id || '';
                             const responsibleNameValue = viewTab === 'delegated'
                                 ? getResponsibleLabel(item)
                                 : (item.assignee || item.responsible || getUserName(responsibleIdValue));
