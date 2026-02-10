@@ -763,7 +763,9 @@ export default function UnifiedTaskActivityTable({
                             const deadlineValueInput = toDateOnly(deadlineValue);
                             const keyAreaIdValue = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || '';
                             const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || '';
-                            const responsibleNameValue = item.assignee || item.responsible || getUserName(responsibleIdValue);
+                            const responsibleNameValue = viewTab === 'delegated'
+                                ? getResponsibleLabel(item)
+                                : (item.assignee || item.responsible || getUserName(responsibleIdValue));
                             const goalIdValue = item.goalId || item.goal_id || '';
                             
                             return (
@@ -989,6 +991,11 @@ export default function UnifiedTaskActivityTable({
                                             ) : (
                                                 <span>{getKeyAreaName(keyAreaIdValue)}</span>
                                             )}
+                                        </td>
+                                    )}
+                                    {columns.includes('responsible') && viewTab === 'delegated' && (
+                                        <td className="p-2 text-xs">
+                                            <span>{responsibleNameValue || '—'}</span>
                                         </td>
                                     )}
                                     {columns.includes('responsible') && viewTab !== 'delegated' && (
