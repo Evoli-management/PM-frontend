@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { FaCheck, FaTimes, FaTrash, FaLock, FaLockOpen, FaExternalLinkAlt, FaStop, FaAlignJustify, FaBan } from 'react-icons/fa';
 import { toDateOnly } from '../../utils/keyareasHelpers';
 import taskDelegationService from '../../services/taskDelegationService';
+import activityDelegationService from '../../services/activityDelegationService';
 import keyAreaService from '../../services/keyAreaService';
 
 /**
@@ -45,8 +46,11 @@ export default function UnifiedTaskActivityTable({
     const [editValue, setEditValue] = useState('');
     const [showAcceptModal, setShowAcceptModal] = useState(false);
     const [acceptingTask, setAcceptingTask] = useState(null);
+    const [acceptingActivity, setAcceptingActivity] = useState(null); // For activity delegation
     const [userKeyAreas, setUserKeyAreas] = useState([]);
+    const [userTasks, setUserTasks] = useState([]); // For accept-into-task feature
     const [selectedKeyArea, setSelectedKeyArea] = useState('');
+    const [selectedTaskForActivity, setSelectedTaskForActivity] = useState(''); // For accept-into-task
     const [respondingTaskId, setRespondingTaskId] = useState(null);
 
     // Flatten tasks and activities into single array
@@ -489,6 +493,106 @@ export default function UnifiedTaskActivityTable({
         }
     };
 
+    // Activity delegation handlers
+    const handleAcceptActivityClick = async (activity) => {
+        // Load user's key areas and tasks for selection
+        setAcceptingActivity(activity);
+        setShowAcceptModal(true);
+        
+        try {
+            const areas = await keyAreaService.list();
+            setUserKeyAreas(areas || []);
+            
+            // Also load user's tasks for the accept-into-task option
+            // This will be populated when a key area is selected
+            setUserTasks([]);
+        } catch (error) {
+            console.error('Failed to load key areas:', error);
+            setUserKeyAreas([]);
+        }
+    };
+
+    const handleKeyAreaChangeForActivity = async (keyAreaId) => {
+        setSelectedKeyArea(keyAreaId);
+        setSelectedTaskForActivity(''); // Reset task selection
+        
+        if (keyAreaId) {
+            try {
+                // Load tasks for the selected key area
+                const response = await fetch(`/api/tasks?keyAreaId=${keyAreaId}`);
+                if (response.ok) {
+                    const tasksData = await response.json();
+                    setUserTasks(tasksData || []);
+                }
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+                setUserTasks([]);
+            }
+        } else {
+            setUserTasks([]);
+        }
+    };
+
+    const confirmAcceptActivityDelegation = async () => {
+        if (!selectedKeyArea || !acceptingActivity) return;
+        
+        setRespondingTaskId(acceptingActivity.id);
+        try {
+            const payload = {
+                keyAreaId: selectedKeyArea,
+            };
+            
+            // If user selected an existing task, add it to payload
+            if (selectedTaskForActivity) {
+                payload.taskId = selectedTaskForActivity;
+            }
+            
+            const result = await activityDelegationService.acceptDelegation(acceptingActivity.id, payload);
+            
+            if (result.type === 'task') {
+                alert('Activity accepted and converted to a task in your selected Key Area!');
+            } else {
+                alert('Activity accepted and added to the selected task!');
+            }
+            
+            // Close modal
+            setShowAcceptModal(false);
+            setAcceptingActivity(null);
+            setSelectedKeyArea('');
+            setSelectedTaskForActivity('');
+            setUserTasks([]);
+            
+            // Redirect to the selected key area
+            window.location.href = `/key-areas?id=${selectedKeyArea}`;
+        } catch (error) {
+            console.error('Failed to accept activity delegation:', error);
+            alert(error.response?.data?.message || 'Failed to accept activity delegation');
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
+    const handleRejectActivityClick = async (activity) => {
+        if (!confirm('Are you sure you want to reject this activity delegation?')) return;
+        
+        setRespondingTaskId(activity.id);
+        try {
+            await activityDelegationService.rejectDelegation(activity.id);
+            
+            // Update local state - mark as rejected
+            if (onActivityUpdate) {
+                onActivityUpdate(activity.id, { delegationStatus: 'rejected' });
+            }
+            
+            alert('Activity rejected successfully');
+        } catch (error) {
+            console.error('Failed to reject activity delegation:', error);
+            alert(error.response?.data?.message || 'Failed to reject activity delegation');
+        } finally {
+            setRespondingTaskId(null);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full ta-legacy">
             {/* Special Header for Delegated View */}
@@ -914,6 +1018,31 @@ export default function UnifiedTaskActivityTable({
                                                         <FaBan size={14} />
                                                     </button>
                                                 </>
+                                            ) : viewTab === 'delegated' && item.type === 'activity' && (item.delegationStatus === 'pending' || item.delegation_status === 'pending') ? (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAcceptActivityClick(item);
+                                                        }}
+                                                        disabled={respondingTaskId === item.id}
+                                                        className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
+                                                        title="Accept this activity delegation"
+                                                    >
+                                                        <FaCheck size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRejectActivityClick(item);
+                                                        }}
+                                                        disabled={respondingTaskId === item.id}
+                                                        className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50"
+                                                        title="Reject this activity delegation"
+                                                    >
+                                                        <FaBan size={14} />
+                                                    </button>
+                                                </>
                                             ) : viewTab === 'delegated' ? (
                                                 // For delegated view with accepted/rejected tasks - only show view link
                                                 <button
@@ -1023,7 +1152,10 @@ export default function UnifiedTaskActivityTable({
                                 onClick={() => {
                                     setShowAcceptModal(false);
                                     setAcceptingTask(null);
+                                    setAcceptingActivity(null);
                                     setSelectedKeyArea('');
+                                    setSelectedTaskForActivity('');
+                                    setUserTasks([]);
                                 }}
                                 className="text-gray-400 hover:text-white"
                             >
@@ -1041,17 +1173,26 @@ export default function UnifiedTaskActivityTable({
                                     </p>
                                 </div>
                             )}
+                            
+                            {acceptingActivity && (
+                                <div className="bg-[#34495e] p-3 rounded-lg mb-4 border border-gray-600">
+                                    <p className="text-sm text-gray-400 mb-1">Activity:</p>
+                                    <p className="font-medium text-white">
+                                        {acceptingActivity.text}
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-300 mb-2">
                                     Select Key Area <span className="text-red-400">*</span>
                                 </label>
                                 <p className="text-xs text-gray-400 mb-2">
-                                    Choose which Key Area to add this task to
+                                    Choose which Key Area to add this {acceptingTask ? 'task' : 'activity'} to
                                 </p>
                                 <select
                                     value={selectedKeyArea}
-                                    onChange={(e) => setSelectedKeyArea(e.target.value)}
+                                    onChange={(e) => acceptingActivity ? handleKeyAreaChangeForActivity(e.target.value) : setSelectedKeyArea(e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-600 rounded-lg 
                                              bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
                                              focus:border-transparent"
@@ -1064,6 +1205,32 @@ export default function UnifiedTaskActivityTable({
                                     ))}
                                 </select>
                             </div>
+                            
+                            {/* Task selector for activities (accept-into-task feature) */}
+                            {acceptingActivity && selectedKeyArea && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Add to Existing Task (Optional)
+                                    </label>
+                                    <p className="text-xs text-gray-400 mb-2">
+                                        Leave empty to convert activity into a new task, or select a task to add this activity to it
+                                    </p>
+                                    <select
+                                        value={selectedTaskForActivity}
+                                        onChange={(e) => setSelectedTaskForActivity(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-600 rounded-lg 
+                                                 bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
+                                                 focus:border-transparent"
+                                    >
+                                        <option value="">-- Create New Task --</option>
+                                        {userTasks.map((task) => (
+                                            <option key={task.id} value={task.id}>
+                                                {task.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -1072,7 +1239,10 @@ export default function UnifiedTaskActivityTable({
                                 onClick={() => {
                                     setShowAcceptModal(false);
                                     setAcceptingTask(null);
+                                    setAcceptingActivity(null);
                                     setSelectedKeyArea('');
+                                    setSelectedTaskForActivity('');
+                                    setUserTasks([]);
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-[#34495e] 
                                          rounded-lg transition"
@@ -1080,12 +1250,12 @@ export default function UnifiedTaskActivityTable({
                                 Cancel
                             </button>
                             <button
-                                onClick={confirmAcceptDelegation}
+                                onClick={acceptingTask ? confirmAcceptDelegation : confirmAcceptActivityDelegation}
                                 disabled={!selectedKeyArea || respondingTaskId}
                                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 
                                          rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {respondingTaskId ? 'Accepting...' : 'Accept Task'}
+                                {respondingTaskId ? 'Accepting...' : `Accept ${acceptingTask ? 'Task' : 'Activity'}`}
                             </button>
                         </div>
                     </div>
