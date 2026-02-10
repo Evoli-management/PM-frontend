@@ -91,6 +91,17 @@ export default function EditActivityModal({
   const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
   const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 510);
 
+  // Filter tasks by selected key area and list
+  const filteredTasks = useMemo(() => {
+    if (!keyAreaId || !listIndex) return [];
+    const allTasks = localTasks.length > 0 ? localTasks : (tasks || []);
+    return allTasks.filter((t) => {
+      const tKeyArea = t.keyAreaId || t.key_area_id || t.keyArea || t.key_area;
+      const tList = t.list || t.list_index || t.listIndex;
+      return String(tKeyArea) === String(keyAreaId) && String(tList) === String(listIndex);
+    });
+  }, [keyAreaId, listIndex, localTasks, tasks]);
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
