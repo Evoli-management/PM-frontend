@@ -17,6 +17,7 @@ import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
+import PendingDelegationsSection from '../components/key-areas/PendingDelegationsSection';
 import taskDelegationService from '../services/taskDelegationService';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
 import {
@@ -478,6 +479,7 @@ export default function KeyAreas() {
     const [activeFilter, setActiveFilter] = useState('active');
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
+    const [pendingDelegations, setPendingDelegations] = useState([]); // For DELEGATED tab - pending only
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
     const handleTaskStatusChange = async (id, uiStatus) => {
@@ -741,34 +743,35 @@ export default function KeyAreas() {
             return;
         }
         
-        // Handle DELEGATED tab - show ALL delegated tasks (pending and accepted) like legacy
+        // Handle DELEGATED tab - show TWO sections: pending at top, all delegated below
         if (viewTab === 'delegated') {
             (async () => {
                 try {
                     let delegatedToMe = [];
                     try {
-                        // Get ALL delegated tasks (both pending and accepted) like legacy app
+                        // Get ALL delegated tasks (both pending and accepted)
                         delegatedToMe = await taskDelegationService.getDelegatedToMe();
                         console.log('✅ getDelegatedToMe() returned:', { 
                             count: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
-                            tasks: delegatedToMe?.map(t => ({
-                                id: t.id,
-                                title: t.title,
-                                delegationStatus: t.delegationStatus,
-                                delegation_status: t.delegation_status,
-                                delegatedByUserId: t.delegatedByUserId,
-                                delegated_by_user_id: t.delegated_by_user_id
-                            }))
+                            pending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
+                            accepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
                         });
                         
-                        console.log('✅ Total delegated tasks (all statuses):', { count: delegatedToMe.length });
+                        // Separate pending delegations for top section
+                        const pending = (delegatedToMe || []).filter(t => 
+                            (t.delegationStatus || t.delegation_status) === 'pending' || 
+                            !(t.delegationStatus || t.delegation_status)
+                        );
+                        setPendingDelegations(pending);
+                        
+                        // Set all tasks for the bottom section (with filters)
+                        setAllTasks(delegatedToMe || []);
                     } catch (err) {
-                        console.error('❌ ERROR: getDelegatedToMe(pending) failed:', err);
+                        console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
+                        setPendingDelegations([]);
                     }
 
-                    setAllTasks(delegatedToMe || []);
-                    
                     // Load activities for delegated tasks
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
@@ -784,6 +787,7 @@ export default function KeyAreas() {
                     setActivitiesByTask(Object.fromEntries(entries));
                 } catch (e) {
                     console.error('Failed to load delegated tasks', e);
+                    setPendingDelegations([]);
                 }
             })();
             return;
@@ -3688,8 +3692,83 @@ export default function KeyAreas() {
                             </div>
                         )}
 
-                        {/* Unified Table View for DELEGATED, TODO, ACTIVITY TRAP tabs */}
-                        {(viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap') && (
+                        {/* DELEGATED TAB: Two-section layout - pending at top, all delegated below */}
+                        {viewTab === 'delegated' && (
+                            <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                                {/* Section 1: Pending Delegations */}
+                                <PendingDelegationsSection
+                                    pendingTasks={pendingDelegations}
+                                    onTaskAccept={(taskId) => {
+                                        // Remove from pending and move to all tasks view
+                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
+                                        setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, delegationStatus: 'accepted' } : t));
+                                    }}
+                                    onTaskReject={(taskId) => {
+                                        // Remove from pending
+                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
+                                        setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, delegationStatus: 'rejected' } : t));
+                                    }}
+                                    getDelegatorName={(task) => {
+                                        const delegatorId = task.delegatedByUserId || task.delegated_by_user_id;
+                                        const delegator = users.find(u => u.id === delegatorId);
+                                        return delegator ? `${delegator.firstName} ${delegator.lastName}` : 'Unknown';
+                                    }}
+                                    currentUserId={currentUserId}
+                                />
+
+                                {/* Section 2: All Delegated Tasks with filters */}
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                        All Delegated Tasks ({allTasks.length})
+                                    </h3>
+                                    <UnifiedTaskActivityTable
+                                        viewTab={viewTab}
+                                        tasks={allTasks}
+                                        activities={Object.values(activitiesByTask).flat()}
+                                        keyAreas={keyAreas}
+                                        users={users}
+                                        goals={goals}
+                                        currentUserId={currentUserId}
+                                        onTaskClick={(task) => {
+                                            setSelectedTaskFull(task);
+                                            setTaskFullInitialTab("activities");
+                                        }}
+                                        onActivityClick={(activity) => {
+                                            const task = allTasks.find(t => String(t.id) === String(activity.taskId || activity.task_id));
+                                            if (task) {
+                                                setSelectedTaskFull(task);
+                                                setTaskFullInitialTab("activities");
+                                            }
+                                        }}
+                                        onTaskUpdate={async (id, updatedTask) => {
+                                            try {
+                                                if (updatedTask.delegatedToUserId) {
+                                                    const svc = await getTaskService();
+                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
+                                                    setAllTasks(delegatedToMe || []);
+                                                } else {
+                                                    const result = await api.updateTask(id, updatedTask);
+                                                    setAllTasks(prev => prev.map(t => t.id === id ? result : t));
+                                                }
+                                            } catch (error) {
+                                                console.error('Failed to update task:', error);
+                                            }
+                                        }}
+                                        onTaskDelete={async (id) => {
+                                            try {
+                                                await api.deleteTask(id);
+                                                setAllTasks(prev => prev.filter(t => t.id !== id));
+                                            } catch (error) {
+                                                console.error('Failed to delete task:', error);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Unified Table View for TODO, ACTIVITY TRAP tabs */}
+                        {(viewTab === 'todo' || viewTab === 'activity-trap') && (
                             <div className="flex-1 overflow-auto px-4 py-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
                                 <UnifiedTaskActivityTable
                                     viewTab={viewTab}
@@ -3715,11 +3794,7 @@ export default function KeyAreas() {
                                             // If delegation happened, refresh the task list for the current view
                                             if (updatedTask.delegatedToUserId) {
                                                 // Task was delegated, reload the appropriate view
-                                                if (viewTab === 'delegated') {
-                                                    const svc = await getTaskService();
-                                                    const delegatedToMe = await svc.list({ delegatedTo: true });
-                                                    setAllTasks(delegatedToMe || []);
-                                                } else if (viewTab === 'todo') {
+                                                if (viewTab === 'todo') {
                                                     const svc = await getTaskService();
                                                     const allUserTasks = await svc.list({});
                                                     setAllTasks(allUserTasks || []);
