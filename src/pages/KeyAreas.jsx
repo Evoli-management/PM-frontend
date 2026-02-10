@@ -795,7 +795,8 @@ export default function KeyAreas() {
     const [showMassEditModal, setShowMassEditModal] = useState(false);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
-    const currentUserId = (users && users[0] && users[0].id) ? users[0].id : null;
+    // Don't use users[0] - let CreateTaskModal fetch the actual logged-in user's ID from profile endpoint
+    const currentUserId = null;
 
     // Build a stable lookup map from any possible goal id key to the goal title.
     // This avoids repeated array scans in TaskRow and makes lookups resilient
