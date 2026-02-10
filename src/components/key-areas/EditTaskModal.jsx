@@ -62,12 +62,22 @@ export default function EditTaskModal({
       return initial;
     }
     
-    // Try to find user by name
-    const user = (users || []).find(u => 
-      u.name === initial || 
-      `${u.name || ''} ${u.lastname || ''}`.trim() === initial ||
-      String(u.id) === String(initial)
-    );
+    // Try to find user by name, email, or ID
+    const user = (users || []).find(u => {
+      const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
+      const email = u.email || '';
+      const initialLower = String(initial).toLowerCase();
+      
+      return (
+        String(u.id) === String(initial) ||
+        u.name === initial ||
+        fullName === initial ||
+        email === initial ||
+        // Match email or email-like strings (e.g., "Hussein husseinramdin@hotmail.com")
+        initialLower.includes(email.toLowerCase()) ||
+        initialLower.includes(u.name?.toLowerCase() || '')
+      );
+    });
     
     return user?.id || '';
   };
@@ -124,12 +134,22 @@ export default function EditTaskModal({
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
         nextAssignee = initialAssigneeValue;
       } else {
-        // Try to find user by name
-        const user = usersList.find(u => 
-          u.name === initialAssigneeValue || 
-          `${u.name || ''} ${u.lastname || ''}`.trim() === initialAssigneeValue ||
-          String(u.id) === String(initialAssigneeValue)
-        );
+        // Try to find user by name, email, or ID
+        const user = usersList.find(u => {
+          const fullName = `${u.name || ''} ${u.lastname || ''}`.trim();
+          const email = u.email || '';
+          const initialLower = String(initialAssigneeValue).toLowerCase();
+          
+          return (
+            String(u.id) === String(initialAssigneeValue) ||
+            u.name === initialAssigneeValue ||
+            fullName === initialAssigneeValue ||
+            email === initialAssigneeValue ||
+            // Match email or email-like strings
+            initialLower.includes(email.toLowerCase()) ||
+            initialLower.includes(u.name?.toLowerCase() || '')
+          );
+        });
         nextAssignee = user?.id || '';
       }
     }
