@@ -33,9 +33,15 @@ const Goals = () => {
     const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
-    const [sortBy, setSortBy] = useState("dueDate");
-    const [tagFilter, setTagFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState(() => {
+        return localStorage.getItem("goals-status-filter") || "all";
+    });
+    const [sortBy, setSortBy] = useState(() => {
+        return localStorage.getItem("goals-sort-by") || "dueDate";
+    });
+    const [tagFilter, setTagFilter] = useState(() => {
+        return localStorage.getItem("goals-tag-filter") || "";
+    });
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [keyAreas, setKeyAreas] = useState([]);
     const [toast, setToast] = useState(null);
@@ -44,6 +50,19 @@ const Goals = () => {
     const [selectedGoals, setSelectedGoals] = useState(new Set());
     const navigate = useNavigate();
     // route params handled by dedicated GoalDetail page; this list page only navigates to it
+
+    // Persist filter settings to localStorage
+    useEffect(() => {
+        localStorage.setItem("goals-status-filter", statusFilter);
+    }, [statusFilter]);
+
+    useEffect(() => {
+        localStorage.setItem("goals-sort-by", sortBy);
+    }, [sortBy]);
+
+    useEffect(() => {
+        localStorage.setItem("goals-tag-filter", tagFilter);
+    }, [tagFilter]);
 
     const showToast = (type, message) => {
         setToast({ type, message });
@@ -484,13 +503,6 @@ const Goals = () => {
                                                 >
                                                     <span className="hidden sm:inline text-xs font-medium">Kanban</span>
                                                 </button>
-                                                <button
-                                                    onClick={() => setCurrentView("timeline")}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all ${currentView === "timeline" ? "bg-blue-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}
-                                                    title="Timeline"
-                                                >
-                                                    <span className="hidden sm:inline text-xs font-medium">Timeline</span>
-                                                </button>
                                             </div>
 
                                             <button
@@ -523,8 +535,7 @@ const Goals = () => {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                                                        {/* Small blue dot for Active */}
-                                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                                        <FaClock className="w-3.5 h-3.5 text-blue-600" />
                                                         <div className="flex items-baseline gap-1">
                                                             <span className="text-sm font-bold text-blue-600">{stats.active}</span>
                                                             <span className="text-xs text-gray-500">Active</span>

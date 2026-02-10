@@ -197,7 +197,7 @@ function EChart({ data = [], labels = [] }) {
 }
 
 // SortableWidget wrapper component for drag functionality
-function SortableWidget({ id, children }) {
+function SortableWidget({ id, children, onClose }) {
     const {
         attributes,
         listeners,
@@ -215,14 +215,23 @@ function SortableWidget({ id, children }) {
 
     return (
         <div ref={setNodeRef} style={style} className="group relative">
-            {/* Drag handle */}
+            {/* Drag handle - Full width title area */}
             <div 
                 {...attributes} 
                 {...listeners}
-                className="absolute left-3 top-3 opacity-0 group-hover:opacity-60 transition-opacity duration-200 z-10 cursor-grab active:cursor-grabbing"
-            >
-                <FaGripVertical className="text-gray-400 text-sm" title="Drag to reorder" />
-            </div>
+                className="absolute top-0 left-0 right-0 h-12 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 cursor-grab active:cursor-grabbing"
+            />
+            {/* Close button */}
+            {onClose && (
+                <button
+                    onClick={onClose}
+                    className="absolute top-2 right-2 p-2 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-20"
+                    title="Remove widget"
+                    aria-label="Close widget"
+                >
+                    ✕
+                </button>
+            )}
             {children}
         </div>
     );
@@ -357,7 +366,14 @@ export default function Dashboard() {
                 delete lastSelected[key];
             }
 
-            return { ...p, widgets, widgetOrder, lastSelected };
+            const newPrefs = { ...p, widgets, widgetOrder, lastSelected };
+            
+            // Dispatch event so Navbar updates its widget menu immediately
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('dashboard-prefs-updated', { detail: { widgets } }));
+            }, 0);
+            
+            return newPrefs;
         });
     };
 
@@ -735,12 +751,12 @@ export default function Dashboard() {
 
         if (key === "myDay") {
             return (
-                <SortableWidget key={key} id={key}>
+                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-start justify-between mb-3">
                                 <h3 className="font-semibold text-blue-700">My Day</h3>
-                                <span className="text-xs text-[CanvasText] opacity-60" title="Your daily schedule: appointments and tasks">ℹ️</span>
+                                <span className="text-xs text-[CanvasText] opacity-60 mt-12" title="Your daily schedule: appointments and tasks">ℹ️</span>
                             </div>
                             <div className="flex-1 flex flex-col justify-center items-center">
                                 <div className="text-lg font-extrabold text-blue-700 dark:text-blue-400">{myDayStats.tasksDueToday}</div>
@@ -758,7 +774,7 @@ export default function Dashboard() {
 
         if (key === "goals") {
             return (
-                <SortableWidget key={key} id={key}>
+                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Your active goals</h3>
@@ -836,7 +852,7 @@ export default function Dashboard() {
 
         if (key === "keyAreas") {
             return (
-                <SortableWidget key={key} id={key}>
+                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                         <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                             <h3 className="font-semibold text-blue-700 mb-3">Key Areas Summary</h3>
@@ -853,7 +869,7 @@ export default function Dashboard() {
 
         if (key === "enps") {
             return (
-                <SortableWidget key={key} id={key}>
+                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">eNPS Snapshot</h3>
@@ -879,7 +895,7 @@ export default function Dashboard() {
 
         if (key === "calendarPreview") {
             return (
-                <SortableWidget key={key} id={key}>
+                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">Calendar Preview (Today)</h3>
@@ -921,7 +937,7 @@ export default function Dashboard() {
 
         if (key === "activity") {
             return (
-                <SortableWidget key={key} id={key}>
+                <SortableWidget key={key} id={key} onClose={() => toggleWidget(key)}>
                     <div className={widgetClass}>
                     <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 h-full flex flex-col">
                         <h3 className="font-semibold text-blue-700 mb-3">What's New</h3>

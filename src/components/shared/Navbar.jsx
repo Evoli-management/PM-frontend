@@ -325,6 +325,20 @@ export default function Navbar() {
         return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
     }, []);
 
+    // Close widgets popup when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (widgetsRef.current && !widgetsRef.current.contains(event.target)) {
+                setOpenWidgets(false);
+            }
+        };
+
+        if (openWidgets) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [openWidgets]);
+
     // Listen for global open-reminder-inline events
     useEffect(() => {
         const handler = (e) => {
@@ -800,8 +814,17 @@ export default function Navbar() {
                             </button>
 
                             {openWidgets && (
-                                <div className="absolute right-20 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-[150] p-2">
-                                    <div className="px-2 py-1 text-xs text-slate-500 border-b">Widgets</div>
+                                <div className="absolute right-2 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-[150] p-2">
+                                    <div className="px-2 py-1 text-xs text-slate-500 border-b flex items-center justify-between">
+                                        <span>Widgets</span>
+                                        <button
+                                            onClick={() => setOpenWidgets(false)}
+                                            className="p-1 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none"
+                                            aria-label="Close widgets menu"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
                                     <div className="p-2 max-h-64 overflow-auto">
                                         {widgetKeys.map((w) => {
                                             const checked = typeof widgetsPrefs[w.key] === 'boolean' ? widgetsPrefs[w.key] : true;
