@@ -518,12 +518,14 @@ export default function UnifiedTaskActivityTable({
         
         if (keyAreaId) {
             try {
-                // Load tasks for the selected key area
-                const response = await fetch(`/api/tasks?keyAreaId=${keyAreaId}`);
-                if (response.ok) {
-                    const tasksData = await response.json();
-                    setUserTasks(tasksData || []);
+                // Load tasks for the selected key area using service
+                if (String(keyAreaId).startsWith('__missing_')) {
+                    setUserTasks([]);
+                    return;
                 }
+                const { get } = await import('../../services/taskService');
+                const tasks = await get({ keyAreaId });
+                setUserTasks(Array.isArray(tasks) ? tasks : []);
             } catch (error) {
                 console.error('Failed to load tasks:', error);
                 setUserTasks([]);

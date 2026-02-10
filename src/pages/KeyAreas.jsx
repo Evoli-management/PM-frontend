@@ -3716,6 +3716,7 @@ export default function KeyAreas() {
                                 {/* Section 1: Pending Delegations */}
                                 <PendingDelegationsSection
                                     pendingTasks={pendingDelegations}
+                                    keyAreas={keyAreas}
                                     onTaskAccept={async (taskId) => {
                                         // Remove from pending
                                         setPendingDelegations(prev => prev.filter(t => t.id !== taskId));

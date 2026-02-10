@@ -10,7 +10,8 @@ export default function PendingDelegationsSection({
   onTaskAccept,
   onTaskReject,
   getDelegatorName,
-  currentUserId
+  currentUserId,
+  keyAreas: keyAreasFromProps = []
 }) {
   const [respondingItemId, setRespondingItemId] = useState(null);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -53,8 +54,11 @@ export default function PendingDelegationsSection({
         areas = await mod.get();
       }
       setKeyAreas(Array.isArray(areas) ? areas : []);
+      setKeyAreaError(''); // Clear error on success
     } catch (error) {
       console.error('Failed to load key areas:', error);
+      setKeyAreaError('Failed to load key areas. Please refresh the page.');
+      setKeyAreas([]);
     }
   };
 
@@ -85,7 +89,11 @@ export default function PendingDelegationsSection({
     setKeyAreaError('');
     setTaskError('');
     setAcceptMode('create-new');
-    await loadKeyAreas();
+    if (Array.isArray(keyAreasFromProps) && keyAreasFromProps.length > 0) {
+      setKeyAreas(keyAreasFromProps);
+    } else {
+      await loadKeyAreas();
+    }
     setShowAcceptModal(true);
   };
 
