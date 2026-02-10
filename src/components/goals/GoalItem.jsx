@@ -2,8 +2,10 @@
 import React from "react";
 import { calculateGoalProgress } from "../../utils/goalUtils";
 import { Link } from "react-router-dom";
-import { FaClock, FaFlag, FaArrowRight, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
+import { FaArrowRight, FaExclamationTriangle, FaCheckCircle, FaClock, FaFlag } from "react-icons/fa";
+import { Pencil, MoreHorizontal } from "lucide-react";
 import { useFormattedDate } from "../../hooks/useFormattedDate";
+import { getStatusConfig, getProgressColor } from "../../utils/goalCardStyles";
 
 const GoalItem = ({ goal }) => {
     const { id, title, description, dueDate, status, milestones = [] } = goal;
@@ -23,52 +25,7 @@ const GoalItem = ({ goal }) => {
     const totalMilestones = milestones.length;
     const progressPercent = calculateGoalProgress(goal);
 
-    const getStatusConfig = (status) => {
-        switch (status) {
-            case "active":
-                return {
-                    bg: "bg-blue-50",
-                    border: "border-blue-200",
-                    text: "text-blue-800",
-                    icon: FaClock,
-                    label: "Active",
-                };
-            case "completed":
-                return {
-                    bg: "bg-green-50",
-                    border: "border-green-200",
-                    text: "text-green-800",
-                    icon: FaCheckCircle,
-                    label: "Completed",
-                };
-            case "archived":
-                return {
-                    bg: "bg-slate-50",
-                    border: "border-slate-200",
-                    text: "text-slate-800",
-                    icon: FaFlag,
-                    label: "Archived",
-                };
-            default:
-                return {
-                    bg: "bg-slate-50",
-                    border: "border-slate-200",
-                    text: "text-slate-800",
-                    icon: FaFlag,
-                    label: status,
-                };
-        }
-    };
-
     const statusConfig = getStatusConfig(status);
-    const StatusIcon = statusConfig.icon;
-
-    const getProgressColor = (percent) => {
-        if (percent >= 90) return "from-green-500 to-emerald-500";
-        if (percent >= 70) return "from-blue-500 to-cyan-500";
-        if (percent >= 40) return "from-yellow-500 to-orange-500";
-        return "from-red-500 to-pink-500";
-    };
 
     return (
         <Link to={`/goals/${id}`} className="group block relative">
@@ -88,43 +45,46 @@ const GoalItem = ({ goal }) => {
                 )}
 
                 {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div
+                <div className="flex items-center justify-between mb-4">
+                    {/* Left side: Checkbox + Status Badge */}
+                    <div className="flex items-center gap-2">
+                        {status === "active" && (
+                            <button className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors">
+                                <FaCheckCircle className="w-4 h-4" />
+                            </button>
+                        )}
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        <span
                             className={`
-              p-2 rounded-xl ${statusConfig.bg} ${statusConfig.border} border
-              transition-transform group-hover:scale-110
-            `}
-                        >
-                            <StatusIcon className={`w-4 h-4 ${statusConfig.text}`} />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                            <h3
-                                className="font-bold text-slate-900 text-lg mb-1 group-hover:text-blue-900 transition-colors truncate"
-                                title={title}
-                            >
-                                {title}
-                            </h3>
-
-                            {/* Status badge */}
-                            <span
-                                className={`
                 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full
                 ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border} border
               `}
-                            >
-                                <StatusIcon className="w-3 h-3" />
-                                {statusConfig.label}
-                            </span>
-                        </div>
+                        >
+                            {statusConfig.label}
+                        </span>
                     </div>
 
-                    {/* Arrow indicator */}
-                    <div className="p-2 rounded-lg bg-slate-50 group-hover:bg-blue-50 transition-colors">
-                        <FaArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-all group-hover:translate-x-1" />
+                    {/* Right side: Edit + Menu + Arrow */}
+                    <div className="flex items-center gap-1">
+                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                            <Pencil className="w-4 h-4" />
+                        </button>
+                        <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors">
+                            <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                        <div className="p-2 rounded-lg bg-slate-50 group-hover:bg-blue-50 transition-colors">
+                            <FaArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-all group-hover:translate-x-1" />
+                        </div>
                     </div>
                 </div>
+
+                {/* Title */}
+                <h3
+                    className="font-bold text-slate-900 text-lg mb-2 group-hover:text-blue-900 transition-colors"
+                    title={title}
+                >
+                    {title}
+                </h3>
 
                 {/* Description */}
                 {description && (

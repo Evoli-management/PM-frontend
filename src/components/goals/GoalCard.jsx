@@ -13,11 +13,12 @@ import {
     Clock,
     ChevronRight,
 } from "lucide-react";
+import { FaCheckCircle, FaClock, FaFlag } from "react-icons/fa";
 import { useFormattedDate } from "../../hooks/useFormattedDate";
-
+import { getStatusStyle, getProgressColorCard } from "../../utils/goalCardStyles";
 import { getGoalById, prefetchGoal } from "../../services/goalService";
 
-const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUnarchive, onToggleVisibility }) => {
+const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUnarchive, onToggleVisibility, isSelected, onToggleSelection }) => {
     const [showActions, setShowActions] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [localMilestones, setLocalMilestones] = useState(null);
@@ -135,24 +136,9 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
 
     const statusDisplay = getStatusDisplay();
 
-    const getStatusStyle = (status) => {
-        switch (status) {
-            case "completed":
-                return "bg-green-100 text-green-700";
-            case "active":
-                return "bg-blue-100 text-blue-700";
-            case "archived":
-                return "bg-gray-100 text-gray-700";
-            default:
-                return "bg-gray-100 text-gray-700";
-        }
-    };
 
     const getProgressColor = () => {
-        if (progressPercent >= 80) return "bg-green-500";
-        if (progressPercent >= 60) return "bg-blue-500";
-        if (progressPercent >= 40) return "bg-yellow-500";
-        return "bg-gray-400";
+        return getProgressColorCard(progressPercent);
     };
 
     const handleAction = async (action, ...args) => {
@@ -192,38 +178,48 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
         >
             {/* Header Section */}
             <div className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <span
-                                className={`px-2 py-1 rounded-md text-xs font-medium capitalize ${getStatusStyle(goal.status)}`}
-                            >
-                                {goal.status}
-                            </span>
-                            {goal.visibility === "private" && (
-                                <div className="p-1 bg-gray-100 rounded-md">
-                                    <EyeOff className="w-3 h-3 text-gray-500" />
-                                </div>
-                            )}
-                        </div>
-
-                        <h3
-                            title={goal.title.length > 60 ? goal.title : ""}
-                            className="font-semibold text-gray-900 text-base mb-2 leading-tight hover:text-blue-600 transition-colors line-clamp-2 break-words"
-                        >
-                            {goal.title}
-                        </h3>
-
-                        {goal.description && (
-                            <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-4">
-                                {goal.description}
-                            </p>
+                <div className="flex items-center justify-between mb-4">
+                    {/* Left side: Checkbox */}
+                    <div className="flex items-center gap-2">
+                        {onToggleSelection && (
+                            <input
+                                type="checkbox"
+                                checked={isSelected || false}
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    onToggleSelection(goal.id);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
+                            />
+                        )}
+                        {goal.visibility === "private" && (
+                            <div className="p-1 bg-gray-100 rounded-md">
+                                <EyeOff className="w-3 h-3 text-gray-500" />
+                            </div>
                         )}
                     </div>
 
-                    {/* Quick Actions */}
-                    <div className="flex items-center gap-1 ml-4">
+                    {/* Center: Status Icon + Badge */}
+                    <div className="flex items-center gap-2">
+                        {goal.status === "completed" && (
+                            <FaCheckCircle className="w-3.5 h-3.5 text-green-600" />
+                        )}
+                        {goal.status === "active" && (
+                            <FaClock className="w-3.5 h-3.5 text-blue-600" />
+                        )}
+                        {goal.status === "archived" && (
+                            <FaFlag className="w-3.5 h-3.5 text-gray-600" />
+                        )}
+                        <span
+                            className={`px-2 py-1 rounded-md text-xs font-medium capitalize ${getStatusStyle(goal.status)}`}
+                        >
+                            {goal.status}
+                        </span>
+                    </div>
+
+                    {/* Right side: Edit + Menu Actions */}
+                    <div className="flex items-center gap-1">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -241,20 +237,6 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                         >
                             <Pencil className="w-4 h-4" />
                         </button>
-
-                        {goal.status === "active" && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAction(onComplete, goal.id);
-                                }}
-                                disabled={isLoading}
-                                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors disabled:opacity-50"
-                                title="Mark Complete"
-                            >
-                                <CheckCircle className="w-4 h-4" />
-                            </button>
-                        )}
 
                         <div className="relative">
                             <button
@@ -334,6 +316,20 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                         </div>
                     </div>
                 </div>
+
+                {/* Title and Description */}
+                <h3
+                    title={goal.title.length > 60 ? goal.title : ""}
+                    className="font-semibold text-gray-900 text-base mb-2 leading-tight hover:text-blue-600 transition-colors line-clamp-2 break-words"
+                >
+                    {goal.title}
+                </h3>
+
+                {goal.description && (
+                    <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed mb-4">
+                        {goal.description}
+                    </p>
+                )}
 
                 {/* Progress Section */}
                 <div className="mb-4">
