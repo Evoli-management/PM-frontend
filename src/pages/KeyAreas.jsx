@@ -4018,6 +4018,11 @@ export default function KeyAreas() {
                                                 }}
                                                 onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); }}
                                                 isSaving={false}
+                                                users={users}
+                                                currentUserId={currentUserId}
+                                                keyAreas={keyAreas}
+                                                goals={goals}
+                                                availableLists={[1]}
                                             />
                                         ) : editingActivityViaTaskModal ? (
                                             // Use external EditActivityModal when editing an activity via task modal
