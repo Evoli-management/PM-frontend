@@ -212,7 +212,8 @@ export const normalizeActivity = (a = {}) => {
     const priority = a.priority ?? a.priority_level ?? 2;
     const created_task_id = a.created_task_id ?? a.createdTaskId ?? null;
     // assignee normalization: servers/older APIs may use different field names
-    const assignee = a.assignee ?? a.responsible ?? a.owner ?? a.assigned_to ?? a.assignee_name ?? null;
+    // For activities, delegatedToUserId represents the assigned user (pending delegation)
+    const assignee = a.assignee ?? a.responsible ?? a.owner ?? a.assigned_to ?? a.assignee_name ?? a.delegatedToUserId ?? a.delegated_to_user_id ?? null;
     // key area / list / goal / notes / duration aliases
     const key_area_id = a.key_area_id ?? a.keyAreaId ?? a.keyArea ?? a.ka_id ?? null;
     const list = a.list ?? a.list_index ?? a.listIndex ?? a.parent_list ?? a.list_number ?? null;

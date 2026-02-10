@@ -132,8 +132,8 @@ export default function EditActivityModal({
     setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || '');
     setListIndex(initialData.list || initialData.list_index || '');
     setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
-    // If activity doesn't carry an assignee, prefer the parent task's assignee (if available)
-    const initialAssigneeValue = initialData.responsible || initialData.assignee || '';
+    // Activity assignee can come from responsible, assignee, or delegatedToUserId fields
+    const initialAssigneeValue = initialData.responsible || initialData.assignee || initialData.delegatedToUserId || initialData.delegated_to_user_id || '';
     let nextAssignee = '';
     if (initialAssigneeValue) {
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
