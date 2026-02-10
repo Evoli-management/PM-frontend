@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { FaChevronLeft, FaStop, FaEllipsisV, FaSave, FaTag, FaTrash, FaEdit, FaAngleDoubleLeft, FaUserPlus } from 'react-icons/fa';
 import EmptyState from '../../components/goals/EmptyState.jsx';
 import TaskSlideOver from './TaskSlideOver';
@@ -109,7 +110,7 @@ export default function TaskFullView({
                 <button ref={btnRef} type="button" aria-haspopup="menu" aria-expanded={open} onClick={toggle} className="p-1 rounded hover:bg-slate-100 text-slate-600" title="More actions">
                     <FaEllipsisV />
                 </button>
-                {open && anchor && (
+                {open && anchor && typeof document !== 'undefined' && createPortal(
                     <div id={`activity-menu-${item.id}`} style={{ position: 'fixed', top: anchor.top, left: anchor.left, zIndex: 9999, minWidth: 176 }} className="bg-white border border-slate-200 rounded shadow">
                         <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={(e) => { e.stopPropagation(); setOpen(false); toggleRow(item.id); }}>
                             <FaEdit className="text-slate-600" />
@@ -123,7 +124,8 @@ export default function TaskFullView({
                             <FaAngleDoubleLeft />
                             <span>{item.created_task_id ? 'Task created' : 'Convert to task'}</span>
                         </button>
-                    </div>
+                    </div>,
+                    document.body,
                 )}
             </div>
         );
@@ -693,198 +695,6 @@ export default function TaskFullView({
                     </div>
                 </div>
             </div>
-
-            
-
-            <div className="px-3 pt-3 pb-2 bg-white">
-                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2">
-                    <div className="text-sm">
-                        <div className="grid grid-cols-9 gap-x-1">
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Responsible</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Status</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Priority</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Quadrant</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">End date</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Deadline</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Duration</div>
-                                <div className="text-[11px] uppercase tracking-wide text-slate-500">Completed</div>
-                            </div>
-                            <div className="grid grid-cols-9 gap-x-1 mt-0.5">
-                                <div className="text-slate-900 truncate min-w-0">{task.assignee || task.responsible || '—'}</div>
-                                {(() => {
-                                    const statusUi = mapServerStatusToUi(task.status || '');
-                                    const statusColors = getStatusColorClass(statusUi);
-                                    // Map UI status to a human-friendly label
-                                    const statusLabel = statusUi === 'open' ? 'Open' : statusUi === 'in_progress' ? 'In Progress' : statusUi === 'done' ? 'Done' : String(statusUi).replace(/_/g, ' ');
-                                    return (<div className="text-slate-900 capitalize truncate min-w-0 inline-flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${statusColors.dot}`} aria-hidden="true"></span>{statusLabel}</div>);
-                                })()}
-                                {(() => {
-                                    const pLabel = getPriorityLabel(task.priority);
-                                    const pColors = getPriorityColorClass(task.priority);
-                                    const isHigh = getPriorityLevel(task.priority) === 3;
-                                    return (<div className="text-slate-900 truncate min-w-0 inline-flex items-center gap-1 whitespace-nowrap">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium ${pColors.badge}`}>{pLabel}</span>
-                                        {isHigh ? <span className="inline-block text-sm font-bold text-red-600" title="Priority: High">!</span> : null}
-                                    </div>);
-                                })()}
-                                <div className="min-w-0">{
-                                    (() => {
-                                            // Compute quadrant using current rules for display; fall back to server value only on error
-                                            let raw = null;
-                                            try {
-                                                raw = computeEisenhowerQuadrant({
-                                                    deadline: task.deadline || task.dueDate || task.due_date,
-                                                    end_date: task.end_date || task.endDate || task.end_date,
-                                                    start_date: task.start_date || task.startDate || null,
-                                                    priority: task.priority,
-                                                    status: task.status,
-                                                    key_area_id: task.keyAreaId ?? task.key_area_id ?? null,
-                                                });
-                                            } catch (e) {
-                                                raw = task.eisenhowerQuadrant ?? task.eisenhower_quadrant ?? null;
-                                            }
-                                        let qn = 4;
-                                        if (typeof raw === 'number') qn = Number(raw) || 4;
-                                        else if (typeof raw === 'string') {
-                                            const m = raw.match(/^Q([1-4])$/i);
-                                            if (m) qn = Number(m[1]);
-                                            else if (/^[1-4]$/.test(raw)) qn = Number(raw);
-                                        }
-                                        const qc = getQuadrantColorClass ? getQuadrantColorClass(qn) : { badge: 'bg-slate-100 text-slate-700' };
-                                        return (<span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${qc.badge}`}>{`Q${qn}`}</span>);
-                                    })()
-                                }</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.start_date || task.startDate) || '—'}</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.end_date || task.endDate) || '—'}</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{toDateOnly(task.deadline || task.dueDate || task.due_date) || '—'}</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{(() => {
-                                    const td = (formatDuration && (formatDuration(task.start_date || task.startDate, task.end_date || task.endDate))) || '';
-                                    return td || (task.duration || '—');
-                                })()}</div>
-                                <div className="text-slate-900 truncate min-w-0 whitespace-nowrap">{(toDateOnly(task.completionDate || task.completion_date) || '—')}</div>
-                            </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="px-2 pt-2 bg-white">
-                        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                    {!isDontForget && (
-                        <div className={`px-3 py-1 rounded-md text-sm font-semibold ${tab === 'activities' ? 'bg-white text-slate-900 shadow' : ''}`} aria-label="Activities"> <span className="inline-flex items-center gap-1"><svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: kaColor }}><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>Activities</span></div>
-                    )}
-                </div>
-            </div>
-
-            {tab === "activities" && !isDontForget ? (
-                <div className="p-4">
-                    {/* Render activities for this task */}
-                    <div className="mb-3">
-                        {/* Full view displays activities in a table (same layout as SlideOver) */}
-                        {Array.isArray(list) && list.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full text-sm">
-                                    <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                        <tr>
-                                            <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Activity</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Responsible</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Status</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Priority</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Start date</th>
-                                            <th className="px-3 py-2 text-left font-semibold">End date</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Deadline</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Duration</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Completed</th>
-                                            {/* Actions column removed — actions are available via the row menu */}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {list.map((a) => (
-                                            <tr key={a.id} className="bg-white border-b border-slate-100">
-                                                <td className="px-3 py-2 align-top">
-                                                    <div className="flex items-center gap-3">
-                                                        <ActivityMenu item={a} />
-                                                        <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: kaColor }}><path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path></svg>
-                                                        <div className="flex flex-col">
-                                                            <div className="text-sm text-slate-800 truncate max-w-[540px]">{a.text || a.activity_name || 'Untitled activity'}</div>
-                                                            <div className="text-xs text-slate-500">{a.note || ''}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-3 py-2 align-top text-slate-700">
-                                                    {Array.isArray(localUsers) && localUsers.length ? (
-                                                            <select
-                                                                className="text-sm rounded-md border bg-white px-2 py-1"
-                                                                value={resolveAssignee({ activity: a, taskAssignee: task.assignee, users: localUsers, currentUserId }).selectValue || ''}
-                                                                onChange={async (e) => {
-                                                                    const sel = e.target.value;
-                                                                    try { await setActivityAssignee(a.id, sel); } catch (err) { console.error(err); }
-                                                                }}
-                                                            >
-                                                                <option value="">—</option>
-                                                                {localUsers.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
-                                                            </select>
-                                                        ) : (
-                                                            resolveAssignee({ activity: a, taskAssignee: task.assignee, users: localUsers, currentUserId }).display
-                                                        )}
-                                                </td>
-                                                <td className="px-3 py-2 align-top">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                            <select value={a.status || 'open'} onChange={(e)=> setActivityStatus(a.id, e.target.value)} className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
-                                                                <option value="open">Open</option>
-                                                                <option value="in_progress">In progress</option>
-                                                                <option value="done">Done</option>
-                                                            </select>
-                                                        </div>
-                                                </td>
-                                                <td className="px-3 py-2 align-top">
-                                                    <select className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm" value={(function(){ const raw = a.priority ?? task.priority; if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low'; if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high'; return 'normal'; })()} onChange={async (e) => { try { await setActivityPriority(a.id, e.target.value); } catch (err) { console.error(err); } }}>
-                                                        <option value="low">Low</option>
-                                                        <option value="normal">Normal</option>
-                                                        <option value="high">High</option>
-                                                    </select>
-                                                </td>
-                                                <td className="px-3 py-2 align-top">
-                                                    {editingDate.id === a.id && editingDate.field === 'start_date' ? (
-                                                        <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.start_date) || ''} onChange={async (e) => { try { await setActivityDate(a.id, 'start_date', e.target.value); } catch (err) { console.error(err); } }} onBlur={() => setEditingDate({ id: null, field: null })} />
-                                                    ) : (
-                                                        <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingDate({ id: a.id, field: 'start_date' }); }} title="Edit start date">{toDateOnly(a.start_date) || '—'}</button>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 align-top">
-                                                    {editingDate.id === a.id && editingDate.field === 'end_date' ? (
-                                                        <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.end_date) || ''} onChange={async (e) => { try { await setActivityDate(a.id, 'end_date', e.target.value); } catch (err) { console.error(err); } }} onBlur={() => setEditingDate({ id: null, field: null })} />
-                                                    ) : (
-                                                        <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingDate({ id: a.id, field: 'end_date' }); }} title="Edit end date">{toDateOnly(a.end_date) || '—'}</button>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 align-top">
-                                                    {editingDate.id === a.id && editingDate.field === 'deadline' ? (
-                                                        <input autoFocus type="date" className="border rounded px-1 py-0.5 text-sm" value={toDateOnly(a.deadline) || ''} onChange={async (e) => { try { await setActivityDate(a.id, 'deadline', e.target.value); } catch (err) { console.error(err); } }} onBlur={() => setEditingDate({ id: null, field: null })} />
-                                                    ) : (
-                                                        <button className="hover:bg-slate-50 rounded px-1" onClick={(e) => { e.stopPropagation(); setEditingDate({ id: a.id, field: 'deadline' }); }} title="Edit deadline">{toDateOnly(a.deadline) || '—'}</button>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 align-top">{(formatDuration ? formatDuration(a.start_date || a.startDate, a.end_date || a.endDate) : '') || (a.duration || '')}</td>
-                                                <td className="px-3 py-2 align-top text-slate-800">{toDateOnly(a.completionDate || a.completion_date) || ''}</td>
-                                                {/* Actions column removed — use ActivityMenu in the first column */}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
-                        )}
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                        <button type="button" className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 ml-auto" onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: task?.id } }))}>Add Activity</button>
-                    </div>
-                </div>
-            ) : (
-                <div className="p-2 grid md:grid-cols-3 gap-2 items-stretch">{/* details layout omitted */}</div>
-            )}
 
             {showDetailsPopup && (
                 <TaskSlideOver

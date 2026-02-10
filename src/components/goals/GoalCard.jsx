@@ -3,10 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { calculateGoalProgress } from "../../utils/goalUtils";
 import {
     Eye,
-    Pencil,
     CheckCircle,
     Trash2,
-    MoreHorizontal,
     Calendar,
     EyeOff,
     Archive,
@@ -193,11 +191,6 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                 className="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
                             />
                         )}
-                        {goal.visibility === "private" && (
-                            <div className="p-1 bg-gray-100 rounded-md">
-                                <EyeOff className="w-3 h-3 text-gray-500" />
-                            </div>
-                        )}
                     </div>
 
                     {/* Center: Status Icon + Badge */}
@@ -223,19 +216,29 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                // Explicitly call the edit handler so the edit modal opens in grid view
                                 if (typeof onEdit === "function") {
                                     onEdit(goal, "edit");
                                 } else if (typeof onOpen === "function") {
-                                    // fallback
                                     onOpen(goal);
                                 }
                             }}
                             disabled={isLoading}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
-                            title="Edit Goal"
+                            title="Edit goal"
                         >
-                            <Pencil className="w-4 h-4" />
+                            <svg
+                                stroke="currentColor"
+                                fill="currentColor"
+                                strokeWidth="0"
+                                viewBox="0 0 576 512"
+                                className="w-4 h-4 text-slate-600"
+                                height="1em"
+                                width="1em"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                            >
+                                <path d="M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z" />
+                            </svg>
                         </button>
 
                         <div className="relative">
@@ -246,7 +249,23 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                 }}
                                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                             >
-                                <MoreHorizontal className="w-4 h-4" />
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="lucide lucide-ellipsis w-4 h-4"
+                                    aria-hidden="true"
+                                >
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <circle cx="19" cy="12" r="1"></circle>
+                                    <circle cx="5" cy="12" r="1"></circle>
+                                </svg>
                             </button>
 
                             {showActions && (
@@ -267,14 +286,13 @@ const GoalCard = ({ goal, onOpen, onEdit, onComplete, onDelete, onArchive, onUna
                                             }}
                                             className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-sm"
                                         >
-                                            {goal.visibility === "public" ? (
+                                            {goal.visibility === "private" ? (
                                                 <EyeOff className="w-4 h-4" />
                                             ) : (
                                                 <Eye className="w-4 h-4" />
                                             )}
-                                            Make {goal.visibility === "public" ? "Private" : "Public"}
+                                            {goal.visibility === "private" ? "Make Public" : "Make Private"}
                                         </button>
-
                                         {goal.status !== "archived" ? (
                                             <button
                                                 onClick={(e) => {

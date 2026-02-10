@@ -12,15 +12,20 @@ import EditActivityModal from '../components/key-areas/EditActivityModal';
 import EmptyState from '../components/goals/EmptyState.jsx';
 import TaskRow from '../components/key-areas/TaskRow';
 import ViewTabsNavigation from '../components/key-areas/ViewTabsNavigation';
-import { FaCog } from 'react-icons/fa';
 import ActivityList from '../components/key-areas/ActivityList';
 import TaskSlideOver from '../components/key-areas/TaskSlideOver';
 import TaskFullView from '../components/key-areas/TaskFullView';
 import UnifiedTaskActivityTable from '../components/key-areas/UnifiedTaskActivityTable';
 import PendingDelegationsSection from '../components/key-areas/PendingDelegationsSection';
+import TripleViewLayout from '../components/key-areas/TripleViewLayout';
+import TaskListPanel from '../components/key-areas/TaskListPanel';
+import ActivityListPanel from '../components/key-areas/ActivityListPanel';
+import ResizablePanels from '../components/key-areas/ResizablePanels';
+import KeyAreasTripleView from '../components/key-areas/KeyAreasTripleView';
 import taskDelegationService from '../services/taskDelegationService';
 import activityDelegationService from '../services/activityDelegationService';
 import { FaTimes, FaSave, FaTag, FaTrash, FaAngleDoubleLeft, FaChevronLeft, FaStop, FaEllipsisV, FaEdit, FaSearch, FaPlus, FaBars, FaLock, FaExclamationCircle } from 'react-icons/fa';
+import '../styles/triple-view.css';
 import {
     safeParseDate,
     nullableString,
@@ -547,9 +552,126 @@ export default function KeyAreas() {
     // Full page task view state
     const [selectedTaskFull, setSelectedTaskFull] = useState(null);
     const [taskFullInitialTab, setTaskFullInitialTab] = useState("activities");
+    // Triple view left panel selected task
+    const [selectedTaskInPanel, setSelectedTaskInPanel] = useState(null);
     // Inline Activities popover state
     const [openActivitiesMenu, setOpenActivitiesMenu] = useState(null); // task id or null
     const [activitiesMenuPos, setActivitiesMenuPos] = useState({ top: 0, left: 0 });
+    const ActivityRowMenu = ({ activity, taskId }) => {
+        const [open, setOpen] = useState(false);
+        const btnRef = useRef(null);
+        const menuRef = useRef(null);
+
+        useEffect(() => {
+            if (!open) return;
+            const onDown = (e) => {
+                if (menuRef.current && menuRef.current.contains(e.target)) return;
+                if (btnRef.current && btnRef.current.contains(e.target)) return;
+                setOpen(false);
+            };
+            const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+            document.addEventListener('mousedown', onDown);
+            document.addEventListener('keydown', onKey);
+            return () => {
+                document.removeEventListener('mousedown', onDown);
+                document.removeEventListener('keydown', onKey);
+            };
+        }, [open]);
+
+        const toggle = (e) => {
+            e.stopPropagation();
+            setOpen((s) => !s);
+        };
+
+        const handleEdit = () => {
+            setOpen(false);
+            try {
+                window.dispatchEvent(new CustomEvent('ka-open-activity-editor', { detail: { activity, taskId } }));
+            } catch (e) {}
+        };
+
+        const handleDelete = async () => {
+            setOpen(false);
+            if (!confirm(`Delete activity "${(activity?.text || activity?.activity_name || 'Untitled activity')}"?`)) return;
+            try {
+                const activityService = await getActivityService();
+                await activityService.remove(activity.id);
+                setActivitiesByTask((prev) => {
+                    const key = String(taskId || activity.task_id || activity.taskId || '');
+                    if (!key) return prev;
+                    const updated = { ...prev };
+                    updated[key] = (updated[key] || []).filter((a) => a.id !== activity.id);
+                    return updated;
+                });
+            } catch (error) {
+                console.error('Failed to delete activity:', error);
+            }
+        };
+
+        const handleConvert = () => {
+            setOpen(false);
+            try {
+                window.dispatchEvent(new CustomEvent('ka-create-task-from-activity', { detail: { taskId, activity } }));
+            } catch (e) {}
+        };
+
+        return (
+            <div className="inline-block mr-1 relative">
+                <button
+                    type="button"
+                    ref={btnRef}
+                    aria-haspopup="menu"
+                    aria-expanded={open}
+                    onClick={toggle}
+                    className="p-1 rounded hover:bg-slate-100 text-slate-600"
+                    title="More actions"
+                >
+                    <FaEllipsisV />
+                </button>
+                {open && (
+                    <div
+                        ref={menuRef}
+                        className="absolute top-full left-0 mt-1 z-50 min-w-[176px] bg-white border border-slate-200 rounded shadow"
+                    >
+                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-50" onClick={handleEdit}>
+                            <FaEdit className="text-slate-600" />
+                            <span>Edit</span>
+                        </button>
+                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={handleDelete}>
+                            <FaTrash />
+                            <span>Delete</span>
+                        </button>
+                        <button type="button" className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={handleConvert}>
+                            <FaAngleDoubleLeft />
+                            <span>Convert to task</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const saveActivityName = async (activity, taskId, value) => {
+        const trimmed = String(value || '').trim();
+        setActivityNameEditId(null);
+        if (!trimmed) return;
+        const current = (activity?.text || activity?.activity_name || '').trim();
+        if (trimmed === current) return;
+        try {
+            const svc = await getActivityService();
+            const result = await svc.update(activity.id, { text: trimmed });
+            setActivitiesByTask((prev) => {
+                const key = String(taskId || activity.taskId || activity.task_id || '');
+                if (!key) return prev;
+                const updated = { ...prev };
+                updated[key] = (updated[key] || []).map((a) => (a.id === activity.id ? { ...a, ...result } : a));
+                return updated;
+            });
+        } catch (error) {
+            console.error('Failed to update activity name:', error);
+        }
+    };
+
     // Mass edit selection & form state
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [bulkForm, setBulkForm] = useState({
@@ -653,6 +775,8 @@ export default function KeyAreas() {
     const [editingActivityViaTaskModal, setEditingActivityViaTaskModal] = useState(null); // { id, taskId }
     const [showActivityComposer, setShowActivityComposer] = useState(false);
     const [editingActivityId, setEditingActivityId] = useState(null);
+    const [activityNameEditId, setActivityNameEditId] = useState(null);
+    const [activityNameEditValue, setActivityNameEditValue] = useState('');
     const [showTaskHelp, setShowTaskHelp] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -668,6 +792,7 @@ export default function KeyAreas() {
     const tabsRef = useRef(null);
     // Mass edit UI toggle and anchor
     const [showMassEdit, setShowMassEdit] = useState(false);
+    const [showMassEditModal, setShowMassEditModal] = useState(false);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
     const currentUserId = (users && users[0] && users[0].id) ? users[0].id : null;
@@ -1485,8 +1610,11 @@ export default function KeyAreas() {
 
     // Auto-hide mass edit when selection is cleared
     useEffect(() => {
-        if (selectedIds.size === 0 && showMassEdit) setShowMassEdit(false);
-    }, [selectedIds, showMassEdit]);
+        if (selectedIds.size === 0) {
+            if (showMassEdit) setShowMassEdit(false);
+            if (showMassEditModal) setShowMassEditModal(false);
+        }
+    }, [selectedIds, showMassEdit, showMassEditModal]);
 
     useEffect(() => {
         (async () => {
@@ -2951,7 +3079,9 @@ export default function KeyAreas() {
                                                 onClick={() => setShowColumnsMenu((s) => !s)}
                                                 title="Columns"
                                             >
-                                                <FaCog />
+                                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
+                                                </svg>
                                             </button>
                                             {showColumnsMenu && (
                                                 <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded shadow z-50 p-3 text-sm">
@@ -2980,6 +3110,7 @@ export default function KeyAreas() {
                                     </div>
                                 </div>
                             )}
+                            </div>
                         </div>
                         {/* Title block removed; title now shown inline with Back */}
                         {selectedTaskFull && (
@@ -3062,7 +3193,13 @@ export default function KeyAreas() {
                             </div>
                         )}
                         {(selectedKA || viewTab === 'delegated' || viewTab === 'todo') && (viewTab !== 'delegated' && viewTab !== 'todo' && viewTab !== 'activity-trap') && (
-                            <div className="mb-4" style={{ display: selectedTaskFull ? "none" : undefined }}>
+                            <div className="flex-1 h-[calc(100vh-200px)] min-h-[600px]">
+                                <ResizablePanels
+                                    taskPanel={
+                                    <div className="flex flex-col h-full bg-white">
+                                        {/* Task Panel Content */}
+                                        <div className="flex-1 overflow-y-auto px-3 py-3">
+                                            <div className="space-y-6">
                                 <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
                                         <div className="flex items-center justify-between border-b pb-2">
@@ -3083,26 +3220,13 @@ export default function KeyAreas() {
                                                     onClick={() => {
                                                         // Only allow entering mass edit when at least one task is selected
                                                         if (selectedIds.size === 0) return;
-                                                        if (showMassEdit) {
-                                                            setShowMassEdit(false);
-                                                        } else {
-                                                            setShowMassEdit(true);
-                                                            // Scroll to Tasks Display area where the form appears
-                                                            setTimeout(() => {
-                                                                if (tasksDisplayRef.current) {
-                                                                    tasksDisplayRef.current.scrollIntoView({
-                                                                        behavior: "smooth",
-                                                                        block: "start",
-                                                                    });
-                                                                }
-                                                            }, 0);
-                                                        }
+                                                        setShowMassEditModal(true);
                                                     }}
                                                     className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                                                     aria-label="mass edit"
                                                     title={selectedIds.size === 0 ? "Select tasks to enable mass edit" : "Mass edit selected tasks"}
                                                 >
-                                                    {showMassEdit ? "Exit Mass Edit" : "Mass Edit"}
+                                                    Mass Edit
                                                 </button>
                                             </div>
                                         </div>
@@ -3152,7 +3276,7 @@ export default function KeyAreas() {
                                                 <input
                                                     value={filterTag}
                                                     onChange={(e) => setFilterTag(e.target.value)}
-                                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                                    className="border rounded px-2 py-1 text-sm bg-white max-w-20"
                                                     placeholder="Tag"
                                                 />
                                             </div>
@@ -3308,163 +3432,6 @@ export default function KeyAreas() {
 
                                         {/* Bottom Row: Tasks Display (full width) */}
                                         <div ref={tasksDisplayRef}>
-                                            {showMassEdit && (
-                                                <form
-                                                    onSubmit={applyBulkEdit}
-                                                    aria-label="Mass edit selected tasks"
-                                                    className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg"
-                                                >
-                                                    <div className="text-sm text-blue-900 font-medium mb-3">
-                                                        {selectedIds.size === 0 
-                                                            ? "Mass Edit Mode: Select tasks to edit multiple tasks at once"
-                                                            : `Mass edit ${selectedIds.size} task${selectedIds.size > 1 ? "s" : ""}`
-                                                        }
-                                                    </div>
-                                                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                                        <div>
-                                                            <label className="block text-xs text-blue-900">
-                                                                Assignee
-                                                            </label>
-                                                            <input
-                                                                value={bulkForm.assignee}
-                                                                onChange={(e) =>
-                                                                    setBulkForm((s) => ({
-                                                                        ...s,
-                                                                        assignee: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 bg-white"
-                                                                placeholder="Name"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs text-blue-900">
-                                                                Status
-                                                            </label>
-                                                            <select
-                                                                value={bulkForm.status}
-                                                                onChange={(e) =>
-                                                                    setBulkForm((s) => ({
-                                                                        ...s,
-                                                                        status: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 bg-white"
-                                                            >
-                                                                <option value="">(leave as is)</option>
-                                                                <option value="open">Open</option>
-                                                                <option value="in_progress">In Progress</option>
-                                                                <option value="done">Done</option>
-                                                                <option value="cancelled">Cancelled</option>
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs text-blue-900">
-                                                                Priority
-                                                            </label>
-                                                            <select
-                                                                value={bulkForm.priority}
-                                                                onChange={(e) =>
-                                                                    setBulkForm((s) => ({
-                                                                        ...s,
-                                                                        priority: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 bg-white"
-                                                            >
-                                                                <option value="">(leave as is)</option>
-                                                                <option value="low">Low</option>
-                                                                <option value="med">Medium</option>
-                                                                <option value="high">High</option>
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs text-blue-900">
-                                                                Start Date
-                                                            </label>
-                                                            <input
-                                                                type="date"
-                                                                value={bulkForm.start_date}
-                                                                onChange={(e) =>
-                                                                    setBulkForm((s) => ({
-                                                                        ...s,
-                                                                        start_date: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 bg-white"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs text-blue-900">
-                                                                Deadline
-                                                            </label>
-                                                            <input
-                                                                type="date"
-                                                                value={bulkForm.deadline}
-                                                                onChange={(e) =>
-                                                                    setBulkForm((s) => ({
-                                                                        ...s,
-                                                                        deadline: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 bg-white"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs text-blue-900">
-                                                                End date
-                                                            </label>
-                                                            <input
-                                                                type="date"
-                                                                value={bulkForm.end_date}
-                                                                onChange={(e) =>
-                                                                    setBulkForm((s) => ({
-                                                                        ...s,
-                                                                        end_date: e.target.value,
-                                                                    }))
-                                                                }
-                                                                className="w-full border rounded px-2 py-1 bg-white"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-3 flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setBulkForm({
-                                                                    assignee: "",
-                                                                    status: "",
-                                                                    priority: "",
-                                                                    start_date: "",
-                                                                    deadline: "",
-                                                                    end_date: "",
-                                                                })
-                                                            }
-                                                            className="px-3 py-1.5 bg-slate-200 text-slate-900 rounded-md hover:bg-slate-300"
-                                                        >
-                                                            Clear all
-                                                        </button>
-                                                        <button
-                                                            type="submit"
-                                                            disabled={selectedTasks.length === 0}
-                                                            className={`px-3 py-1.5 rounded-md ${
-                                                                selectedTasks.length === 0
-                                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                            }`}
-                                                        >
-                                                            Apply
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowMassEdit(false)}
-                                                            className="px-3 py-1.5 text-blue-700 hover:underline"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            )}
                                             {view === "list" ? (
                                                 sortedTasks.length === 0 ? (
                                                     <EmptyState
@@ -3633,6 +3600,10 @@ export default function KeyAreas() {
                                                                                     setShowTaskComposer(true);
                                                                                 }}
                                                                                 onDeleteClick={() => handleDeleteTask(t)}
+                                                                                onRowClick={(task) => {
+                                                                                    console.log('Task clicked:', task);
+                                                                                    setSelectedTaskInPanel(task);
+                                                                                }}
                                                                             />
                                                                             {expandedActivityRows.has(t.id) && (
                                                                                 <tr className="bg-slate-50">
@@ -3687,9 +3658,10 @@ export default function KeyAreas() {
                                                 />
                                             )}
                                         </div>
+                                    </div>
                                         
-                                        {/* Add Task Footer */}
-                                        <div className="flex justify-end pr-10 pt-3">
+                                    {/* Add Task Footer */}
+                                    <div className="flex justify-end pr-10 pt-3">
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -3707,7 +3679,289 @@ export default function KeyAreas() {
                                                 Add Task
                                             </button>
                                         </div>
+                                        </div>
+                                        </div>
                                     </div>
+                                }
+                                activityPanel={
+                                    selectedTaskInPanel ? (
+                                        <div className="flex flex-col h-full bg-slate-50">
+                                            {/* Activity Panel Header */}
+                                            <div className="px-4 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    {(() => {
+                                                        const lvl = getPriorityLevel ? getPriorityLevel(selectedTaskInPanel?.priority) : 2;
+                                                        if (lvl === 2) return null;
+                                                        const cls = lvl === 3 ? "text-red-600" : "text-emerald-600";
+                                                        const label = lvl === 3 ? "High" : "Low";
+                                                        return (
+                                                            <span
+                                                                className={`inline-block text-sm font-bold ${cls}`}
+                                                                title={`Priority: ${label}`}
+                                                            >
+                                                                !
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                    <h3 className="text-sm font-semibold text-slate-900 truncate">{selectedTaskInPanel.title || 'Untitled Task'}</h3>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedTaskInPanel(null)}
+                                                    className="ml-2 p-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                                                    aria-label="Close activity panel"
+                                                >
+                                                    <FaTimes className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            {/* Activity Panel Content */}
+                                            <div className="flex-1 overflow-y-auto">
+                                                {/* Activities Tab Header */}
+                                                <div className="px-2 pt-2 bg-white">
+                                                    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                                                        <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
+                                                                    <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                                                </svg>
+                                                                Activities
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Activities Table */}
+                                                <div className="p-4">
+                                                    <div className="mb-3">
+                                                        {(() => {
+                                                            const taskKey = String(selectedTaskInPanel.id);
+                                                            const list = (activitiesByTask[taskKey] || []).slice();
+                                                            
+                                                            return Array.isArray(list) && list.length > 0 ? (
+                                                                <div className="overflow-x-auto">
+                                                                    <table className="min-w-full text-sm">
+                                                                        <thead className="bg-slate-50 border border-slate-200 text-slate-700">
+                                                                            <tr>
+                                                                                <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Activity</th>
+                                                                                {visibleColumns.responsible && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Responsible</th>
+                                                                                )}
+                                                                                {visibleColumns.status !== false && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Status</th>
+                                                                                )}
+                                                                                {visibleColumns.priority && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Priority</th>
+                                                                                )}
+                                                                                {visibleColumns.start_date && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Start date</th>
+                                                                                )}
+                                                                                {visibleColumns.end_date && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">End date</th>
+                                                                                )}
+                                                                                {visibleColumns.deadline && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Deadline</th>
+                                                                                )}
+                                                                                {visibleColumns.duration && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Duration</th>
+                                                                                )}
+                                                                                {visibleColumns.completed && (
+                                                                                    <th className="px-3 py-2 text-left font-semibold">Completed</th>
+                                                                                )}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {list.map((a) => (
+                                                                                <tr key={a.id} className="bg-white border-b border-slate-100">
+                                                                                    <td className="px-3 py-2 align-top">
+                                                                                        <div className="flex items-center gap-3">
+                                                                                            <ActivityRowMenu activity={a} taskId={selectedTaskInPanel?.id} />
+                                                                                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-4 h-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" style={{ color: selectedKA?.color || 'rgb(16, 185, 129)' }}>
+                                                                                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                                                                            </svg>
+                                                                                            <div className="flex flex-col">
+                                                                                                {activityNameEditId === a.id ? (
+                                                                                                    <input
+                                                                                                        autoFocus
+                                                                                                        className="text-sm text-slate-800 border rounded px-1 py-0.5 max-w-[540px]"
+                                                                                                        value={activityNameEditValue}
+                                                                                                        onChange={(e) => setActivityNameEditValue(e.target.value)}
+                                                                                                        onBlur={() => saveActivityName(a, selectedTaskInPanel?.id, activityNameEditValue)}
+                                                                                                        onKeyDown={(e) => {
+                                                                                                            if (e.key === 'Enter') {
+                                                                                                                e.preventDefault();
+                                                                                                                saveActivityName(a, selectedTaskInPanel?.id, activityNameEditValue);
+                                                                                                            } else if (e.key === 'Escape') {
+                                                                                                                setActivityNameEditId(null);
+                                                                                                                setActivityNameEditValue((a.text || a.activity_name || '').trim());
+                                                                                                            }
+                                                                                                        }}
+                                                                                                    />
+                                                                                                ) : (
+                                                                                                    <div
+                                                                                                        className="text-sm text-slate-800 truncate max-w-[540px] cursor-pointer"
+                                                                                                        onDoubleClick={() => {
+                                                                                                            setActivityNameEditId(a.id);
+                                                                                                            setActivityNameEditValue((a.text || a.activity_name || '').trim());
+                                                                                                        }}
+                                                                                                        title="Double click to edit"
+                                                                                                    >
+                                                                                                        {a.text || a.activity_name || 'Untitled activity'}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                <div className="text-xs text-slate-500">{a.note || ''}</div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    {visibleColumns.responsible && (
+                                                                                        <td className="px-3 py-2 align-top text-slate-700">
+                                                                                            {Array.isArray(users) && users.length ? (
+                                                                                                <select className="text-sm rounded-md border bg-white px-2 py-1" value={a.assignee || selectedTaskInPanel.assignee || ''} disabled>
+                                                                                                    <option value="">—</option>
+                                                                                                    {users.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                                                                                                </select>
+                                                                                            ) : (
+                                                                                                a.assignee || selectedTaskInPanel.assignee || '—'
+                                                                                            )}
+                                                                                        </td>
+                                                                                    )}
+                                                                                    {visibleColumns.status && (
+                                                                                        <td className="px-3 py-2 align-top">
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
+                                                                                                <select value={a.status || 'open'} disabled className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
+                                                                                                    <option value="open">Open</option>
+                                                                                                    <option value="in_progress">In progress</option>
+                                                                                                    <option value="done">Done</option>
+                                                                                                </select>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    )}
+                                                                                    {visibleColumns.priority && (
+                                                                                        <td className="px-3 py-2 align-top">
+                                                                                            <select className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm" value={(function() {
+                                                                                                const raw = a.priority ?? selectedTaskInPanel.priority;
+                                                                                                if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
+                                                                                                if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
+                                                                                                return 'normal';
+                                                                                            })()} disabled>
+                                                                                                <option value="low">Low</option>
+                                                                                                <option value="normal">Normal</option>
+                                                                                                <option value="high">High</option>
+                                                                                            </select>
+                                                                                        </td>
+                                                                                    )}
+                                                                                    {visibleColumns.start_date && (
+                                                                                        <td className="px-3 py-2 align-top">
+                                                                                            <button className="hover:bg-slate-50 rounded px-1" title="Edit start date" disabled>
+                                                                                                {(() => {
+                                                                                                    const date = a.start_date || a.startDate;
+                                                                                                    if (!date) return '—';
+                                                                                                    try {
+                                                                                                        const d = new Date(date);
+                                                                                                        return d.toISOString().split('T')[0];
+                                                                                                    } catch { return '—'; }
+                                                                                                })()}
+                                                                                            </button>
+                                                                                        </td>
+                                                                                    )}
+                                                                                    {visibleColumns.end_date && (
+                                                                                        <td className="px-3 py-2 align-top">
+                                                                                            <button className="hover:bg-slate-50 rounded px-1" title="Edit end date" disabled>
+                                                                                                {(() => {
+                                                                                                    const date = a.end_date || a.endDate;
+                                                                                                    if (!date) return '—';
+                                                                                                    try {
+                                                                                                        const d = new Date(date);
+                                                                                                        return d.toISOString().split('T')[0];
+                                                                                                    } catch { return '—'; }
+                                                                                                })()}
+                                                                                            </button>
+                                                                                        </td>
+                                                                                    )}
+                                                                                    {visibleColumns.deadline && (
+                                                                                        <td className="px-3 py-2 align-top">
+                                                                                            <button className="hover:bg-slate-50 rounded px-1" title="Edit deadline" disabled>
+                                                                                                {(() => {
+                                                                                                    const date = a.deadline;
+                                                                                                    if (!date) return '—';
+                                                                                                    try {
+                                                                                                        const d = new Date(date);
+                                                                                                        return d.toISOString().split('T')[0];
+                                                                                                    } catch { return '—'; }
+                                                                                                })()}
+                                                                                            </button>
+                                                                                        </td>
+                                                                                    )}
+                                                                                    {visibleColumns.duration && (
+                                                                                        <td className="px-3 py-2 align-top">{a.duration || '0d'}</td>
+                                                                                    )}
+                                                                                    {visibleColumns.completed && (
+                                                                                        <td className="px-3 py-2 align-top text-slate-800">
+                                                                                            {(() => {
+                                                                                                const date = a.completionDate || a.completion_date;
+                                                                                                if (!date) return '';
+                                                                                                try {
+                                                                                                    const d = new Date(date);
+                                                                                                    return d.toISOString().split('T')[0];
+                                                                                                } catch { return ''; }
+                                                                                            })()}
+                                                                                        </td>
+                                                                                    )}
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm text-slate-500 mt-2">No activities yet.</div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                    <div className="mt-3 flex items-center gap-2">
+                                                        <button 
+                                                            type="button" 
+                                                            className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 ml-auto"
+                                                            onClick={() => window.dispatchEvent(new CustomEvent("ka-open-activity-composer", { detail: { taskId: selectedTaskInPanel?.id } }))}
+                                                        >
+                                                            Add Activity
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col h-full">
+                                            {/* Activities Tab Header */}
+                                            <div className="px-2 pt-2 bg-white">
+                                                <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                                                    <div className="px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900 shadow" aria-label="Activities">
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <svg className="w-4 h-4" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="currentColor" style={{ color: 'rgb(16, 185, 129)' }}>
+                                                                <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
+                                                            </svg>
+                                                            Activities
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Activities Table */}
+                                            <div className="flex-1 overflow-auto p-4">
+                                                <div className="flex items-center justify-center h-full text-slate-500 text-center">
+                                                    <div>
+                                                        <p className="text-lg font-medium mb-2">Select a task</p>
+                                                        <p className="text-sm">Choose a task from the left panel to view its activities</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                }
+                                initialTaskWidth={50}
+                                minTaskWidth={30}
+                                minActivityWidth={30}
+                            />
                             </div>
                         )}
 
@@ -4145,11 +4399,76 @@ export default function KeyAreas() {
                                     />
                                 )}
 
+                                {/* Mass Edit Modal */}
+                                {showMassEditModal && selectedIds.size > 0 && (
+                                    <EditTaskModal
+                                        isOpen={true}
+                                        initialData={{
+                                            type: 'bulk',
+                                            count: selectedIds.size,
+                                            key_area_id: (() => {
+                                                const firstId = Array.from(selectedIds)[0];
+                                                const firstTask = allTasks.find((t) => String(t.id) === String(firstId));
+                                                return firstTask?.key_area_id || firstTask?.keyAreaId || selectedKA?.id || null;
+                                            })(),
+                                        }}
+                                        onSave={async (payload) => {
+                                            // Apply bulk edit to all selected tasks
+                                            const updates = [];
+                                            for (const id of Array.from(selectedIds)) {
+                                                const original = allTasks.find((t) => String(t.id) === String(id));
+                                                if (!original) continue;
+                                                const next = { ...original };
+                                                
+                                                // Apply only the fields that are being edited
+                                                if (payload.assignee) next.assignee = payload.assignee;
+                                                if (payload.status) next.status = payload.status;
+                                                if (payload.priority) next.priority = payload.priority;
+                                                if (payload.start_date) next.start_date = payload.start_date;
+                                                if (payload.deadline) next.deadline = payload.deadline;
+                                                if (payload.end_date) next.end_date = payload.end_date;
+                                                
+                                                next.eisenhower_quadrant = computeEisenhowerQuadrant({
+                                                    deadline: next.deadline,
+                                                    end_date: next.end_date,
+                                                    start_date: next.start_date,
+                                                    priority: next.priority,
+                                                    status: next.status,
+                                                    key_area_id: next.key_area_id,
+                                                });
+                                                
+                                                // eslint-disable-next-line no-await-in-loop
+                                                const saved = await api.updateTask(next.id, next);
+                                                updates.push(saved);
+                                            }
+                                            
+                                            // Update state
+                                            setAllTasks((prev) => {
+                                                const map = new Map(prev.map((t) => [String(t.id), t]));
+                                                updates.forEach((u) => map.set(String(u.id), { ...map.get(String(u.id)), ...u }));
+                                                return Array.from(map.values());
+                                            });
+                                            
+                                            setShowMassEditModal(false);
+                                            clearSelection();
+                                        }}
+                                        onCancel={() => setShowMassEditModal(false)}
+                                        isSaving={false}
+                                        keyAreas={keyAreas}
+                                        users={users}
+                                        goals={goals}
+                                        availableLists={availableListNumbers}
+                                    />
+                                )}
+
                                 {/* Tasks list rendering moved inside the Task Lists card above */}
 
                                 {/* Kanban/Calendar already rendered above based on view */}
                             </div>
                         )}
+                        
+                        {/* Modals Container */}
+                        <>
                             {/* Create/Edit KA Modal */}
                             <KeyAreaModal
                                 isOpen={showForm}
@@ -4160,7 +4479,7 @@ export default function KeyAreas() {
                                     setEditing(null);
                                 }}
                             />
-                        </div>
+                        </>
                     </div>
                 </main>
             </div>
