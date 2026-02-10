@@ -434,19 +434,27 @@ export default function CreateTaskModal({
     let assigneeName = assignee;
     let delegatedToUserId = null;
     
+    console.log('🔍 Assignee state value:', assignee);
+    console.log('🔍 Current user ID:', resolvedCurrentUserId);
+    console.log('🔍 Users list:', usersList?.map(u => ({ id: u.id, name: u.name })));
+    
     if (assignee) {
       // Check if assignee is a user ID (UUID format) in usersList
       const selectedUser = usersList.find(u => String(u.id) === String(assignee));
+      console.log('🔍 Selected user found:', selectedUser);
+      
       if (selectedUser) {
         const userId = selectedUser.id;
         
         // Set assignee name for display
         if (String(userId) === String(resolvedCurrentUserId)) {
           assigneeName = 'Me';
+          console.log('✅ Assigning to self (Me)');
         } else {
           assigneeName = selectedUser.name;
           // Only add delegatedToUserId if assigning to different user (auto-creates delegation)
           delegatedToUserId = userId;
+          console.log('✅ Creating delegation to:', userId, selectedUser.name);
         }
       }
     }
