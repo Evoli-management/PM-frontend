@@ -2823,6 +2823,7 @@ export default function KeyAreas() {
                             setViewTab={setViewTab}
                             activeFilter={activeFilter}
                             setActiveFilter={setActiveFilter}
+                            pendingDelegationsCount={pendingDelegations.length}
                         />
                     </div>
                     

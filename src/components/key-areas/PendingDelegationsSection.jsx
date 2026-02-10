@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { FaCheck, FaBan, FaSquare, FaListUl, FaExclamation, FaArrowDown } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import Select from 'react-select';
 import taskDelegationService from '../../services/taskDelegationService';
 import activityDelegationService from '../../services/activityDelegationService';
 
@@ -22,6 +24,20 @@ export default function PendingDelegationsSection({
   const [taskError, setTaskError] = useState('');
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [rejectingItem, setRejectingItem] = useState(null);
+
+  // Format date as dd.mm.yyyy
+  const formatDate = (date) => {
+    if (!date) return '-';
+    try {
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}.${month}.${year}`;
+    } catch {
+      return '-';
+    }
+  };
 
   const loadKeyAreas = async () => {
     try {
@@ -176,61 +192,70 @@ export default function PendingDelegationsSection({
                 </tr>
               </thead>
               <tbody>
-                {pendingTasks.map((item) => (
-                  <tr key={`${item.type}-${item.id}`} className="border-b border-gray-200 hover:bg-yellow-50">
-                    <td className="px-2 py-3 text-center">
-                      {item.type === 'task' ? (
-                        <FaSquare title="Task" className="text-blue-600 mx-auto" />
-                      ) : (
-                        <FaListUl title="Activity" className="text-purple-600 mx-auto" />
-                      )}
-                    </td>
-                    <td className="px-2 py-3 text-center">
-                      {item.priority === 'high' && (
-                        <FaExclamation 
-                          title="High Priority" 
-                          className="text-red-600 mx-auto inline-block" 
-                        />
-                      )}
-                      {item.priority === 'low' && (
-                        <FaArrowDown 
-                          title="Low Priority" 
-                          className="text-blue-600 mx-auto inline-block" 
-                        />
-                      )}
-                      {(!item.priority || item.priority === 'normal') && (
-                        <div className="text-gray-400 mx-auto text-xs">—</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{item.title}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {item.dueDate || item.deadline ? new Date(item.dueDate || item.deadline).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {getDelegatorName(item)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleAcceptClick(item)}
-                          disabled={respondingItemId === item.id}
-                          className="p-2 text-green-600 hover:bg-green-100 rounded transition disabled:opacity-50"
-                          title="Accept this delegation"
-                        >
-                          <FaCheck size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleRejectClick(item)}
-                          disabled={respondingItemId === item.id}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded transition disabled:opacity-50"
-                          title="Reject this delegation"
-                        >
-                          <FaBan size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {pendingTasks.map((item) => (
+                    <motion.tr
+                      key={`${item.type}-${item.id}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -100 }}
+                      transition={{ duration: 0.2 }}
+                      className="border-b border-gray-200 hover:bg-yellow-50"
+                    >
+                      <td className="px-2 py-3 text-center">
+                        {item.type === 'task' ? (
+                          <FaSquare title="Task" className="text-blue-600 mx-auto" />
+                        ) : (
+                          <FaListUl title="Activity" className="text-purple-600 mx-auto" />
+                        )}
+                      </td>
+                      <td className="px-2 py-3 text-center">
+                        {item.priority === 'high' && (
+                          <FaExclamation 
+                            title="High Priority" 
+                            className="text-red-600 mx-auto inline-block" 
+                          />
+                        )}
+                        {item.priority === 'low' && (
+                          <FaArrowDown 
+                            title="Low Priority" 
+                            className="text-blue-600 mx-auto inline-block" 
+                          />
+                        )}
+                        {(!item.priority || item.priority === 'normal') && (
+                          <div className="text-gray-400 mx-auto text-xs">—</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{item.title}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {formatDate(item.dueDate || item.deadline)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {getDelegatorName(item)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleAcceptClick(item)}
+                            disabled={respondingItemId === item.id}
+                            className="p-2 text-green-600 hover:bg-green-100 rounded transition disabled:opacity-50"
+                            title="Accept this delegation"
+                          >
+                            <FaCheck size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleRejectClick(item)}
+                            disabled={respondingItemId === item.id}
+                            className="p-2 text-red-600 hover:bg-red-100 rounded transition disabled:opacity-50"
+                            title="Reject this delegation"
+                          >
+                            <FaBan size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>
@@ -284,25 +309,51 @@ export default function PendingDelegationsSection({
                 <p className="text-xs text-gray-500 mb-2">
                   Choose which Key Area to add this {acceptingItem?.type === 'task' ? 'task' : 'activity'} to
                 </p>
-                <select
-                  value={selectedKeyArea}
-                  onChange={(e) => {
-                    setSelectedKeyArea(e.target.value);
+                <Select
+                  options={keyAreas.map(ka => ({
+                    value: ka.id,
+                    label: ka.name
+                  }))}
+                  value={selectedKeyArea ? {
+                    value: selectedKeyArea,
+                    label: keyAreas.find(ka => ka.id === selectedKeyArea)?.name
+                  } : null}
+                  onChange={(option) => {
+                    setSelectedKeyArea(option?.value || '');
                     setKeyAreaError('');
                     // Load tasks for the selected key area if it's an activity
                     if (acceptingItem?.type === 'activity') {
-                      loadTasksForKeyArea(e.target.value);
+                      loadTasksForKeyArea(option?.value || '');
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Select a Key Area --</option>
-                  {keyAreas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {area.name}
-                    </option>
-                  ))}
-                </select>
+                  isSearchable
+                  isClearable
+                  placeholder="Search key areas..."
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: keyAreaError ? '#ef4444' : '#d1d5db',
+                      '&:hover': {
+                        borderColor: keyAreaError ? '#ef4444' : '#9ca3af',
+                      },
+                      '&:focus': {
+                        borderColor: '#3b82f6',
+                        boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                      },
+                      borderRadius: '0.5rem',
+                      padding: '0.25rem',
+                      fontSize: '0.875rem',
+                    }),
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
+                      color: state.isSelected ? 'white' : '#1f2937',
+                      fontSize: '0.875rem',
+                    }),
+                  }}
+                />
               </div>
 
               {/* Task Selector (Only for Activities) */}
