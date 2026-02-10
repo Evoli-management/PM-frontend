@@ -77,8 +77,18 @@ export default function UnifiedTaskActivityTable({
             });
         }
         
+        // Debug: Log delegation status for delegated view
+        if (viewTab === 'delegated') {
+            console.log('🔍 Delegated tasks delegation status:', items.filter(i => i.type === 'task').map(t => ({
+                id: t.id,
+                title: t.title,
+                delegationStatus: t.delegationStatus,
+                delegation_status: t.delegation_status
+            })));
+        }
+        
         return items;
-    }, [tasks, activities, showTasks, showActivities]);
+    }, [tasks, activities, showTasks, showActivities, viewTab]);
 
     // Filter items
     const filteredItems = useMemo(() => {
@@ -845,8 +855,23 @@ export default function UnifiedTaskActivityTable({
                                     {/* Action Buttons */}
                                     <td className="p-2 text-center">
                                         <div className="flex items-center justify-center gap-2">
+                                            {/* Debug delegation status */}
+                                            {viewTab === 'delegated' && item.type === 'task' && (() => {
+                                                const isPending = item.delegationStatus === 'pending' || item.delegation_status === 'pending';
+                                                if (!isPending) {
+                                                    console.log('⚠️ Task not showing accept/reject buttons:', {
+                                                        id: item.id,
+                                                        title: item.title,
+                                                        viewTab,
+                                                        type: item.type,
+                                                        delegationStatus: item.delegationStatus,
+                                                        delegation_status: item.delegation_status
+                                                    });
+                                                }
+                                                return null;
+                                            })()}
                                             {/* Accept/Reject for pending delegations */}
-                                            {viewTab === 'delegated' && item.type === 'task' && item.delegationStatus === 'pending' ? (
+                                            {viewTab === 'delegated' && item.type === 'task' && (item.delegationStatus === 'pending' || item.delegation_status === 'pending') ? (
                                                 <>
                                                     <button
                                                         onClick={(e) => {
