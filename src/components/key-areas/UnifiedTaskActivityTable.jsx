@@ -352,6 +352,13 @@ export default function UnifiedTaskActivityTable({
     const getResponsibleLabel = (item) => {
         // For delegated view, show who delegated the task (delegatedBy)
         if (viewTab === 'delegated') {
+            // First try to get delegator from the delegatedByUser object (enriched by backend)
+            if (item.delegatedByUser) {
+                const delegator = item.delegatedByUser;
+                return `${delegator.firstName || ''} ${delegator.lastName || ''}`.trim();
+            }
+            
+            // Fallback to delegatedByUserId if we have the users list
             const delegatorId = item.delegatedByUserId || item.delegated_by_user_id;
             if (delegatorId) {
                 const user = users.find(u => String(u.id || u.member_id) === String(delegatorId));

@@ -3698,17 +3698,44 @@ export default function KeyAreas() {
                                 {/* Section 1: Pending Delegations */}
                                 <PendingDelegationsSection
                                     pendingTasks={pendingDelegations}
-                                    onTaskAccept={(taskId) => {
-                                        // Remove from pending and move to all tasks view
-                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
-                                        setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, delegationStatus: 'accepted' } : t));
-                                    }}
-                                    onTaskReject={(taskId) => {
+                                    onTaskAccept={async (taskId) => {
                                         // Remove from pending
                                         setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
-                                        setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, delegationStatus: 'rejected' } : t));
+                                        
+                                        // Reload ALL delegated tasks from backend to show the newly created accepted task with keyAreaId
+                                        try {
+                                            const delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                                            setAllTasks(delegatedToMe || []);
+                                            
+                                            // Update pending list by filtering for pending status only
+                                            const pending = (delegatedToMe || []).filter(t => 
+                                                (t.delegationStatus || t.delegation_status) === 'pending' || 
+                                                !(t.delegationStatus || t.delegation_status)
+                                            );
+                                            setPendingDelegations(pending);
+                                        } catch (error) {
+                                            console.error('Failed to reload delegated tasks after accept:', error);
+                                        }
+                                    }}
+                                    onTaskReject={async (taskId) => {
+                                        // Remove from pending
+                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
+                                        
+                                        // Reload delegated tasks to refresh the list
+                                        try {
+                                            const delegatedToMe = await taskDelegationService.getDelegatedToMe();
+                                            setAllTasks(delegatedToMe || []);
+                                        } catch (error) {
+                                            console.error('Failed to reload delegated tasks after reject:', error);
+                                        }
                                     }}
                                     getDelegatorName={(task) => {
+                                        // First try to get from delegatedByUser object (enriched by backend)
+                                        if (task.delegatedByUser) {
+                                            return `${task.delegatedByUser.firstName || ''} ${task.delegatedByUser.lastName || ''}`.trim();
+                                        }
+                                        
+                                        // Fallback to delegatedByUserId with users list
                                         const delegatorId = task.delegatedByUserId || task.delegated_by_user_id;
                                         const delegator = users.find(u => u.id === delegatorId);
                                         return delegator ? `${delegator.firstName} ${delegator.lastName}` : 'Unknown';
