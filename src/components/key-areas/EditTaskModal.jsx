@@ -359,6 +359,11 @@ export default function EditTaskModal({
     );
     if (selectedArea?.listNames) {
       setListNames(selectedArea.listNames || {});
+      // If current list is not in the new key area's lists, reset to first available
+      const availableListIndices = Object.keys(selectedArea.listNames || {});
+      if (availableListIndices.length > 0 && !availableListIndices.includes(String(listIndex))) {
+        setListIndex(Number(availableListIndices[0]));
+      }
     } else {
       setListNames({});
     }
@@ -566,11 +571,20 @@ export default function EditTaskModal({
                 <label className="text-sm font-medium text-slate-700">List</label>
                 <div className="relative mt-0">
                   <select name="list_index" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 appearance-none pr-10" required="" value={listIndex} onChange={(e) => setListIndex(Number(e.target.value))} disabled={!keyAreaId}>
-                    {(availableLists || [1]).map((idx) => (
-                      <option key={idx} value={idx}>
-                        {(listNames && listNames[idx]) || `List ${idx}`}
-                      </option>
-                    ))}
+                    {!keyAreaId && <option value="">— Select Key Area First —</option>}
+                    {keyAreaId && Object.keys(listNames).length > 0 ? (
+                      Object.entries(listNames).map(([idx, name]) => (
+                        <option key={idx} value={idx}>
+                          {name || `List ${idx}`}
+                        </option>
+                      ))
+                    ) : (
+                      keyAreaId && (availableLists || [1]).map((idx) => (
+                        <option key={idx} value={idx}>
+                          {(listNames && listNames[idx]) || `List ${idx}`}
+                        </option>
+                      ))
+                    )}
                   </select>
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"><path fill="currentColor" d="M6.7 8.7a1 1 0 0 1 1.4 0L12 12.6l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0L6.7 10.1a1 1 0 0 1 0-1.4Z"></path></svg>
                 </div>
