@@ -1100,14 +1100,19 @@ export default function KeyAreas() {
                         
                         // Set all items for the bottom section (with filters)
                         setAllTasks(allDelegated);
+                        
+                        // For delegated tab, clear activitiesByTask since activities are already in allDelegated with taskId
+                        setActivitiesByTask({});
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
                         delegatedActivities = [];
                         setPendingDelegations([]);
+                        setActivitiesByTask({});
                     }
 
-                    // Load activities for delegated tasks
+                    // Skip loading activities by task in delegated view - they're already included with taskId
+                    return;
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
                         (delegatedToMe || []).map(async (row) => {
@@ -4567,7 +4572,7 @@ export default function KeyAreas() {
                                     <UnifiedTaskActivityTable
                                         viewTab={viewTab}
                                         tasks={allTasks}
-                                        activities={Object.values(activitiesByTask).flat()}
+                                        activities={viewTab === 'delegated' ? [] : Object.values(activitiesByTask).flat()}
                                         keyAreas={keyAreas}
                                         users={users}
                                         goals={goals}
