@@ -312,6 +312,14 @@ export default function UnifiedTaskActivityTable({
             updates.deadline = v;
             updates.dueDate = v;
             updates.due_date = v;
+        } else if (field === 'priority') {
+            updates.priority = value;
+            updates.priority_level = value;
+            updates.priorityLevel = value;
+        } else if (field === 'listIndex') {
+            const v = value === '' || value === null ? null : Number(value);
+            updates.listIndex = Number.isNaN(v) ? value : v;
+            updates.list_index = Number.isNaN(v) ? value : v;
         } else if (field === 'keyAreaId') {
             updates.keyAreaId = value || null;
             updates.key_area_id = value || null;
@@ -757,6 +765,8 @@ export default function UnifiedTaskActivityTable({
                             const keyAreaKey = getCellKey(item, 'keyAreaId');
                             const responsibleKey = getCellKey(item, 'responsibleId');
                             const goalKey = getCellKey(item, 'goalId');
+                            const priorityKey = getCellKey(item, 'priority');
+                            const listIndexKey = getCellKey(item, 'listIndex');
                             const titleValue = item.title || item.name || item.text || item.activity_name || '';
                             const startDateValue = toDateOnly(item.startDate || item.start_date);
                             const endDateValue = toDateOnly(item.endDate || item.end_date);
@@ -783,8 +793,35 @@ export default function UnifiedTaskActivityTable({
                                         />
                                     </td>
                                     {columns.includes('priority') && (
-                                        <td className="p-2 text-center font-bold ta-priority">
-                                            {getPriorityIcon(item.priority)}
+                                        <td
+                                            className="p-2 text-center font-bold ta-priority"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                const raw = item.priority ?? item.priority_level ?? item.priorityLevel;
+                                                const val = (() => {
+                                                    if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
+                                                    if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
+                                                    return 'normal';
+                                                })();
+                                                startEdit(item, 'priority', val);
+                                            }}
+                                        >
+                                            {editingCell === priorityKey ? (
+                                                <select
+                                                    autoFocus
+                                                    className="w-full border rounded px-2 py-1 text-xs"
+                                                    value={editValue}
+                                                    onChange={(e) => saveEdit(item, 'priority', e.target.value)}
+                                                    onBlur={cancelEdit}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="low">Low</option>
+                                                    <option value="normal">Normal</option>
+                                                    <option value="high">High</option>
+                                                </select>
+                                            ) : (
+                                                <span>{getPriorityIcon(item.priority)}</span>
+                                            )}
                                         </td>
                                     )}
                                     {viewTab === 'delegated' && (
@@ -860,8 +897,26 @@ export default function UnifiedTaskActivityTable({
                                         </td>
                                     )}
                                     {columns.includes('tab') && (
-                                        <td className="p-2 text-xs text-center">
-                                            {item.list_index || item.listIndex || item.list || ''}
+                                        <td
+                                            className="p-2 text-xs text-center"
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                startEdit(item, 'listIndex', String(item.list_index ?? item.listIndex ?? item.list ?? ''));
+                                            }}
+                                        >
+                                            {editingCell === listIndexKey ? (
+                                                <input
+                                                    autoFocus
+                                                    type="number"
+                                                    className="w-full border rounded px-2 py-1 text-xs text-center"
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    onBlur={() => saveEdit(item, 'listIndex', editValue)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <span>{item.list_index || item.listIndex || item.list || ''}</span>
+                                            )}
                                         </td>
                                     )}
                                     {columns.includes('goal') && (

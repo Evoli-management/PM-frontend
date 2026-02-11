@@ -52,6 +52,7 @@ const TaskRow = ({
   const [editingKey, setEditingKey] = useState(null);
   const [localValue, setLocalValue] = useState("");
   const clickTimer = useRef(null);
+  const dateInputRefs = useRef({});
   
   const menuRef = useRef(null);
   useEffect(() => {
@@ -321,28 +322,41 @@ const TaskRow = ({
       {vc.start_date && (
         <td className="px-3 py-2 align-top text-slate-800">
         {enableInlineEditing ? (
-          editingKey === 'start_date' ? (
+          <div className="relative inline-block">
+            <button
+              type="button"
+              className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingKey('start_date');
+                setTimeout(() => {
+                  const input = dateInputRefs.current['start_date'];
+                  if (input?.showPicker) {
+                    input.showPicker();
+                  } else {
+                    input?.focus();
+                  }
+                }, 0);
+              }}
+              title="Edit start date"
+            >
+              <span>{toDateOnly(t.start_date) || '—'}</span>
+              {editingKey === 'start_date' && <span className="text-sm">📅</span>}
+            </button>
             <input
+              ref={(el) => { dateInputRefs.current['start_date'] = el; }}
               type="date"
-              className="border rounded px-1 py-0.5 text-sm"
+              className="absolute opacity-0"
+              style={{ width: 0, height: 0 }}
               value={toDateOnly(t.start_date) || ''}
               onChange={async (e) => {
                 const v = e.target.value || '';
-                // auto-close: remove focus after change
                 try { await updateField && updateField(t.id, 'start_date', v); } catch (e) {}
-                setEditingKey(null);
               }}
               onBlur={() => setEditingKey(null)}
+              onClick={(e) => e.stopPropagation()}
             />
-          ) : (
-            <button
-              className="hover:bg-slate-100 rounded px-1"
-              onClick={(e) => { e.stopPropagation(); setEditingKey('start_date'); }}
-              title="Edit start date"
-            >
-              {toDateOnly(t.start_date) || '—'}
-            </button>
-          )
+          </div>
         ) : (
           toDateOnly(t.start_date) || '—'
         )}
@@ -351,27 +365,41 @@ const TaskRow = ({
       {vc.end_date && (
         <td className="px-3 py-2 align-top text-slate-800">
         {enableInlineEditing ? (
-          editingKey === 'end_date' ? (
+          <div className="relative inline-block">
+            <button
+              type="button"
+              className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingKey('end_date');
+                setTimeout(() => {
+                  const input = dateInputRefs.current['end_date'];
+                  if (input?.showPicker) {
+                    input.showPicker();
+                  } else {
+                    input?.focus();
+                  }
+                }, 0);
+              }}
+              title="Edit end date"
+            >
+              <span>{toDateOnly(t.end_date) || '—'}</span>
+              {editingKey === 'end_date' && <span className="text-sm">📅</span>}
+            </button>
             <input
+              ref={(el) => { dateInputRefs.current['end_date'] = el; }}
               type="date"
-              className="border rounded px-1 py-0.5 text-sm"
+              className="absolute opacity-0"
+              style={{ width: 0, height: 0 }}
               value={toDateOnly(t.end_date) || ''}
               onChange={async (e) => {
                 const v = e.target.value || '';
                 try { await updateField && updateField(t.id, 'end_date', v); } catch (e) {}
-                setEditingKey(null);
               }}
               onBlur={() => setEditingKey(null)}
+              onClick={(e) => e.stopPropagation()}
             />
-          ) : (
-            <button
-              className="hover:bg-slate-100 rounded px-1"
-              onClick={(e) => { e.stopPropagation(); setEditingKey('end_date'); }}
-              title="Edit end date"
-            >
-              {toDateOnly(t.end_date) || '—'}
-            </button>
-          )
+          </div>
         ) : (
           toDateOnly(t.end_date) || '—'
         )}
@@ -380,27 +408,41 @@ const TaskRow = ({
       {vc.deadline && (
         <td className="px-3 py-2 align-top text-slate-800">
         {enableInlineEditing ? (
-          editingKey === 'deadline' ? (
+          <div className="relative inline-block">
+            <button
+              type="button"
+              className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingKey('deadline');
+                setTimeout(() => {
+                  const input = dateInputRefs.current['deadline'];
+                  if (input?.showPicker) {
+                    input.showPicker();
+                  } else {
+                    input?.focus();
+                  }
+                }, 0);
+              }}
+              title="Edit deadline"
+            >
+              <span>{toDateOnly(t.deadline || t.dueDate) || '—'}</span>
+              {editingKey === 'deadline' && <span className="text-sm">📅</span>}
+            </button>
             <input
+              ref={(el) => { dateInputRefs.current['deadline'] = el; }}
               type="date"
-              className="border rounded px-1 py-0.5 text-sm"
+              className="absolute opacity-0"
+              style={{ width: 0, height: 0 }}
               value={toDateOnly(t.deadline || t.dueDate) || ''}
               onChange={async (e) => {
                 const v = e.target.value || '';
                 try { await updateField && updateField(t.id, 'dueDate', v); } catch (e) {}
-                setEditingKey(null);
               }}
               onBlur={() => setEditingKey(null)}
+              onClick={(e) => e.stopPropagation()}
             />
-          ) : (
-            <button
-              className="hover:bg-slate-100 rounded px-1"
-              onClick={(e) => { e.stopPropagation(); setEditingKey('deadline'); }}
-              title="Edit deadline"
-            >
-              {toDateOnly(t.deadline || t.dueDate) || '—'}
-            </button>
-          )
+          </div>
         ) : (
           toDateOnly(t.deadline) || '—'
         )}
