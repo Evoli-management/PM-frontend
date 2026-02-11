@@ -1098,11 +1098,16 @@ export default function KeyAreas() {
                         );
                         setPendingDelegations(pending);
                         
-                        // Set all items for the bottom section (with filters)
-                        setAllTasks(allDelegated);
+                        // For delegated tab: separate tasks and activities
+                        // UnifiedTaskActivityTable expects tasks in 'tasks' prop and activities in 'activities' prop
+                        // to properly display the correct icons
+                        const delegatedTasks = allDelegated.filter(item => item.type === 'task');
+                        const delegatedActivityItems = allDelegated.filter(item => item.type === 'activity');
                         
-                        // For delegated tab, clear activitiesByTask since activities are already in allDelegated with taskId
-                        setActivitiesByTask({});
+                        // Set all items for the bottom section
+                        // Store activities grouped by empty key (since they're delegated, not linked to specific task view)
+                        setAllTasks(delegatedTasks);
+                        setActivitiesByTask({ '__delegated_activities': delegatedActivityItems });
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
@@ -4572,7 +4577,7 @@ export default function KeyAreas() {
                                     <UnifiedTaskActivityTable
                                         viewTab={viewTab}
                                         tasks={allTasks}
-                                        activities={viewTab === 'delegated' ? [] : Object.values(activitiesByTask).flat()}
+                                        activities={Object.values(activitiesByTask).flat()}
                                         keyAreas={keyAreas}
                                         users={users}
                                         goals={goals}
