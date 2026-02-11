@@ -278,6 +278,7 @@ export default function Tasks() {
                 title: name,
                 description: payload?.notes || "",
                 assignee: payload?.assignee || "",
+                delegatedToUserId: payload?.delegatedToUserId || null,
                 startDate: payload?.start_date ? new Date(payload.start_date).toISOString() : undefined,
                 endDate: payload?.end_date ? new Date(payload.end_date).toISOString() : undefined,
                 dueDate: payload?.dueDate ? new Date(payload.dueDate).toISOString() : undefined,

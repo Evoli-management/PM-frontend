@@ -3,6 +3,8 @@ import { toDateOnly } from '../../utils/keyareasHelpers';
 import Modal from '../shared/Modal';
 import { getPriorityLevel } from '../../utils/keyareasHelpers';
 import usersService from '../../services/usersService';
+import { useDraggable } from '../../hooks/useDraggable';
+import { useResizable } from '../../hooks/useResizable';
 
 // ---- helpers (JS only) ----
 const safeDate = (v) => {
@@ -89,6 +91,17 @@ export default function EditActivityModal({
   const { position, isDragging, handleMouseDown, handleMouseMove, handleMouseUp, resetPosition } = useDraggable();
   const { size, isDraggingResize, handleResizeMouseDown } = useResizable(550, 510);
 
+  // Filter tasks by selected key area and list
+  const filteredTasks = useMemo(() => {
+    if (!keyAreaId || !listIndex) return [];
+    const allTasks = localTasks.length > 0 ? localTasks : (tasks || []);
+    return allTasks.filter((t) => {
+      const tKeyArea = t.keyAreaId || t.key_area_id || t.keyArea || t.key_area;
+      const tList = t.list || t.list_index || t.listIndex;
+      return String(tKeyArea) === String(keyAreaId) && String(tList) === String(listIndex);
+    });
+  }, [keyAreaId, listIndex, localTasks, tasks]);
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -119,8 +132,8 @@ export default function EditActivityModal({
     setKeyAreaId(initialData.key_area_id || initialData.keyAreaId || initialData.keyArea || initialData.key_area || '');
     setListIndex(initialData.list || initialData.list_index || '');
     setTaskId(initialData.taskId || initialData.task_id || initialData.task || initialData.task_id || '');
-    // If activity doesn't carry an assignee, prefer the parent task's assignee (if available)
-    const initialAssigneeValue = initialData.responsible || initialData.assignee || '';
+    // Activity assignee can come from responsible, assignee, or delegatedToUserId fields
+    const initialAssigneeValue = initialData.responsible || initialData.assignee || initialData.delegatedToUserId || initialData.delegated_to_user_id || '';
     let nextAssignee = '';
     if (initialAssigneeValue) {
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
@@ -259,24 +272,13 @@ export default function EditActivityModal({
   if (!isOpen) return null;
 
   const handleSave = () => {
-    // Validate required fields
-    if (!keyAreaId) {
-      setKeyAreaError('Please select a Key Area');
-      try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (_) {}
-      return;
-    }
-    if (!listIndex) {
-      setListError('Please select a List');
-      try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (_) {}
-      return;
-    }
+    // Activities don't require key area or list - they're attached to tasks which have those
     // Normalize dates to date-only strings (YYYY-MM-DD) to avoid timezone shifts
     const normStart = toDateOnly(startDate) || null;
     const normEnd = toDateOnly(endDate) || null;
     const normDeadline = toDateOnly(deadline) || null;
 
-  // Handle assignee - convert user ID to assignee and add delegatedToUserId for auto-delegation
-  let assigneeValue = assignee || null;
+  // Handle assignee - convert user ID to delegatedToUserId for auto-delegation
   let delegatedToUserId = null;
   
   if (assignee) {
@@ -295,29 +297,21 @@ export default function EditActivityModal({
       ...initialData,
       text: (title || '').trim(),
       notes: (description || '').trim(),
-      // keep legacy aliases but prefer normalized ISO fields
-      date_start: normStart,
-      date_end: normEnd,
-      deadline: normDeadline,
-      // also set camelCase aliases to help consumers that expect them
+      // Backend expects camelCase date fields
       startDate: normStart,
       endDate: normEnd,
+      deadline: normDeadline,
       duration: duration || null,
-      key_area_id: keyAreaId || null,
-      keyAreaId: keyAreaId || null,
-      list: listIndex || null,
-      listIndex: listIndex || null,
       taskId: taskId || null,
-      assignee: assigneeValue,
       delegatedToUserId: delegatedToUserId,
       priority,
-      goal: goal || null,
       goalId: goal || null,
     };
-    // Strip empty-string values (backend treats empty string as invalid)
+    // Strip empty-string values and fields not supported by activities backend
+    const unsupportedFields = ['key_area_id', 'keyAreaId', 'keyArea', 'list', 'listIndex', 'list_index', 'assignee', 'responsible', 'assigneeId', 'responsibleId'];
     Object.keys(payload).forEach((k) => {
       try {
-        if (payload[k] === '') delete payload[k];
+        if (payload[k] === '' || unsupportedFields.includes(k)) delete payload[k];
       } catch (__) {}
     });
 

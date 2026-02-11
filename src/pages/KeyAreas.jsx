@@ -73,6 +73,14 @@ const getUsersService = async () => {
     return _usersService;
 };
 
+let _userProfileService = null;
+const getUserProfileService = async () => {
+    if (_userProfileService) return _userProfileService;
+    const mod = await import('../services/userProfileService');
+    _userProfileService = mod.default || mod;
+    return _userProfileService;
+};
+
 const api = {
     async listKeyAreas() {
         try {
@@ -160,6 +168,7 @@ const api = {
                 if (p === "low" || p === "medium" || p === "high") return p;
                 return "medium";
             })(),
+            delegatedToUserId: task.delegatedToUserId ?? null,
             // Accept client-provided list index when creating so server persists list membership
             listIndex: typeof task.list_index !== 'undefined' ? task.list_index : (typeof task.listIndex !== 'undefined' ? task.listIndex : undefined),
         };
@@ -938,7 +947,7 @@ export default function KeyAreas() {
     const [showMassEditModal, setShowMassEditModal] = useState(false);
     const tasksDisplayRef = useRef(null);
     const [users, setUsers] = useState([]);
-    const currentUserId = (users && users[0] && users[0].id) ? users[0].id : null;
+    const [currentUserId, setCurrentUserId] = useState(null);
 
     // Build a stable lookup map from any possible goal id key to the goal title.
     // This avoids repeated array scans in TaskRow and makes lookups resilient
@@ -1063,7 +1072,15 @@ export default function KeyAreas() {
                         (delegatedToMe || []).map(async (row) => {
                             try {
                                 const list = await actSvc.list({ taskId: row.id });
-                                return [String(row.id), Array.isArray(list) ? list.map(normalizeActivity) : []];
+                                const filtered = Array.isArray(list)
+                                    ? list.filter((activity) => {
+                                          if (!currentUserId) return true;
+                                          const delegatedTo = activity.delegatedToUserId || activity.delegated_to_user_id;
+                                          if (!delegatedTo) return true;
+                                          return String(delegatedTo) === String(currentUserId);
+                                      })
+                                    : [];
+                                return [String(row.id), filtered.map(normalizeActivity)];
                             } catch {
                                 return [String(row.id), []];
                             }
@@ -1399,6 +1416,19 @@ export default function KeyAreas() {
                 setUsers(Array.isArray(list) ? list : []);
             } catch {
                 setUsers([]);
+            }
+        })();
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const pSvc = await getUserProfileService();
+                const profile = await pSvc.getProfile();
+                const id = profile?.id || profile?.userId || profile?.sub || null;
+                if (id) setCurrentUserId(id);
+            } catch {
+                // Keep null if profile fetch fails; auth guard will redirect on 401.
             }
         })();
     }, []);
@@ -3016,6 +3046,8 @@ export default function KeyAreas() {
             if (payload.completionDate) body.completionDate = payload.completionDate;
             // Allow task attachment if provided
             if (payload.taskId || payload.task_id) body.taskId = payload.taskId || payload.task_id;
+            // Allow delegation if provided
+            if (payload.delegatedToUserId) body.delegatedToUserId = payload.delegatedToUserId;
 
             if (payload.id) {
                 // update
@@ -4834,6 +4866,7 @@ export default function KeyAreas() {
                                                 goals={goals}
                                                 availableLists={availableListNumbers}
                                                 parentListNames={selectedKA ? listNames[selectedKA.id] : null}
+                                                currentUserId={currentUserId}
                                                 onSave={async (payload) => {
                                                     try {
                                                         const created = await api.createTask(payload);

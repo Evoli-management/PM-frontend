@@ -1357,7 +1357,7 @@ export default function DontForget() {
                                     task={selectedTask}
                                     goals={goals}
                                     users={users}
-                                    currentUserId={users && users[0] ? users[0].id : null}
+                                    currentUserId={null}
                                     // DontForget does not fetch activities; provide empty map
                                     activitiesByTask={{}}
                                     onBack={() => setSelectedTask(null)}
@@ -1805,7 +1805,7 @@ export default function DontForget() {
                                                         enableInlineEditing={!massEditingMode}
                                                         isSaving={savingIds.has(task.id)}
                                                         users={users}
-                                                        currentUserId={users && users[0] ? users[0].id : null}
+                                                        currentUserId={null}
                                                         isSelected={isSelected(task.id)}
                                                         onToggleSelect={() => toggleSelect(task.id)}
                                                         onOpenTask={() => openFullTaskView(task)}
@@ -1893,6 +1893,7 @@ export default function DontForget() {
                                             users={users}
                                             goals={goals}
                                             isDontForgetMode={true}
+                                            currentUserId={null}
                                     />
 
                                 <EditTaskModal

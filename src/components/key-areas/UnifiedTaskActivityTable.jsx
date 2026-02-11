@@ -237,7 +237,7 @@ export default function UnifiedTaskActivityTable({
                 delete activityUpdates.name;
             }
             
-            // Backend expects snake_case for dates
+            // Backend expects camelCase for dates
             if (updates.start_date !== undefined) {
                 activityUpdates.startDate = updates.start_date;
                 delete activityUpdates.start_date;
@@ -251,17 +251,15 @@ export default function UnifiedTaskActivityTable({
                 delete activityUpdates.due_date;
             }
             
-            // Map key area and assignee IDs (backend might not support these for activities)
-            if (updates.key_area_id !== undefined) {
-                delete activityUpdates.key_area_id;
-                delete activityUpdates.keyAreaId;
-            }
-            if (updates.assignee_id !== undefined || updates.responsible_id !== undefined) {
-                delete activityUpdates.assignee_id;
-                delete activityUpdates.responsible_id;
-                delete activityUpdates.assigneeId;
-                delete activityUpdates.responsibleId;
-            }
+            // Activities don't have key_area, list, or assignee fields (they inherit from parent task)
+            // Remove all unsupported fields
+            const unsupportedFields = [
+                'key_area_id', 'keyAreaId', 'keyArea',
+                'list', 'listIndex', 'list_index',
+                'assignee_id', 'responsible_id', 'assigneeId', 'responsibleId',
+                'assignee', 'responsible'
+            ];
+            unsupportedFields.forEach(field => delete activityUpdates[field]);
             
             onActivityUpdate(item.id || item.activity_id, activityUpdates);
         }
@@ -344,8 +342,16 @@ export default function UnifiedTaskActivityTable({
                         updates.delegatedToUserId = userId;
                     }
                 }
+            } else if (item.type === 'activity') {
+                // For activities, use delegatedToUserId (auto-creates delegation)
+                if (value && String(value) !== String(currentUserId)) {
+                    updates.delegatedToUserId = value;
+                } else {
+                    // Clear delegation if assigning to self or empty
+                    updates.delegatedToUserId = null;
+                }
             } else {
-                // Fallback for activities or empty value
+                // Fallback for empty value or unknown types
                 updates.assigneeId = value || null;
                 updates.assignee_id = value || null;
                 updates.responsibleId = value || null;
@@ -380,7 +386,8 @@ export default function UnifiedTaskActivityTable({
         }
         
         // For other views, show assignee/responsible
-        const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id;
+        // For activities, delegatedToUserId represents the assigned user
+        const id = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || item.delegatedToUserId || item.delegated_to_user_id;
         const user = users.find(u => String(u.id || u.member_id) === String(id));
         if (user) return `${user.name || user.firstname || ''} ${user.lastname || ''}`.trim();
         return item.assignee || item.responsible || '';
@@ -772,8 +779,11 @@ export default function UnifiedTaskActivityTable({
                             const endDateValue = toDateOnly(item.endDate || item.end_date);
                             const deadlineValueInput = toDateOnly(deadlineValue);
                             const keyAreaIdValue = item.keyAreaId || item.key_area_id || item.key_area || item.keyArea || '';
-                            const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || '';
-                            const responsibleNameValue = item.assignee || item.responsible || getUserName(responsibleIdValue);
+                            // For activities, delegatedToUserId represents the assigned user
+                            const responsibleIdValue = item.assigneeId || item.assignee_id || item.responsibleId || item.responsible_id || item.delegatedToUserId || item.delegated_to_user_id || '';
+                            const responsibleNameValue = viewTab === 'delegated'
+                                ? getResponsibleLabel(item)
+                                : (item.assignee || item.responsible || getUserName(responsibleIdValue));
                             const goalIdValue = item.goalId || item.goal_id || '';
                             
                             return (
@@ -1044,6 +1054,11 @@ export default function UnifiedTaskActivityTable({
                                             ) : (
                                                 <span>{getKeyAreaName(keyAreaIdValue)}</span>
                                             )}
+                                        </td>
+                                    )}
+                                    {columns.includes('responsible') && viewTab === 'delegated' && (
+                                        <td className="p-2 text-xs">
+                                            <span>{responsibleNameValue || '—'}</span>
                                         </td>
                                     )}
                                     {columns.includes('responsible') && viewTab !== 'delegated' && (
