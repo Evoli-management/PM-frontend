@@ -138,6 +138,11 @@ const api = {
                 assignee: t.assignee ?? null,
                 duration: t.duration ?? null,
                 key_area_id: t.keyAreaId || t.key_area_id || keyAreaId,
+                // Ensure list_index is always present
+                list_index: t.listIndex ?? t.list_index ?? 1,
+                listIndex: t.listIndex ?? t.list_index ?? 1,
+                // Ensure goal_id is normalized
+                goal_id: t.goalId ?? t.goal_id ?? null,
             }));
         } catch (e) {
             if (e?.response?.status === 401) throw e;
@@ -241,12 +246,15 @@ const api = {
             assignee: updated.assignee ?? payload.assignee ?? null,
             duration: updated.duration ?? null,
             key_area_id: updated.keyAreaId || payload.keyAreaId,
+            // Ensure list_index from server response or payload is preserved
+            list_index: updated.listIndex ?? updated.list_index ?? payload.listIndex ?? payload.list_index ?? 1,
+            listIndex: updated.listIndex ?? updated.list_index ?? payload.listIndex ?? payload.list_index ?? 1,
+            // Ensure goal_id is preserved
+            goal_id: updated.goalId ?? updated.goal_id ?? payload.goalId ?? payload.goal_id ?? null,
         };
         // Carry over UI-only fields not persisted by backend so table/view keeps them
         const uiOnly = ((t) => ({
             tags: t.tags ?? "",
-            list_index: t.list_index ?? 1,
-            goal_id: t.goal_id ?? "",
             recurrence: t.recurrence ?? "",
             attachments: t.attachments ?? "",
             attachmentsFiles: t.attachmentsFiles ?? [],
@@ -1508,8 +1516,12 @@ export default function KeyAreas() {
         setAllTasks((prev) => prev.map(optimistic));
         markSaving(id, 2000);
 
-        // build patch
-        const patch = {};
+        // build patch - always preserve list_index and key_area_id
+        const patch = {
+            list_index: prevTask.list_index || prevTask.list || 1,
+            key_area_id: prevTask.key_area_id || prevTask.keyAreaId || null,
+        };
+        
         if (key === 'name') patch.title = value;
         else if (key === 'notes') patch.description = value;
         else if (key === 'assignee') patch.assignee = value;
@@ -2563,7 +2575,16 @@ export default function KeyAreas() {
 
     const visibleTasks = useMemo(() => {
         const isSearch = String(siteSearch || "").trim().length >= 2;
-        let arr = isSearch ? (searchResults || []) : allTasks.filter((t) => (t.list_index || 1) === taskTab);
+        let arr = isSearch 
+            ? (searchResults || []) 
+            : allTasks.filter((t) => {
+                // Filter by key area (if in a specific key area view)
+                if (selectedKA && String(t.key_area_id || t.keyAreaId) !== String(selectedKA.id)) {
+                    return false;
+                }
+                // Filter by list index
+                return (t.list_index || 1) === taskTab;
+            });
         // If not showing completed items, filter them out
         // ALSO: if in 'active-tasks' tab and activeFilter is 'active', filter out completed tasks
         if (!showCompleted || (viewTab === 'active-tasks' && activeFilter === 'active')) {
@@ -2594,7 +2615,7 @@ export default function KeyAreas() {
         // Site-wide search already filtered by query in the async fetch; apply quadrant filter if set
         if (quadrant !== "all") arr = arr.filter((t) => String(t.eisenhower_quadrant || "") === quadrant);
         return arr;
-    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter]);
+    }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter, selectedKA]);
 
     const handleTaskSort = (field) => {
         if (taskSortField === field) {
@@ -3053,6 +3074,18 @@ export default function KeyAreas() {
     // server returned updated task in `saved`
         // Update UI immediately with server payload (already normalized by api.updateTask)
         setAllTasks((prev) => prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)));
+        
+        // If key area changed, clear selectedTaskFull so user sees the task moved
+        const originalTask = allTasks.find((t) => t.id === saved.id);
+        const keyAreaChanged = originalTask && 
+            String(originalTask.key_area_id || originalTask.keyAreaId) !== String(saved.key_area_id || saved.keyAreaId);
+        
+        if (keyAreaChanged) {
+            // Task moved to different key area - clear selection and show success message
+            setSelectedTaskFull(null);
+            try { addToast && addToast({ type: 'success', message: 'Task moved to different key area' }); } catch (e) {}
+        }
+        
         await refreshActivitiesForTask(saved.id);
         setSelectedTask(null);
     };
@@ -3456,9 +3489,18 @@ export default function KeyAreas() {
                                     }
                                     onBack={() => setSelectedTaskFull(null)}
                                     onSave={async (payload) => {
+                                        const originalTask = allTasks.find((x) => x.id === payload.id);
                                         await handleSaveTask(payload);
                                         const updated = allTasks.find((x) => x.id === payload.id) || payload;
-                                        setSelectedTaskFull(updated);
+                                        
+                                        // If key area changed, selectedTaskFull is already cleared by handleSaveTask
+                                        const keyAreaChanged = originalTask && 
+                                            String(originalTask.key_area_id || originalTask.keyAreaId) !== 
+                                            String(payload.key_area_id || payload.keyAreaId);
+                                        
+                                        if (!keyAreaChanged) {
+                                            setSelectedTaskFull(updated);
+                                        }
                                     }}
                                     onDelete={async (tsk) => {
                                         await handleDeleteTask(tsk);
@@ -4831,9 +4873,26 @@ export default function KeyAreas() {
                                                 // ensure we always pass a definitive id into the modal's initialData
                                                 initialData={{ ...(taskForm || {}), id: editingTaskId || taskForm?.id || null }}
                                                 onSave={async (payload) => {
+                                                    const originalTask = allTasks.find((t) => t.id === (editingTaskId || payload.id));
                                                     await handleSaveTask(payload);
+                                                    
+                                                    // Check if key area or list changed
+                                                    const keyAreaChanged = originalTask && 
+                                                        String(originalTask.key_area_id || originalTask.keyAreaId) !== 
+                                                        String(payload.key_area_id || payload.keyAreaId);
+                                                    const listChanged = originalTask &&
+                                                        String(originalTask.list_index || originalTask.list) !== 
+                                                        String(payload.list_index || payload.list);
+                                                    
                                                     setEditingTaskId(null);
                                                     setShowTaskComposer(false);
+                                                    
+                                                    // Show appropriate feedback
+                                                    if (keyAreaChanged) {
+                                                        try { addToast && addToast({ type: 'success', message: 'Task moved to different key area' }); } catch (e) {}
+                                                    } else if (listChanged) {
+                                                        try { addToast && addToast({ type: 'success', message: 'Task moved to different list' }); } catch (e) {}
+                                                    }
                                                 }}
                                                 onCancel={() => { setShowTaskComposer(false); setEditingTaskId(null); }}
                                                 isSaving={false}
