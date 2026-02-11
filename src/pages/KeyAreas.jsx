@@ -1042,18 +1042,52 @@ export default function KeyAreas() {
                         // Get ALL delegated activities (both pending and accepted)
                         delegatedActivities = await activityDelegationService.getDelegatedToMe();
                         
-                        console.log('✅ getDelegatedToMe() returned:', { 
-                            tasks: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
-                            tasksPending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
-                            tasksAccepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
-                            activities: Array.isArray(delegatedActivities) ? delegatedActivities.length : 0,
-                            activitiesPending: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'pending').length,
-                            activitiesAccepted: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted').length,
-                        });
-                        
                         // Normalize both tasks and activities with type indicator
                         const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
-                        const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));
+                        // For activities: normalize field names for display (text -> title, deadline -> dueDate)
+                        let normalizedActivities = (delegatedActivities || []).map(a => ({
+                            ...a,
+                            type: 'activity',
+                            title: a.title || a.text, // Use title if exists, otherwise text
+                            dueDate: a.dueDate || a.deadline || a.endDate, // Normalize deadline field
+                        }));
+                        
+                        // Deduplicate activities: for each unique (text + delegator) pair, keep ONE best version
+                        // Strategy: prefer accepted > pending, and for same status prefer one with taskId
+                        const activityGroups = new Map();
+                        for (const activity of normalizedActivities) {
+                            const actText = activity.title || activity.text || '';
+                            const delegator = activity.delegatedByUserId || activity.delegated_by_user_id || '';
+                            const key = `${actText}::${delegator}`;
+                            
+                            if (!activityGroups.has(key)) {
+                                activityGroups.set(key, []);
+                            }
+                            activityGroups.get(key).push(activity);
+                        }
+                        
+                        // For each group, select the best version (accepted > pending, with taskId > without)
+                        const dedupedActivities = [];
+                        for (const [key, group] of activityGroups) {
+                            // Separate by status
+                            const acceptedActivities = group.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted');
+                            const otherActivities = group.filter(a => (a.delegationStatus || a.delegation_status) !== 'accepted');
+                            
+                            let selectedActivity;
+                            if (acceptedActivities.length > 0) {
+                                // Prefer accepted. If multiple, prefer one with taskId
+                                const withTaskId = acceptedActivities.filter(a => a.taskId || a.task_id);
+                                selectedActivity = withTaskId.length > 0 ? withTaskId[0] : acceptedActivities[0];
+                            } else {
+                                // No accepted, use first from other statuses
+                                selectedActivity = otherActivities[0];
+                            }
+                            
+                            if (selectedActivity) {
+                                dedupedActivities.push(selectedActivity);
+                            }
+                        }
+                        normalizedActivities = dedupedActivities;
                         
                         // Combine all delegated items
                         const allDelegated = [...normalizedTasks, ...normalizedActivities];
@@ -1065,16 +1099,26 @@ export default function KeyAreas() {
                         );
                         setPendingDelegations(pending);
                         
-                        // Set all items for the bottom section (with filters)
-                        setAllTasks(allDelegated);
+                        // For delegated tab: separate tasks and activities
+                        // UnifiedTaskActivityTable expects tasks in 'tasks' prop and activities in 'activities' prop
+                        // to properly display the correct icons
+                        const delegatedTasks = allDelegated.filter(item => item.type === 'task');
+                        const delegatedActivityItems = allDelegated.filter(item => item.type === 'activity');
+                        
+                        // Set all items for the bottom section
+                        // Store activities grouped by empty key (since they're delegated, not linked to specific task view)
+                        setAllTasks(delegatedTasks);
+                        setActivitiesByTask({ '__delegated_activities': delegatedActivityItems });
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
                         delegatedActivities = [];
                         setPendingDelegations([]);
+                        setActivitiesByTask({});
                     }
 
-                    // Load activities for delegated tasks
+                    // Skip loading activities by task in delegated view - they're already included with taskId
+                    return;
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
                         (delegatedToMe || []).map(async (row) => {

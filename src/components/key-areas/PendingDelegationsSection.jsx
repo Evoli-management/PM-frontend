@@ -19,6 +19,7 @@ export default function PendingDelegationsSection({
   const [keyAreas, setKeyAreas] = useState([]);
   const [selectedKeyArea, setSelectedKeyArea] = useState('');
   const [keyAreaError, setKeyAreaError] = useState('');
+  // Accept mode: 'create-new' (default, add as new task), 'add-to-task' (attach as activity)
   const [acceptMode, setAcceptMode] = useState('create-new');
   const [selectedTaskForActivity, setSelectedTaskForActivity] = useState('');
   const [availableTasks, setAvailableTasks] = useState([]);
@@ -73,8 +74,8 @@ export default function PendingDelegationsSection({
         return;
       }
       // Fetch tasks for the selected key area
-      const { get } = await import('../../services/taskService');
-      const tasks = await get({ keyAreaId });
+      const taskService = (await import('../../services/taskService')).default;
+      const tasks = await taskService.list({ keyAreaId });
       setAvailableTasks(Array.isArray(tasks) ? tasks : []);
     } catch (error) {
       console.error('Failed to load tasks:', error);
@@ -88,6 +89,7 @@ export default function PendingDelegationsSection({
     setSelectedTaskForActivity('');
     setKeyAreaError('');
     setTaskError('');
+    // For activities, default to 'create-new' mode; for tasks, use 'create-new'
     setAcceptMode('create-new');
     if (Array.isArray(keyAreasFromProps) && keyAreasFromProps.length > 0) {
       setKeyAreas(keyAreasFromProps);
@@ -131,6 +133,7 @@ export default function PendingDelegationsSection({
         if (acceptMode === 'add-to-task' && selectedTaskForActivity) {
           payload.taskId = selectedTaskForActivity;
         }
+        // If 'create-new', do not add taskId to payload (backend should create a new task)
         await activityDelegationService.acceptDelegation(acceptingItem.id, payload);
         onTaskAccept?.(acceptingItem.id);
       }
@@ -400,7 +403,7 @@ export default function PendingDelegationsSection({
                 />
               </div>
 
-              {/* Task Selector (Only for Activities) */}
+              {/* Accept Mode Selector (Only for Activities) */}
               {acceptingItem?.type === 'activity' && (
                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -413,15 +416,11 @@ export default function PendingDelegationsSection({
                         name="accept-mode"
                         value="create-new"
                         checked={acceptMode === 'create-new'}
-                        onChange={(e) => {
-                          setAcceptMode(e.target.value);
-                          setSelectedTaskForActivity('');
-                          setTaskError('');
-                        }}
+                        onChange={(e) => setAcceptMode(e.target.value)}
                         className="mr-2"
                       />
                       <span className="text-sm text-gray-700">
-                        Create as new standalone activity
+                        Add as <b>new Task</b> in Key Area
                       </span>
                     </label>
                     <label className="flex items-center">
@@ -438,8 +437,7 @@ export default function PendingDelegationsSection({
                       </span>
                     </label>
                   </div>
-
-                  {/* Task Selector (shown only in add-to-task mode) */}
+                  {/* Task Selector (only if add-to-task is chosen) */}
                   {acceptMode === 'add-to-task' && (
                     <div className="mt-3">
                       <select
