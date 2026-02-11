@@ -73,8 +73,8 @@ export default function PendingDelegationsSection({
         return;
       }
       // Fetch tasks for the selected key area
-      const { get } = await import('../../services/taskService');
-      const tasks = await get({ keyAreaId });
+      const taskService = (await import('../../services/taskService')).default;
+      const tasks = await taskService.list({ keyAreaId });
       setAvailableTasks(Array.isArray(tasks) ? tasks : []);
     } catch (error) {
       console.error('Failed to load tasks:', error);
@@ -88,7 +88,8 @@ export default function PendingDelegationsSection({
     setSelectedTaskForActivity('');
     setKeyAreaError('');
     setTaskError('');
-    setAcceptMode('create-new');
+    // For activities, default to 'add-to-task' mode; for tasks, use 'create-new'
+    setAcceptMode(item.type === 'activity' ? 'add-to-task' : 'create-new');
     if (Array.isArray(keyAreasFromProps) && keyAreasFromProps.length > 0) {
       setKeyAreas(keyAreasFromProps);
     } else {
@@ -113,7 +114,8 @@ export default function PendingDelegationsSection({
     }
 
     // Validate task selector for activity add-to-task mode
-    if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task' && !selectedTaskForActivity) {
+// For activities, require task selection (they must be added to existing tasks)
+      if (acceptingItem?.type === 'activity' && !selectedTaskForActivity) {
       setTaskError('Please select a task to add this activity to');
       return;
     }
@@ -127,8 +129,8 @@ export default function PendingDelegationsSection({
         await taskDelegationService.acceptDelegation(acceptingItem.id, payload);
         onTaskAccept?.(acceptingItem.id);
       } else {
-        // Accept activity delegation
-        if (acceptMode === 'add-to-task' && selectedTaskForActivity) {
+        // Accept activity delegation - always add to existing task
+        if (selectedTaskForActivity) {
           payload.taskId = selectedTaskForActivity;
         }
         await activityDelegationService.acceptDelegation(acceptingItem.id, payload);
@@ -411,23 +413,6 @@ export default function PendingDelegationsSection({
                       <input
                         type="radio"
                         name="accept-mode"
-                        value="create-new"
-                        checked={acceptMode === 'create-new'}
-                        onChange={(e) => {
-                          setAcceptMode(e.target.value);
-                          setSelectedTaskForActivity('');
-                          setTaskError('');
-                        }}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-700">
-                        Create as new standalone activity
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="accept-mode"
                         value="add-to-task"
                         checked={acceptMode === 'add-to-task'}
                         onChange={(e) => setAcceptMode(e.target.value)}
@@ -439,8 +424,8 @@ export default function PendingDelegationsSection({
                     </label>
                   </div>
 
-                  {/* Task Selector (shown only in add-to-task mode) */}
-                  {acceptMode === 'add-to-task' && (
+                  {/* Task Selector (shown only for activities) */}
+                  {acceptingItem?.type === 'activity' && (
                     <div className="mt-3">
                       <select
                         value={selectedTaskForActivity}

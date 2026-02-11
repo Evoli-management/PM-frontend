@@ -1036,7 +1036,13 @@ export default function KeyAreas() {
                         
                         // Normalize both tasks and activities with type indicator
                         const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
-                        const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));
+                        // For activities: normalize field names for display (text -> title, deadline -> dueDate)
+                        const normalizedActivities = (delegatedActivities || []).map(a => ({
+                            ...a,
+                            type: 'activity',
+                            title: a.title || a.text, // Use title if exists, otherwise text
+                            dueDate: a.dueDate || a.deadline || a.endDate, // Normalize deadline field
+                        }));
                         
                         // Combine all delegated items
                         const allDelegated = [...normalizedTasks, ...normalizedActivities];
