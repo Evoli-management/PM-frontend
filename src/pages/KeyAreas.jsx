@@ -1034,15 +1034,6 @@ export default function KeyAreas() {
                         // Get ALL delegated activities (both pending and accepted)
                         delegatedActivities = await activityDelegationService.getDelegatedToMe();
                         
-                        console.log('✅ getDelegatedToMe() returned:', { 
-                            tasks: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
-                            tasksPending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
-                            tasksAccepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
-                            activities: Array.isArray(delegatedActivities) ? delegatedActivities.length : 0,
-                            activitiesPending: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'pending').length,
-                            activitiesAccepted: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted').length,
-                        });
-                        
                         // Normalize both tasks and activities with type indicator
                         const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
                         const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));

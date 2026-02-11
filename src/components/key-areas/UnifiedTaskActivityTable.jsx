@@ -81,16 +81,6 @@ export default function UnifiedTaskActivityTable({
             });
         }
         
-        // Debug: Log delegation status for delegated view
-        if (viewTab === 'delegated') {
-            console.log('🔍 Delegated tasks delegation status:', items.filter(i => i.type === 'task').map(t => ({
-                id: t.id,
-                title: t.title,
-                delegationStatus: t.delegationStatus,
-                delegation_status: t.delegation_status
-            })));
-        }
-        
         return items;
     }, [tasks, activities, showTasks, showActivities, viewTab]);
 

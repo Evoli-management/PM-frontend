@@ -8,7 +8,6 @@ class UserProfileService {
      */
     async getProfile() {
         const res = await apiClient.get("/user/profile");
-        console.log('Raw API response from /user/profile:', res.data);
         return res.data;
     }
 
