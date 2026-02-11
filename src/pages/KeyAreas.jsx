@@ -1044,30 +1044,48 @@ export default function KeyAreas() {
                             dueDate: a.dueDate || a.deadline || a.endDate, // Normalize deadline field
                         }));
                         
-                        // Deduplicate accepted activities: when an activity is accepted and added to existing task,
-                        // backend creates two records (original + new copy with taskId). Keep only the one with taskId.
+                        // Deduplicate accepted activities by grouping and keeping only those with taskId
+                        // Group activities by (text + delegator)
+                        const activityGroups = new Map();
+                        for (const activity of normalizedActivities) {
+                            const actText = activity.title || activity.text || '';
+                            const delegator = activity.delegatedByUserId || activity.delegated_by_user_id || '';
+                            const key = `${actText}::${delegator}`;
+                            
+                            if (!activityGroups.has(key)) {
+                                activityGroups.set(key, []);
+                            }
+                            activityGroups.get(key).push(activity);
+                        }
+                        
+                        // Filter: for each group, if accepted activities exist with taskId, keep only those
                         normalizedActivities = normalizedActivities.filter(activity => {
-                            if ((activity.delegationStatus || activity.delegation_status) !== 'accepted') {
-                                return true; // Keep all non-accepted activities
+                            // Always keep non-accepted activities (pending, rejected, etc)
+                            const status = activity.delegationStatus || activity.delegation_status;
+                            if (status !== 'accepted') {
+                                return true;
                             }
-                            // For accepted activities, check if there's a newer version with taskId
-                            const hasTaskId = activity.taskId || activity.task_id;
-                            if (hasTaskId) {
-                                return true; // Keep accepted activities that are linked to a task
+                            
+                            // For accepted activities, find the group and check for taskId versions
+                            const actText = activity.title || activity.text || '';
+                            const delegator = activity.delegatedByUserId || activity.delegated_by_user_id || '';
+                            const key = `${actText}::${delegator}`;
+                            const group = activityGroups.get(key) || [];
+                            
+                            // Get accepted activities in this group
+                            const acceptedInGroup = group.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted');
+                            if (acceptedInGroup.length === 0) return true;
+                            
+                            // Check if ANY activity in the group has taskId
+                            const hasTaskIdInGroup = acceptedInGroup.some(a => a.taskId || a.task_id);
+                            
+                            if (hasTaskIdInGroup) {
+                                // Keep this activity ONLY if it has taskId
+                                return !!(activity.taskId || activity.task_id);
+                            } else {
+                                // No taskId versions exist, keep all accepted activities
+                                return true;
                             }
-                            // Check if there's another accepted activity with same text/delegator that HAS taskId
-                            const duplicateExists = normalizedActivities.some(other => {
-                                const otherText = other.title || other.text;
-                                const currentText = activity.title || activity.text;
-                                const otherTaskId = other.taskId || other.task_id;
-                                const otherStatus = other.delegationStatus || other.delegation_status;
-                                const sameText = otherText === currentText;
-                                const sameDelegator = (other.delegatedByUserId || other.delegated_by_user_id) === 
-                                                     (activity.delegatedByUserId || activity.delegated_by_user_id);
-                                const isAccepted = otherStatus === 'accepted';
-                                return sameText && sameDelegator && isAccepted && otherTaskId;
-                            });
-                            return !duplicateExists; // Remove this activity if a newer version with taskId exists
                         });
                         
                         // Combine all delegated items
