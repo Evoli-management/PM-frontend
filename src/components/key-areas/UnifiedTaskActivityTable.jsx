@@ -51,7 +51,6 @@ export default function UnifiedTaskActivityTable({
     const [userTasks, setUserTasks] = useState([]); // For accept-into-task feature
     const [selectedKeyArea, setSelectedKeyArea] = useState('');
     const [selectedTaskForActivity, setSelectedTaskForActivity] = useState(''); // For accept-into-task
-    const [acceptMode, setAcceptMode] = useState('new-task'); // 'new-task' or 'attach-activity'
     const [respondingTaskId, setRespondingTaskId] = useState(null);
 
     // Flatten tasks and activities into single array
@@ -1225,46 +1224,16 @@ export default function UnifiedTaskActivityTable({
                                     ))}
                                 </select>
                             </div>
-
-                            {/* Accept mode radio buttons for activities */}
+                            
+                            {/* Task selector for activities (accept-into-task feature) */}
                             {acceptingActivity && selectedKeyArea && (
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        How would you like to proceed?
+                                        Add to Existing Task (Optional)
                                     </label>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="inline-flex items-center">
-                                            <input
-                                                type="radio"
-                                                className="form-radio"
-                                                name="acceptMode"
-                                                value="new-task"
-                                                checked={acceptMode === 'new-task'}
-                                                onChange={() => setAcceptMode('new-task')}
-                                            />
-                                            <span className="ml-2">Add as a new Task in Key Area</span>
-                                        </label>
-                                        <label className="inline-flex items-center">
-                                            <input
-                                                type="radio"
-                                                className="form-radio"
-                                                name="acceptMode"
-                                                value="attach-activity"
-                                                checked={acceptMode === 'attach-activity'}
-                                                onChange={() => setAcceptMode('attach-activity')}
-                                            />
-                                            <span className="ml-2">Attach as an Activity to an existing Task</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Task selector for activities (only if attach-activity mode) */}
-                            {acceptingActivity && selectedKeyArea && acceptMode === 'attach-activity' && (
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Select Task to Attach Activity
-                                    </label>
+                                    <p className="text-xs text-gray-400 mb-2">
+                                        Leave empty to convert activity into a new task, or select a task to add this activity to it
+                                    </p>
                                     <select
                                         value={selectedTaskForActivity}
                                         onChange={(e) => setSelectedTaskForActivity(e.target.value)}
@@ -1272,7 +1241,7 @@ export default function UnifiedTaskActivityTable({
                                                  bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
                                                  focus:border-transparent"
                                     >
-                                        <option value="">-- Select a Task --</option>
+                                        <option value="">-- Create New Task --</option>
                                         {userTasks.map((task) => (
                                             <option key={task.id} value={task.id}>
                                                 {task.title}
