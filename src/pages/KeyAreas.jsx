@@ -1044,8 +1044,8 @@ export default function KeyAreas() {
                             dueDate: a.dueDate || a.deadline || a.endDate, // Normalize deadline field
                         }));
                         
-                        // Deduplicate accepted activities by grouping and keeping only those with taskId
-                        // Group activities by (text + delegator)
+                        // Deduplicate activities: for each unique (text + delegator) pair, keep ONE best version
+                        // Strategy: prefer accepted > pending, and for same status prefer one with taskId
                         const activityGroups = new Map();
                         for (const activity of normalizedActivities) {
                             const actText = activity.title || activity.text || '';
@@ -1058,35 +1058,28 @@ export default function KeyAreas() {
                             activityGroups.get(key).push(activity);
                         }
                         
-                        // Filter: for each group, if accepted activities exist with taskId, keep only those
-                        normalizedActivities = normalizedActivities.filter(activity => {
-                            // Always keep non-accepted activities (pending, rejected, etc)
-                            const status = activity.delegationStatus || activity.delegation_status;
-                            if (status !== 'accepted') {
-                                return true;
-                            }
+                        // For each group, select the best version (accepted > pending, with taskId > without)
+                        const dedupedActivities = [];
+                        for (const [key, group] of activityGroups) {
+                            // Separate by status
+                            const acceptedActivities = group.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted');
+                            const otherActivities = group.filter(a => (a.delegationStatus || a.delegation_status) !== 'accepted');
                             
-                            // For accepted activities, find the group and check for taskId versions
-                            const actText = activity.title || activity.text || '';
-                            const delegator = activity.delegatedByUserId || activity.delegated_by_user_id || '';
-                            const key = `${actText}::${delegator}`;
-                            const group = activityGroups.get(key) || [];
-                            
-                            // Get accepted activities in this group
-                            const acceptedInGroup = group.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted');
-                            if (acceptedInGroup.length === 0) return true;
-                            
-                            // Check if ANY activity in the group has taskId
-                            const hasTaskIdInGroup = acceptedInGroup.some(a => a.taskId || a.task_id);
-                            
-                            if (hasTaskIdInGroup) {
-                                // Keep this activity ONLY if it has taskId
-                                return !!(activity.taskId || activity.task_id);
+                            let selectedActivity;
+                            if (acceptedActivities.length > 0) {
+                                // Prefer accepted. If multiple, prefer one with taskId
+                                const withTaskId = acceptedActivities.filter(a => a.taskId || a.task_id);
+                                selectedActivity = withTaskId.length > 0 ? withTaskId[0] : acceptedActivities[0];
                             } else {
-                                // No taskId versions exist, keep all accepted activities
-                                return true;
+                                // No accepted, use first from other statuses
+                                selectedActivity = otherActivities[0];
                             }
-                        });
+                            
+                            if (selectedActivity) {
+                                dedupedActivities.push(selectedActivity);
+                            }
+                        }
+                        normalizedActivities = dedupedActivities;
                         
                         // Combine all delegated items
                         const allDelegated = [...normalizedTasks, ...normalizedActivities];
