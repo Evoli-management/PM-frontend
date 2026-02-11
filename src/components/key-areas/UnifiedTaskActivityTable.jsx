@@ -1229,25 +1229,56 @@ export default function UnifiedTaskActivityTable({
                             {acceptingActivity && selectedKeyArea && (
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Add to Existing Task (Optional)
+                                        How would you like to proceed?
                                     </label>
-                                    <p className="text-xs text-gray-400 mb-2">
-                                        Leave empty to convert activity into a new task, or select a task to add this activity to it
-                                    </p>
-                                    <select
-                                        value={selectedTaskForActivity}
-                                        onChange={(e) => setSelectedTaskForActivity(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-600 rounded-lg 
-                                                 bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
-                                                 focus:border-transparent"
-                                    >
-                                        <option value="">-- Create New Task --</option>
-                                        {userTasks.map((task) => (
-                                            <option key={task.id} value={task.id}>
-                                                {task.title}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                name="accept-activity-mode"
+                                                value="new-task"
+                                                checked={!selectedTaskForActivity}
+                                                onChange={() => setSelectedTaskForActivity('')}
+                                            />
+                                            <span className="text-gray-200">Add as <b>new Task</b> in Key Area</span>
+                                        </label>
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                name="accept-activity-mode"
+                                                value="attach-task"
+                                                checked={!!selectedTaskForActivity}
+                                                onChange={() => {
+                                                    if (userTasks.length > 0) setSelectedTaskForActivity(userTasks[0].id);
+                                                }}
+                                            />
+                                            <span className="text-gray-200">Attach as <b>Activity</b> under an existing Task</span>
+                                        </label>
+                                    </div>
+                                    {/* Only show task select if "Attach as Activity" is chosen */}
+                                    {!!selectedTaskForActivity && (
+                                        <div className="mt-2 p-2 border-l-4 border-orange-400 bg-orange-100 bg-opacity-10 rounded">
+                                            <label className="block text-xs font-medium text-orange-300 mb-1">
+                                                Select Task to attach Activity
+                                            </label>
+                                            <select
+                                                value={selectedTaskForActivity}
+                                                onChange={(e) => setSelectedTaskForActivity(e.target.value)}
+                                                className="w-full px-3 py-2 border border-gray-600 rounded-lg 
+                                                         bg-[#34495e] text-white focus:ring-2 focus:ring-blue-500 
+                                                         focus:border-transparent"
+                                            >
+                                                {userTasks.map((task) => (
+                                                    <option key={task.id} value={task.id}>
+                                                        {task.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="text-xs text-orange-300 mt-1">
+                                                The activity will be added under the selected task.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
