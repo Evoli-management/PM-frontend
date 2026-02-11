@@ -1037,12 +1037,38 @@ export default function KeyAreas() {
                         // Normalize both tasks and activities with type indicator
                         const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
                         // For activities: normalize field names for display (text -> title, deadline -> dueDate)
-                        const normalizedActivities = (delegatedActivities || []).map(a => ({
+                        let normalizedActivities = (delegatedActivities || []).map(a => ({
                             ...a,
                             type: 'activity',
                             title: a.title || a.text, // Use title if exists, otherwise text
                             dueDate: a.dueDate || a.deadline || a.endDate, // Normalize deadline field
                         }));
+                        
+                        // Deduplicate accepted activities: when an activity is accepted and added to existing task,
+                        // backend creates two records (original + new copy with taskId). Keep only the one with taskId.
+                        normalizedActivities = normalizedActivities.filter(activity => {
+                            if ((activity.delegationStatus || activity.delegation_status) !== 'accepted') {
+                                return true; // Keep all non-accepted activities
+                            }
+                            // For accepted activities, check if there's a newer version with taskId
+                            const hasTaskId = activity.taskId || activity.task_id;
+                            if (hasTaskId) {
+                                return true; // Keep accepted activities that are linked to a task
+                            }
+                            // Check if there's another accepted activity with same text/delegator that HAS taskId
+                            const duplicateExists = normalizedActivities.some(other => {
+                                const otherText = other.title || other.text;
+                                const currentText = activity.title || activity.text;
+                                const otherTaskId = other.taskId || other.task_id;
+                                const otherStatus = other.delegationStatus || other.delegation_status;
+                                const sameText = otherText === currentText;
+                                const sameDelegator = (other.delegatedByUserId || other.delegated_by_user_id) === 
+                                                     (activity.delegatedByUserId || activity.delegated_by_user_id);
+                                const isAccepted = otherStatus === 'accepted';
+                                return sameText && sameDelegator && isAccepted && otherTaskId;
+                            });
+                            return !duplicateExists; // Remove this activity if a newer version with taskId exists
+                        });
                         
                         // Combine all delegated items
                         const allDelegated = [...normalizedTasks, ...normalizedActivities];
