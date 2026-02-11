@@ -36,6 +36,8 @@ import {
     mapUiStatusToServer,
     mapServerStatusToUi,
     normalizeActivity,
+    resolveAssignee,
+    selectedUserIdToPersistValue,
 } from '../utils/keyareasHelpers';
 
 // Lazy getters for services to allow code-splitting and avoid circular imports
@@ -681,6 +683,80 @@ export default function KeyAreas() {
         }
     };
 
+    const updateActivityField = async (activity, taskId, key, value) => {
+        const tid = String(taskId || activity?.taskId || activity?.task_id || '');
+        if (!tid) return;
+        const prevList = Array.isArray(activitiesByTask[tid]) ? activitiesByTask[tid].slice() : [];
+
+        const optimistic = (a) => {
+            if (a.id !== activity.id) return a;
+            if (key === 'status') return { ...a, status: value };
+            if (key === 'priority') return { ...a, priority: value };
+            if (key === 'start_date' || key === 'end_date' || key === 'deadline') return { ...a, [key]: value };
+            if (key === 'assignee') return { ...a, assignee: value };
+            return { ...a, [key]: value };
+        };
+
+        setActivitiesByTask((prev) => ({ ...prev, [tid]: (prev[tid] || []).map(optimistic) }));
+        setSavingActivityIds((s) => new Set([...s, activity.id]));
+
+        try {
+            if (key === 'assignee') {
+                const ts = await getTaskService();
+                let valueToSend = value;
+                try {
+                    valueToSend = selectedUserIdToPersistValue(value, users, currentUserId);
+                } catch (err) {}
+
+                const updatedTask = await ts.update(taskId, { assignee: valueToSend });
+                setSelectedTaskInPanel((prev) => (prev && String(prev.id) === String(updatedTask.id) ? { ...prev, ...updatedTask } : prev));
+                setAllTasks((prev) => (Array.isArray(prev) ? prev.map((t) => (String(t.id) === String(updatedTask.id) ? { ...t, ...updatedTask } : t)) : prev));
+                setActivitiesByTask((prev) => ({
+                    ...prev,
+                    [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, assignee: valueToSend } : a)),
+                }));
+                addToast && addToast({ title: 'Saved', variant: 'success' });
+            } else {
+                const svc = await getActivityService();
+                const body = {};
+
+                if (key === 'status') body.status = mapUiStatusToServer(value);
+                else if (key === 'priority') body.priority = value;
+                else if (key === 'start_date' || key === 'end_date' || key === 'deadline') {
+                    if (!value) body[key] = null;
+                    else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+                        try {
+                            const [y, m, d] = String(value).split('-').map((s) => parseInt(s, 10));
+                            body[key] = new Date(Date.UTC(y, m - 1, d)).toISOString();
+                        } catch (err) {
+                            body[key] = String(value);
+                        }
+                    } else {
+                        body[key] = String(value);
+                    }
+                } else body[key] = value;
+
+                const updated = await svc.update(activity.id, body);
+                const norm = normalizeActivity(updated || {});
+                setActivitiesByTask((prev) => ({
+                    ...prev,
+                    [tid]: (prev[tid] || []).map((a) => (a.id === activity.id ? { ...a, ...norm } : a)),
+                }));
+                addToast && addToast({ title: 'Saved', variant: 'success' });
+            }
+        } catch (error) {
+            console.error('Failed to update activity', error);
+            setActivitiesByTask((prev) => ({ ...prev, [tid]: prevList }));
+            addToast && addToast({ title: 'Failed to update activity', variant: 'error' });
+        } finally {
+            setSavingActivityIds((s) => {
+                const copy = new Set(s);
+                copy.delete(activity.id);
+                return copy;
+            });
+        }
+    };
+
     // Mass edit selection & form state
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [bulkForm, setBulkForm] = useState({
@@ -692,6 +768,30 @@ export default function KeyAreas() {
         end_date: "",
     });
     const [sortBy, setSortBy] = useState("manual");
+    const [taskSortField, setTaskSortField] = useState(() => {
+        try {
+            return window.localStorage.getItem('keyareas.taskSortField') || null;
+        } catch (_) {}
+        return null;
+    });
+    const [taskSortDirection, setTaskSortDirection] = useState(() => {
+        try {
+            return window.localStorage.getItem('keyareas.taskSortDirection') || null;
+        } catch (_) {}
+        return null;
+    });
+    const [activitySortField, setActivitySortField] = useState(() => {
+        try {
+            return window.localStorage.getItem('keyareas.activitySortField') || null;
+        } catch (_) {}
+        return null;
+    });
+    const [activitySortDirection, setActivitySortDirection] = useState(() => {
+        try {
+            return window.localStorage.getItem('keyareas.activitySortDirection') || null;
+        } catch (_) {}
+        return null;
+    });
     const [filterStatus, setFilterStatus] = useState("all");
     const [filterAssignee, setFilterAssignee] = useState("");
     const [filterTag, setFilterTag] = useState("");
@@ -743,6 +843,47 @@ export default function KeyAreas() {
         } catch (_) {}
     }, [showCompleted]);
 
+    // Persist task sort state to localStorage
+    useEffect(() => {
+        try {
+            if (taskSortField) {
+                window.localStorage.setItem('keyareas.taskSortField', taskSortField);
+            } else {
+                window.localStorage.removeItem('keyareas.taskSortField');
+            }
+        } catch (_) {}
+    }, [taskSortField]);
+
+    useEffect(() => {
+        try {
+            if (taskSortDirection) {
+                window.localStorage.setItem('keyareas.taskSortDirection', taskSortDirection);
+            } else {
+                window.localStorage.removeItem('keyareas.taskSortDirection');
+            }
+        } catch (_) {}
+    }, [taskSortDirection]);
+
+    useEffect(() => {
+        try {
+            if (activitySortField) {
+                window.localStorage.setItem('keyareas.activitySortField', activitySortField);
+            } else {
+                window.localStorage.removeItem('keyareas.activitySortField');
+            }
+        } catch (_) {}
+    }, [activitySortField]);
+
+    useEffect(() => {
+        try {
+            if (activitySortDirection) {
+                window.localStorage.setItem('keyareas.activitySortDirection', activitySortDirection);
+            } else {
+                window.localStorage.removeItem('keyareas.activitySortDirection');
+            }
+        } catch (_) {}
+    }, [activitySortDirection]);
+
     // When siteSearch changes, perform a site-wide search across all Key Areas (debounced)
     useEffect(() => {
         const q = String(siteSearch || "").trim();
@@ -786,6 +927,8 @@ export default function KeyAreas() {
     const [editingActivityId, setEditingActivityId] = useState(null);
     const [activityNameEditId, setActivityNameEditId] = useState(null);
     const [activityNameEditValue, setActivityNameEditValue] = useState('');
+    const [activityDateEditId, setActivityDateEditId] = useState(null);
+    const activityDateRefs = useRef({});
     const [showTaskHelp, setShowTaskHelp] = useState(false);
     const [listNames, setListNames] = useState({}); // { [keyAreaId]: { [index]: name } }
     const [showViewMenu, setShowViewMenu] = useState(false);
@@ -2409,37 +2552,140 @@ export default function KeyAreas() {
         return arr;
     }, [allTasks, taskTab, searchTerm, quadrant, siteSearch, searchResults, showCompleted, filterStatus, filterAssignee, filterTag, viewTab, activeFilter]);
 
+    const handleTaskSort = (field) => {
+        if (taskSortField === field) {
+            if (taskSortDirection === 'asc') {
+                setTaskSortDirection('desc');
+            } else if (taskSortDirection === 'desc') {
+                setTaskSortField(null);
+                setTaskSortDirection(null);
+            }
+        } else {
+            setTaskSortField(field);
+            setTaskSortDirection('asc');
+        }
+    };
+
+    const handleActivitySort = (field) => {
+        if (activitySortField === field) {
+            if (activitySortDirection === 'asc') {
+                setActivitySortDirection('desc');
+            } else if (activitySortDirection === 'desc') {
+                setActivitySortField(null);
+                setActivitySortDirection(null);
+            }
+        } else {
+            setActivitySortField(field);
+            setActivitySortDirection('asc');
+        }
+    };
+
     const sortedTasks = useMemo(() => {
         const arr = Array.isArray(visibleTasks) ? visibleTasks.slice() : [];
-        switch (sortBy) {
-            case "date":
-                arr.sort((a, b) => {
-                    const ad = a.deadline || a.due_date || a.dueDate || a.end_date || null;
-                    const bd = b.deadline || b.due_date || b.dueDate || b.end_date || null;
-                    if (!ad && !bd) return 0;
-                    if (!ad) return 1;
-                    if (!bd) return -1;
-                    return new Date(ad).getTime() - new Date(bd).getTime();
-                });
-                break;
-            case "priority":
-                arr.sort((a, b) => getPriorityLevel(b.priority) - getPriorityLevel(a.priority));
-                break;
-            case "status":
-                {
-                    const order = { open: 0, in_progress: 1, done: 2, completed: 2, cancelled: 3, blocked: 3 };
-                    arr.sort(
-                        (a, b) =>
-                            (order[String(a.status || "").toLowerCase()] ?? 99) -
-                            (order[String(b.status || "").toLowerCase()] ?? 99),
-                    );
+        
+        // Apply column header sorting first if active
+        if (taskSortField && taskSortDirection) {
+            arr.sort((a, b) => {
+                let aVal, bVal;
+                
+                switch (taskSortField) {
+                    case 'title':
+                        aVal = (a.title || a.name || '').toLowerCase();
+                        bVal = (b.title || b.name || '').toLowerCase();
+                        break;
+                    case 'responsible':
+                        aVal = (a.assignee || a.responsible || '').toLowerCase();
+                        bVal = (b.assignee || b.responsible || '').toLowerCase();
+                        break;
+                    case 'status':
+                        aVal = (a.status || '').toLowerCase();
+                        bVal = (b.status || '').toLowerCase();
+                        break;
+                    case 'priority':
+                        aVal = getPriorityLevel(a.priority);
+                        bVal = getPriorityLevel(b.priority);
+                        break;
+                    case 'quadrant':
+                        aVal = a.quadrant || 4;
+                        bVal = b.quadrant || 4;
+                        break;
+                    case 'start_date':
+                        aVal = a.start_date || a.startDate || '';
+                        bVal = b.start_date || b.startDate || '';
+                        break;
+                    case 'end_date':
+                        aVal = a.end_date || a.endDate || '';
+                        bVal = b.end_date || b.endDate || '';
+                        break;
+                    case 'deadline':
+                        aVal = a.deadline || a.due_date || a.dueDate || '';
+                        bVal = b.deadline || b.due_date || b.dueDate || '';
+                        break;
+                    case 'duration':
+                        const getDuration = (t) => {
+                            const start = t.start_date || t.startDate;
+                            const end = t.end_date || t.endDate;
+                            if (!start || !end) return 0;
+                            return new Date(end).getTime() - new Date(start).getTime();
+                        };
+                        aVal = getDuration(a);
+                        bVal = getDuration(b);
+                        break;
+                    case 'completed':
+                        aVal = a.completionDate || a.completion_date || '';
+                        bVal = b.completionDate || b.completion_date || '';
+                        break;
+                    default:
+                        return 0;
                 }
-                break;
-            default:
-                break;
+                
+                // Handle empty values
+                if (!aVal && !bVal) return 0;
+                if (!aVal) return 1;
+                if (!bVal) return -1;
+                
+                // Compare values
+                let comparison = 0;
+                if (typeof aVal === 'string' && typeof bVal === 'string') {
+                    comparison = aVal.localeCompare(bVal);
+                } else {
+                    comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                }
+                
+                return taskSortDirection === 'asc' ? comparison : -comparison;
+            });
+        } else {
+            // Apply dropdown sorting when no column sort is active
+            switch (sortBy) {
+                case "date":
+                    arr.sort((a, b) => {
+                        const ad = a.deadline || a.due_date || a.dueDate || a.end_date || null;
+                        const bd = b.deadline || b.due_date || b.dueDate || b.end_date || null;
+                        if (!ad && !bd) return 0;
+                        if (!ad) return 1;
+                        if (!bd) return -1;
+                        return new Date(ad).getTime() - new Date(bd).getTime();
+                    });
+                    break;
+                case "priority":
+                    arr.sort((a, b) => getPriorityLevel(b.priority) - getPriorityLevel(a.priority));
+                    break;
+                case "status":
+                    {
+                        const order = { open: 0, in_progress: 1, done: 2, completed: 2, cancelled: 3, blocked: 3 };
+                        arr.sort(
+                            (a, b) =>
+                                (order[String(a.status || "").toLowerCase()] ?? 99) -
+                                (order[String(b.status || "").toLowerCase()] ?? 99),
+                        );
+                    }
+                    break;
+                default:
+                    break;
+            }
         }
         return arr;
-    }, [visibleTasks, sortBy]);
+    }, [visibleTasks, sortBy, taskSortField, taskSortDirection]);
 
     // Debug traces removed: temporary logging used during goal/title load debugging cleared.
 
@@ -3488,51 +3734,81 @@ export default function KeyAreas() {
                                                                             onChange={selectAllVisible}
                                                                         />
                                                                     </th>
-                                                                    <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">
-                                                                        Task
+                                                                    <th 
+                                                                        className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                                        onClick={() => handleTaskSort('title')}
+                                                                    >
+                                                                        Task {taskSortField === 'title' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.responsible && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Responsible
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('responsible')}
+                                                                        >
+                                                                            Responsible {taskSortField === 'responsible' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
-                                                                    <th className="px-3 py-2 text-left font-semibold">
-                                                                        Status
+                                                                    <th 
+                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                        onClick={() => handleTaskSort('status')}
+                                                                    >
+                                                                        Status {taskSortField === 'status' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.priority && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Priority
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('priority')}
+                                                                        >
+                                                                            Priority {taskSortField === 'priority' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {visibleColumns.quadrant && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Quadrant
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('quadrant')}
+                                                                        >
+                                                                            Quadrant {taskSortField === 'quadrant' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {/* Goal and Tags columns removed per UX request */}
                                                                     {visibleColumns.start_date && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Start Date
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('start_date')}
+                                                                        >
+                                                                            Start Date {taskSortField === 'start_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {visibleColumns.end_date && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            End date
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('end_date')}
+                                                                        >
+                                                                            End date {taskSortField === 'end_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {visibleColumns.deadline && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Deadline
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('deadline')}
+                                                                        >
+                                                                            Deadline {taskSortField === 'deadline' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {visibleColumns.duration && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Duration
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('duration')}
+                                                                        >
+                                                                            Duration {taskSortField === 'duration' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {visibleColumns.completed && (
-                                                                        <th className="px-3 py-2 text-left font-semibold">
-                                                                            Completed
+                                                                        <th 
+                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            onClick={() => handleTaskSort('completed')}
+                                                                        >
+                                                                            Completed {taskSortField === 'completed' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     {/* Actions column removed — actions available via row menu */}
@@ -3768,37 +4044,151 @@ export default function KeyAreas() {
                                                     <div className="mb-3">
                                                         {(() => {
                                                             const taskKey = String(selectedTaskInPanel.id);
-                                                            const list = (activitiesByTask[taskKey] || []).slice();
+                                                            let list = (activitiesByTask[taskKey] || []).slice();
+                                                            
+                                                            // Apply activity sorting
+                                                            if (activitySortField && activitySortDirection) {
+                                                                list.sort((a, b) => {
+                                                                    let aVal, bVal;
+                                                                    
+                                                                    switch (activitySortField) {
+                                                                        case 'name':
+                                                                            aVal = (a.name || a.activity || '').toLowerCase();
+                                                                            bVal = (b.name || b.activity || '').toLowerCase();
+                                                                            break;
+                                                                        case 'responsible':
+                                                                            aVal = (a.responsible || '').toLowerCase();
+                                                                            bVal = (b.responsible || '').toLowerCase();
+                                                                            break;
+                                                                        case 'status':
+                                                                            aVal = (a.status || '').toLowerCase();
+                                                                            bVal = (b.status || '').toLowerCase();
+                                                                            break;
+                                                                        case 'priority':
+                                                                            aVal = getPriorityLevel(a.priority);
+                                                                            bVal = getPriorityLevel(b.priority);
+                                                                            break;
+                                                                        case 'start_date':
+                                                                            aVal = a.start_date || a.startDate || '';
+                                                                            bVal = b.start_date || b.startDate || '';
+                                                                            break;
+                                                                        case 'end_date':
+                                                                            aVal = a.end_date || a.endDate || '';
+                                                                            bVal = b.end_date || b.endDate || '';
+                                                                            break;
+                                                                        case 'deadline':
+                                                                            aVal = a.deadline || '';
+                                                                            bVal = b.deadline || '';
+                                                                            break;
+                                                                        case 'duration':
+                                                                            const getDuration = (act) => {
+                                                                                const start = act.start_date || act.startDate;
+                                                                                const end = act.end_date || act.endDate;
+                                                                                if (!start || !end) return 0;
+                                                                                return new Date(end).getTime() - new Date(start).getTime();
+                                                                            };
+                                                                            aVal = getDuration(a);
+                                                                            bVal = getDuration(b);
+                                                                            break;
+                                                                        case 'completed':
+                                                                            aVal = a.completionDate || a.completion_date || '';
+                                                                            bVal = b.completionDate || b.completion_date || '';
+                                                                            break;
+                                                                        default:
+                                                                            return 0;
+                                                                    }
+                                                                    
+                                                                    // Handle empty values
+                                                                    if (!aVal && !bVal) return 0;
+                                                                    if (!aVal) return 1;
+                                                                    if (!bVal) return -1;
+                                                                    
+                                                                    // Compare values
+                                                                    let comparison = 0;
+                                                                    if (typeof aVal === 'string' && typeof bVal === 'string') {
+                                                                        comparison = aVal.localeCompare(bVal);
+                                                                    } else {
+                                                                        comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                                                                    }
+                                                                    
+                                                                    return activitySortDirection === 'asc' ? comparison : -comparison;
+                                                                });
+                                                            }
                                                             
                                                             return Array.isArray(list) && list.length > 0 ? (
                                                                 <div className="overflow-x-auto">
                                                                     <table className="min-w-full text-sm">
                                                                         <thead className="bg-slate-50 border border-slate-200 text-slate-700">
                                                                             <tr>
-                                                                                <th className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Activity</th>
+                                                                                <th 
+                                                                                    className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                                                    onClick={() => handleActivitySort('name')}
+                                                                                >
+                                                                                    Activity {activitySortField === 'name' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                </th>
                                                                                 {visibleColumns.responsible && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Responsible</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('responsible')}
+                                                                                    >
+                                                                                        Responsible {activitySortField === 'responsible' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.status !== false && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Status</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('status')}
+                                                                                    >
+                                                                                        Status {activitySortField === 'status' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.priority && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Priority</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('priority')}
+                                                                                    >
+                                                                                        Priority {activitySortField === 'priority' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.start_date && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Start date</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('start_date')}
+                                                                                    >
+                                                                                        Start date {activitySortField === 'start_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.end_date && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">End date</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('end_date')}
+                                                                                    >
+                                                                                        End date {activitySortField === 'end_date' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.deadline && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Deadline</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('deadline')}
+                                                                                    >
+                                                                                        Deadline {activitySortField === 'deadline' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.duration && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Duration</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('duration')}
+                                                                                    >
+                                                                                        Duration {activitySortField === 'duration' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                                 {visibleColumns.completed && (
-                                                                                    <th className="px-3 py-2 text-left font-semibold">Completed</th>
+                                                                                    <th 
+                                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                                        onClick={() => handleActivitySort('completed')}
+                                                                                    >
+                                                                                        Completed {activitySortField === 'completed' && (activitySortDirection === 'asc' ? '↑' : '↓')}
+                                                                                    </th>
                                                                                 )}
                                                                             </tr>
                                                                         </thead>
@@ -3848,12 +4238,17 @@ export default function KeyAreas() {
                                                                                     {visibleColumns.responsible && (
                                                                                         <td className="px-3 py-2 align-top text-slate-700">
                                                                                             {Array.isArray(users) && users.length ? (
-                                                                                                <select className="text-sm rounded-md border bg-white px-2 py-1" value={a.assignee || selectedTaskInPanel.assignee || ''} disabled>
+                                                                                                <select
+                                                                                                    className="text-sm rounded-md border bg-white px-2 py-1"
+                                                                                                    value={resolveAssignee({ activity: a, taskAssignee: selectedTaskInPanel?.assignee, users, currentUserId }).selectValue}
+                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'assignee', e.target.value)}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                >
                                                                                                     <option value="">—</option>
                                                                                                     {users.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
                                                                                                 </select>
                                                                                             ) : (
-                                                                                                a.assignee || selectedTaskInPanel.assignee || '—'
+                                                                                                (a.assignee || selectedTaskInPanel?.assignee || '—')
                                                                                             )}
                                                                                         </td>
                                                                                     )}
@@ -3861,7 +4256,13 @@ export default function KeyAreas() {
                                                                                         <td className="px-3 py-2 align-top">
                                                                                             <div className="flex items-center gap-2">
                                                                                                 <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                                                                <select value={a.status || 'open'} disabled className="text-xs rounded-md border bg-white px-2 py-1" aria-label={`Change status for activity ${a.text}`}>
+                                                                                                <select
+                                                                                                    value={a.status || 'open'}
+                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'status', e.target.value)}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    className="text-xs rounded-md border bg-white px-2 py-1"
+                                                                                                    aria-label={`Change status for activity ${a.text}`}
+                                                                                                >
                                                                                                     <option value="open">Open</option>
                                                                                                     <option value="in_progress">In progress</option>
                                                                                                     <option value="done">Done</option>
@@ -3871,12 +4272,17 @@ export default function KeyAreas() {
                                                                                     )}
                                                                                     {visibleColumns.priority && (
                                                                                         <td className="px-3 py-2 align-top">
-                                                                                            <select className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm" value={(function() {
+                                                                                            <select
+                                                                                                className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
+                                                                                                value={(function() {
                                                                                                 const raw = a.priority ?? selectedTaskInPanel.priority;
                                                                                                 if (raw === 1 || String(raw) === '1' || String(raw).toLowerCase() === 'low') return 'low';
                                                                                                 if (raw === 3 || String(raw) === '3' || String(raw).toLowerCase() === 'high') return 'high';
                                                                                                 return 'normal';
-                                                                                            })()} disabled>
+                                                                                            })()}
+                                                                                                onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'priority', e.target.value)}
+                                                                                                disabled={savingActivityIds.has(a.id)}
+                                                                                            >
                                                                                                 <option value="low">Low</option>
                                                                                                 <option value="normal">Normal</option>
                                                                                                 <option value="high">High</option>
@@ -3885,44 +4291,107 @@ export default function KeyAreas() {
                                                                                     )}
                                                                                     {visibleColumns.start_date && (
                                                                                         <td className="px-3 py-2 align-top">
-                                                                                            <button className="hover:bg-slate-50 rounded px-1" title="Edit start date" disabled>
-                                                                                                {(() => {
-                                                                                                    const date = a.start_date || a.startDate;
-                                                                                                    if (!date) return '—';
-                                                                                                    try {
-                                                                                                        const d = new Date(date);
-                                                                                                        return d.toISOString().split('T')[0];
-                                                                                                    } catch { return '—'; }
-                                                                                                })()}
-                                                                                            </button>
+                                                                                            <div className="relative inline-block">
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="hover:bg-slate-50 rounded px-2 py-0.5 text-sm flex items-center gap-1"
+                                                                                                    onClick={() => {
+                                                                                                        const key = `start_${a.id}`;
+                                                                                                        setActivityDateEditId(key);
+                                                                                                        setTimeout(() => {
+                                                                                                            try {
+                                                                                                                activityDateRefs.current[key]?.showPicker?.();
+                                                                                                                activityDateRefs.current[key]?.focus();
+                                                                                                            } catch (_) {}
+                                                                                                        }, 0);
+                                                                                                    }}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    title="Edit start date"
+                                                                                                >
+                                                                                                    <span>{toDateOnly(a.start_date || a.startDate) || '—'}</span>
+                                                                                                    {activityDateEditId === `start_${a.id}` ? (<span className="text-purple-600">📅</span>) : null}
+                                                                                                </button>
+                                                                                                <input
+                                                                                                    ref={(el) => { activityDateRefs.current[`start_${a.id}`] = el; }}
+                                                                                                    type="date"
+                                                                                                    className="absolute opacity-0"
+                                                                                                    value={toDateOnly(a.start_date || a.startDate) || ''}
+                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'start_date', e.target.value)}
+                                                                                                    onBlur={() => setActivityDateEditId(null)}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    style={{ width: 0, height: 0 }}
+                                                                                                />
+                                                                                            </div>
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.end_date && (
                                                                                         <td className="px-3 py-2 align-top">
-                                                                                            <button className="hover:bg-slate-50 rounded px-1" title="Edit end date" disabled>
-                                                                                                {(() => {
-                                                                                                    const date = a.end_date || a.endDate;
-                                                                                                    if (!date) return '—';
-                                                                                                    try {
-                                                                                                        const d = new Date(date);
-                                                                                                        return d.toISOString().split('T')[0];
-                                                                                                    } catch { return '—'; }
-                                                                                                })()}
-                                                                                            </button>
+                                                                                            <div className="relative inline-block">
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="hover:bg-slate-50 rounded px-2 py-0.5 text-sm flex items-center gap-1"
+                                                                                                    onClick={() => {
+                                                                                                        const key = `end_${a.id}`;
+                                                                                                        setActivityDateEditId(key);
+                                                                                                        setTimeout(() => {
+                                                                                                            try {
+                                                                                                                activityDateRefs.current[key]?.showPicker?.();
+                                                                                                                activityDateRefs.current[key]?.focus();
+                                                                                                            } catch (_) {}
+                                                                                                        }, 0);
+                                                                                                    }}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    title="Edit end date"
+                                                                                                >
+                                                                                                    <span>{toDateOnly(a.end_date || a.endDate) || '—'}</span>
+                                                                                                    {activityDateEditId === `end_${a.id}` ? (<span className="text-purple-600">📅</span>) : null}
+                                                                                                </button>
+                                                                                                <input
+                                                                                                    ref={(el) => { activityDateRefs.current[`end_${a.id}`] = el; }}
+                                                                                                    type="date"
+                                                                                                    className="absolute opacity-0"
+                                                                                                    value={toDateOnly(a.end_date || a.endDate) || ''}
+                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'end_date', e.target.value)}
+                                                                                                    onBlur={() => setActivityDateEditId(null)}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    style={{ width: 0, height: 0 }}
+                                                                                                />
+                                                                                            </div>
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.deadline && (
                                                                                         <td className="px-3 py-2 align-top">
-                                                                                            <button className="hover:bg-slate-50 rounded px-1" title="Edit deadline" disabled>
-                                                                                                {(() => {
-                                                                                                    const date = a.deadline;
-                                                                                                    if (!date) return '—';
-                                                                                                    try {
-                                                                                                        const d = new Date(date);
-                                                                                                        return d.toISOString().split('T')[0];
-                                                                                                    } catch { return '—'; }
-                                                                                                })()}
-                                                                                            </button>
+                                                                                            <div className="relative inline-block">
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="hover:bg-slate-50 rounded px-2 py-0.5 text-sm flex items-center gap-1"
+                                                                                                    onClick={() => {
+                                                                                                        const key = `deadline_${a.id}`;
+                                                                                                        setActivityDateEditId(key);
+                                                                                                        setTimeout(() => {
+                                                                                                            try {
+                                                                                                                activityDateRefs.current[key]?.showPicker?.();
+                                                                                                                activityDateRefs.current[key]?.focus();
+                                                                                                            } catch (_) {}
+                                                                                                        }, 0);
+                                                                                                    }}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    title="Edit deadline"
+                                                                                                >
+                                                                                                    <span>{toDateOnly(a.deadline) || '—'}</span>
+                                                                                                    {activityDateEditId === `deadline_${a.id}` ? (<span className="text-purple-600">📅</span>) : null}
+                                                                                                </button>
+                                                                                                <input
+                                                                                                    ref={(el) => { activityDateRefs.current[`deadline_${a.id}`] = el; }}
+                                                                                                    type="date"
+                                                                                                    className="absolute opacity-0"
+                                                                                                    value={toDateOnly(a.deadline) || ''}
+                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'deadline', e.target.value)}
+                                                                                                    onBlur={() => setActivityDateEditId(null)}
+                                                                                                    disabled={savingActivityIds.has(a.id)}
+                                                                                                    style={{ width: 0, height: 0 }}
+                                                                                                />
+                                                                                            </div>
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.duration && (

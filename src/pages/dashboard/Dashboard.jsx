@@ -396,7 +396,31 @@ export default function Dashboard() {
             try {
                 const widgets = e?.detail?.widgets;
                 if (widgets) {
-                    setPrefs((p) => ({ ...p, widgets: { ...p.widgets, ...widgets } }));
+                    setPrefs((p) => {
+                        const updatedWidgets = { ...p.widgets, ...widgets };
+                        let widgetOrder = Array.isArray(p.widgetOrder) ? p.widgetOrder.slice() : [];
+                        const lastSelected = { ...(p.lastSelected || {}) };
+                        
+                        // Add newly enabled widgets to the order and track timestamp
+                        Object.keys(widgets).forEach(key => {
+                            const wasEnabled = p.widgets[key];
+                            const isEnabled = widgets[key];
+                            
+                            if (!wasEnabled && isEnabled) {
+                                // Widget was toggled on - add to order if not present
+                                if (!widgetOrder.includes(key)) {
+                                    widgetOrder.push(key);
+                                }
+                                lastSelected[key] = Date.now();
+                            } else if (wasEnabled && !isEnabled) {
+                                // Widget was toggled off - remove from order
+                                widgetOrder = widgetOrder.filter(k => k !== key);
+                                delete lastSelected[key];
+                            }
+                        });
+                        
+                        return { ...p, widgets: updatedWidgets, widgetOrder, lastSelected };
+                    });
                 }
             } catch (err) {
                 console.warn('dashboard prefs handler error', err);
