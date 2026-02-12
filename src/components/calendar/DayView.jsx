@@ -50,7 +50,7 @@ function adjustEndInclusive(ed) {
     return ed;
   }
 }
-import { FaChevronDown, FaEdit, FaTrash } from "react-icons/fa";
+import { FaChevronDown, FaEdit, FaTrash, FaCheck } from "react-icons/fa";
 
 // DayView props: startHour, endHour, slotMinutes, hourHeight
 export default function DayView({
@@ -77,6 +77,12 @@ export default function DayView({
   onActivityDrop,
   onTaskClick,
   onActivityClick,
+  onTaskComplete,
+  onTaskEdit,
+  onTaskDelete,
+  onActivityComplete,
+  onActivityEdit,
+  onActivityDelete,
 }) {
 
   // Always render the full 24-hour grid; non-working slots will be greyed
@@ -126,6 +132,8 @@ export default function DayView({
   const [resizing, setResizing] = useState(null);
   // flag to suppress click immediately after a resize operation
   const justResizedRef = useRef(false);
+  // State to track which time slot is being dragged over
+  const [dragOverSlot, setDragOverSlot] = useState(null);
 
   const isToday = (() => {
     const d = currentDate || new Date();
@@ -356,7 +364,7 @@ export default function DayView({
           if (!ignore) setKeyAreaMap({});
         }
 
-        // Fetch activities for todos on this day
+        // Fetch activities for todos on this day AND unattached activities
         try {
           const todosForDay = (Array.isArray(tds) ? tds : []).filter((t) => {
             try {
@@ -371,7 +379,9 @@ export default function DayView({
             }
           });
           const uniqueIds = Array.from(new Set(todosForDay.map((t) => String(t.id))));
-          const pairs = await Promise.all(
+          
+          // Fetch activities attached to tasks
+          const taskActivityPairs = await Promise.all(
             uniqueIds.map(async (id) => {
               try {
                 const svc = await getActivityService();
@@ -382,8 +392,32 @@ export default function DayView({
               }
             }),
           );
-          const flat = ([]).concat(...pairs).filter(Boolean);
-          if (!ignore) setSideActivities(flat);
+          
+          // Also fetch all activities (including unattached ones)
+          let allActivities = [];
+          try {
+            const svc = await getActivityService();
+            allActivities = await svc.list().catch(() => []);
+          } catch (_) {
+            allActivities = [];
+          }
+          
+          const taskActivities = ([]).concat(...taskActivityPairs).filter(Boolean);
+          const combined = Array.isArray(allActivities) ? allActivities : [];
+          
+          // Filter out completed activities (check both completed flag and status)
+          const activeActivities = combined.filter((a) => !a.completed && a.status !== 'done');
+          
+          // Deduplicate by ID
+          const seen = new Set();
+          const deduped = activeActivities.filter((a) => {
+            const id = String(a.id || a._id || Math.random());
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+          
+          if (!ignore) setSideActivities(deduped);
         } catch (e) {
           if (!ignore) setSideActivities([]);
         }
@@ -434,14 +468,60 @@ export default function DayView({
                   onDragStart={(e) => {
                     try {
                       e.dataTransfer.setData("taskId", String(t.id));
+                      e.dataTransfer.setData("taskText", String(t.title || t.name || "Task"));
+                      e.dataTransfer.setData("dragEffect", "copy");
                       e.dataTransfer.effectAllowed = "copy";
                     } catch (_) {}
                   }}
-                  className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 ${bgClass || ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onTaskClick) onTaskClick(t);
+                  }}
+                  className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
                   style={style}
-                  title={t.title || t.name || 'Untitled'}
+                  title={`Drag to calendar to create appointment • ${t.title || t.name || 'Untitled'}`}
                 >
-                  <div className="truncate font-medium">{t.title || t.name || 'Untitled'}</div>
+                  <div className="truncate font-medium flex-1">{t.title || t.name || 'Untitled'}</div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {onTaskComplete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Update local state to remove task immediately
+                          setSideTodos((prev) => prev.filter((task) => String(task.id) !== String(t.id)));
+                          onTaskComplete(t);
+                        }}
+                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        title="Mark complete"
+                      >
+                        <FaCheck className="w-3 h-3" />
+                      </button>
+                    )}
+                    {onTaskEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTaskEdit(t);
+                        }}
+                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        title="Edit"
+                      >
+                        <FaEdit className="w-3 h-3" />
+                      </button>
+                    )}
+                    {onTaskDelete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTaskDelete(t);
+                        }}
+                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                        title="Delete"
+                      >
+                        <FaTrash className="w-3 h-3 text-red-600" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -477,9 +557,9 @@ export default function DayView({
         <div className="text-[11px] text-slate-500 text-center">Loading…</div>
       ) : (
         <>
-          {((Array.isArray(unattachedActivities) && unattachedActivities.length) || (sideActivities && sideActivities.length)) ? (
+          {(sideActivities && sideActivities.length) || (Array.isArray(unattachedActivities) && unattachedActivities.length) ? (
             <div className="flex flex-col gap-2">
-                {(Array.isArray(unattachedActivities) && unattachedActivities.length ? unattachedActivities : sideActivities).slice(0,12).map((a, i) => {
+                {(sideActivities && sideActivities.length ? sideActivities : unattachedActivities).slice(0,12).map((a, i) => {
                 const kindKey = a.kind || a.type || null;
                 const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
                 let ka = null;
@@ -506,12 +586,17 @@ export default function DayView({
                       try {
                         e.dataTransfer.setData("activityId", String(a.id || ""));
                         e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
-                        e.dataTransfer.effectAllowed = "copyMove";
+                        e.dataTransfer.setData("dragEffect", "copy");
+                        e.dataTransfer.effectAllowed = "copy";
                       } catch (_) {}
                     }}
-                    className={`px-2 py-1 rounded border text-xs w-full flex items-center gap-2 ${bgClass || ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onActivityClick) onActivityClick(a);
+                    }}
+                    className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
                     style={style}
-                    title={a.text || a.desc || a.note || 'Activity'}
+                    title={`Drag to calendar to create appointment • ${a.text || a.desc || a.note || 'Activity'}`}
                   >
                     <svg
                       stroke="currentColor"
@@ -526,7 +611,47 @@ export default function DayView({
                       <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z" />
                     </svg>
 
-                    <div className="truncate">{a.text || a.desc || a.note || 'Activity'}</div>
+                    <div className="truncate flex-1">{a.text || a.desc || a.note || 'Activity'}</div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {onActivityComplete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Update local state to remove activity immediately
+                            setSideActivities((prev) => prev.filter((activity) => String(activity.id) !== String(a.id)));
+                            onActivityComplete(a);
+                          }}
+                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          title="Mark complete"
+                        >
+                          <FaCheck className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onActivityEdit && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onActivityEdit(a);
+                          }}
+                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <FaEdit className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onActivityDelete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onActivityDelete(a);
+                          }}
+                          className="p-1 hover:bg-white/20 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <FaTrash className="w-3 h-3 text-red-600" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -553,7 +678,7 @@ export default function DayView({
 
   return (
   <div className="flex items-start gap-1">
-        <div className="flex-1">
+        <div className="w-1/2 flex-shrink-0">
           {/* compact header */}
           <div className="w-full mb-3">
             <div className="flex items-center justify-between mb-2">
@@ -875,14 +1000,16 @@ export default function DayView({
 
                           const slotTimeStr = `${String(h).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
                           const slotIsWorking = isWorkingTime ? isWorkingTime(slotTimeStr) : true;
+                          const slotKey = `${h}-${minute}`;
+                          const isDraggedOver = dragOverSlot === slotKey;
 
                           rows.push(
                             <div
-                              key={`${h}-${minute}`}
+                              key={slotKey}
                               role="button"
                               tabIndex={0}
-                              className={`w-full ${borderClasses}`}
-                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: slotIsWorking ? undefined : '#f8fafc' }}
+                              className={`w-full ${borderClasses} transition-colors ${isDraggedOver ? 'bg-blue-100 border-blue-300' : ''}`}
+                              style={{ height: segmentHeight, cursor: "pointer", backgroundColor: isDraggedOver ? undefined : (slotIsWorking ? undefined : '#f8fafc') }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (typeof onQuickCreate === "function") {
@@ -919,12 +1046,22 @@ export default function DayView({
                                 }
                               }}
                               onDragOver={(e) => {
-                                try { e.preventDefault(); } catch (_) {}
+                                try { 
+                                  e.preventDefault(); 
+                                  setDragOverSlot(slotKey);
+                                } catch (_) {}
+                              }}
+                              onDragLeave={(e) => {
+                                try {
+                                  e.preventDefault();
+                                  setDragOverSlot(null);
+                                } catch (_) {}
                               }}
                               onDrop={(e) => {
                                 try {
                                   e.preventDefault();
                                   e.stopPropagation();
+                                  setDragOverSlot(null);
                                   const data = e.dataTransfer;
                                   const eventId = data.getData("eventId");
                                   const taskId = data.getData("taskId");
@@ -946,13 +1083,15 @@ export default function DayView({
                                     return;
                                   }
                                   if (taskId && typeof onTaskDrop === "function") {
-                                    const dropEffect = data.dropEffect || data.effectAllowed || "";
-                                    onTaskDrop(taskId, dt, dropEffect);
+                                    const taskText = data.getData("taskText");
+                                    const dropEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
+                                    onTaskDrop(taskId, dt, dropEffect, taskText);
                                     return;
                                   }
                                   if (activityId && typeof onActivityDrop === "function") {
-                                    const dropEffect = data.dropEffect || data.effectAllowed || "";
-                                    onActivityDrop(activityId, dt, dropEffect);
+                                    const activityText = data.getData("activityText");
+                                    const dropEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
+                                    onActivityDrop(activityId, dt, dropEffect, activityText);
                                     return;
                                   }
                                 } catch (__) {}
@@ -1129,7 +1268,7 @@ export default function DayView({
         </div>
 
   {/* Sidebar: Quick actions panel */}
-  <div className="w-64 md:w-72 flex-shrink-0 mr-0">
+  <div className="w-1/2 flex-shrink-0">
           <div className="sticky top-2">
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 mb-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-stretch">

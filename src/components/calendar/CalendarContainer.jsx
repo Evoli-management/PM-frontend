@@ -341,7 +341,12 @@ const CalendarContainer = () => {
                     // Fallback: store raw events if utils fail
                     setEvents(allEvents);
                 }
-                setTodos(Array.isArray(tds) ? tds : []);
+                // Filter out completed tasks (status 'done' or 'completed')
+                const activeTodos = (Array.isArray(tds) ? tds : []).filter((t) => {
+                    const status = String(t.status || '').toLowerCase();
+                    return status !== 'done' && status !== 'completed';
+                });
+                setTodos(activeTodos);
 
                 // Load elephant tasks
                 try {
@@ -391,7 +396,9 @@ const CalendarContainer = () => {
                             }),
                         );
                         const flat = ([]).concat(...lists).filter(Boolean);
-                        setWeekActivities(flat);
+                        // Filter out completed activities (check both completed flag and status)
+                        const activeActivities = flat.filter((a) => !a.completed && a.status !== 'done');
+                        setWeekActivities(activeActivities);
                         setActivitiesByTask({});
                     } catch {
                         setWeekActivities([]);
@@ -440,7 +447,12 @@ const CalendarContainer = () => {
         const toISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString();
         try {
             const tds = await calendarService.listTodos({ from: fromISO, to: toISO });
-            setTodos(Array.isArray(tds) ? tds : []);
+            // Filter out completed tasks
+            const activeTodos = (Array.isArray(tds) ? tds : []).filter((t) => {
+                const status = String(t.status || '').toLowerCase();
+                return status !== 'done' && status !== 'completed';
+            });
+            setTodos(activeTodos);
             // Also refresh activities map if day view
             if (view === "day") {
                 try {
@@ -479,7 +491,9 @@ const CalendarContainer = () => {
                         }),
                     );
                     const flat = ([]).concat(...lists).filter(Boolean);
-                    setWeekActivities(flat);
+                    // Filter out completed activities (check both completed flag and status)
+                    const activeActivities = flat.filter((a) => !a.completed && a.status !== 'done');
+                    setWeekActivities(activeActivities);
                 } catch {
                     setWeekActivities([]);
                 }
@@ -488,7 +502,7 @@ const CalendarContainer = () => {
     };
 
     // Drag-and-drop: create an appointment for a task
-    const handleTaskDrop = async (taskOrId, date, dropEffect) => {
+    const handleTaskDrop = async (taskOrId, date, dropEffect, fallbackText) => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
@@ -528,12 +542,29 @@ const CalendarContainer = () => {
             }
 
             // Otherwise create a calendar appointment (existing behavior / copy-from-list)
-            // Try to find a title from todos if not provided
-            let title =
-                (typeof taskOrId === "object" && taskOrId?.title) ||
-                todos.find((t) => String(t.id) === String(taskId))?.title ||
-                "Task";
-            const description = typeof taskOrId === "object" ? taskOrId.description || "" : "";
+            // Resolve the task first - look it up in todos if we only have an id
+            let resolvedTask = null;
+            if (typeof taskOrId === "string") {
+                try {
+                    resolvedTask = (todos || []).find((t) => String(t.id) === String(taskOrId));
+                } catch (_) {
+                    resolvedTask = null;
+                }
+            } else if (typeof taskOrId === "object") {
+                resolvedTask = taskOrId;
+            }
+
+            // Extract title from resolved task, handling both 'title' and 'name' fields
+            // Use fallbackText if task resolution failed
+            let title = "Task";
+            if (resolvedTask) {
+                title = resolvedTask.title || resolvedTask.name || "Task";
+            } else if (fallbackText) {
+                title = fallbackText;
+            }
+            
+            const description = (resolvedTask && resolvedTask.description) || "";
+            const descriptionValue = description && description.trim() !== "" ? description.trim() : null;
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
             const toOffsetISO = (d) => {
                 const pad = (n) => String(n).padStart(2, "0");
@@ -549,35 +580,31 @@ const CalendarContainer = () => {
                 const om = pad(Math.abs(off) % 60);
                 return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            // Try to include optional metadata (key area, goal) when available so
-            // the appointment editor can prefill these fields.
-            // Resolve metadata. The drop source sometimes only sends an id (string),
-            // so if we received a string, try to find the full task object in
-            // `todos` to extract key area, goal and assignee.
-            let resolvedTask = null;
-            if (typeof taskOrId === "string") {
-                try {
-                    resolvedTask = (todos || []).find((t) => String(t.id) === String(taskOrId));
-                } catch (_) {
-                    resolvedTask = null;
-                }
-            } else if (typeof taskOrId === "object") {
-                resolvedTask = taskOrId;
-            }
 
             const keyAreaId = (resolvedTask && (resolvedTask.keyAreaId || resolvedTask.key_area_id || resolvedTask.keyArea)) || null;
             const goalId = (resolvedTask && (resolvedTask.goalId || resolvedTask.goal_id || resolvedTask.goal)) || null;
             const assignee = (resolvedTask && (resolvedTask.assignee || resolvedTask.assigneeId || resolvedTask.assignee_name || resolvedTask.assigned_to)) || null;
 
+            // Build payload with only valid, non-empty values
             const payload = {
                 title,
-                description,
                 start: toOffsetISO(start),
                 end: toOffsetISO(end),
                 timezone: tz,
-                ...(goalId ? { goalId: String(goalId) } : {}),
-                ...(keyAreaId ? { keyAreaId: String(keyAreaId) } : {}),
             };
+            
+            // Only add description if it has a value
+            if (descriptionValue) {
+                payload.description = descriptionValue;
+            }
+            
+            // Only include goalId and keyAreaId if they are valid UUIDs
+            if (goalId && String(goalId).trim() !== '' && String(goalId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                payload.goalId = String(goalId);
+            }
+            if (keyAreaId && String(keyAreaId).trim() !== '' && String(keyAreaId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                payload.keyAreaId = String(keyAreaId);
+            }
             if (import.meta.env.DEV) {
                 try { console.debug('Creating appointment payload', payload); } catch (_) {}
             }
@@ -622,7 +649,7 @@ const CalendarContainer = () => {
     };
 
     // Drag-and-drop: create an appointment for an activity
-    const handleActivityDrop = async (activityOrObj, date, dropEffect) => {
+    const handleActivityDrop = async (activityOrObj, date, dropEffect, fallbackText) => {
         try {
             const defaultMinutes = 30;
             let start = new Date(date);
@@ -651,10 +678,31 @@ const CalendarContainer = () => {
                 return;
             }
 
-            const title =
-                (typeof activityOrObj === "object" && (activityOrObj.text || activityOrObj.title)) ||
-                "Activity";
-            const description = typeof activityOrObj === "object" ? activityOrObj.description || "" : "";
+            // Resolve the activity first - look it up if we only have an id
+            let resolvedActivity = null;
+            if (typeof activityOrObj === "string") {
+                try {
+                    resolvedActivity = (weekActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                        (unattachedActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
+                        null;
+                } catch (_) {
+                    resolvedActivity = null;
+                }
+            } else if (typeof activityOrObj === "object") {
+                resolvedActivity = activityOrObj;
+            }
+
+            // Extract title from resolved activity, handling both 'text' and 'title' fields
+            // Use fallbackText if activity resolution failed
+            let title = "Activity";
+            if (resolvedActivity) {
+                title = resolvedActivity.text || resolvedActivity.title || resolvedActivity.name || "Activity";
+            } else if (fallbackText) {
+                title = fallbackText;
+            }
+            
+            const description = (resolvedActivity && resolvedActivity.description) || "";
+            const descriptionValue = description && description.trim() !== "" ? description.trim() : null;
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
             const toOffsetISO = (d) => {
                 const pad = (n) => String(n).padStart(2, "0");
@@ -670,23 +718,6 @@ const CalendarContainer = () => {
                 const om = pad(Math.abs(off) % 60);
                 return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${oh}:${om}`;
             };
-            // Resolve metadata (key area, goal, assignee).
-            // If we were passed an id (string), try to find the activity in
-            // `weekActivities` or `unattachedActivities`. If found, use the
-            // activity's own metadata or fall back to its parent task (from
-            // `todos`) when available.
-            let resolvedActivity = null;
-            if (typeof activityOrObj === "string") {
-                try {
-                    resolvedActivity = (weekActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
-                        (unattachedActivities || []).find((a) => String(a.id) === String(activityOrObj)) ||
-                        null;
-                } catch (_) {
-                    resolvedActivity = null;
-                }
-            } else if (typeof activityOrObj === "object") {
-                resolvedActivity = activityOrObj;
-            }
 
             let keyAreaId = null;
             let goalId = null;
@@ -709,15 +740,27 @@ const CalendarContainer = () => {
                 }
             }
 
+            // Build payload with only valid, non-empty values
             const payload = {
                 title,
-                description,
                 start: toOffsetISO(start),
                 end: toOffsetISO(end),
                 timezone: tz,
-                ...(goalId ? { goalId: String(goalId) } : {}),
-                ...(keyAreaId ? { keyAreaId: String(keyAreaId) } : {}),
             };
+            
+            // Only add description if it has a value
+            if (descriptionValue) {
+                payload.description = descriptionValue;
+            }
+            
+            // Only include goalId and keyAreaId if they are valid UUIDs
+            if (goalId && String(goalId).trim() !== '' && String(goalId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                payload.goalId = String(goalId);
+            }
+            if (keyAreaId && String(keyAreaId).trim() !== '' && String(keyAreaId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                payload.keyAreaId = String(keyAreaId);
+            }
+            
             if (import.meta.env.DEV) {
                 try { console.debug('Creating appointment payload', payload); } catch (_) {}
             }
@@ -1170,6 +1213,75 @@ const CalendarContainer = () => {
         };
         setEditItem(item);
         setEditModalOpen(true);
+    };
+
+    // Handler: Mark task as complete
+    const handleTaskComplete = async (task) => {
+        if (!task || !task.id) return;
+        try {
+            const svc = await getTaskService();
+            await svc.update(task.id, { status: 'done' });
+            // Update local state
+            setTodos((prev) => prev.filter((t) => String(t.id) !== String(task.id)));
+            addToast({ title: "Task completed", variant: "success" });
+        } catch (err) {
+            console.error("Failed to complete task", err);
+            addToast({ title: "Failed to complete task", description: String(err?.message || err), variant: "error" });
+        }
+    };
+
+    // Handler: Delete task
+    const handleTaskDelete = async (task) => {
+        if (!task || !task.id) return;
+        if (!confirm(`Delete task "${task.title || task.name || 'Untitled'}"?`)) return;
+        try {
+            const svc = await getTaskService();
+            await svc.remove(task.id);
+            // Update local state
+            setTodos((prev) => prev.filter((t) => String(t.id) !== String(task.id)));
+            addToast({ title: "Task deleted", variant: "success" });
+        } catch (err) {
+            console.error("Failed to delete task", err);
+            addToast({ title: "Failed to delete task", description: String(err?.message || err), variant: "error" });
+        }
+    };
+
+    // Handler: Mark activity as complete
+    const handleActivityComplete = async (activity) => {
+        if (!activity || !activity.id) return;
+        try {
+            const svc = await getActivityService();
+            // Set completed, status, and completionDate for compatibility with key areas table
+            await svc.update(activity.id, { 
+                completed: true,
+                status: 'done',
+                completionDate: new Date().toISOString()
+            });
+            // Update local state
+            setWeekActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
+            setUnattachedActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
+            addToast({ title: "Activity completed", variant: "success" });
+        } catch (err) {
+            console.error("Failed to complete activity", err);
+            addToast({ title: "Failed to complete activity", description: String(err?.message || err), variant: "error" });
+        }
+    };
+
+    // Handler: Delete activity
+    const handleActivityDelete = async (activity) => {
+        if (!activity || !activity.id) return;
+        if (!confirm(`Delete activity "${activity.text || activity.title || 'Untitled'}"?`)) return;
+        try {
+            const svc = await getActivityService();
+            await svc.remove(activity.id);
+            // Update local state
+            setWeekActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
+            setUnattachedActivities((prev) => prev.filter((a) => String(a.id) !== String(activity.id)));
+            addToast({ title: "Activity deleted", variant: "success" });
+        } catch (err) {
+            console.error("Failed to delete activity", err);
+            addToast({ title: "Failed to delete activity", description: String(err?.message || err), variant: "error" });
+        }
     };
 
     const handleAddSave = async (form) => {
@@ -1644,6 +1756,12 @@ const CalendarContainer = () => {
                         onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
                         onActivityClick={openEditActivity}
+                        onTaskComplete={handleTaskComplete}
+                        onTaskEdit={openEditTask}
+                        onTaskDelete={handleTaskDelete}
+                        onActivityComplete={handleActivityComplete}
+                        onActivityEdit={openEditActivity}
+                        onActivityDelete={handleActivityDelete}
                         onPlanTomorrow={() => {}}
                     />
                 )}

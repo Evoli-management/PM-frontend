@@ -174,11 +174,17 @@ export default function UnifiedTaskActivityTable({
 
     const handleCompleteToggle = (item, e) => {
         e.stopPropagation();
-        const isCompleted = item.dateCompleted || item.date_completed;
+        // For activities, also check the 'completed' boolean field and 'completionDate'
+        const isCompleted = item.dateCompleted || item.date_completed || item.completionDate || (item.type === 'activity' && item.completed);
         const updatedItem = {
             ...item,
             dateCompleted: isCompleted ? null : new Date().toISOString(),
-            date_completed: isCompleted ? null : new Date().toISOString()
+            date_completed: isCompleted ? null : new Date().toISOString(),
+            completionDate: isCompleted ? null : new Date().toISOString(),
+            ...(item.type === 'activity' ? { 
+                completed: !isCompleted,
+                status: isCompleted ? 'open' : 'done'
+            } : {})
         };
         
         if (item.type === 'task' && onTaskUpdate) {
@@ -753,7 +759,8 @@ export default function UnifiedTaskActivityTable({
                         {sortedItems.map((item) => {
                             const deadlineValue = item.deadline || item.dueDate || item.due_date;
                             const overdue = isOverdue(deadlineValue, item.endDate || item.end_date);
-                            const isCompleted = item.dateCompleted || item.date_completed;
+                            // For activities, also check the 'completed' boolean field and 'completionDate'
+                            const isCompleted = item.dateCompleted || item.date_completed || item.completionDate || (item.type === 'activity' && item.completed);
                             const isPrivate = item.public === 0 || item.public === '0' ? true : false;
                             const titleKey = getCellKey(item, 'title');
                             const startDateKey = getCellKey(item, 'startDate');
