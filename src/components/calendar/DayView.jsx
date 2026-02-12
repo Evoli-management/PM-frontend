@@ -120,6 +120,7 @@ export default function DayView({
   const [view, setView] = useState(propView || "day");
   const [showViewMenu, setShowViewMenu] = useState(false);
   const viewMenuRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   // Sidebar data: todos, appointments and activities for selected day
   const [sideTodos, setSideTodos] = useState([]);
@@ -176,6 +177,25 @@ export default function DayView({
       setView(propView);
     }
   }, [propView]);
+
+  // Auto-scroll to current time when viewing today's date
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+    // Only auto-scroll if we're viewing today
+    const d = currentDate || new Date();
+    const t = new Date();
+    const isCurrentDay = (
+      d.getFullYear() === t.getFullYear() &&
+      d.getMonth() === t.getMonth() &&
+      d.getDate() === t.getDate()
+    );
+    
+    if (isCurrentDay) {
+      // Scroll to current time with a small offset to keep it visible in the middle
+      const scrollOffset = Math.max(0, nowTop - HOUR_HEIGHT * 2); // Center time in the middle of view
+      scrollContainerRef.current.scrollTop = scrollOffset;
+    }
+  }, [currentDate, HOUR_HEIGHT, nowTop]);
 
   // Pointer-based resize helper (top/bottom handles) — mirrors WeekView behavior in a simpler form.
   const startResize = (ev, apptObj, side) => {
@@ -393,11 +413,12 @@ export default function DayView({
             }),
           );
           
-          // Also fetch all activities (including unattached ones)
+          // Also fetch all activities (including unattached ones) with date filtering
+          // Use the same padDays approach as todos to handle multi-day activities
           let allActivities = [];
           try {
             const svc = await getActivityService();
-            allActivities = await svc.list().catch(() => []);
+            allActivities = await svc.list({ fromDate: fetchFrom, toDate: fetchTo }).catch(() => []);
           } catch (_) {
             allActivities = [];
           }
@@ -405,8 +426,27 @@ export default function DayView({
           const taskActivities = ([]).concat(...taskActivityPairs).filter(Boolean);
           const combined = Array.isArray(allActivities) ? allActivities : [];
           
+          // Client-side filter to only keep activities that overlap the selected day
+          const filteredActivities = (Array.isArray(combined) ? combined : []).filter((a) => {
+            try {
+              const s = a.startDate || a.start_date || null;
+              const e = a.endDate || a.end_date || null;
+              // If activity has no dates, include it (unschedule activities)
+              if (!s && !e) return true;
+              if (!s || !e) return true; // Include if only one date is set
+              const sd = new Date(s);
+              const ed = new Date(e);
+              if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return true; // Include if date parsing fails
+              const edAdjusted = adjustEndInclusive(ed);
+              // overlap test: activity overlaps the selected day
+              return sd <= dayEnd && edAdjusted >= dayStart;
+            } catch (_) {
+              return true; // Include on error
+            }
+          });
+          
           // Filter out completed activities (check both completed flag and status)
-          const activeActivities = combined.filter((a) => !a.completed && a.status !== 'done');
+          const activeActivities = filteredActivities.filter((a) => !a.completed && a.status !== 'done');
           
           // Deduplicate by ID
           const seen = new Set();
@@ -945,7 +985,7 @@ export default function DayView({
               </div>
 
               {/* MAIN SCROLL AREA */}
-              <div className="flex-1 flex min-h-0" style={{ overflowX: "hidden", overflowY: "auto" }}>
+              <div ref={scrollContainerRef} className="flex-1 flex min-h-0" style={{ overflowX: "hidden", overflowY: "auto" }}>
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
                 <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
                   <div

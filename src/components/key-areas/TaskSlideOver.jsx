@@ -431,7 +431,12 @@ export default function TaskSlideOver({
                                                     <td className="px-3 py-2 align-top">{toDateOnly(a.end_date) || '—'}</td>
                                                     <td className="px-3 py-2 align-top">{toDateOnly(a.deadline) || '—'}</td>
                                                     <td className="px-3 py-2 align-top">{/* duration placeholder */}</td>
-                                                    <td className="px-3 py-2 align-top text-slate-800">{toDateOnly(a.completionDate || a.completion_date) || '—'}</td>
+                                                    <td className="px-3 py-2 align-top text-slate-800">
+                                                        {(() => {
+                                                            const isDone = (String(a.status || '').toLowerCase() === 'done') || !!a.completed;
+                                                            return isDone ? (toDateOnly(a.completionDate || a.completion_date) || '—') : '—';
+                                                        })()}
+                                                    </td>
                                                     <td className="px-3 py-2 align-top">
                                                         <div className="flex items-center gap-2">
                                                             {/* Tag icon: use a single consistent color regardless of activity status */}
