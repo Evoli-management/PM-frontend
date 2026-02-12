@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/shared/ToastProvider.jsx';
+import { useFormattedDate } from '../hooks/useFormattedDate';
 import Sidebar from '../components/shared/Sidebar';
 import TaskFormModal from '../components/key-areas/TaskFormModal';
 import CreateTaskModal from '../components/key-areas/CreateTaskModal';
@@ -445,7 +446,7 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
                                         {/* Show read-only completion date when present */}
                                         {t.completionDate ? (
                                             <div className="text-[11px] text-slate-500 mt-1 truncate">
-                                                Completed: {toDateOnly(t.completionDate || t.completion_date)}
+                                                Completed: {formatDate(t.completionDate || t.completion_date)}
                                             </div>
                                         ) : null}
                                     </button>
@@ -489,6 +490,7 @@ const CalendarView = ({ tasks = [], onSelect, selectedIds = new Set(), toggleSel
 export default function KeyAreas() {
     const location = useLocation();
     const navigate = useNavigate();
+    const { formatDate } = useFormattedDate();
     const [loading, setLoading] = useState(true);
     const [keyAreas, setKeyAreas] = useState([]);
     const [filter, setFilter] = useState("");
@@ -1042,52 +1044,18 @@ export default function KeyAreas() {
                         // Get ALL delegated activities (both pending and accepted)
                         delegatedActivities = await activityDelegationService.getDelegatedToMe();
                         
+                        console.log('✅ getDelegatedToMe() returned:', { 
+                            tasks: Array.isArray(delegatedToMe) ? delegatedToMe.length : 0,
+                            tasksPending: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'pending').length,
+                            tasksAccepted: delegatedToMe?.filter(t => (t.delegationStatus || t.delegation_status) === 'accepted').length,
+                            activities: Array.isArray(delegatedActivities) ? delegatedActivities.length : 0,
+                            activitiesPending: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'pending').length,
+                            activitiesAccepted: delegatedActivities?.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted').length,
+                        });
+                        
                         // Normalize both tasks and activities with type indicator
                         const normalizedTasks = (delegatedToMe || []).map(t => ({ ...t, type: 'task' }));
-                        // For activities: normalize field names for display (text -> title, deadline -> dueDate)
-                        let normalizedActivities = (delegatedActivities || []).map(a => ({
-                            ...a,
-                            type: 'activity',
-                            title: a.title || a.text, // Use title if exists, otherwise text
-                            dueDate: a.dueDate || a.deadline || a.endDate, // Normalize deadline field
-                        }));
-                        
-                        // Deduplicate activities: for each unique (text + delegator) pair, keep ONE best version
-                        // Strategy: prefer accepted > pending, and for same status prefer one with taskId
-                        const activityGroups = new Map();
-                        for (const activity of normalizedActivities) {
-                            const actText = activity.title || activity.text || '';
-                            const delegator = activity.delegatedByUserId || activity.delegated_by_user_id || '';
-                            const key = `${actText}::${delegator}`;
-                            
-                            if (!activityGroups.has(key)) {
-                                activityGroups.set(key, []);
-                            }
-                            activityGroups.get(key).push(activity);
-                        }
-                        
-                        // For each group, select the best version (accepted > pending, with taskId > without)
-                        const dedupedActivities = [];
-                        for (const [key, group] of activityGroups) {
-                            // Separate by status
-                            const acceptedActivities = group.filter(a => (a.delegationStatus || a.delegation_status) === 'accepted');
-                            const otherActivities = group.filter(a => (a.delegationStatus || a.delegation_status) !== 'accepted');
-                            
-                            let selectedActivity;
-                            if (acceptedActivities.length > 0) {
-                                // Prefer accepted. If multiple, prefer one with taskId
-                                const withTaskId = acceptedActivities.filter(a => a.taskId || a.task_id);
-                                selectedActivity = withTaskId.length > 0 ? withTaskId[0] : acceptedActivities[0];
-                            } else {
-                                // No accepted, use first from other statuses
-                                selectedActivity = otherActivities[0];
-                            }
-                            
-                            if (selectedActivity) {
-                                dedupedActivities.push(selectedActivity);
-                            }
-                        }
-                        normalizedActivities = dedupedActivities;
+                        const normalizedActivities = (delegatedActivities || []).map(a => ({ ...a, type: 'activity' }));
                         
                         // Combine all delegated items
                         const allDelegated = [...normalizedTasks, ...normalizedActivities];
@@ -1099,26 +1067,16 @@ export default function KeyAreas() {
                         );
                         setPendingDelegations(pending);
                         
-                        // For delegated tab: separate tasks and activities
-                        // UnifiedTaskActivityTable expects tasks in 'tasks' prop and activities in 'activities' prop
-                        // to properly display the correct icons
-                        const delegatedTasks = allDelegated.filter(item => item.type === 'task');
-                        const delegatedActivityItems = allDelegated.filter(item => item.type === 'activity');
-                        
-                        // Set all items for the bottom section
-                        // Store activities grouped by empty key (since they're delegated, not linked to specific task view)
-                        setAllTasks(delegatedTasks);
-                        setActivitiesByTask({ '__delegated_activities': delegatedActivityItems });
+                        // Set all items for the bottom section (with filters)
+                        setAllTasks(allDelegated);
                     } catch (err) {
                         console.error('❌ ERROR: getDelegatedToMe() failed:', err);
                         delegatedToMe = [];
                         delegatedActivities = [];
                         setPendingDelegations([]);
-                        setActivitiesByTask({});
                     }
 
-                    // Skip loading activities by task in delegated view - they're already included with taskId
-                    return;
+                    // Load activities for delegated tasks
                     const actSvc = await getActivityService();
                     const entries = await Promise.all(
                         (delegatedToMe || []).map(async (row) => {
@@ -1240,6 +1198,47 @@ export default function KeyAreas() {
             }
         })();
     }, [viewTab, activeFilter, selectedKA?.id, currentUserId, navigate]);
+    
+    // Listen for 'task-created' events from ModalManager (navbar quick actions)
+    // When a task is created via the quick actions with a key area, add it to allTasks
+    useEffect(() => {
+        const handler = (e) => {
+            const created = e && e.detail ? e.detail : null;
+            if (!created) return;
+            
+            // Only add the task if it matches the currently selected key area
+            const createdKeyAreaId = created.keyAreaId || created.key_area_id || null;
+            if (!selectedKA || String(createdKeyAreaId) !== String(selectedKA.id)) return;
+            
+            try {
+                // Normalize the created task to match the format used internally
+                const normalized = {
+                    ...created,
+                    // Normalize field names
+                    status: mapServerStatusToUi(created.status),
+                    due_date: created.dueDate || created.due_date || null,
+                    deadline: created.dueDate || created.due_date || null,
+                    start_date: created.startDate || created.start_date || null,
+                    end_date: created.endDate || created.end_date || null,
+                    completionDate: created.completionDate || created.completion_date || null,
+                    assignee: created.assignee ?? null,
+                    duration: created.duration ?? null,
+                    key_area_id: createdKeyAreaId,
+                    list_index: created.listIndex ?? created.list_index ?? 1,
+                    listIndex: created.listIndex ?? created.list_index ?? 1,
+                    goal_id: created.goalId ?? created.goal_id ?? null,
+                };
+                
+                // Add the task to allTasks
+                setAllTasks((prev) => [...(prev || []), normalized]);
+            } catch (err) {
+                console.error('Failed to add task-created event to allTasks', err);
+            }
+        };
+        
+        window.addEventListener('task-created', handler);
+        return () => window.removeEventListener('task-created', handler);
+    }, [selectedKA]);
     
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
     // Toasts and saving state for activity updates
@@ -4322,10 +4321,10 @@ export default function KeyAreas() {
                                                                                         </div>
                                                                                     </td>
                                                                                     {visibleColumns.responsible && (
-                                                                                        <td className="px-3 py-2 align-top text-slate-700">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800">
                                                                                             {Array.isArray(users) && users.length ? (
                                                                                                 <select
-                                                                                                    className="text-sm rounded-md border bg-white px-2 py-1"
+                                                                                                    className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
                                                                                                     value={resolveAssignee({ activity: a, taskAssignee: selectedTaskInPanel?.assignee, users, currentUserId }).selectValue}
                                                                                                     onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'assignee', e.target.value)}
                                                                                                     disabled={savingActivityIds.has(a.id)}
@@ -4342,17 +4341,19 @@ export default function KeyAreas() {
                                                                                         <td className="px-3 py-2 align-top">
                                                                                             <div className="flex items-center gap-2">
                                                                                                 <span className={`inline-block w-2.5 h-2.5 rounded-full ${String(a.status || '').toLowerCase() === 'done' ? 'bg-emerald-500' : String(a.status || '').toLowerCase() === 'in_progress' ? 'bg-blue-500' : 'bg-slate-400'}`} aria-hidden="true" />
-                                                                                                <select
-                                                                                                    value={a.status || 'open'}
-                                                                                                    onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'status', e.target.value)}
-                                                                                                    disabled={savingActivityIds.has(a.id)}
-                                                                                                    className="text-xs rounded-md border bg-white px-2 py-1"
-                                                                                                    aria-label={`Change status for activity ${a.text}`}
-                                                                                                >
-                                                                                                    <option value="open">Open</option>
-                                                                                                    <option value="in_progress">In progress</option>
-                                                                                                    <option value="done">Done</option>
-                                                                                                </select>
+                                                                                                <div>
+                                                                                                    <select
+                                                                                                        value={a.status || 'open'}
+                                                                                                        onChange={(e) => updateActivityField(a, selectedTaskInPanel?.id, 'status', e.target.value)}
+                                                                                                        disabled={savingActivityIds.has(a.id)}
+                                                                                                        className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-18"
+                                                                                                        aria-label={`Change status for ${a.text || 'activity'}`}
+                                                                                                    >
+                                                                                                        <option value="open">Open</option>
+                                                                                                        <option value="in_progress">In progress</option>
+                                                                                                        <option value="done">Done</option>
+                                                                                                    </select>
+                                                                                                </div>
                                                                                             </div>
                                                                                         </td>
                                                                                     )}
@@ -4376,11 +4377,11 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.start_date && (
-                                                                                        <td className="px-3 py-2 align-top">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800">
                                                                                             <div className="relative inline-block">
                                                                                                 <button
                                                                                                     type="button"
-                                                                                                    className="hover:bg-slate-50 rounded px-2 py-0.5 text-sm flex items-center gap-1"
+                                                                                                    className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
                                                                                                     onClick={() => {
                                                                                                         const key = `start_${a.id}`;
                                                                                                         setActivityDateEditId(key);
@@ -4394,8 +4395,7 @@ export default function KeyAreas() {
                                                                                                     disabled={savingActivityIds.has(a.id)}
                                                                                                     title="Edit start date"
                                                                                                 >
-                                                                                                    <span>{toDateOnly(a.start_date || a.startDate) || '—'}</span>
-                                                                                                    {activityDateEditId === `start_${a.id}` ? (<span className="text-purple-600">📅</span>) : null}
+                                                                                                    <span>{(a.start_date || a.startDate) ? formatDate(a.start_date || a.startDate) : '—'}</span>
                                                                                                 </button>
                                                                                                 <input
                                                                                                     ref={(el) => { activityDateRefs.current[`start_${a.id}`] = el; }}
@@ -4411,11 +4411,11 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.end_date && (
-                                                                                        <td className="px-3 py-2 align-top">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800">
                                                                                             <div className="relative inline-block">
                                                                                                 <button
                                                                                                     type="button"
-                                                                                                    className="hover:bg-slate-50 rounded px-2 py-0.5 text-sm flex items-center gap-1"
+                                                                                                    className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
                                                                                                     onClick={() => {
                                                                                                         const key = `end_${a.id}`;
                                                                                                         setActivityDateEditId(key);
@@ -4429,8 +4429,7 @@ export default function KeyAreas() {
                                                                                                     disabled={savingActivityIds.has(a.id)}
                                                                                                     title="Edit end date"
                                                                                                 >
-                                                                                                    <span>{toDateOnly(a.end_date || a.endDate) || '—'}</span>
-                                                                                                    {activityDateEditId === `end_${a.id}` ? (<span className="text-purple-600">📅</span>) : null}
+                                                                                                    <span>{(a.end_date || a.endDate) ? formatDate(a.end_date || a.endDate) : '—'}</span>
                                                                                                 </button>
                                                                                                 <input
                                                                                                     ref={(el) => { activityDateRefs.current[`end_${a.id}`] = el; }}
@@ -4446,11 +4445,11 @@ export default function KeyAreas() {
                                                                                         </td>
                                                                                     )}
                                                                                     {visibleColumns.deadline && (
-                                                                                        <td className="px-3 py-2 align-top">
+                                                                                        <td className="px-3 py-2 align-top text-slate-800">
                                                                                             <div className="relative inline-block">
                                                                                                 <button
                                                                                                     type="button"
-                                                                                                    className="hover:bg-slate-50 rounded px-2 py-0.5 text-sm flex items-center gap-1"
+                                                                                                    className="hover:bg-slate-100 rounded px-1 flex items-center gap-1"
                                                                                                     onClick={() => {
                                                                                                         const key = `deadline_${a.id}`;
                                                                                                         setActivityDateEditId(key);
@@ -4464,8 +4463,7 @@ export default function KeyAreas() {
                                                                                                     disabled={savingActivityIds.has(a.id)}
                                                                                                     title="Edit deadline"
                                                                                                 >
-                                                                                                    <span>{toDateOnly(a.deadline) || '—'}</span>
-                                                                                                    {activityDateEditId === `deadline_${a.id}` ? (<span className="text-purple-600">📅</span>) : null}
+                                                                                                    <span>{a.deadline ? formatDate(a.deadline) : '—'}</span>
                                                                                                 </button>
                                                                                                 <input
                                                                                                     ref={(el) => { activityDateRefs.current[`deadline_${a.id}`] = el; }}

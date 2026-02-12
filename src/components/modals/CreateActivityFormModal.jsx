@@ -113,23 +113,23 @@ export default function CreateActivityFormModal({
 
   useEffect(() => {
     if (!isOpen) return
-    setTitle(initialData.text || '')
-    setDescription(initialData.description || '')
-  setStartDate(safeDate(initialData.startDate || initialData.date_start) || defaultDate)
-  const nextEnd = safeDate(initialData.endDate || initialData.date_end) || defaultDate
-  setEndDate(nextEnd)
-  // If initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
-  setEndAuto(!Boolean(initialData.endDate || initialData.date_end))
-    setDeadline(safeDate(initialData.deadline || initialData.dueDate))
-    setPriority(initialData.priority ?? initialData.priority_level ?? 'normal')
-    setGoalId(initialData.goalId || initialData.goal || '')
-    setCompleted(initialData.completed || false)
-    setTaskId(initialData.taskId || initialData.task_id || initialData.task || '')
-    setKeyAreaId(initialData.keyAreaId || initialData.key_area_id || initialData.keyArea || initialData.key_area || '')
+    setTitle(initialData?.text || '')
+    setDescription(initialData?.description || '')
+    setStartDate(safeDate(initialData?.startDate || initialData?.date_start) || defaultDate)
+    const nextEnd = safeDate(initialData?.endDate || initialData?.date_end) || defaultDate
+    setEndDate(nextEnd)
+    // If initial data provides an explicit end date, disable auto-sync; otherwise keep auto-sync enabled
+    setEndAuto(!Boolean(initialData?.endDate || initialData?.date_end))
+    setDeadline(safeDate(initialData?.deadline || initialData?.dueDate))
+    setPriority(initialData?.priority ?? initialData?.priority_level ?? 'normal')
+    setGoalId(initialData?.goalId || initialData?.goal || '')
+    setCompleted(initialData?.completed || false)
+    setTaskId(initialData?.taskId || initialData?.task_id || initialData?.task || '')
+    setKeyAreaId(initialData?.keyAreaId || initialData?.key_area_id || initialData?.keyArea || initialData?.key_area || '')
     // Only prefill listIndex when the caller explicitly provided one; otherwise leave empty
-  setListIndex(initialData.list || initialData.list_index || '')
+    setListIndex(initialData?.list || initialData?.list_index || '')
     // Convert assignee name/email to user id for select dropdown
-    const initialAssigneeValue = initialData.assignee || initialData.responsible || ''
+    const initialAssigneeValue = initialData?.assignee || initialData?.responsible || ''
     let nextAssignee = ''
     if (initialAssigneeValue) {
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialAssigneeValue)) {
@@ -152,33 +152,36 @@ export default function CreateActivityFormModal({
       }
     }
     setAssignee(nextAssignee)
-    setDuration(initialData.duration || '')
-  }, [isOpen, initialData])
+    setDuration(initialData?.duration || '')
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
     ;(async () => {
       try {
-        if (goals && goals.length) {
+        // If goals were provided as props, use them directly
+        if (Array.isArray(goals) && goals.length) {
           setLocalGoals(goals)
           return
         }
+        // Otherwise fetch from service
         const mod = await import('../../services/goalService').catch(() => null)
         if (mod && mod.getGoals) {
           const fetched = await mod.getGoals().catch(() => [])
           setLocalGoals(Array.isArray(fetched) ? fetched : [])
         }
       } catch (e) {
-        if (goals && goals.length) setLocalGoals(goals)
+        // If goals were provided, fall back to them
+        if (Array.isArray(goals) && goals.length) setLocalGoals(goals)
       }
     })()
-  }, [isOpen, goals])
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
     ;(async () => {
       try {
-        if (users && users.length) {
+        if (Array.isArray(users) && users.length) {
           if (!usersLoadedRef.current) {
             const me = await usersService.list()
             usersLoadedRef.current = true
@@ -212,10 +215,10 @@ export default function CreateActivityFormModal({
           setUsersList(me || [])
         }
       } catch (e) {
-        if (users && users.length) setUsersList(users)
+        if (Array.isArray(users) && users.length) setUsersList(users)
       }
     })()
-  }, [isOpen, users])
+  }, [isOpen])
 
   // When the selected key area changes, populate the available lists for that area
   useEffect(() => {
@@ -258,7 +261,7 @@ export default function CreateActivityFormModal({
       setLocalAvailableLists(Array.isArray(availableLists) ? availableLists : [1])
       setLocalListNames({})
     }
-  }, [keyAreaId, keyAreas, availableLists])
+  }, [keyAreaId])
 
   // Filter tasks to those belonging to the selected key area and selected list.
   // The Task dropdown will remain empty until the user picks both a Key Area
@@ -275,7 +278,7 @@ export default function CreateActivityFormModal({
         return String(tList) === String(listIndex)
       })
     } catch (e) { return [] }
-  }, [tasks, keyAreaId, listIndex])
+  }, [keyAreaId, listIndex])
 
   // If the currently selected taskId no longer exists in the filtered set (for
   // example because the user changed the Key Area or List), clear the selection
@@ -289,17 +292,10 @@ export default function CreateActivityFormModal({
   }, [filteredTasks, taskId])
 
   const handleSave = () => {
-    // Require a Key Area before creating an activity
-    if (!keyAreaId) {
-      setKeyAreaError('Please select a Key Area before creating an activity')
-      try { document.querySelector('select[name="key_area_id"]')?.focus?.(); } catch (__) {}
-      return
-    }
-    // Require a List selection as well
-    if (!listIndex) {
-      setListError('Please select a List for the chosen Key Area')
-      try { document.querySelector('select[name="list_index"]')?.focus?.(); } catch (__) {}
-      return
+    // Validate required field
+    if (!title || !(title || '').trim()) {
+      alert('Please enter an activity title');
+      return;
     }
 
     // Handle assignee - add delegatedToUserId for auto-delegation if assigning to different user
@@ -315,21 +311,23 @@ export default function CreateActivityFormModal({
       }
     }
 
-    const payload = {
-      text: (title || '').trim(),
-      priority: priority || undefined,
-      keyAreaId: keyAreaId || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-      deadline: deadline || undefined,
-      goalId: goalId || undefined,
-      completed: typeof completed === 'boolean' ? completed : undefined,
-      taskId: taskId || undefined,
-      listIndex: listIndex || undefined,
-      assignee: assignee || undefined,
-      delegatedToUserId: delegatedToUserId,
-      duration: duration || undefined,
-    }
+    // Build payload with only fields the backend accepts (CreateActivityDto)
+    const payload = {};
+    
+    // Required field
+    payload.text = (title || '').trim();
+    
+    // Add optional fields only if they have values
+    // Note: keyAreaId, listIndex, assignee, duration are UI-only and NOT sent to backend
+    if (taskId) payload.taskId = taskId;
+    if (priority && priority !== 'normal') payload.priority = priority;
+    if (startDate) payload.startDate = startDate;
+    if (endDate) payload.endDate = endDate;
+    if (deadline) payload.deadline = deadline;
+    if (goalId) payload.goalId = goalId;
+    if (typeof completed === 'boolean' && completed) payload.completed = completed;
+    if (delegatedToUserId) payload.delegatedToUserId = delegatedToUserId;
+    
     onSave && onSave(payload)
   }
 
@@ -381,6 +379,7 @@ export default function CreateActivityFormModal({
           <label className="text-sm font-medium text-slate-700" htmlFor="ka-activity-title">Activity name</label>
           <input
             id="ka-activity-title"
+            autoFocus
             required
             name="title"
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-50 mt-0.5"
