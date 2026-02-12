@@ -1240,6 +1240,38 @@ export default function KeyAreas() {
         return () => window.removeEventListener('task-created', handler);
     }, [selectedKA]);
     
+    // Listen for 'activity-created' events from ModalManager (navbar quick actions)
+    // When an activity is created via quick actions, add it to activitiesByTask
+    useEffect(() => {
+        const handler = (e) => {
+            const created = e && e.detail ? e.detail : null;
+            if (!created) return;
+            
+            const taskId = created.taskId || created.task_id;
+            if (!taskId) return; // Activities must have a taskId
+            
+            try {
+                // Normalize the created activity to match internal format
+                const normalized = normalizeActivity(created);
+                
+                // Add the activity to activitiesByTask under the appropriate task
+                setActivitiesByTask((prev) => {
+                    const taskKey = String(taskId);
+                    const existingActivities = prev[taskKey] || [];
+                    return {
+                        ...prev,
+                        [taskKey]: [...existingActivities, normalized]
+                    };
+                });
+            } catch (err) {
+                console.error('Failed to add activity-created event to activitiesByTask', err);
+            }
+        };
+        
+        window.addEventListener('activity-created', handler);
+        return () => window.removeEventListener('activity-created', handler);
+    }, []);
+    
     const [activityAttachTaskId, setActivityAttachTaskId] = useState(null);
     // Toasts and saving state for activity updates
     const { addToast } = useToast ? useToast() : { addToast: () => {} };
