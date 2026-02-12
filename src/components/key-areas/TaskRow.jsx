@@ -147,20 +147,7 @@ const TaskRow = ({
           </div>
         </div>
       </td>
-      <td
-        className={`px-3 py-2 align-top`}
-        onDoubleClick={(e) => {
-          // Allow double-click to enter inline edit even when disableOpen is true.
-          // Clear any pending single-click action and open the inline editor.
-          try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
-          if (enableInlineEditing) {
-            e.stopPropagation();
-            setLocalValue(t.title || '');
-            setEditingKey('name');
-          }
-        }}
-        title={enableInlineEditing ? 'Double-click to edit' : undefined}
-      >
+      <td className={`px-3 py-2 align-top`}>
         <div className="flex items-start gap-2">
           {(() => {
             const lvl = getPriorityLevel ? getPriorityLevel(t.priority) : 2;
@@ -176,50 +163,53 @@ const TaskRow = ({
               </span>
             );
           })()}
-          {enableInlineEditing ? (
-            editingKey === 'name' ? (
-              <input
-                autoFocus
-                className="border rounded px-1 py-0.5 text-sm w-full"
-                value={localValue}
-                onChange={(e) => setLocalValue(e.target.value)}
-                onBlur={async () => {
-                  setEditingKey(null);
-                  if (localValue !== t.title && typeof updateField === 'function') {
-                    try { await updateField(t.id, 'name', localValue); } catch (e) {}
-                  }
-                }}
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    e.currentTarget.blur();
-                  } else if (e.key === 'Escape') {
-                    setLocalValue(t.title);
+          <div className="flex flex-col">
+            {enableInlineEditing ? (
+              editingKey === 'name' ? (
+                <input
+                  autoFocus
+                  className="border rounded px-1 py-0.5 text-sm w-full max-w-[540px]"
+                  value={localValue}
+                  onChange={(e) => setLocalValue(e.target.value)}
+                  onBlur={async () => {
                     setEditingKey(null);
-                  }
-                }}
-              />
+                    if (localValue !== t.title && typeof updateField === 'function') {
+                      try { await updateField(t.id, 'name', localValue); } catch (e) {}
+                    }
+                  }}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    } else if (e.key === 'Escape') {
+                      setLocalValue(t.title);
+                      setEditingKey(null);
+                    }
+                  }}
+                />
+              ) : (
+                <div
+                  className={`text-sm truncate max-w-[540px] cursor-pointer ${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                  onDoubleClick={(e) => {
+                    try { if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } } catch (__) {}
+                    e.stopPropagation();
+                    setLocalValue(t.title || '');
+                    setEditingKey('name');
+                  }}
+                  title="Double click to edit"
+                >
+                  {t.title}
+                </div>
+              )
             ) : (
-              <span
-                className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
-                title={disableOpen ? 'Double-click to edit' : undefined}
-              >
+              <div className={`text-sm truncate max-w-[540px] ${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
                 {t.title}
-              </span>
-            )
-          ) : (
-            disableOpen ? (
-              <span className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 font-semibold'}`}>{t.title}</span>
-            ) : (
-              <span
-                className={`${String(t.status || "").toLowerCase() === 'done' ? 'text-slate-400 line-through' : 'text-blue-700 hover:underline font-semibold'}`}
-              >
-                {t.title}
-              </span>
-            )
-          )}
+              </div>
+            )}
+            <div className="text-xs text-slate-500">{t.notes || t.description || ''}</div>
+          </div>
           {isSaving && (
-            <div className="text-xs text-blue-600 mt-1">Saving...</div>
+            <div className="text-xs text-blue-600 ml-2">Saving...</div>
           )}
         </div>
       </td>
