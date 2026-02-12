@@ -4,7 +4,7 @@ const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.js
 const CalendarCreateModal = React.lazy(() => import("../modals/CalendarCreateModal.jsx"));
 const CreateActivityModal = React.lazy(() => import("../modals/CreateActivityFormModal.jsx"));
 const GoalForm = React.lazy(() => import("../goals/GoalForm.jsx"));
-// Load taskService on demand to allow code-splitting
+// Load services on demand to allow code-splitting
 let _taskService = null;
 const getTaskService = async () => {
     if (_taskService) return _taskService;
@@ -12,10 +12,21 @@ const getTaskService = async () => {
     _taskService = mod?.default || mod;
     return _taskService;
 };
+
+let _keyAreaService = null;
+const getKeyAreaService = async () => {
+    if (_keyAreaService) return _keyAreaService;
+    const mod = await import("../../services/keyAreaService");
+    _keyAreaService = mod?.default || mod;
+    return _keyAreaService;
+};
+
 import { useToast } from "./ToastProvider.jsx";
 
 export default function ModalManager() {
     const [modal, setModal] = useState({ type: null, payload: null });
+    const [keyAreas, setKeyAreas] = useState([]);
+    const [tasks, setTasks] = useState([]);
     const { addToast } = useToast();
 
     useEffect(() => {
@@ -31,6 +42,33 @@ export default function ModalManager() {
         window.addEventListener('open-create-modal', handler);
         return () => window.removeEventListener('open-create-modal', handler);
     }, []);
+
+    // Load key areas and data when the activity modal opens
+    useEffect(() => {
+        if (modal.type === 'activity') {
+            (async () => {
+                try {
+                    const kaSvc = await getKeyAreaService();
+                    const taskSvc = await getTaskService();
+                    
+                    // Load key areas
+                    const areas = await kaSvc.list({ includeTaskCount: false });
+                    setKeyAreas(Array.isArray(areas) ? areas : []);
+                    
+                    // Load all tasks for all key areas
+                    const allTasks = await taskSvc.list({});
+                    setTasks(Array.isArray(allTasks) ? allTasks : []);
+                } catch (err) {
+                    console.error('Failed to load key areas and tasks for activity modal', err);
+                    setKeyAreas([]);
+                    setTasks([]);
+                }
+            })();
+        } else {
+            setKeyAreas([]);
+            setTasks([]);
+        }
+    }, [modal.type]);
 
     const close = () => setModal({ type: null, payload: null });
 
@@ -78,7 +116,18 @@ export default function ModalManager() {
                         isOpen={true}
                         onCancel={close}
                         onClose={close}
-                        onSave={(res) => { addToast({ title: 'Task created', variant: 'success' }); close(); window.dispatchEvent(new CustomEvent('task-created', { detail: res })); }}
+                        onSave={async (payload) => {
+                            try {
+                                const taskService = await getTaskService();
+                                const created = await taskService.create(payload);
+                                addToast({ title: 'Task created', variant: 'success' });
+                                close();
+                                window.dispatchEvent(new CustomEvent('task-created', { detail: created }));
+                            } catch (err) {
+                                addToast({ title: 'Failed to create task', description: String(err?.message || err), variant: 'error' });
+                                throw err;
+                            }
+                        }}
                         renderInline={false}
                     />
                 </Suspense>
@@ -91,11 +140,58 @@ export default function ModalManager() {
                         isOpen={true}
                         onCancel={close}
                         renderInline={false}
+                        keyAreas={keyAreas}
+                        tasks={tasks}
+                        initialData={modal.payload || {}}
                         onSave={async (payload) => {
                             try {
                                 const mod = await import('../../services/activityService');
                                 const svc = mod?.default || mod;
-                                const toSend = { text: payload.text || payload.title || '', taskId: payload.taskId || payload.task_id || null, ...payload };
+                                
+                                // Build a clean payload with only defined values
+                                const toSend = {};
+                                
+                                // Required fields
+                                toSend.text = (payload.text || payload.title || '').trim();
+                                
+                                // Optional fields (only include if defined and non-empty)
+                                if (payload.taskId || payload.task_id) {
+                                    toSend.taskId = payload.taskId || payload.task_id;
+                                }
+                                if (payload.keyAreaId || payload.key_area_id) {
+                                    toSend.keyAreaId = payload.keyAreaId || payload.key_area_id;
+                                }
+                                if (payload.priority) {
+                                    toSend.priority = payload.priority;
+                                }
+                                if (payload.startDate || payload.date_start) {
+                                    toSend.startDate = payload.startDate || payload.date_start;
+                                }
+                                if (payload.endDate || payload.date_end) {
+                                    toSend.endDate = payload.endDate || payload.date_end;
+                                }
+                                if (payload.deadline || payload.dueDate) {
+                                    toSend.deadline = payload.deadline || payload.dueDate;
+                                }
+                                if (payload.goalId || payload.goal_id) {
+                                    toSend.goalId = payload.goalId || payload.goal_id;
+                                }
+                                if (payload.listIndex || payload.list_index) {
+                                    toSend.listIndex = payload.listIndex || payload.list_index;
+                                }
+                                if (payload.assignee) {
+                                    toSend.assignee = payload.assignee;
+                                }
+                                if (payload.delegatedToUserId) {
+                                    toSend.delegatedToUserId = payload.delegatedToUserId;
+                                }
+                                if (payload.duration) {
+                                    toSend.duration = payload.duration;
+                                }
+                                if (typeof payload.completed === 'boolean') {
+                                    toSend.completed = payload.completed;
+                                }
+                                
                                 const res = await svc.create(toSend);
                                 addToast({ title: 'Activity created', variant: 'success' });
                                 close();

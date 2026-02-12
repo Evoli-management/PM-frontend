@@ -3,6 +3,7 @@ import StatusIndicator from '../ui/StatusIndicator';
 import PriorityBadge from '../ui/PriorityBadge';
 import { getQuadrantColorClass } from '../../utils/keyareasHelpers';
 import { FaEdit, FaTrash, FaEllipsisV } from 'react-icons/fa';
+import { useFormattedDate } from '../../hooks/useFormattedDate';
 
 const TaskRow = ({
   t,
@@ -37,6 +38,7 @@ const TaskRow = ({
   disableOpen = false,
   visibleColumns = null,
 }) => {
+  const { formatDate } = useFormattedDate();
   const vc = visibleColumns ?? {
     responsible: true,
     priority: true,
@@ -340,7 +342,7 @@ const TaskRow = ({
               }}
               title="Edit start date"
             >
-              <span>{toDateOnly(t.start_date) || '—'}</span>
+              <span>{(t.start_date) ? formatDate(t.start_date) : '—'}</span>
               {editingKey === 'start_date' && <span className="text-sm">📅</span>}
             </button>
             <input
@@ -358,7 +360,7 @@ const TaskRow = ({
             />
           </div>
         ) : (
-          toDateOnly(t.start_date) || '—'
+          (t.start_date) ? formatDate(t.start_date) : '—'
         )}
         </td>
       )}
@@ -383,7 +385,7 @@ const TaskRow = ({
               }}
               title="Edit end date"
             >
-              <span>{toDateOnly(t.end_date) || '—'}</span>
+              <span>{(t.end_date) ? formatDate(t.end_date) : '—'}</span>
               {editingKey === 'end_date' && <span className="text-sm">📅</span>}
             </button>
             <input
@@ -401,7 +403,7 @@ const TaskRow = ({
             />
           </div>
         ) : (
-          toDateOnly(t.end_date) || '—'
+          (t.end_date) ? formatDate(t.end_date) : '—'
         )}
         </td>
       )}
@@ -426,7 +428,7 @@ const TaskRow = ({
               }}
               title="Edit deadline"
             >
-              <span>{toDateOnly(t.deadline || t.dueDate) || '—'}</span>
+              <span>{(t.deadline || t.dueDate) ? formatDate(t.deadline || t.dueDate) : '—'}</span>
               {editingKey === 'deadline' && <span className="text-sm">📅</span>}
             </button>
             <input
@@ -444,7 +446,7 @@ const TaskRow = ({
             />
           </div>
         ) : (
-          toDateOnly(t.deadline) || '—'
+          (t.deadline || t.dueDate) ? formatDate(t.deadline || t.dueDate) : '—'
         )}
         </td>
       )}
@@ -453,7 +455,7 @@ const TaskRow = ({
       )}
       {vc.completed && (
         <td className="px-3 py-2 align-top text-slate-800">
-          {toDateOnly(t.completionDate || t.completion_date) ? <span>{toDateOnly(t.completionDate || t.completion_date)}</span> : <span className="text-slate-500">—</span>}
+          {(t.completionDate || t.completion_date) ? <span>{formatDate(t.completionDate || t.completion_date)}</span> : <span className="text-slate-500">—</span>}
         </td>
       )}
       

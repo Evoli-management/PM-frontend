@@ -489,10 +489,41 @@ export default function DontForget() {
         } catch {}
         return 1;
     });
+    const [dfSortField, setDfSortField] = useState(() => {
+        try {
+            return window.localStorage.getItem('dontforget.sortField') || null;
+        } catch (_) {}
+        return null;
+    });
+    const [dfSortDirection, setDfSortDirection] = useState(() => {
+        try {
+            return window.localStorage.getItem('dontforget.sortDirection') || null;
+        } catch (_) {}
+        return null;
+    });
     useEffect(() => {
         if (!availableDfLists || availableDfLists.length === 0) return;
         if (!availableDfLists.includes(selectedDfList)) setSelectedDfList(availableDfLists[0]);
     }, [availableDfLists]);
+    // Persist DF sort state to localStorage
+    useEffect(() => {
+        try {
+            if (dfSortField) {
+                window.localStorage.setItem('dontforget.sortField', dfSortField);
+            } else {
+                window.localStorage.removeItem('dontforget.sortField');
+            }
+        } catch (_) {}
+    }, [dfSortField]);
+    useEffect(() => {
+        try {
+            if (dfSortDirection) {
+                window.localStorage.setItem('dontforget.sortDirection', dfSortDirection);
+            } else {
+                window.localStorage.removeItem('dontforget.sortDirection');
+            }
+        } catch (_) {}
+    }, [dfSortDirection]);
     const getDfListName = (n) => (dfListNames?.[n] ? dfListNames[n] : `List ${n}`);
     const addDfList = () => {
         const max = availableDfLists.length ? Math.max(...availableDfLists) : 0;
@@ -637,8 +668,8 @@ export default function DontForget() {
 
     // Which DF tasks are visible in the list (filtered by selected DF list)
     const dontForgetTasks = useMemo(
-        () =>
-            (tasks || []).filter((t) => {
+        () => {
+            let arr = (tasks || []).filter((t) => {
                 if (t.keyArea) return false;
                 if (!(showImported || !t.imported)) return false;
                 if (!(showCompleted || !t.completed)) return false;
@@ -646,8 +677,84 @@ export default function DontForget() {
                 const idx = Number(t.listIndex ?? t.list_index ?? 1);
                 if (selectedDfList && Number(selectedDfList) !== Number(idx)) return false;
                 return true;
-            }),
-        [tasks, showImported, showCompleted, selectedDfList],
+            });
+            
+            // Apply sorting if a sort field is selected
+            if (dfSortField && dfSortDirection) {
+                arr.sort((a, b) => {
+                    let aVal, bVal;
+                    
+                    switch (dfSortField) {
+                        case 'title':
+                            aVal = (a.title || a.name || '').toLowerCase();
+                            bVal = (b.title || b.name || '').toLowerCase();
+                            break;
+                        case 'responsible':
+                            aVal = (a.assignee || a.responsible || '').toLowerCase();
+                            bVal = (b.assignee || b.responsible || '').toLowerCase();
+                            break;
+                        case 'status':
+                            aVal = (a.status || '').toLowerCase();
+                            bVal = (b.status || '').toLowerCase();
+                            break;
+                        case 'priority':
+                            aVal = getPriorityLevel(a.priority);
+                            bVal = getPriorityLevel(b.priority);
+                            break;
+                        case 'quadrant':
+                            aVal = a.quadrant || 4;
+                            bVal = b.quadrant || 4;
+                            break;
+                        case 'start_date':
+                            aVal = a.start_date || a.startDate || '';
+                            bVal = b.start_date || b.startDate || '';
+                            break;
+                        case 'end_date':
+                            aVal = a.end_date || a.endDate || '';
+                            bVal = b.end_date || b.endDate || '';
+                            break;
+                        case 'deadline':
+                            aVal = a.deadline || a.due_date || a.dueDate || '';
+                            bVal = b.deadline || b.due_date || b.dueDate || '';
+                            break;
+                        case 'duration':
+                            const getDuration = (t) => {
+                                const start = t.start_date || t.startDate;
+                                const end = t.end_date || t.endDate;
+                                if (!start || !end) return 0;
+                                return new Date(end).getTime() - new Date(start).getTime();
+                            };
+                            aVal = getDuration(a);
+                            bVal = getDuration(b);
+                            break;
+                        case 'completed':
+                            aVal = a.completionDate || a.completion_date || '';
+                            bVal = b.completionDate || b.completion_date || '';
+                            break;
+                        default:
+                            return 0;
+                    }
+                    
+                    // Handle empty values
+                    if (!aVal && !bVal) return 0;
+                    if (!aVal) return 1;
+                    if (!bVal) return -1;
+                    
+                    // Compare values
+                    let comparison = 0;
+                    if (typeof aVal === 'string' && typeof bVal === 'string') {
+                        comparison = aVal.localeCompare(bVal);
+                    } else {
+                        comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                    }
+                    
+                    return dfSortDirection === 'asc' ? comparison : -comparison;
+                });
+            }
+            
+            return arr;
+        },
+        [tasks, showImported, showCompleted, selectedDfList, dfSortField, dfSortDirection],
     );
 
     const addDontForgetTask = async (payload) => {
@@ -865,6 +972,21 @@ export default function DontForget() {
             console.error('Failed to update status', e);
         }
     };
+
+    const handleDfSort = (field) => {
+        if (dfSortField === field) {
+            if (dfSortDirection === 'asc') {
+                setDfSortDirection('desc');
+            } else if (dfSortDirection === 'desc') {
+                setDfSortField(null);
+                setDfSortDirection(null);
+            }
+        } else {
+            setDfSortField(field);
+            setDfSortDirection('asc');
+        }
+    };
+
     const deleteTask = async (id) => {
         try {
             markSaving(id);
@@ -1761,31 +1883,81 @@ export default function DontForget() {
                                                                 }
                                                             />
                                                         </th>
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px]">Task</th>
+                                                        <th 
+                                                            className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                            onClick={() => handleDfSort('title')}
+                                                        >
+                                                            Task {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                        </th>
                                                         {visibleColumns.responsible && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell">Responsible</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden sm:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('responsible')}
+                                                            >
+                                                                Responsible {dfSortField === 'responsible' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
-                                                        <th className="px-2 sm:px-3 py-2 text-left font-semibold">Status</th>
+                                                        <th 
+                                                            className="px-2 sm:px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                            onClick={() => handleDfSort('status')}
+                                                        >
+                                                            Status {dfSortField === 'status' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                        </th>
                                                         {visibleColumns.priority && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell">Priority</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden md:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('priority')}
+                                                            >
+                                                                Priority {dfSortField === 'priority' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {visibleColumns.quadrant && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Quadrant</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('quadrant')}
+                                                            >
+                                                                Quadrant {dfSortField === 'quadrant' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {visibleColumns.start_date && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Start Date</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('start_date')}
+                                                            >
+                                                                Start Date {dfSortField === 'start_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {visibleColumns.end_date && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">End date</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('end_date')}
+                                                            >
+                                                                End date {dfSortField === 'end_date' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {visibleColumns.deadline && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell">Deadline</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden lg:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('deadline')}
+                                                            >
+                                                                Deadline {dfSortField === 'deadline' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {visibleColumns.duration && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Duration</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('duration')}
+                                                            >
+                                                                Duration {dfSortField === 'duration' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {visibleColumns.completed && (
-                                                            <th className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell">Completed</th>
+                                                            <th 
+                                                                className="px-2 sm:px-3 py-2 text-left font-semibold hidden xl:table-cell cursor-pointer hover:bg-slate-100"
+                                                                onClick={() => handleDfSort('completed')}
+                                                            >
+                                                                Completed {dfSortField === 'completed' && (dfSortDirection === 'asc' ? '↑' : '↓')}
+                                                            </th>
                                                         )}
                                                         {/* Actions column removed — use row menu instead */}
                                                     </tr>
