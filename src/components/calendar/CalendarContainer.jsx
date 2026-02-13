@@ -186,7 +186,7 @@ const CalendarContainer = () => {
             try {
                 const goalsMod = await import('../../services/goalService');
                 const goalsSvc = goalsMod?.default || goalsMod;
-                const gs = await goalsSvc.getGoals().catch(() => []);
+                const gs = await goalsSvc.getGoals({ status: 'active' }).catch(() => []);
                 if (!ignore) setGoalsList(Array.isArray(gs) ? gs : []);
             } catch (e) {
                 console.warn('Failed to load goals for calendar', e);

@@ -27,8 +27,8 @@ const GoalDetailModal = ({
     const { formatDate, dateFormat } = useFormattedDate();
 
     const formatDateLabel = (value) => {
-        if (!value) return `Format: ${dateFormat}`;
-        return `${formatDate(value)} (Format: ${dateFormat})`;
+        if (!value) return '';
+        return formatDate(value);
     };
 
     React.useEffect(() => {
@@ -613,9 +613,6 @@ const GoalDetailModal = ({
                                     >
                                         📅
                                     </button>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        {formatDateLabel(localGoal?.startDate)}
-                                    </p>
                                 </div>
                             </div>
 
@@ -658,9 +655,6 @@ const GoalDetailModal = ({
                                     >
                                         📅
                                     </button>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        {formatDateLabel(localGoal?.dueDate)}
-                                    </p>
                                 </div>
                             </div>
 
@@ -1139,9 +1133,6 @@ const GoalDetailModal = ({
                                                         >
                                                             📅
                                                         </button>
-                                                        <p className="mt-1 text-xs text-gray-500">
-                                                            {formatDateLabel(m.startDate)}
-                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-2">
@@ -1269,9 +1260,6 @@ const GoalDetailModal = ({
                                                         >
                                                             📅
                                                         </button>
-                                                        <p className="mt-1 text-xs text-gray-500">
-                                                            {formatDateLabel(m.dueDate)}
-                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>

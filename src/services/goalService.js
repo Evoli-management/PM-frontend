@@ -24,11 +24,20 @@ const handleError = (context, error) => {
 
 /**
  * Fetches all goals for the current user, including milestones.
+ * @param {object} filters - Optional filters (status, keyAreaId, etc.)
  * @returns {Promise<Array>} A promise that resolves to an array of goals with milestones.
  */
-export const getGoals = async () => {
+export const getGoals = async (filters = {}) => {
     try {
-        const response = await apiClient.get("/goals");
+        const params = new URLSearchParams();
+        if (filters.status) params.append('status', filters.status);
+        if (filters.keyAreaId) params.append('keyAreaId', filters.keyAreaId);
+        if (filters.parentId !== undefined) params.append('parentId', filters.parentId);
+        if (filters.q) params.append('q', filters.q);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/goals?${queryString}` : "/goals";
+        const response = await apiClient.get(url);
 
         // The backend findAll doesn't include milestones, so we need to fetch them separately
         if (Array.isArray(response.data)) {

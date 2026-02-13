@@ -102,7 +102,7 @@ export default function CreateTaskModal({
                     kaSvc.list({ includeTaskCount: false }),
                     // Dynamically import goalService so it can be split from the
                     // initial bundle when the modal is not used at startup.
-                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
+                    import("../../services/goalService").then((m) => m.getGoals({ status: 'active' })).catch(() => []),
                     ts.list({}),
                 ]);
                 console.log('Goals fetched:', goalsData);

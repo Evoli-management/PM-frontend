@@ -57,7 +57,7 @@ const EventModal = ({ event, onClose, categories, timezone, onEventUpdated, onEv
                     // Dynamically import goalService so it can be code-split away
                     // from the initial bundle. Some consumers already use
                     // dynamic import; doing it here avoids keeping goals in main.
-                    import("../../services/goalService").then((m) => m.getGoals()).catch(() => []),
+                    import("../../services/goalService").then((m) => m.getGoals({ status: 'active' })).catch(() => []),
                 ]);
                 setKeyAreas(Array.isArray(kas) ? kas : []);
                 setGoals(Array.isArray(gs) ? gs : []);
