@@ -205,7 +205,7 @@ export default function EditActivityModal({
         const [areas, fetchedTasks, fetchedGoals] = await Promise.all([
           kaSvc.list({ includeTaskCount: false }).catch(() => []),
           taskSvc ? taskSvc.list({}).catch(() => []) : Promise.resolve([]),
-          goalsMod && goalsMod.getGoals ? goalsMod.getGoals().catch(() => []) : Promise.resolve([]),
+          goalsMod && goalsMod.getGoals ? goalsMod.getGoals({ status: 'active' }).catch(() => []) : Promise.resolve([]),
         ]);
         if (ignore) return;
         setLocalKeyAreas(Array.isArray(areas) ? areas : []);

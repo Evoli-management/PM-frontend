@@ -100,7 +100,7 @@ const api = {
             const mod = await import('../services/goalService');
             const fn = mod?.getGoals || mod?.default?.getGoals || mod?.default;
             if (typeof fn === 'function') {
-                return await fn();
+                return await fn({ status: 'active' });
             }
             // fallback: call default export if it returns an object with getGoals
             return [];

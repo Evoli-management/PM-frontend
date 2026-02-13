@@ -454,7 +454,7 @@ export default function Dashboard() {
             try {
                 console.log("Loading goals...");
                 const mod = await import("../../services/goalService");
-                const goalsData = await mod.getGoals();
+                const goalsData = await mod.getGoals({ status: 'active' });
                 console.log("Goals loaded:", goalsData);
                 
                 // Transform goals data for dashboard display

@@ -228,7 +228,7 @@ export default function DontForget() {
             try {
                 const [uSvc, gSvc] = await Promise.all([getUsersService(), getGoalService()]);
                 const usersArr = uSvc && typeof uSvc.list === "function" ? await uSvc.list() : [];
-                const goalsArr = gSvc && typeof gSvc.getGoals === "function" ? await gSvc.getGoals() : [];
+                const goalsArr = gSvc && typeof gSvc.getGoals === "function" ? await gSvc.getGoals({ status: 'active' }) : [];
                 if (cancelled) return;
                 setUsers(usersArr || []);
                 setGoals(goalsArr || []);

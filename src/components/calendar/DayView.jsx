@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import calendarService from "../../services/calendarService";
+import ResizablePanels from "../key-areas/ResizablePanels";
 
 // Load activityService on demand to keep it out of the main chunk
 let _activityService = null;
@@ -517,12 +518,12 @@ export default function DayView({
                     e.stopPropagation();
                     if (onTaskClick) onTaskClick(t);
                   }}
-                  className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
+                  className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
                   style={style}
                   title={`Drag to calendar to create appointment • ${t.title || t.name || 'Untitled'}`}
                 >
                   <div className="truncate font-medium flex-1">{t.title || t.name || 'Untitled'}</div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     {onTaskComplete && (
                       <button
                         onClick={(e) => {
@@ -634,7 +635,7 @@ export default function DayView({
                       e.stopPropagation();
                       if (onActivityClick) onActivityClick(a);
                     }}
-                    className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
+                    className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing w-full flex items-center gap-2 hover:opacity-90 hover:shadow-md transition-all ${bgClass || ''}`}
                     style={style}
                     title={`Drag to calendar to create appointment • ${a.text || a.desc || a.note || 'Activity'}`}
                   >
@@ -652,7 +653,7 @@ export default function DayView({
                     </svg>
 
                     <div className="truncate flex-1">{a.text || a.desc || a.note || 'Activity'}</div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       {onActivityComplete && (
                         <button
                           onClick={(e) => {
@@ -716,9 +717,8 @@ export default function DayView({
     </>
   );
 
-  return (
-  <div className="flex items-start gap-1">
-        <div className="w-1/2 flex-shrink-0">
+  const leftPanel = (
+        <div className="flex-shrink-0 h-full">
           {/* compact header */}
           <div className="w-full mb-3">
             <div className="flex items-center justify-between mb-2">
@@ -1306,9 +1306,10 @@ export default function DayView({
             </div>
           </div>
         </div>
-
-  {/* Sidebar: Quick actions panel */}
-  <div className="w-1/2 flex-shrink-0">
+      );
+  
+  const rightPanel = (
+        <div className="flex-shrink-0 h-full">
           <div className="sticky top-2">
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2 mb-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-stretch">
@@ -1322,6 +1323,15 @@ export default function DayView({
             </div>
           </div>
         </div>
-      </div>
+      );
+
+  return (
+    <ResizablePanels
+      taskPanel={leftPanel}
+      activityPanel={rightPanel}
+      initialTaskWidth={50}
+      minTaskWidth={25}
+      minActivityWidth={25}
+    />
   );
 }

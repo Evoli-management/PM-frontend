@@ -291,7 +291,7 @@ export default function CreateTaskModal({
         const [areas, tasks, goalsData] = await Promise.all([
           kaSvc.list({ includeTaskCount: false }).catch(() => []),
           taskSvc ? taskSvc.list({}).catch(() => []) : Promise.resolve([]),
-          import('../../services/goalService').then((m) => m.getGoals()).catch(() => []),
+          import('../../services/goalService').then((m) => m.getGoals({ status: 'active' })).catch(() => []),
         ]);
         if (ignore) return;
         const newAreas = Array.isArray(areas) ? areas : [];

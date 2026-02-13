@@ -167,7 +167,7 @@ export default function CreateActivityFormModal({
         // Otherwise fetch from service
         const mod = await import('../../services/goalService').catch(() => null)
         if (mod && mod.getGoals) {
-          const fetched = await mod.getGoals().catch(() => [])
+          const fetched = await mod.getGoals({ status: 'active' }).catch(() => [])
           setLocalGoals(Array.isArray(fetched) ? fetched : [])
         }
       } catch (e) {
