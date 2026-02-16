@@ -354,7 +354,8 @@ export default function DayView({
         const tds = (Array.isArray(rawTodos) ? rawTodos : []).filter((t) => {
           try {
             const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
-            const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || null;
+            // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
+            const e = t.endDate || t.end_date || t.dueDate || t.due_date || null;
             if (!s || !e) return false;
             const sd = new Date(s);
             const ed = new Date(e);
@@ -368,7 +369,28 @@ export default function DayView({
         });
 
         if (ignore) return;
-        setSideTodos(Array.isArray(tds) ? tds : []);
+        
+        // Filter sideTodos to exclude multi-day tasks (only show single-day tasks)
+        const singleDayTodos = (Array.isArray(tds) ? tds : []).filter((t) => {
+          try {
+            const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
+            // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
+            const e = t.endDate || t.end_date || t.dueDate || t.due_date || null;
+            if (!s || !e) return false;
+            const sd = new Date(s);
+            const ed = new Date(e);
+            if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return false;
+            // Check if task spans multiple calendar days
+            const sDay = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
+            const eDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+            // Exclude multi-day tasks
+            return sDay.getTime() === eDay.getTime();
+          } catch (_) {
+            return false;
+          }
+        });
+        
+        setSideTodos(singleDayTodos);
         setSideAppointments(Array.isArray(apps) ? apps : []);
 
         // Load key areas to map colors for tasks when categories mapping is not present
@@ -391,7 +413,8 @@ export default function DayView({
             try {
               const todayOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
               let start = new Date(t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null);
-              let end = new Date(t.endDate || t.end_date || t.date || t.dueDate || t.due_date || null);
+              // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
+              let end = new Date(t.endDate || t.end_date || t.dueDate || t.due_date || null);
               if (isNaN(start.getTime())) start = todayOnly;
               if (isNaN(end.getTime())) end = todayOnly;
               return start <= todayOnly && todayOnly <= end;
@@ -907,7 +930,8 @@ export default function DayView({
                               seen.add(dedupeId);
 
                               const s = t.startDate || t.start || t.start_date || t.from || t.begin || t.date || t.dueDate || t.due_date || null;
-                              const e = t.endDate || t.end || t.end_date || t.to || t.finish || t.date || t.dueDate || t.due_date || null;
+                              // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
+                              const e = t.endDate || t.end || t.end_date || t.to || t.finish || t.dueDate || t.due_date || null;
                               if (!s || !e) return false;
                               const sd = new Date(s);
                               const ed = new Date(e);
@@ -928,7 +952,8 @@ export default function DayView({
                           return multiDay.map((t) => {
                             try {
                               const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
-                              const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || null;
+                              // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
+                              const e = t.endDate || t.end_date || t.dueDate || t.due_date || null;
                               const sd = new Date(s);
                               const ed = new Date(e);
                               const edAdjusted = adjustEndInclusive(ed);
