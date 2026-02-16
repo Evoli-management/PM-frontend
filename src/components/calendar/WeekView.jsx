@@ -69,6 +69,8 @@ const WeekView = ({
     const listOuterRef = useRef(null);
     const [columnWidth, setColumnWidth] = useState(null);
     const [keyAreaMap, setKeyAreaMap] = useState({});
+    const [calculatedListHeight, setCalculatedListHeight] = useState(400);
+    const hasAutoScrolledRef = useRef(null); // Track if we've auto-scrolled for current date
 
     // Track current time as ms so we can compute fractional minutes (minutes + seconds/60)
     const [nowMs, setNowMs] = useState(() => Date.now());
@@ -96,6 +98,23 @@ const WeekView = ({
                 clearInterval(weekScrollRef.current._nowInterval);
             }
         };
+    }, []);
+
+    // Calculate FixedSizeList height based on available flex space
+    useEffect(() => {
+        const calculateHeight = () => {
+            if (!weekScrollRef.current) return;
+            const rect = weekScrollRef.current.getBoundingClientRect();
+            const availableHeight = rect.height;
+            if (availableHeight > 0) {
+                setCalculatedListHeight(availableHeight);
+            }
+        };
+        
+        // Calculate on mount and when window resizes
+        calculateHeight();
+        window.addEventListener('resize', calculateHeight);
+        return () => window.removeEventListener('resize', calculateHeight);
     }, []);
 
     // Track FixedSizeList outer scroll so the now-line can be positioned relative to visible scroll
@@ -240,6 +259,50 @@ const WeekView = ({
         };
     }, []);
 
+    // Auto-scroll to current time when viewing a week that includes today
+    useEffect(() => {
+        if (!listOuterRef.current || !slots.length) return;
+        
+        // Create a unique key for the current week to prevent re-scrolling on other changes
+        const weekKey = `${currentDate?.toISOString().split('T')[0]}_${workWeek}`;
+        
+        // Only auto-scroll once per week view
+        if (hasAutoScrolledRef.current === weekKey) return;
+        
+        // Check if today is in the currently viewed week
+        const today = new Date();
+        const isThisWeek = days.some(
+            (d) =>
+                d.getFullYear() === today.getFullYear() &&
+                d.getMonth() === today.getMonth() &&
+                d.getDate() === today.getDate()
+        );
+        
+        if (isThisWeek) {
+            // Calculate scroll position based on current time
+            const firstSlot = slots[0] || "00:00";
+            const [fh, fm] = firstSlot.split(":").map(Number);
+            const startMinutes = fh * 60 + (fm || 0);
+            const nowMinutes = today.getHours() * 60 + today.getMinutes();
+            const pixelsPerMinute = (measuredSlotPx || ITEM_SIZE) / slotSize;
+            
+            // Calculate scroll offset with some padding to center the current time
+            const scrollOffset = Math.max(0, (nowMinutes - startMinutes) * pixelsPerMinute - 100);
+            
+            // Small delay to ensure the list is fully rendered
+            setTimeout(() => {
+                if (listOuterRef.current) {
+                    listOuterRef.current.scrollTop = scrollOffset;
+                    // Mark as auto-scrolled for this week
+                    hasAutoScrolledRef.current = weekKey;
+                }
+            }, 100);
+        } else {
+            // Mark as processed even if not scrolling (not viewing current week)
+            hasAutoScrolledRef.current = weekKey;
+        }
+    }, [currentDate, workWeek, days]); // Only depend on date/week changes, not scroll-related state
+
     // Drag-and-drop handler
     const handleDrop = (e, day, slot) => {
         try {
@@ -351,7 +414,7 @@ const WeekView = ({
                     }
                     .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
                 `}</style>
-                <div className="p-0" style={{ overflow: "hidden", position: 'relative' }}>
+                <div className="p-0 flex flex-col h-screen" style={{ overflow: "hidden", position: 'relative' }}>
                 {/* Header with navigation inside the view */}
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -360,7 +423,11 @@ const WeekView = ({
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 36, minHeight: 36 }}
                             aria-label="Previous week"
-                            onClick={() => onShiftDate && onShiftDate(-1)}
+                            onClick={() => {
+                                // Reset auto-scroll tracker to allow auto-scroll on new week
+                                hasAutoScrolledRef.current = null;
+                                onShiftDate && onShiftDate(-1);
+                            }}
                         >
                             <FaChevronLeft />
                         </button>
@@ -474,6 +541,8 @@ const WeekView = ({
                             aria-label="Today"
                             onClick={() => {
                                 try {
+                                    // Reset auto-scroll tracker so it will scroll to current time again
+                                    hasAutoScrolledRef.current = null;
                                     if (typeof onSetDate === 'function') onSetDate(new Date());
                                 } catch (_) {}
                                 // trigger blink overlay for today's column
@@ -538,7 +607,11 @@ const WeekView = ({
                             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
                             style={{ minWidth: 36, minHeight: 36 }}
                             aria-label="Next week"
-                            onClick={() => onShiftDate && onShiftDate(1)}
+                            onClick={() => {
+                                // Reset auto-scroll tracker to allow auto-scroll on new week
+                                hasAutoScrolledRef.current = null;
+                                onShiftDate && onShiftDate(1);
+                            }}
                         >
                             <FaChevronRight />
                         </button>
@@ -548,12 +621,12 @@ const WeekView = ({
                 {/* Calendar grid */}
                 <div
                     ref={containerRef}
-                    className="no-scrollbar"
-                    style={{ overflowX: "hidden", overflowY: "hidden" }}
+                    className="no-scrollbar flex-1"
+                    style={{ overflowX: "hidden", overflowY: "hidden", display: "flex", flexDirection: "column" }}
                 >
-                    <div style={{ width: "100%" }}>
+                    <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                         {/* Header + all-day row */}
-                        <div className="no-scrollbar">
+                        <div className="no-scrollbar flex-shrink-0" style={{ flexBasis: "auto" }}>
                             <table
                                 className="min-w-full border border-gray-100 rounded-lg"
                                 style={{
@@ -591,13 +664,22 @@ const WeekView = ({
                                 <tbody>
                                     <tr>
                                         <td
-                                            className="border-r border-gray-100 px-2 py-2 text-xs text-gray-500"
-                                            style={{ width: TIME_COL_PX + "px" }}
+                                            className="px-2 py-2 text-xs text-gray-500"
+                                            style={{
+                                                width: TIME_COL_PX + "px",
+                                                borderRightWidth: "2px",
+                                                borderRightStyle: "dashed",
+                                                borderRightColor: "rgba(148, 163, 184, 0.3)",
+                                            }}
                                         >
                                             <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">All-Day</span>
                                         </td>
                                         {/* single cell spanning the day columns; we will render multi-day task bars inside */}
-                                        <td className="border-r border-gray-100 px-2 py-2 align-top" colSpan={daysCount}>
+                                        <td className="px-2 py-2 align-top" style={{
+                                            borderRightWidth: "2px",
+                                            borderRightStyle: "dashed",
+                                            borderRightColor: "rgba(148, 163, 184, 0.3)",
+                                        }} colSpan={daysCount}>
                                             <div style={{ position: 'relative', minHeight: 40 }}>
                                                 {(() => {
                                                     try {
@@ -699,11 +781,11 @@ const WeekView = ({
                             <div
                                 ref={weekScrollRef}
                                 className="w-full no-scrollbar"
-                                style={{ position: "relative", width: "100%" }}
+                                style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", flex: "3", minHeight: 0 }}
                             >
                                 <FixedSizeList
                                     className="no-scrollbar"
-                                    height={LIST_HEIGHT_PX}
+                                    height={calculatedListHeight}
                                     itemCount={slots.length}
                                     itemSize={ITEM_SIZE}
                                     width={undefined}
@@ -1051,11 +1133,14 @@ const WeekView = ({
                                             >
                                                 {/* LEFT: hour labels (only on :00) */}
                                                 <div
-                                                    className="border-r border-gray-100 px-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
+                                                    className="px-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-center relative"
                                                     style={{
                                                         width: TIME_COL_PX + "px",
                                                         height: ITEM_SIZE,
                                                         backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
+                                                        borderRightWidth: "2px",
+                                                        borderRightStyle: "dashed",
+                                                        borderRightColor: "rgba(148, 163, 184, 0.3)",
                                                     }}
                                                 >
                                                     {/* non-working hour indicator removed (keep pale background only) */}
@@ -1083,7 +1168,7 @@ const WeekView = ({
                                                     return (
                                                         <div
                                                             key={dIdx}
-                                                            className="border-r border-gray-100 px-2 align-top group flex items-center relative overflow-visible"
+                                                            className="px-2 align-top group flex items-center relative overflow-visible"
                                                             style={{
                                                                 flex: "1 1 0",
                                                                 minWidth: 0,
@@ -1093,6 +1178,9 @@ const WeekView = ({
                                                                 cursor: "pointer",
                                                                 backgroundColor: slotIsWorking ? undefined : NON_WORK_BG,
                                                                 opacity: slotIsWorking ? 1 : NON_WORK_OPACITY,
+                                                                borderRightWidth: "2px",
+                                                                borderRightStyle: "dashed",
+                                                                borderRightColor: "rgba(148, 163, 184, 0.3)",
                                                                 ...cellTopBorderStyle,
                                                             }}
                                                             onDragOver={(e) =>
@@ -1185,7 +1273,7 @@ const WeekView = ({
                         )}
 
                         {/* Combined Tasks + Activities row: render per-day vertical columns under each date (no separation) */}
-                        <div className="flex w-full bg-white border border-gray-100 rounded-b-lg mt-2">
+                        <div className="flex w-full bg-white border border-gray-100 rounded-b-lg mt-2 flex-shrink-0" style={{ flex: "0 0 25vh", maxHeight: "25vh", minHeight: "25vh", overflowY: "auto", borderTop: "3px solid rgba(100, 116, 139, 0.6)" }}>
                             {/* LEFT: sticky column with both Add buttons stacked */}
                             <div className="flex flex-col items-start pr-2 pl-1 py-2" style={{ width: TIME_COL_PX + "px", position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white', minHeight: 56 }}>
                                 <button
@@ -1275,7 +1363,11 @@ const WeekView = ({
                                     });
 
                                     return (
-                                        <div key={`col-${dIdx}`} className="border-r border-gray-100 p-2 min-h-[56px] overflow-hidden">
+                                        <div key={`col-${dIdx}`} className="p-2 min-h-[56px] overflow-hidden" style={{
+                                            borderRightWidth: "2px",
+                                            borderRightStyle: "dashed",
+                                            borderRightColor: "rgba(148, 163, 184, 0.3)",
+                                        }}>
                                             <div className="flex flex-col gap-2">
                                                 {combined.map((item) => {
                                                     if (item.__type === 'task') {

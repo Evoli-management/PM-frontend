@@ -1640,9 +1640,9 @@ const CalendarContainer = () => {
     };
 
     return (
-        <div className="w-full">
+        <div className="w-full h-screen flex flex-col">
             {/* Unified calendar card */}
-            <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3">
+            <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 flex flex-col flex-1 overflow-hidden">
                 {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
 
@@ -1650,7 +1650,7 @@ const CalendarContainer = () => {
                 {(() => {
                     const { dateStart, dateEnd } = getCurrentViewDateRange();
                     return (
-                        <div className="mb-3">
+                        <div className="mb-3 flex-shrink-0">
                             <ElephantTaskInput
                                 viewType={view}
                                 dateStart={dateStart}
@@ -1662,8 +1662,9 @@ const CalendarContainer = () => {
                         </div>
                     );
                 })()}
-                {/* Active view content */}
+                {/* Active view content - flex-1 to fill available space */}
                 {view === "quarter" && (
+                    <div className="flex-1 overflow-hidden">
                     <QuarterView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
@@ -1679,8 +1680,10 @@ const CalendarContainer = () => {
                         onEventClick={(ev) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev))}
                         onTaskClick={openEditTask}
                     />
+                    </div>
                 )}
                 {view === "month" && (
+                    <div className="flex-1 overflow-hidden">
                     <MonthView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
@@ -1697,8 +1700,10 @@ const CalendarContainer = () => {
                         onQuickCreate={handleQuickCreate}
                         enableQuickCreate={false}
                     />
+                    </div>
                 )}
                 {view === "week" && (
+                    <div className="flex-1 overflow-hidden">
                     <WeekView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
@@ -1722,8 +1727,10 @@ const CalendarContainer = () => {
                         onTaskClick={openEditTask}
                         activities={weekActivities}
                     />
+                    </div>
                 )}
                 {view === "day" && (
+                    <div className="flex-1 overflow-hidden">
                     <DayView
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
@@ -1755,6 +1762,7 @@ const CalendarContainer = () => {
                         onActivityDelete={handleActivityDelete}
                         onPlanTomorrow={() => {}}
                     />
+                    </div>
                 )}
             </div>
             {addModalOpen && (
