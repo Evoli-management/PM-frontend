@@ -5,7 +5,6 @@ import QuarterView from "./QuarterView";
 import MonthView from "./MonthView";
 import WeekView from "./WeekView";
 import DayView from "./DayView";
-import ListView from "./ListView";
 import EventModal from "./EventModal";
 const CreateTaskModal = React.lazy(() => import("../key-areas/CreateTaskModal.jsx"));
 // The activities modal file is named CreateActivityFormModal.jsx in /components/modals
@@ -39,7 +38,7 @@ import AppointmentModal from "./AppointmentModal";
 import DebugEventModal from "./DebugEventModal";
 import useCalendarPreferences from '../../hooks/useCalendarPreferences';
 
-const VIEWS = ["day", "week", "month", "quarter", "list"];
+const VIEWS = ["day", "week", "month", "quarter"];
 const EVENT_CATEGORIES = {
     focus: { color: "bg-blue-500", icon: "🧠" },
     meeting: { color: "bg-yellow-500", icon: "📅" },
@@ -150,7 +149,10 @@ const CalendarContainer = () => {
     useEffect(() => {
         try {
             const savedView = localStorage.getItem("calendar:view");
-            if (savedView && ["day", "week", "month", "quarter", "list"].includes(savedView)) {
+            if (
+                savedView &&
+                ["day", "week", "month", "quarter"].includes(savedView)
+            ) {
                 setView(savedView);
             }
             const savedDate = localStorage.getItem("calendar:date");
@@ -286,7 +288,7 @@ const CalendarContainer = () => {
         }
     };
 
-    // Fetch events/todos from backend for day/week/month/quarter/list views
+    // Fetch events/todos from backend for day/week/month/quarter views
     useEffect(() => {
         const load = async () => {
             // Compute range based on view
@@ -309,10 +311,6 @@ const CalendarContainer = () => {
                 const q = Math.floor(start.getMonth() / 3);
                 start.setMonth(q * 3, 1);
                 end.setMonth(q * 3 + 3, 0); // last day of quarter
-            } else if (view === "list") {
-                // Use current month for list view range
-                start.setDate(1);
-                end.setMonth(start.getMonth() + 1, 0);
             }
             const fromISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0).toISOString();
             const toISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString();
@@ -435,7 +433,7 @@ const CalendarContainer = () => {
             // Exact day range for refresh
             start.setTime(currentDate.getTime());
             end.setTime(currentDate.getTime());
-        } else if (view === "month" || view === "list") {
+        } else if (view === "month") {
             start.setDate(1);
             end.setMonth(start.getMonth() + 1, 0);
         } else if (view === "quarter") {
@@ -1513,9 +1511,6 @@ const CalendarContainer = () => {
                 // 3-month window by one month at a time (Jan-Mar -> Feb-Apr).
                 d.setMonth(d.getMonth() + delta);
                 break;
-            case "list":
-                d.setMonth(d.getMonth() + delta);
-                break;
             default:
                 d.setDate(d.getDate() + delta);
         }
@@ -1545,9 +1540,6 @@ const CalendarContainer = () => {
         if (view === "quarter") {
             const q = Math.floor(d.getMonth() / 3) + 1;
             return `Q${q} ${d.getFullYear()}`;
-        }
-        if (view === "list") {
-            return formatDate(d, { longMonth: true });
         }
         return "";
     })();
@@ -1634,7 +1626,7 @@ const CalendarContainer = () => {
             end.setMonth(q * 3 + 3, 0);
             end.setHours(23, 59, 59, 999);
         } else {
-            // Default to current month for list view
+            // Default to current month for any fallback view
             start.setDate(1);
             start.setHours(0, 0, 0, 0);
             end.setMonth(start.getMonth() + 1, 0);
@@ -1655,22 +1647,21 @@ const CalendarContainer = () => {
                 {/* Each view renders its own navigation header */}
 
                 {/* New Calendar Elephant Task Input */}
-                {view !== "list" &&
-                    (() => {
-                        const { dateStart, dateEnd } = getCurrentViewDateRange();
-                        return (
-                            <div className="mb-3">
-                                <ElephantTaskInput
-                                    viewType={view}
-                                    dateStart={dateStart}
-                                    dateEnd={dateEnd}
-                                    onTaskChange={() => {
-                                        // Optionally refresh calendar data when elephant task changes
-                                    }}
-                                />
-                            </div>
-                        );
-                    })()}
+                {(() => {
+                    const { dateStart, dateEnd } = getCurrentViewDateRange();
+                    return (
+                        <div className="mb-3">
+                            <ElephantTaskInput
+                                viewType={view}
+                                dateStart={dateStart}
+                                dateEnd={dateEnd}
+                                onTaskChange={() => {
+                                    // Optionally refresh calendar data when elephant task changes
+                                }}
+                            />
+                        </div>
+                    );
+                })()}
                 {/* Active view content */}
                 {view === "quarter" && (
                     <QuarterView
@@ -1763,20 +1754,6 @@ const CalendarContainer = () => {
                         onActivityEdit={openEditActivity}
                         onActivityDelete={handleActivityDelete}
                         onPlanTomorrow={() => {}}
-                    />
-                )}
-                {view === "list" && (
-                    <ListView
-                        currentDate={currentDate}
-                        onShiftDate={shiftDate}
-                        view={view}
-                        onChangeView={setView}
-                        filterType={filterType}
-                        onChangeFilter={setFilterType}
-                        events={events.filter((e) => filterType === "all" || e.kind === filterType)}
-                        todos={todos}
-                        onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
-                        onTaskClick={openEditTask}
                     />
                 )}
             </div>

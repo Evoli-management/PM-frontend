@@ -113,7 +113,7 @@ const ListView = ({
                                     role="menu"
                                     className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                                 >
-                                    {["day", "week", "month", "quarter", "list"].map((v) => (
+                                    {["day", "week", "month", "quarter"].map((v) => (
                                         <button
                                             key={v}
                                             role="menuitemradio"
@@ -181,7 +181,7 @@ const ListView = ({
                                 role="menu"
                                 className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
                             >
-                                {["day", "week", "month", "quarter", "list"].map((v) => (
+                                {["day", "week", "month", "quarter"].map((v) => (
                                     <button
                                         key={v}
                                         role="menuitemradio"
