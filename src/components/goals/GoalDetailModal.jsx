@@ -24,11 +24,140 @@ const GoalDetailModal = ({
     const [isEditing, setIsEditing] = useState(false);
     const [localGoal, setLocalGoal] = useState(goal);
     const [updatingMilestone, setUpdatingMilestone] = useState(null);
+    const [dateInputValues, setDateInputValues] = useState({});
     const { formatDate, dateFormat } = useFormattedDate();
 
     const formatDateLabel = (value) => {
-        if (!value) return '';
-        return formatDate(value);
+        if (!value) return `Format: ${dateFormat}`;
+        return `${formatDate(value)} (Format: ${dateFormat})`;
+    };
+
+    const milestoneDateLabel = (value) => {
+        if (!value) return dateFormat;
+        return `${formatDate(value)} (${dateFormat})`;
+    };
+
+    const normalizeToIsoDate = (value) => {
+        if (!value) return "";
+        const raw = String(value).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return "";
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    };
+
+    const parseDateFromDisplay = (value, format) => {
+        const trimmed = String(value || "").trim();
+        if (!trimmed) return "";
+        const ensureValid = (y, m, d) => {
+            if (!y || !m || !d) return "";
+            const dateObj = new Date(y, m - 1, d);
+            if (
+                dateObj.getFullYear() !== y ||
+                dateObj.getMonth() !== m - 1 ||
+                dateObj.getDate() !== d
+            ) {
+                return "";
+            }
+            return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(
+                2,
+                "0"
+            )}`;
+        };
+
+        switch (format) {
+            case "MM/dd/yyyy": {
+                const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (!match) return "";
+                return ensureValid(
+                    Number(match[3]),
+                    Number(match[1]),
+                    Number(match[2])
+                );
+            }
+            case "dd/MM/yyyy": {
+                const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (!match) return "";
+                return ensureValid(
+                    Number(match[3]),
+                    Number(match[2]),
+                    Number(match[1])
+                );
+            }
+            case "yyyy-MM-dd": {
+                const match = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+                if (!match) return "";
+                return ensureValid(
+                    Number(match[1]),
+                    Number(match[2]),
+                    Number(match[3])
+                );
+            }
+            case "MMM dd, yyyy": {
+                const match = trimmed.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+                if (!match) return "";
+                const monthMap = {
+                    jan: 1,
+                    feb: 2,
+                    mar: 3,
+                    apr: 4,
+                    may: 5,
+                    jun: 6,
+                    jul: 7,
+                    aug: 8,
+                    sep: 9,
+                    oct: 10,
+                    nov: 11,
+                    dec: 12,
+                };
+                const month = monthMap[match[1].toLowerCase()];
+                if (!month) return "";
+                return ensureValid(
+                    Number(match[3]),
+                    month,
+                    Number(match[2])
+                );
+            }
+            default:
+                return "";
+        }
+    };
+
+    const getDisplayValue = (id, dateValue) => {
+        if (Object.prototype.hasOwnProperty.call(dateInputValues, id)) {
+            return dateInputValues[id];
+        }
+        return dateValue ? formatDate(dateValue) : "";
+    };
+
+    const handleDisplayChange = (id, value) => {
+        setDateInputValues((prev) => ({ ...prev, [id]: value }));
+    };
+
+    const clearDisplayOverride = (id) => {
+        setDateInputValues((prev) => {
+            if (!Object.prototype.hasOwnProperty.call(prev, id)) return prev;
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+    };
+
+    const commitDisplayValue = (id, value, onValid) => {
+        const trimmed = String(value || "").trim();
+        if (!trimmed) {
+            onValid(null);
+            clearDisplayOverride(id);
+            return;
+        }
+        const iso = parseDateFromDisplay(trimmed, dateFormat);
+        if (iso) {
+            onValid(iso);
+        }
+        clearDisplayOverride(id);
     };
 
     React.useEffect(() => {
@@ -281,13 +410,19 @@ const GoalDetailModal = ({
         );
         if (!titleEl) return;
         const startEl = document.getElementById(
-            `new-milestone-start-${goal.id}`
+            `new-milestone-start-display-${goal.id}`
         );
-        const dueEl = document.getElementById(`new-milestone-due-${goal.id}`);
+        const dueEl = document.getElementById(
+            `new-milestone-due-display-${goal.id}`
+        );
 
         const title = (titleEl.value || "").trim();
-        const start = startEl?.value || null;
-        const due = dueEl?.value || null;
+        const start = startEl?.value
+            ? parseDateFromDisplay(startEl.value, dateFormat) || null
+            : null;
+        const due = dueEl?.value
+            ? parseDateFromDisplay(dueEl.value, dateFormat) || null
+            : null;
 
         if (!title) return; // nothing to save
         if (creatingMilestoneRef.current) return; // already creating
@@ -323,9 +458,11 @@ const GoalDetailModal = ({
             } catch (_) {}
             try {
                 if (startEl) startEl.value = "";
+                clearDisplayOverride(`new-milestone-start-${goal.id}`);
             } catch (_) {}
             try {
                 if (dueEl) dueEl.value = "";
+                clearDisplayOverride(`new-milestone-due-${goal.id}`);
             } catch (_) {}
         } catch (err) {
             console.error("Failed to auto-create milestone:", err);
@@ -347,6 +484,43 @@ const GoalDetailModal = ({
             } catch (e) {}
         } catch (e) {
             // ignore
+        }
+    };
+
+    const updateMilestoneDate = async (milestone, field, value) => {
+        const prevValue = milestone[field] || null;
+        const nextValue = value || null;
+        const payload =
+            field === "startDate"
+                ? { startDate: nextValue }
+                : { dueDate: nextValue };
+
+        setLocalGoal((prev) => {
+            if (!prev) return prev;
+            const ms = (prev.milestones || []).map((mm) =>
+                mm.id === milestone.id
+                    ? { ...mm, [field]: nextValue }
+                    : mm
+            );
+            return { ...prev, milestones: ms };
+        });
+
+        const mod = await import("../../services/milestoneService");
+        try {
+            await mod.updateMilestone(milestone.id, payload);
+            if (typeof onMilestoneUpdated === "function")
+                await onMilestoneUpdated();
+        } catch (err) {
+            console.error(err);
+            setLocalGoal((prev) => {
+                if (!prev) return prev;
+                const ms = (prev.milestones || []).map((mm) =>
+                    mm.id === milestone.id
+                        ? { ...mm, [field]: prevValue }
+                        : mm
+                );
+                return { ...prev, milestones: ms };
+            });
         }
     };
 
@@ -579,40 +753,70 @@ const GoalDetailModal = ({
                                 <span className="md:hidden text-xs mr-2 text-gray-500">
                                     Start
                                 </span>
-                                <div className="relative md:inline-block">
-                                    <input
-                                        id={`goal-${goal.id}-date_start-input-${goal.id}`}
-                                        type="date"
-                                        value={
-                                            localGoal?.startDate
-                                                ? new Date(
-                                                      localGoal.startDate
-                                                  )
-                                                      .toISOString()
-                                                      .slice(0, 10)
-                                                : ""
-                                        }
-                                        onChange={(e) =>
-                                            setLocalGoal((p) => ({
-                                                ...p,
-                                                startDate:
-                                                    e.target.value || null,
-                                            }))
-                                        }
-                                        className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
-                                    />
-                                    <button
-                                        type="button"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                                        aria-label="Open date picker"
-                                        onClick={() =>
-                                            openDatePicker(
-                                                `goal-${goal.id}-date_start-input-${goal.id}`
-                                            )
-                                        }
-                                    >
-                                        📅
-                                    </button>
+                                <div className="md:inline-block">
+                                    <div className="relative">
+                                        <input
+                                            id={`goal-${goal.id}-date_start-display`}
+                                            type="text"
+                                            value={getDisplayValue(
+                                                `goal-start-${goal.id}`,
+                                                localGoal?.startDate
+                                            )}
+                                            onChange={(e) =>
+                                                handleDisplayChange(
+                                                    `goal-start-${goal.id}`,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onBlur={(e) =>
+                                                commitDisplayValue(
+                                                    `goal-start-${goal.id}`,
+                                                    e.target.value,
+                                                    (iso) =>
+                                                        setLocalGoal((p) => ({
+                                                            ...p,
+                                                            startDate:
+                                                                iso || null,
+                                                        }))
+                                                )
+                                            }
+                                            placeholder={`Format: ${dateFormat}`}
+                                            className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
+                                        />
+                                        <input
+                                            id={`goal-${goal.id}-date_start-input-${goal.id}`}
+                                            type="date"
+                                            value={normalizeToIsoDate(
+                                                localGoal?.startDate
+                                            )}
+                                            onChange={(e) => {
+                                                const next =
+                                                    e.target.value || null;
+                                                setLocalGoal((p) => ({
+                                                    ...p,
+                                                    startDate: next,
+                                                }));
+                                                clearDisplayOverride(
+                                                    `goal-start-${goal.id}`
+                                                );
+                                            }}
+                                            tabIndex={-1}
+                                            aria-hidden="true"
+                                            className="absolute inset-0 opacity-0 pointer-events-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                            aria-label="Open date picker"
+                                            onClick={() =>
+                                                openDatePicker(
+                                                    `goal-${goal.id}-date_start-input-${goal.id}`
+                                                )
+                                            }
+                                        >
+                                            📅
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -621,40 +825,70 @@ const GoalDetailModal = ({
                                 <span className="md:hidden text-xs mr-2 text-gray-500">
                                     Deadline
                                 </span>
-                                <div className="relative md:inline-block">
-                                    <input
-                                        id={`goal-${goal.id}-deadline-input-${goal.id}`}
-                                        type="date"
-                                        value={
-                                            localGoal?.dueDate
-                                                ? new Date(
-                                                      localGoal.dueDate
-                                                  )
-                                                      .toISOString()
-                                                      .slice(0, 10)
-                                                : ""
-                                        }
-                                        onChange={(e) =>
-                                            setLocalGoal((p) => ({
-                                                ...p,
-                                                dueDate:
-                                                    e.target.value || null,
-                                            }))
-                                        }
-                                        className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
-                                    />
-                                    <button
-                                        type="button"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
-                                        aria-label="Open date picker"
-                                        onClick={() =>
-                                            openDatePicker(
-                                                `goal-${goal.id}-deadline-input-${goal.id}`
-                                            )
-                                        }
-                                    >
-                                        📅
-                                    </button>
+                                <div className="md:inline-block">
+                                    <div className="relative">
+                                        <input
+                                            id={`goal-${goal.id}-deadline-display`}
+                                            type="text"
+                                            value={getDisplayValue(
+                                                `goal-due-${goal.id}`,
+                                                localGoal?.dueDate
+                                            )}
+                                            onChange={(e) =>
+                                                handleDisplayChange(
+                                                    `goal-due-${goal.id}`,
+                                                    e.target.value
+                                                )
+                                            }
+                                            onBlur={(e) =>
+                                                commitDisplayValue(
+                                                    `goal-due-${goal.id}`,
+                                                    e.target.value,
+                                                    (iso) =>
+                                                        setLocalGoal((p) => ({
+                                                            ...p,
+                                                            dueDate:
+                                                                iso || null,
+                                                        }))
+                                                )
+                                            }
+                                            placeholder={`Format: ${dateFormat}`}
+                                            className="w-full md:max-w-[140px] px-3 py-2 pr-11 border border-slate-300 rounded-md text-sm bg-white text-gray-700 no-calendar"
+                                        />
+                                        <input
+                                            id={`goal-${goal.id}-deadline-input-${goal.id}`}
+                                            type="date"
+                                            value={normalizeToIsoDate(
+                                                localGoal?.dueDate
+                                            )}
+                                            onChange={(e) => {
+                                                const next =
+                                                    e.target.value || null;
+                                                setLocalGoal((p) => ({
+                                                    ...p,
+                                                    dueDate: next,
+                                                }));
+                                                clearDisplayOverride(
+                                                    `goal-due-${goal.id}`
+                                                );
+                                            }}
+                                            tabIndex={-1}
+                                            aria-hidden="true"
+                                            className="absolute inset-0 opacity-0 pointer-events-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600"
+                                            aria-label="Open date picker"
+                                            onClick={() =>
+                                                openDatePicker(
+                                                    `goal-${goal.id}-deadline-input-${goal.id}`
+                                                )
+                                            }
+                                        >
+                                            📅
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -710,17 +944,13 @@ const GoalDetailModal = ({
                             <div className="mb-2">
                                 Start:{" "}
                                 {localGoal?.startDate
-                                    ? new Date(
-                                          localGoal.startDate
-                                      ).toLocaleDateString()
+                                    ? formatDate(localGoal.startDate)
                                     : "—"}
                             </div>
                             <div className="mb-2">
                                 Due:{" "}
                                 {localGoal?.dueDate
-                                    ? new Date(
-                                          localGoal.dueDate
-                                      ).toLocaleDateString()
+                                    ? formatDate(localGoal.dueDate)
                                     : "—"}
                             </div>
                             <div className="mb-2">
@@ -1012,114 +1242,56 @@ const GoalDetailModal = ({
                                                     </span>
                                                     <div className="relative">
                                                         <input
+                                                            id={`milestone-start-display-${m.id || i}-${goal.id}`}
+                                                            type="text"
+                                                            value={getDisplayValue(
+                                                                `milestone-start-${m.id || i}-${goal.id}`,
+                                                                m.startDate
+                                                            )}
+                                                            onChange={(e) =>
+                                                                handleDisplayChange(
+                                                                    `milestone-start-${m.id || i}-${goal.id}`,
+                                                                    e.target.value
+                                                                )
+                                                            }
+                                                            onBlur={(e) =>
+                                                                commitDisplayValue(
+                                                                    `milestone-start-${m.id || i}-${goal.id}`,
+                                                                    e.target.value,
+                                                                    (iso) =>
+                                                                        updateMilestoneDate(
+                                                                            m,
+                                                                            "startDate",
+                                                                            iso
+                                                                        )
+                                                                )
+                                                            }
+                                                            placeholder={dateFormat}
+                                                            className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        />
+                                                        <input
                                                             id={`milestone-start-${m.id || i}-${goal.id}`}
                                                             type="date"
-                                                            value={
+                                                            value={normalizeToIsoDate(
                                                                 m.startDate
-                                                                    ? new Date(
-                                                                          m.startDate
-                                                                      )
-                                                                          .toISOString()
-                                                                          .slice(
-                                                                              0,
-                                                                              10
-                                                                          )
-                                                                    : ""
-                                                            }
-                                                            onChange={async (
-                                                                e
-                                                            ) => {
-                                                                const v =
+                                                            )}
+                                                            onChange={(e) => {
+                                                                const next =
                                                                     e.target
                                                                         .value ||
                                                                     null;
-                                                                const prevStart =
-                                                                    m.startDate ||
-                                                                    null;
-                                                                // optimistic UI update
-                                                                setLocalGoal(
-                                                                    (prev) => {
-                                                                        if (
-                                                                            !prev
-                                                                        )
-                                                                            return prev;
-                                                                        const ms = (
-                                                                            prev.milestones ||
-                                                                            []
-                                                                        ).map(
-                                                                            (
-                                                                                mm
-                                                                            ) =>
-                                                                                mm.id ===
-                                                                                m.id
-                                                                                    ? {
-                                                                                          ...mm,
-                                                                                          startDate:
-                                                                                              v,
-                                                                                      }
-                                                                                    : mm
-                                                                        );
-                                                                        return {
-                                                                            ...prev,
-                                                                            milestones:
-                                                                                ms,
-                                                                        };
-                                                                    }
+                                                                clearDisplayOverride(
+                                                                    `milestone-start-${m.id || i}-${goal.id}`
                                                                 );
-                                                                const mod =
-                                                                    await import(
-                                                                        "../../services/milestoneService"
-                                                                    );
-                                                                try {
-                                                                    await mod.updateMilestone(
-                                                                        m.id,
-                                                                        {
-                                                                            startDate:
-                                                                                v,
-                                                                        }
-                                                                    );
-                                                                    if (
-                                                                        typeof onMilestoneUpdated ===
-                                                                        "function"
-                                                                    )
-                                                                        await onMilestoneUpdated();
-                                                                } catch (err) {
-                                                                    console.error(
-                                                                        err
-                                                                    );
-                                                                    // revert optimistic change on error
-                                                                    setLocalGoal(
-                                                                        (prev) => {
-                                                                            if (
-                                                                                !prev
-                                                                            )
-                                                                                return prev;
-                                                                            const ms = (
-                                                                                prev.milestones ||
-                                                                                []
-                                                                            ).map(
-                                                                                (
-                                                                                    mm
-                                                                                ) =>
-                                                                                    mm.id ===
-                                                                                    m.id
-                                                                                        ? {
-                                                                                              ...mm,
-                                                                                              startDate:
-                                                                                                  prevStart,
-                                                                                          }
-                                                                                        : mm
-                                                                            );
-                                                                            return {
-                                                                                ...prev,
-                                                                                milestones:
-                                                                                    ms,
-                                                                            };
-                                                                        }
-                                                                    );
-                                                                }
+                                                                updateMilestoneDate(
+                                                                    m,
+                                                                    "startDate",
+                                                                    next
+                                                                );
                                                             }}
-                                                            className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                            tabIndex={-1}
+                                                            aria-hidden="true"
+                                                            className="absolute inset-0 opacity-0 pointer-events-none"
                                                         />
                                                         <button
                                                             type="button"
@@ -1141,112 +1313,56 @@ const GoalDetailModal = ({
                                                     </span>
                                                     <div className="relative">
                                                         <input
+                                                            id={`milestone-due-display-${m.id || i}-${goal.id}`}
+                                                            type="text"
+                                                            value={getDisplayValue(
+                                                                `milestone-due-${m.id || i}-${goal.id}`,
+                                                                m.dueDate
+                                                            )}
+                                                            onChange={(e) =>
+                                                                handleDisplayChange(
+                                                                    `milestone-due-${m.id || i}-${goal.id}`,
+                                                                    e.target.value
+                                                                )
+                                                            }
+                                                            onBlur={(e) =>
+                                                                commitDisplayValue(
+                                                                    `milestone-due-${m.id || i}-${goal.id}`,
+                                                                    e.target.value,
+                                                                    (iso) =>
+                                                                        updateMilestoneDate(
+                                                                            m,
+                                                                            "dueDate",
+                                                                            iso
+                                                                        )
+                                                                )
+                                                            }
+                                                            placeholder={dateFormat}
+                                                            className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        />
+                                                        <input
                                                             id={`milestone-due-${m.id || i}-${goal.id}`}
                                                             type="date"
-                                                            value={
+                                                            value={normalizeToIsoDate(
                                                                 m.dueDate
-                                                                    ? new Date(
-                                                                          m.dueDate
-                                                                      )
-                                                                          .toISOString()
-                                                                          .slice(
-                                                                              0,
-                                                                              10
-                                                                          )
-                                                                    : ""
-                                                            }
-                                                            onChange={async (
-                                                                e
-                                                            ) => {
-                                                                const v =
+                                                            )}
+                                                            onChange={(e) => {
+                                                                const next =
                                                                     e.target
                                                                         .value ||
                                                                     null;
-                                                                const prevDue =
-                                                                    m.dueDate ||
-                                                                    null;
-                                                                setLocalGoal(
-                                                                    (prev) => {
-                                                                        if (
-                                                                            !prev
-                                                                        )
-                                                                            return prev;
-                                                                        const ms = (
-                                                                            prev.milestones ||
-                                                                            []
-                                                                        ).map(
-                                                                            (
-                                                                                mm
-                                                                            ) =>
-                                                                                mm.id ===
-                                                                                m.id
-                                                                                    ? {
-                                                                                          ...mm,
-                                                                                          dueDate:
-                                                                                              v,
-                                                                                      }
-                                                                                    : mm
-                                                                        );
-                                                                        return {
-                                                                            ...prev,
-                                                                            milestones:
-                                                                                ms,
-                                                                        };
-                                                                    }
+                                                                clearDisplayOverride(
+                                                                    `milestone-due-${m.id || i}-${goal.id}`
                                                                 );
-                                                                const mod =
-                                                                    await import(
-                                                                        "../../services/milestoneService"
-                                                                    );
-                                                                try {
-                                                                    await mod.updateMilestone(
-                                                                        m.id,
-                                                                        {
-                                                                            dueDate:
-                                                                                v,
-                                                                        }
-                                                                    );
-                                                                    if (
-                                                                        typeof onMilestoneUpdated ===
-                                                                        "function"
-                                                                    )
-                                                                        await onMilestoneUpdated();
-                                                                } catch (err) {
-                                                                    console.error(
-                                                                        err
-                                                                    );
-                                                                    setLocalGoal(
-                                                                        (prev) => {
-                                                                            if (
-                                                                                !prev
-                                                                            )
-                                                                                return prev;
-                                                                            const ms = (
-                                                                                prev.milestones ||
-                                                                                []
-                                                                            ).map(
-                                                                                (
-                                                                                    mm
-                                                                                ) =>
-                                                                                    mm.id ===
-                                                                                    m.id
-                                                                                        ? {
-                                                                                              ...mm,
-                                                                                              dueDate:
-                                                                                                  prevDue,
-                                                                                          }
-                                                                                        : mm
-                                                                            );
-                                                                            return {
-                                                                                ...prev,
-                                                                                milestones:
-                                                                                    ms,
-                                                                            };
-                                                                        }
-                                                                    );
-                                                                }
+                                                                updateMilestoneDate(
+                                                                    m,
+                                                                    "dueDate",
+                                                                    next
+                                                                );
                                                             }}
-                                                            className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                            tabIndex={-1}
+                                                            aria-hidden="true"
+                                                            className="absolute inset-0 opacity-0 pointer-events-none"
                                                         />
                                                         <button
                                                             type="button"
@@ -1309,12 +1425,56 @@ const GoalDetailModal = ({
                                                 </span>
                                                 <div className="relative">
                                                     <input
-                                                        id={`new-milestone-start-${goal.id}`}
-                                                        type="date"
-                                                        className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        id={`new-milestone-start-display-${goal.id}`}
+                                                        type="text"
+                                                        value={getDisplayValue(
+                                                            `new-milestone-start-${goal.id}`,
+                                                            ""
+                                                        )}
+                                                        onChange={(e) =>
+                                                            handleDisplayChange(
+                                                                `new-milestone-start-${goal.id}`,
+                                                                e.target.value
+                                                            )
+                                                        }
                                                         onBlur={async () => {
                                                             await tryCreateMilestoneFromInputs();
                                                         }}
+                                                        placeholder={dateFormat}
+                                                        className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                    />
+                                                    <input
+                                                        id={`new-milestone-start-${goal.id}`}
+                                                        type="date"
+                                                        value={
+                                                            parseDateFromDisplay(
+                                                                getDisplayValue(
+                                                                    `new-milestone-start-${goal.id}`,
+                                                                    ""
+                                                                ),
+                                                                dateFormat
+                                                            ) || ""
+                                                        }
+                                                        onChange={(e) => {
+                                                            const next =
+                                                                e.target
+                                                                    .value ||
+                                                                "";
+                                                            clearDisplayOverride(
+                                                                `new-milestone-start-${goal.id}`
+                                                            );
+                                                            handleDisplayChange(
+                                                                `new-milestone-start-${goal.id}`,
+                                                                next
+                                                                    ? formatDate(
+                                                                          next
+                                                                      )
+                                                                    : ""
+                                                            );
+                                                        }}
+                                                        tabIndex={-1}
+                                                        aria-hidden="true"
+                                                        className="absolute inset-0 opacity-0 pointer-events-none"
                                                     />
                                                     <button
                                                         type="button"
@@ -1336,12 +1496,56 @@ const GoalDetailModal = ({
                                                 </span>
                                                 <div className="relative">
                                                     <input
-                                                        id={`new-milestone-due-${goal.id}`}
-                                                        type="date"
-                                                        className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                        id={`new-milestone-due-display-${goal.id}`}
+                                                        type="text"
+                                                        value={getDisplayValue(
+                                                            `new-milestone-due-${goal.id}`,
+                                                            ""
+                                                        )}
+                                                        onChange={(e) =>
+                                                            handleDisplayChange(
+                                                                `new-milestone-due-${goal.id}`,
+                                                                e.target.value
+                                                            )
+                                                        }
                                                         onBlur={async () => {
                                                             await tryCreateMilestoneFromInputs();
                                                         }}
+                                                        placeholder={dateFormat}
+                                                        className="w-full px-2 py-1 pr-11 border rounded-md text-sm bg-white text-gray-700 border-slate-300 no-calendar"
+                                                    />
+                                                    <input
+                                                        id={`new-milestone-due-${goal.id}`}
+                                                        type="date"
+                                                        value={
+                                                            parseDateFromDisplay(
+                                                                getDisplayValue(
+                                                                    `new-milestone-due-${goal.id}`,
+                                                                    ""
+                                                                ),
+                                                                dateFormat
+                                                            ) || ""
+                                                        }
+                                                        onChange={(e) => {
+                                                            const next =
+                                                                e.target
+                                                                    .value ||
+                                                                "";
+                                                            clearDisplayOverride(
+                                                                `new-milestone-due-${goal.id}`
+                                                            );
+                                                            handleDisplayChange(
+                                                                `new-milestone-due-${goal.id}`,
+                                                                next
+                                                                    ? formatDate(
+                                                                          next
+                                                                      )
+                                                                    : ""
+                                                            );
+                                                        }}
+                                                        tabIndex={-1}
+                                                        aria-hidden="true"
+                                                        className="absolute inset-0 opacity-0 pointer-events-none"
                                                     />
                                                     <button
                                                         type="button"
