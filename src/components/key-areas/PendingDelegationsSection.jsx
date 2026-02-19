@@ -26,6 +26,11 @@ export default function PendingDelegationsSection({
   const [taskError, setTaskError] = useState('');
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [rejectingItem, setRejectingItem] = useState(null);
+  // State for Task List selection
+  const [selectedListIndex, setSelectedListIndex] = useState('');
+  const [availableLists, setAvailableLists] = useState([]);
+  const [listNames, setListNames] = useState({});
+  const [listError, setListError] = useState('');
 
   const normalizeKeyAreaTitle = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const getKeyAreaLabel = (area) => area?.name || area?.title || 'Untitled';
@@ -86,10 +91,13 @@ export default function PendingDelegationsSection({
   const handleAcceptClick = async (item) => {
     setAcceptingItem(item);
     setSelectedKeyArea('');
+    setSelectedListIndex('');
+    setAvailableLists([]);
+    setListNames({});
+    setListError('');
     setSelectedTaskForActivity('');
     setKeyAreaError('');
     setTaskError('');
-    // For activities, default to 'create-new' mode; for tasks, use 'create-new'
     setAcceptMode('create-new');
     if (Array.isArray(keyAreasFromProps) && keyAreasFromProps.length > 0) {
       setKeyAreas(keyAreasFromProps);
@@ -100,11 +108,9 @@ export default function PendingDelegationsSection({
   };
 
   const confirmAccept = async () => {
-    // Clear previous errors
     setKeyAreaError('');
     setTaskError('');
-    
-    // Validate key area
+    setListError('');
     if (!selectedKeyArea) {
       setKeyAreaError('Key area selection is required');
       return;
@@ -113,17 +119,17 @@ export default function PendingDelegationsSection({
       setKeyAreaError('This key area is not available for selection yet');
       return;
     }
-
-    // Validate task selector for activity add-to-task mode
+    if (!selectedListIndex) {
+      setListError('Task List selection is required');
+      return;
+    }
     if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task' && !selectedTaskForActivity) {
       setTaskError('Please select a task to add this activity to');
       return;
     }
-
     setRespondingItemId(acceptingItem.id);
     try {
-      const payload = { keyAreaId: selectedKeyArea };
-      
+      const payload = { keyAreaId: selectedKeyArea, listIndex: selectedListIndex };
       if (acceptingItem.type === 'task') {
         // Accept task delegation
         await taskDelegationService.acceptDelegation(acceptingItem.id, payload);
@@ -151,6 +157,10 @@ export default function PendingDelegationsSection({
     setShowAcceptModal(false);
     setAcceptingItem(null);
     setSelectedKeyArea('');
+    setSelectedListIndex('');
+    setAvailableLists([]);
+    setListNames({});
+    setListError('');
     setSelectedTaskForActivity('');
     setAvailableTasks([]);
     setKeyAreaError('');
@@ -359,48 +369,69 @@ export default function PendingDelegationsSection({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Key Area <span className="text-red-500">*</span>
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Choose which Key Area to add this {acceptingItem?.type === 'task' ? 'task' : 'activity'} to
-                </p>
                 <Select
                   options={keyAreaOptions}
-                  value={selectedKeyArea ? selectedKeyAreaOption : null}
-                  onChange={(option) => {
-                    setSelectedKeyArea(option?.value || '');
+                  value={keyAreaOptions.find((opt) => String(opt.value) === String(selectedKeyArea)) || null}
+                  onChange={(opt) => {
+                    setSelectedKeyArea(opt?.value || '');
                     setKeyAreaError('');
-                    // Load tasks for the selected key area if it's an activity
-                    if (acceptingItem?.type === 'activity') {
-                      loadTasksForKeyArea(option?.value || '');
+                    setSelectedListIndex('');
+                    setAvailableLists([]);
+                    setListNames({});
+                    setListError('');
+                    const kaObj = keyAreas.find((ka) => String(ka.id) === String(opt?.value));
+                    if (kaObj && kaObj.listNames) {
+                      setAvailableLists(Object.keys(kaObj.listNames));
+                      setListNames(kaObj.listNames);
+                    } else {
+                      setAvailableLists(['1']);
+                      setListNames({});
+                    }
+                    if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task') {
+                      loadTasksForKeyArea(opt?.value || '');
                     }
                   }}
-                  isSearchable
-                  isClearable
                   placeholder="Search key areas..."
+                  isClearable
                   className="react-select-container"
                   classNamePrefix="react-select"
                   styles={{
                     control: (base) => ({
                       ...base,
-                      borderColor: keyAreaError ? '#ef4444' : '#d1d5db',
-                      '&:hover': {
-                        borderColor: keyAreaError ? '#ef4444' : '#9ca3af',
-                      },
-                      '&:focus': {
-                        borderColor: '#3b82f6',
-                        boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
-                      },
-                      borderRadius: '0.5rem',
-                      padding: '0.25rem',
-                      fontSize: '0.875rem',
-                    }),
-                    option: (base, state) => ({
-                      ...base,
-                      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f3f4f6' : 'white',
-                      color: state.isSelected ? 'white' : '#1f2937',
+                      minHeight: '2.5rem',
                       fontSize: '0.875rem',
                     }),
                   }}
                 />
+                {keyAreaError && (
+                  <p className="text-red-500 text-xs mt-1">{keyAreaError}</p>
+                )}
+              </div>
+
+              {/* Task List (Required for all) */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Task List <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedListIndex}
+                  onChange={(e) => {
+                    setSelectedListIndex(e.target.value);
+                    setListError('');
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  disabled={!selectedKeyArea || availableLists.length === 0}
+                >
+                  <option value="">-- Select a Task List --</option>
+                  {availableLists.map((idx) => (
+                    <option key={idx} value={idx}>
+                      {listNames && listNames[idx] ? listNames[idx] : `List ${idx}`}
+                    </option>
+                  ))}
+                </select>
+                {listError && (
+                  <p className="text-red-500 text-xs mt-1">{listError}</p>
+                )}
               </div>
 
               {/* Accept Mode Selector (Only for Activities) */}
