@@ -129,7 +129,8 @@ export default function PendingDelegationsSection({
     }
     setRespondingItemId(acceptingItem.id);
     try {
-      const payload = { keyAreaId: selectedKeyArea, listIndex: selectedListIndex };
+      // Ensure listIndex is sent as integer, not string
+      const payload = { keyAreaId: selectedKeyArea, listIndex: Number(selectedListIndex) };
       if (acceptingItem.type === 'task') {
         // Accept task delegation
         await taskDelegationService.acceptDelegation(acceptingItem.id, payload);
@@ -143,7 +144,6 @@ export default function PendingDelegationsSection({
         await activityDelegationService.acceptDelegation(acceptingItem.id, payload);
         onTaskAccept?.(acceptingItem.id);
       }
-      
       closeModal();
     } catch (error) {
       console.error('Failed to accept delegation:', error);
