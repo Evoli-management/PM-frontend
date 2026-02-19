@@ -7,6 +7,7 @@ import activityDelegationService from '../../services/activityDelegationService'
 
 export default function PendingDelegationsSection({
   pendingTasks = [],
+  pendingLoading = false,
   onTaskAccept,
   onTaskReject,
   getDelegatorName,
@@ -194,6 +195,13 @@ export default function PendingDelegationsSection({
     }
   };
 
+  if (pendingLoading) {
+    return (
+      <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
+        <p className="text-blue-800 font-medium">Loading pending delegations...</p>
+      </div>
+    );
+  }
   if (!pendingTasks || pendingTasks.length === 0) {
     return (
       <div className="mb-8 p-6 bg-green-50 border border-green-200 rounded-lg text-center">

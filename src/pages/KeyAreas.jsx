@@ -519,6 +519,7 @@ export default function KeyAreas() {
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
     const [pendingDelegations, setPendingDelegations] = useState([]); // For DELEGATED tab - pending only
+    const [pendingDelegationsLoading, setPendingDelegationsLoading] = useState(false);
     const [savingIds, setSavingIds] = useState(new Set());
     // Handler: change a task's status (UI value: open | in_progress | done)
     const handleTaskStatusChange = async (id, uiStatus) => {
@@ -1046,6 +1047,7 @@ export default function KeyAreas() {
         // Handle DELEGATED tab - show TWO sections: pending at top, all delegated below
         if (viewTab === 'delegated') {
             (async () => {
+                setPendingDelegationsLoading(true);
                 try {
                     let delegatedToMe = [];
                     let delegatedActivities = [];
@@ -1112,6 +1114,8 @@ export default function KeyAreas() {
                 } catch (e) {
                     console.error('Failed to load delegated tasks', e);
                     setPendingDelegations([]);
+                } finally {
+                    setPendingDelegationsLoading(false);
                 }
             })();
             return;
@@ -4600,6 +4604,7 @@ export default function KeyAreas() {
                                 {/* Section 1: Pending Delegations */}
                                 <PendingDelegationsSection
                                     pendingTasks={pendingDelegations}
+                                    pendingLoading={pendingDelegationsLoading}
                                     keyAreas={keyAreas}
                                     onTaskAccept={async (taskId) => {
                                         // Ensure ?view=delegated is always in the URL
