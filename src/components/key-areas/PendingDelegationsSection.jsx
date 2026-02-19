@@ -376,16 +376,16 @@ export default function PendingDelegationsSection({
                     setSelectedKeyArea(opt?.value || '');
                     setKeyAreaError('');
                     setSelectedListIndex('');
-                    setAvailableLists([]);
-                    setListNames({});
                     setListError('');
+                    // Find selected key area object
                     const kaObj = keyAreas.find((ka) => String(ka.id) === String(opt?.value));
+                    // Sync listNames from selected key area (like CreateTaskModal)
                     if (kaObj && kaObj.listNames) {
-                      setAvailableLists(Object.keys(kaObj.listNames));
                       setListNames(kaObj.listNames);
+                      setAvailableLists(Object.keys(kaObj.listNames));
                     } else {
-                      setAvailableLists(['1']);
                       setListNames({});
+                      setAvailableLists([]);
                     }
                     if (acceptingItem?.type === 'activity' && acceptMode === 'add-to-task') {
                       loadTasksForKeyArea(opt?.value || '');
@@ -420,12 +420,12 @@ export default function PendingDelegationsSection({
                     setListError('');
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  disabled={!selectedKeyArea || availableLists.length === 0}
+                  disabled={!selectedKeyArea || Object.keys(listNames).length === 0}
                 >
                   <option value="">-- Select a Task List --</option>
-                  {availableLists.map((idx) => (
+                  {Object.keys(listNames).map((idx) => (
                     <option key={idx} value={idx}>
-                      {listNames && listNames[idx] ? listNames[idx] : `List ${idx}`}
+                      {listNames[idx] || `List ${idx}`}
                     </option>
                   ))}
                 </select>
