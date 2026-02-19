@@ -694,8 +694,11 @@ const WeekView = ({
                                             <div style={{ position: 'relative', minHeight: 40 }}>
                                                 {(() => {
                                                     try {
-                                                        // find todos that overlap this week AND span more than one day
                                                         const dayMs = 24 * 60 * 60 * 1000;
+                                                        const BAR_TOP = 8;
+                                                        const BAR_HEIGHT = 26;
+                                                        const BAR_GAP = 6;
+
                                                         const weekTasks = (Array.isArray(todos) ? todos : []).filter((t) => {
                                                             try {
                                                                 const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
@@ -706,78 +709,129 @@ const WeekView = ({
                                                                 const sStart = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
                                                                 const eStartDay = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 0, 0, 0, 0);
                                                                 const eEnd = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 23, 59, 59, 999);
-                                                                // must overlap the week
                                                                 if (!(sStart <= endOfWeek && eEnd >= weekStart)) return false;
-                                                                // only include tasks that span more than one calendar day (end day strictly after start day)
                                                                 if (eStartDay.getTime() <= sStart.getTime()) return false;
-                                                                // also require they cover at least two day columns within this week
                                                                 const startIndex = Math.floor((sStart - weekStart) / dayMs);
                                                                 const endIndex = Math.floor((eEnd - weekStart) / dayMs);
                                                                 return endIndex > startIndex;
-                                                            } catch { return false; }
+                                                            } catch {
+                                                                return false;
+                                                            }
                                                         });
 
-                                                        return weekTasks.map((t, i) => {
-                                                            try {
+                                                        const normalized = weekTasks
+                                                            .map((t) => {
                                                                 const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
                                                                 const e = t.endDate || t.end_date || t.date || t.dueDate || t.due_date || s || null;
                                                                 const sDt = s ? new Date(s) : null;
                                                                 const eDt = e ? new Date(e) : null;
                                                                 if (!sDt || !eDt) return null;
 
-                                                                const dayMs = 24 * 60 * 60 * 1000;
                                                                 const sStart = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), 0, 0, 0, 0);
                                                                 const eEnd = new Date(eDt.getFullYear(), eDt.getMonth(), eDt.getDate(), 23, 59, 59, 999);
                                                                 const rawStartIndex = Math.floor((sStart - weekStart) / dayMs);
                                                                 const rawEndIndex = Math.floor((eEnd - weekStart) / dayMs);
                                                                 const startIndex = Math.max(0, rawStartIndex);
                                                                 const endIndex = Math.min(daysCount - 1, rawEndIndex);
-                                                                const leftPct = (startIndex / daysCount) * 100;
-                                                                const widthPct = ((endIndex - startIndex + 1) / daysCount) * 100;
-                                                                const continuesLeft = rawStartIndex < 0;
-                                                                const continuesRight = rawEndIndex > (daysCount - 1);
+                                                                if (endIndex < startIndex) return null;
 
-                                                                // resolve color same as below
-                                                                const kindKey = t.kind || t.type || t.kindName || null;
-                                                                const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
-                                                                const bgClass = cat?.color || null;
-                                                                const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
-                                                                const DEFAULT_BAR_COLOR = '#4DC3D8';
-                                                                const kaColor = (ka && ka.color) ? ka.color : null;
-                                                                const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
-                                                                const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
-                                                                const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+                                                                return {
+                                                                    task: t,
+                                                                    sStart,
+                                                                    eEnd,
+                                                                    rawStartIndex,
+                                                                    rawEndIndex,
+                                                                    startIndex,
+                                                                    endIndex,
+                                                                };
+                                                            })
+                                                            .filter(Boolean)
+                                                            .sort((a, b) => {
+                                                                if (a.startIndex !== b.startIndex) return a.startIndex - b.startIndex;
+                                                                if (a.endIndex !== b.endIndex) return b.endIndex - a.endIndex;
+                                                                return String(a.task?.title || a.task?.name || '').localeCompare(String(b.task?.title || b.task?.name || ''));
+                                                            });
 
-                                                                const barStyle = { left: `${leftPct}%`, width: `${widthPct}%`, boxSizing: 'border-box', paddingRight: continuesRight ? '18px' : undefined, paddingLeft: continuesLeft ? '18px' : undefined, ...style };
-
-                                                                return (
-                                                                    <div
-                                                                        key={`allday-${t.id}-${i}`}
-                                                                        draggable
-                                                                        onDragStart={(e) => {
-                                                                            try {
-                                                                                e.dataTransfer.setData("taskId", String(t.id));
-                                                                                const durMs = eEnd.getTime() - sStart.getTime();
-                                                                                e.dataTransfer.setData("durationMs", String(Math.max(0, durMs)));
-                                                                                e.dataTransfer.effectAllowed = "move";
-                                                                            } catch (_) {}
-                                                                        }}
-                                                                        onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                                                        className={`absolute left-0 top-2 rounded px-2 py-1 text-xs overflow-hidden cursor-pointer ${bgClass || ''}`}
-                                                                        style={barStyle}
-                                                                        title={t.title || t.name}
-                                                                    >
-                                                                        {continuesLeft && (
-                                                                            <FaChevronLeft className="w-4 h-4 absolute left-1 top-1 font-semibold" style={{ color: textColor, zIndex: 6, fontWeight: 700 }} />
-                                                                        )}
-                                                                        <div className="truncate font-medium">{t.title || t.name}</div>
-                                                                        {continuesRight && (
-                                                                            <FaChevronRight className="w-4 h-4 absolute right-1 top-1 font-semibold" style={{ color: textColor, zIndex: 6, fontWeight: 700 }} />
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            } catch (__) { return null; }
+                                                        const laneEndByIndex = [];
+                                                        const placed = normalized.map((entry) => {
+                                                            let lane = laneEndByIndex.findIndex((laneEnd) => entry.startIndex > laneEnd);
+                                                            if (lane === -1) {
+                                                                lane = laneEndByIndex.length;
+                                                                laneEndByIndex.push(entry.endIndex);
+                                                            } else {
+                                                                laneEndByIndex[lane] = entry.endIndex;
+                                                            }
+                                                            return { ...entry, lane };
                                                         });
+
+                                                        const laneCount = Math.max(1, laneEndByIndex.length);
+                                                        const minHeight = BAR_TOP + laneCount * BAR_HEIGHT + Math.max(0, laneCount - 1) * BAR_GAP + 8;
+
+                                                        return (
+                                                            <>
+                                                                <div style={{ minHeight }} />
+                                                                {placed.map((entry, i) => {
+                                                                    try {
+                                                                        const t = entry.task;
+                                                                        const leftPct = (entry.startIndex / daysCount) * 100;
+                                                                        const widthPct = ((entry.endIndex - entry.startIndex + 1) / daysCount) * 100;
+                                                                        const continuesLeft = entry.rawStartIndex < 0;
+                                                                        const continuesRight = entry.rawEndIndex > (daysCount - 1);
+
+                                                                        const kindKey = t.kind || t.type || t.kindName || null;
+                                                                        const cat = (kindKey && categories && categories[kindKey]) ? categories[kindKey] : null;
+                                                                        const bgClass = cat?.color || null;
+                                                                        const ka = (t.keyAreaId || t.key_area_id) ? keyAreaMap[String(t.keyAreaId || t.key_area_id)] : null;
+                                                                        const DEFAULT_BAR_COLOR = '#4DC3D8';
+                                                                        const kaColor = (ka && ka.color) ? ka.color : null;
+                                                                        const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
+                                                                        const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
+                                                                        const style = bgClass ? undefined : { backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                                                                        const topPx = BAR_TOP + entry.lane * (BAR_HEIGHT + BAR_GAP);
+                                                                        const barStyle = {
+                                                                            left: `${leftPct}%`,
+                                                                            top: `${topPx}px`,
+                                                                            width: `${widthPct}%`,
+                                                                            height: `${BAR_HEIGHT}px`,
+                                                                            boxSizing: 'border-box',
+                                                                            paddingRight: continuesRight ? '18px' : undefined,
+                                                                            paddingLeft: continuesLeft ? '18px' : undefined,
+                                                                            ...style,
+                                                                        };
+
+                                                                        return (
+                                                                            <div
+                                                                                key={`allday-${t.id}-${i}`}
+                                                                                draggable
+                                                                                onDragStart={(e) => {
+                                                                                    try {
+                                                                                        e.dataTransfer.setData("taskId", String(t.id));
+                                                                                        const durMs = entry.eEnd.getTime() - entry.sStart.getTime();
+                                                                                        e.dataTransfer.setData("durationMs", String(Math.max(0, durMs)));
+                                                                                        e.dataTransfer.effectAllowed = "move";
+                                                                                    } catch (_) {}
+                                                                                }}
+                                                                                onClick={() => onTaskClick && onTaskClick(String(t.id))}
+                                                                                className={`absolute left-0 rounded px-2 text-xs overflow-hidden cursor-pointer ${bgClass || ''}`}
+                                                                                style={barStyle}
+                                                                                title={t.title || t.name}
+                                                                            >
+                                                                                {continuesLeft && (
+                                                                                    <FaChevronLeft className="w-4 h-4 absolute left-1 top-1 font-semibold" style={{ color: textColor, zIndex: 6, fontWeight: 700 }} />
+                                                                                )}
+                                                                                <div className="truncate font-medium leading-[26px]">{t.title || t.name}</div>
+                                                                                {continuesRight && (
+                                                                                    <FaChevronRight className="w-4 h-4 absolute right-1 top-1 font-semibold" style={{ color: textColor, zIndex: 6, fontWeight: 700 }} />
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    } catch {
+                                                                        return null;
+                                                                    }
+                                                                })}
+                                                            </>
+                                                        );
                                                     } catch (e) {
                                                         return null;
                                                     }
@@ -1289,7 +1343,7 @@ const WeekView = ({
                             style={{
                                 flex: "1 1 0",
                                 minHeight: 0,
-                                overflowY: "auto",
+                                overflowY: "hidden",
                                 borderTop: "3px solid rgba(100, 116, 139, 0.6)",
                             }}
                         >
@@ -1384,7 +1438,7 @@ const WeekView = ({
                                     return (
                                         <div
                                             key={`col-${dIdx}`}
-                                            className="p-2 min-h-[56px] h-full overflow-hidden flex flex-col"
+                                            className="p-2 min-h-[56px] h-full min-h-0 overflow-hidden flex flex-col"
                                             style={{
                                                 borderRightWidth: "2px",
                                                 borderRightStyle: "dashed",
@@ -1392,9 +1446,8 @@ const WeekView = ({
                                             }}
                                         >
                                             <div
-                                                className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden"
+                                                className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden"
                                                 style={{
-                                                    maxHeight: "168px",
                                                     paddingRight: "6px",
                                                 }}
                                             >
@@ -1438,7 +1491,7 @@ const WeekView = ({
                                                                     } catch {}
                                                                 }}
                                                                 onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                                                className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 ${bgClass || ''}`}
+                                                                className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 shrink-0 min-h-[28px] ${bgClass || ''}`}
                                                                 style={style}
                                                                 title={t.title || t.name}
                                                             >
@@ -1475,7 +1528,7 @@ const WeekView = ({
                                                                     e.dataTransfer.effectAllowed = "copyMove";
                                                                 } catch {}
                                                             }}
-                                                            className={`px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 ${bgClass || ''}`}
+                                                            className={`px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 shrink-0 min-h-[28px] ${bgClass || ''}`}
                                                             style={style}
                                                             title={a.text || a.title}
                                                         >
