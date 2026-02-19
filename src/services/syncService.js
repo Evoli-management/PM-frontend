@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -38,6 +39,40 @@ export const syncService = {
       `${API_URL}/sync/sync-preferences/${userId}/google`,
       { enabled }
     );
+    return response.data;
+  },
+
+  /**
+   * Get external task sync status for current user
+   */
+  async getTaskSyncStatus(userId) {
+    const response = await axios.get(`${API_URL}/sync/tasks-status/${userId}`);
+    return response.data;
+  },
+
+  /**
+   * Send external tasks to backend (for manual sync/testing)
+   */
+  async sendExternalTasks(userId, provider, tasks, syncPassword) {
+    const response = await axios.post(`${API_URL}/sync/tasks`, {
+      sync_password: syncPassword,
+      userId,
+      provider,
+      tasks,
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete an external task by externalId
+   */
+  async deleteExternalTask(userId, provider, externalId, syncPassword) {
+    const response = await axios.post(`${API_URL}/sync/delete-task`, {
+      sync_password: syncPassword,
+      userId,
+      provider,
+      externalId,
+    });
     return response.data;
   },
 };

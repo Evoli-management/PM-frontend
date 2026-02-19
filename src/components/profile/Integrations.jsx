@@ -7,7 +7,9 @@ export const Integrations = ({ showToast }) => {
         // Calendar Integrations
         googleCalendar: { connected: false, email: '', syncEnabled: true },
         outlookCalendar: { connected: false, email: '', syncEnabled: true },
-        
+        // Task Integrations
+        googleTasks: { connected: false, syncEnabled: true },
+        microsoftToDo: { connected: false, syncEnabled: true },
         // Communication
         teams: { connected: false, tenant: '', notificationsEnabled: true }
     });
@@ -41,8 +43,49 @@ export const Integrations = ({ showToast }) => {
                 };
             }
             
+            // Task sync status
+            if (syncStatus.googleTasks) {
+                updates.googleTasks = {
+                    connected: syncStatus.googleTasks.connected,
+                    syncEnabled: syncStatus.googleTasks.syncEnabled !== false,
+                };
+            }
+            if (syncStatus.microsoftToDo) {
+                updates.microsoftToDo = {
+                    connected: syncStatus.microsoftToDo.connected,
+                    syncEnabled: syncStatus.microsoftToDo.syncEnabled !== false,
+                };
+            }
             setIntegrations(updates);
             return updates;
+                    {/* Task Integrations */}
+                    <Section 
+                        title="Task Integrations" 
+                        description="Sync your tasks with Google Tasks or Microsoft To Do"
+                    >
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <IntegrationCard
+                                name="Google Tasks"
+                                type="googleTasks"
+                                icon={<img src={`${import.meta.env.BASE_URL}google.svg`} alt="Google Tasks" className="w-6 h-6 object-contain" />}
+                                description="Sync tasks with Google Tasks"
+                                config={integrations.googleTasks}
+                                settings={[
+                                    { key: 'syncEnabled', label: 'Sync Tasks', description: 'Automatically sync tasks with Google Tasks' }
+                                ]}
+                            />
+                            <IntegrationCard
+                                name="Microsoft To Do"
+                                type="microsoftToDo"
+                                icon={<img src={`${import.meta.env.BASE_URL}microsoft.svg`} alt="Microsoft To Do" className="w-6 h-6 object-contain" />}
+                                description="Sync tasks with Microsoft To Do"
+                                config={integrations.microsoftToDo}
+                                settings={[
+                                    { key: 'syncEnabled', label: 'Sync Tasks', description: 'Automatically sync tasks with Microsoft To Do' }
+                                ]}
+                            />
+                        </div>
+                    </Section>
         } catch (error) {
             // Fallback to localStorage
             const saved = localStorage.getItem('userIntegrations');
