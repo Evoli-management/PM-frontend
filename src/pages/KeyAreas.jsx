@@ -4592,12 +4592,16 @@ export default function KeyAreas() {
                                     onTaskAccept={async (taskId) => {
                                         // Remove from pending
                                         setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
-                                        
+                                        // Ensure ?view=delegated is always in the URL
+                                        const params = new URLSearchParams(window.location.search);
+                                        if (params.get('view') !== 'delegated') {
+                                            params.set('view', 'delegated');
+                                            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                                        }
                                         // Reload ALL delegated tasks from backend to show the newly created accepted task with keyAreaId
                                         try {
                                             const delegatedToMe = await taskDelegationService.getDelegatedToMe();
                                             setAllTasks(delegatedToMe || []);
-                                            
                                             // Update pending list by filtering for pending status only
                                             const pending = (delegatedToMe || []).filter(t => 
                                                 (t.delegationStatus || t.delegation_status) === 'pending' || 
@@ -4611,7 +4615,12 @@ export default function KeyAreas() {
                                     onTaskReject={async (taskId) => {
                                         // Remove from pending
                                         setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
-                                        
+                                        // Ensure ?view=delegated is always in the URL
+                                        const params = new URLSearchParams(window.location.search);
+                                        if (params.get('view') !== 'delegated') {
+                                            params.set('view', 'delegated');
+                                            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                                        }
                                         // Reload delegated tasks to refresh the list
                                         try {
                                             const delegatedToMe = await taskDelegationService.getDelegatedToMe();
