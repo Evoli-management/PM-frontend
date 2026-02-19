@@ -100,22 +100,33 @@ const WeekView = ({
         };
     }, []);
 
-    // Calculate FixedSizeList height based on available flex space
+    // Keep the time grid focused to a 3-hour window; use remaining space for the task/activity panel.
     useEffect(() => {
         const calculateHeight = () => {
-            if (!weekScrollRef.current) return;
+            const slotsPerHour = Math.max(1, Math.round(60 / Math.max(1, slotSize)));
+            const desiredSlots = slotsPerHour * 3;
+            const defaultSlotPx = Math.round((slotSize / 30) * 38);
+            const slotPx = measuredSlotPx || defaultSlotPx;
+            const desiredHeight = Math.max(1, Math.round(desiredSlots * slotPx));
+
+            if (!weekScrollRef.current) {
+                setCalculatedListHeight(desiredHeight);
+                return;
+            }
+
             const rect = weekScrollRef.current.getBoundingClientRect();
             const availableHeight = rect.height;
             if (availableHeight > 0) {
-                setCalculatedListHeight(availableHeight);
+                setCalculatedListHeight(Math.min(availableHeight, desiredHeight));
+            } else {
+                setCalculatedListHeight(desiredHeight);
             }
         };
-        
-        // Calculate on mount and when window resizes
+
         calculateHeight();
         window.addEventListener('resize', calculateHeight);
         return () => window.removeEventListener('resize', calculateHeight);
-    }, []);
+    }, [slotSize, measuredSlotPx]);
 
     // Track FixedSizeList outer scroll so the now-line can be positioned relative to visible scroll
     useEffect(() => {
@@ -414,7 +425,7 @@ const WeekView = ({
                     }
                     .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
                 `}</style>
-                <div className="p-0 flex flex-col h-screen" style={{ overflow: "hidden", position: 'relative' }}>
+                <div className="p-0 flex flex-col h-full min-h-0" style={{ overflow: "hidden", position: 'relative' }}>
                 {/* Header with navigation inside the view */}
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -621,10 +632,10 @@ const WeekView = ({
                 {/* Calendar grid */}
                 <div
                     ref={containerRef}
-                    className="no-scrollbar flex-1"
+                    className="no-scrollbar flex-1 min-h-0"
                     style={{ overflowX: "hidden", overflowY: "hidden", display: "flex", flexDirection: "column" }}
                 >
-                    <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                    <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: "1 1 0", minHeight: 0 }}>
                         {/* Header + all-day row */}
                         <div className="no-scrollbar flex-shrink-0" style={{ flexBasis: "auto" }}>
                             <table
@@ -781,7 +792,7 @@ const WeekView = ({
                             <div
                                 ref={weekScrollRef}
                                 className="w-full no-scrollbar"
-                                style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", flex: "3", minHeight: 0 }}
+                                style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", flex: "0 0 auto", minHeight: 0 }}
                             >
                                 <FixedSizeList
                                     className="no-scrollbar"
@@ -1273,7 +1284,15 @@ const WeekView = ({
                         )}
 
                         {/* Combined Tasks + Activities row: render per-day vertical columns under each date (no separation) */}
-                        <div className="flex w-full bg-white border border-gray-100 rounded-b-lg mt-2 flex-shrink-0" style={{ flex: "0 0 25vh", maxHeight: "25vh", minHeight: "25vh", overflowY: "auto", borderTop: "3px solid rgba(100, 116, 139, 0.6)" }}>
+                        <div
+                            className="flex w-full bg-white border border-gray-100 rounded-b-lg mt-2"
+                            style={{
+                                flex: "1 1 0",
+                                minHeight: 0,
+                                overflowY: "auto",
+                                borderTop: "3px solid rgba(100, 116, 139, 0.6)",
+                            }}
+                        >
                             {/* LEFT: sticky column with both Add buttons stacked */}
                             <div className="flex flex-col items-start pr-2 pl-1 py-2" style={{ width: TIME_COL_PX + "px", position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white', minHeight: 56 }}>
                                 <button
@@ -1363,12 +1382,22 @@ const WeekView = ({
                                     });
 
                                     return (
-                                        <div key={`col-${dIdx}`} className="p-2 min-h-[56px] overflow-hidden" style={{
-                                            borderRightWidth: "2px",
-                                            borderRightStyle: "dashed",
-                                            borderRightColor: "rgba(148, 163, 184, 0.3)",
-                                        }}>
-                                            <div className="flex flex-col gap-2">
+                                        <div
+                                            key={`col-${dIdx}`}
+                                            className="p-2 min-h-[56px] h-full overflow-hidden flex flex-col"
+                                            style={{
+                                                borderRightWidth: "2px",
+                                                borderRightStyle: "dashed",
+                                                borderRightColor: "rgba(148, 163, 184, 0.3)",
+                                            }}
+                                        >
+                                            <div
+                                                className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden"
+                                                style={{
+                                                    maxHeight: "168px",
+                                                    paddingRight: "6px",
+                                                }}
+                                            >
                                                 {combined.map((item) => {
                                                     if (item.__type === 'task') {
                                                         const t = item;
