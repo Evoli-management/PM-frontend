@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 /**
  * ViewTabsNavigation - Main view tabs for Key Areas page
@@ -13,6 +14,8 @@ export default function ViewTabsNavigation({
     const [openActiveMenu, setOpenActiveMenu] = useState(false);
     const activeMenuRef = useRef(null);
     const activeTasksLabel = activeFilter === 'all' ? 'ALL TASKS' : 'ACTIVE TASKS';
+    const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -81,7 +84,12 @@ export default function ViewTabsNavigation({
                 {/* DELEGATED Tab */}
                 <button
                     type="button"
-                    onClick={() => setViewTab('delegated')}
+                    onClick={() => {
+                        setViewTab('delegated');
+                        const params = new URLSearchParams(location.search);
+                        params.set('view', 'delegated');
+                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+                    }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 ${
                         viewTab === 'delegated'
                             ? 'text-blue-600 border-b-2 border-blue-600'
@@ -100,7 +108,12 @@ export default function ViewTabsNavigation({
                 {/* TO-DO Tab */}
                 <button
                     type="button"
-                    onClick={() => setViewTab('todo')}
+                    onClick={() => {
+                        setViewTab('todo');
+                        const params = new URLSearchParams(location.search);
+                        params.set('view', 'todo');
+                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+                    }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
                         viewTab === 'todo'
                             ? 'text-blue-600 border-b-2 border-blue-600'
@@ -114,7 +127,12 @@ export default function ViewTabsNavigation({
                 {/* ACTIVITY TRAP Tab */}
                 <button
                     type="button"
-                    onClick={() => setViewTab('activity-trap')}
+                    onClick={() => {
+                        setViewTab('activity-trap');
+                        const params = new URLSearchParams(location.search);
+                        params.set('view', 'activity-trap');
+                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+                    }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
                         viewTab === 'activity-trap'
                             ? 'text-blue-600 border-b-2 border-blue-600'
@@ -128,7 +146,12 @@ export default function ViewTabsNavigation({
                 {/* MY FOCUS Tab */}
                 <button
                     type="button"
-                    onClick={() => setViewTab('my-focus')}
+                    onClick={() => {
+                        setViewTab('my-focus');
+                        const params = new URLSearchParams(location.search);
+                        params.set('view', 'my-focus');
+                        navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+                    }}
                     className={`px-2 py-2 rounded text-xs font-semibold whitespace-nowrap transition ${
                         viewTab === 'my-focus'
                             ? 'text-blue-600 border-b-2 border-blue-600'
