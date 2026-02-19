@@ -501,9 +501,21 @@ export default function KeyAreas() {
 
     const [taskTab, setTaskTab] = useState(1);
     // Main view tab: 'active-tasks' | 'delegated' | 'todo' | 'activity-trap' | 'my-focus'
-    const [viewTab, setViewTab] = useState('active-tasks');
+    const params = new URLSearchParams(location.search || "");
+    const allowedViews = new Set(['active-tasks', 'delegated', 'todo', 'activity-trap', 'my-focus']);
+    const initialViewTab = (() => {
+        const viewParam = params.get('view');
+        if (viewParam && allowedViews.has(viewParam)) return viewParam;
+        return 'active-tasks';
+    })();
+    const initialActiveFilter = (() => {
+        const activeParam = params.get('active');
+        if (activeParam === 'active' || activeParam === 'all') return activeParam;
+        return 'active';
+    })();
+    const [viewTab, setViewTab] = useState(initialViewTab);
     // Sub-filter for ACTIVE TASKS view: 'active' (no completed) or 'all' (including completed)
-    const [activeFilter, setActiveFilter] = useState('active');
+    const [activeFilter, setActiveFilter] = useState(initialActiveFilter);
     const isGlobalTasksView = viewTab === 'delegated' || viewTab === 'todo' || viewTab === 'activity-trap';
     const [allTasks, setAllTasks] = useState([]);
     const [pendingDelegations, setPendingDelegations] = useState([]); // For DELEGATED tab - pending only
@@ -4592,12 +4604,16 @@ export default function KeyAreas() {
                                     onTaskAccept={async (taskId) => {
                                         // Remove from pending
                                         setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
-                                        
+                                        // Ensure ?view=delegated is always in the URL
+                                        const params = new URLSearchParams(window.location.search);
+                                        if (params.get('view') !== 'delegated') {
+                                            params.set('view', 'delegated');
+                                            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                                        }
                                         // Reload ALL delegated tasks from backend to show the newly created accepted task with keyAreaId
                                         try {
                                             const delegatedToMe = await taskDelegationService.getDelegatedToMe();
                                             setAllTasks(delegatedToMe || []);
-                                            
                                             // Update pending list by filtering for pending status only
                                             const pending = (delegatedToMe || []).filter(t => 
                                                 (t.delegationStatus || t.delegation_status) === 'pending' || 
@@ -4611,7 +4627,12 @@ export default function KeyAreas() {
                                     onTaskReject={async (taskId) => {
                                         // Remove from pending
                                         setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
-                                        
+                                        // Ensure ?view=delegated is always in the URL
+                                        const params = new URLSearchParams(window.location.search);
+                                        if (params.get('view') !== 'delegated') {
+                                            params.set('view', 'delegated');
+                                            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                                        }
                                         // Reload delegated tasks to refresh the list
                                         try {
                                             const delegatedToMe = await taskDelegationService.getDelegatedToMe();
