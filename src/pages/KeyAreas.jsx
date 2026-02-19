@@ -4602,8 +4602,6 @@ export default function KeyAreas() {
                                     pendingTasks={pendingDelegations}
                                     keyAreas={keyAreas}
                                     onTaskAccept={async (taskId) => {
-                                        // Remove from pending
-                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
                                         // Ensure ?view=delegated is always in the URL
                                         const params = new URLSearchParams(window.location.search);
                                         if (params.get('view') !== 'delegated') {
@@ -4625,8 +4623,6 @@ export default function KeyAreas() {
                                         }
                                     }}
                                     onTaskReject={async (taskId) => {
-                                        // Remove from pending
-                                        setPendingDelegations(prev => prev.filter(t => t.id !== taskId));
                                         // Ensure ?view=delegated is always in the URL
                                         const params = new URLSearchParams(window.location.search);
                                         if (params.get('view') !== 'delegated') {
@@ -4637,6 +4633,12 @@ export default function KeyAreas() {
                                         try {
                                             const delegatedToMe = await taskDelegationService.getDelegatedToMe();
                                             setAllTasks(delegatedToMe || []);
+                                            // Update pending list by filtering for pending status only
+                                            const pending = (delegatedToMe || []).filter(t => 
+                                                (t.delegationStatus || t.delegation_status) === 'pending' || 
+                                                !(t.delegationStatus || t.delegation_status)
+                                            );
+                                            setPendingDelegations(pending);
                                         } catch (error) {
                                             console.error('Failed to reload delegated tasks after reject:', error);
                                         }
