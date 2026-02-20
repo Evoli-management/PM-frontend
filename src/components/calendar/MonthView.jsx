@@ -1613,6 +1613,38 @@ export default function MonthView({
             </div>
           </div>
         </div>
+
+        {/* Bottom horizontal scroll radar */}
+        <div
+          className="pointer-events-none"
+          style={{
+            position: "sticky",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 320,
+          }}
+        >
+          <div
+            style={{
+              height: 26,
+              background:
+                "linear-gradient(to right, rgba(59,130,246,0.15), rgba(59,130,246,0.05) 20%, rgba(59,130,246,0.05) 80%, rgba(59,130,246,0.15))",
+              borderTop: "1px solid rgba(226,232,240,0.8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              color: "#1e3a8a",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <FaChevronLeft />
+            <span>Scroll horizontally</span>
+            <FaChevronRight />
+          </div>
+        </div>
       </div>
     </>
   );
