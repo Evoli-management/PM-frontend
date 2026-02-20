@@ -150,6 +150,7 @@ export default function QuarterView({
     };
     const gridRef = useRef(null);
     const [weekSeparators, setWeekSeparators] = useState([]);
+    const [weekVerticalDividers, setWeekVerticalDividers] = useState([]);
 
     const scrollToDate = (date) => {
         try {
@@ -261,47 +262,46 @@ export default function QuarterView({
                     const maxWeeks = Math.max(0, ...weekBlockRefs.current.map((m) => (m ? m.length : 0)));
                     const colRects = monthColRefs.current.map((el) => (el ? el.getBoundingClientRect() : null));
                     const lines = [];
+                    const verticalDividers = [];
                     const tolerance = 2; // px
 
+                    // One full-height vertical divider per week block (Mon..Sun)
+                    // positioned just after the weekday/date label region.
+                    for (let mIdx = 0; mIdx < monthColRefs.current.length; mIdx++) {
+                        const colRect = colRects[mIdx];
+                        if (!colRect) continue;
+                        const dividerLeft = colRect.left - rect.left + container.scrollLeft + 76;
+                        const weekBlocks = weekBlockRefs.current[mIdx] || [];
+                        for (let wIdx = 0; wIdx < weekBlocks.length; wIdx++) {
+                            const weekEl = weekBlocks[wIdx];
+                            if (!weekEl) continue;
+                            const r = weekEl.getBoundingClientRect();
+                            verticalDividers.push({
+                                left: dividerLeft,
+                                top: r.top - rect.top + container.scrollTop,
+                                height: r.height,
+                            });
+                        }
+                    }
+
+                    // Create separate horizontal lines for each month (don't extend into gaps)
                     for (let wIdx = 0; wIdx < maxWeeks - 1; wIdx++) {
-                        const tops = monthColRefs.current.map((_, mIdx) => {
+                        for (let mIdx = 0; mIdx < monthColRefs.current.length; mIdx++) {
                             const el = weekBlockRefs.current[mIdx]?.[wIdx];
-                            if (!el) return null;
+                            const colRect = colRects[mIdx];
+                            if (!el || !colRect) continue;
+
                             const r = el.getBoundingClientRect();
-                            return r.bottom - rect.top + container.scrollTop;
-                        });
+                            const top = r.bottom - rect.top + container.scrollTop;
+                            const left = colRect.left - rect.left + container.scrollLeft;
+                            const right = colRect.right - rect.left + container.scrollLeft;
 
-                        let mIdx = 0;
-                        while (mIdx < tops.length) {
-                            if (tops[mIdx] == null || !colRects[mIdx]) {
-                                mIdx += 1;
-                                continue;
-                            }
-
-                            let startIdx = mIdx;
-                            let endIdx = mIdx;
-                            let baseTop = tops[mIdx];
-
-                            while (endIdx + 1 < tops.length) {
-                                const nextTop = tops[endIdx + 1];
-                                if (nextTop == null) break;
-                                if (Math.abs(nextTop - baseTop) > tolerance) break;
-                                endIdx += 1;
-                            }
-
-                            const startRect = colRects[startIdx];
-                            const endRect = colRects[endIdx];
-                            if (startRect && endRect) {
-                                const left = startRect.left - rect.left + container.scrollLeft;
-                                const right = endRect.right - rect.left + container.scrollLeft;
-                                lines.push({ top: baseTop, left, right });
-                            }
-
-                            mIdx = endIdx + 1;
+                            lines.push({ top, left, right });
                         }
                     }
 
                     setWeekSeparators(lines);
+                    setWeekVerticalDividers(verticalDividers);
                 } catch (_) {}
             });
         };
@@ -349,127 +349,137 @@ export default function QuarterView({
                 }
                 .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
             `}</style>
-            {/* Quarter navigation inside view */}
-            <div className="flex items-center justify-between py-3 bg-white border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                    {/* Back first, then View dropdown */}
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Previous month"
-                        onClick={() => onShiftDate && onShiftDate({ months: -1 })}
-                    >
-                        <FaChevronLeft />
-                    </button>
-                    <div className="relative">
+            <div className="h-full min-h-0 flex flex-col">
+                {/* Quarter navigation inside view */}
+                <div className="flex items-center justify-between py-3 bg-white border-b border-gray-200 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                        {/* Back first, then View dropdown */}
                         <button
-                            className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
-                            style={{ minWidth: 36, minHeight: 28 }}
-                            onClick={() => setShowViewMenu((s) => !s)}
-                            aria-haspopup="menu"
-                            aria-expanded={showViewMenu ? "true" : "false"}
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Previous month"
+                            onClick={() => onShiftDate && onShiftDate({ months: -1 })}
                         >
-                            <span>View</span>
-                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                                {view?.charAt(0).toUpperCase() + view?.slice(1)}
-                            </span>
-                            <FaChevronDown
-                                className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
-                            />
+                            <FaChevronLeft />
                         </button>
-                        {showViewMenu && (
-                            <div
-                                role="menu"
-                                className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                        <div className="relative">
+                            <button
+                                className="px-2 py-1 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2"
+                                style={{ minWidth: 36, minHeight: 28 }}
+                                onClick={() => setShowViewMenu((s) => !s)}
+                                aria-haspopup="menu"
+                                aria-expanded={showViewMenu ? "true" : "false"}
                             >
-                                {["day", "week", "month", "quarter"].map((v) => (
-                                    <button
-                                        key={v}
-                                        role="menuitemradio"
-                                        aria-checked={view === v}
-                                        className={`w-full text-left px-3 py-2 text-sm ${view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
-                                        onClick={() => {
-                                            onChangeView && onChangeView(v);
-                                            setShowViewMenu(false);
-                                        }}
-                                    >
-                                        {v.charAt(0).toUpperCase() + v.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                                <span>View</span>
+                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                    {view?.charAt(0).toUpperCase() + view?.slice(1)}
+                                </span>
+                                <FaChevronDown
+                                    className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
+                                />
+                            </button>
+                            {showViewMenu && (
+                                <div
+                                    role="menu"
+                                    className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                                >
+                                    {["day", "week", "month", "quarter"].map((v) => (
+                                        <button
+                                            key={v}
+                                            role="menuitemradio"
+                                            aria-checked={view === v}
+                                            className={`w-full text-left px-3 py-2 text-sm ${view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}
+                                            onClick={() => {
+                                                onChangeView && onChangeView(v);
+                                                setShowViewMenu(false);
+                                            }}
+                                        >
+                                            {v.charAt(0).toUpperCase() + v.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Today"
+                            onClick={() => {
+                                try {
+                                    if (typeof onSetDate === 'function') onSetDate(new Date());
+                                } catch (_) {}
+                                // scroll to and highlight today's cell after render
+                                setTimeout(() => scrollToDate(new Date()), 80);
+                            }}
+                        >
+                            Today
+                        </button>
+                        <button
+                            className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
+                            style={{ minWidth: 36, minHeight: 36 }}
+                            aria-label="Next month"
+                            onClick={() => onShiftDate && onShiftDate({ months: 1 })}
+                        >
+                            <FaChevronRight />
+                        </button>
                     </div>
                 </div>
-                <span className="text-lg font-semibold text-blue-700">{quarterLabel}</span>
-                <div className="flex items-center gap-2">
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Today"
-                        onClick={() => {
-                            try {
-                                if (typeof onSetDate === 'function') onSetDate(new Date());
-                            } catch (_) {}
-                            // scroll to and highlight today's cell after render
-                            setTimeout(() => scrollToDate(new Date()), 80);
-                        }}
-                    >
-                        Today
-                    </button>
-                    <button
-                        className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
-                        style={{ minWidth: 36, minHeight: 36 }}
-                        aria-label="Next month"
-                        onClick={() => onShiftDate && onShiftDate({ months: 1 })}
-                    >
-                        <FaChevronRight />
-                    </button>
+                <div className="relative grid grid-cols-3 gap-6 flex-shrink-0 bg-white border-b border-blue-100">
+                    {monthLongNames.map((monthName, idx) => (
+                        <div key={`month-header-${idx}`} className="text-left px-2 py-2 text-blue-500 text-base font-semibold bg-white min-w-0">
+                            {monthName}
+                        </div>
+                    ))}
                 </div>
-            </div>
-            {/* Calendar grid: three independent month columns */}
-            <div
-                ref={gridRef}
-                className="relative flex items-stretch gap-6 pb-6 overflow-auto"
-                style={{ maxWidth: "100vw", maxHeight: "600px" }}
-            >
-                {weekSeparators.length > 0 && (
-                    <div className="pointer-events-none absolute left-0 right-0 top-0">
-                        {weekSeparators.map((line, idx) => (
-                            <div
-                                key={`wk-line-${idx}`}
-                                style={{ top: line.top, left: line.left, width: Math.max(0, line.right - line.left) }}
-                                className="absolute h-[2px] bg-blue-300"
-                            />
-                        ))}
-                    </div>
-                )}
-                {months.map((monthDate, mIdx) => {
-                    // Build weeks for this month using only in-month dates (1..end of month),
-                    // while keeping week numbers based on the Monday of each week.
-                    const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-                    const lastOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-                    const dayIndexMonday = (d) => (d.getDay() + 6) % 7; // 0 = Monday
-                    const monthWeeksMap = new Map();
-                    for (let day = 1; day <= lastOfMonth.getDate(); day++) {
-                        const d = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
-                        const weekStart = new Date(d);
-                        weekStart.setDate(d.getDate() - dayIndexMonday(d));
-                        const weekKey = weekStart.toISOString().slice(0, 10);
-                        if (!monthWeeksMap.has(weekKey)) {
-                            monthWeeksMap.set(weekKey, { weekStart: new Date(weekStart), days: [] });
-                        }
-                        monthWeeksMap.get(weekKey).days.push(d);
-                    }
+                {/* Calendar grid: three independent month columns */}
+                <div
+                    ref={gridRef}
+                    className="relative flex-1 min-h-0 overflow-auto"
+                    style={{ maxWidth: "100%", maxHeight: "100%" }}
+                >
+                <div className="relative grid grid-cols-3 gap-6 min-w-full pb-6">
+                    {weekSeparators.length > 0 && (
+                        <div className="pointer-events-none absolute left-0 right-0 top-0">
+                            {weekSeparators.map((line, idx) => (
+                                <div
+                                    key={`wk-line-${idx}`}
+                                    style={{ top: line.top, left: line.left, width: Math.max(0, line.right - line.left) }}
+                                    className="absolute h-[2px] bg-blue-300"
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {weekVerticalDividers.length > 0 && (
+                        <div className="pointer-events-none absolute left-0 right-0 top-0">
+                            {weekVerticalDividers.map((line, idx) => (
+                                <div
+                                    key={`wk-vline-${idx}`}
+                                    style={{ left: line.left, top: line.top, height: line.height }}
+                                    className="absolute w-px bg-slate-200/60"
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {months.map((monthDate, mIdx) => {
+                        const monthWeeks = weeks
+                            .map((w) => {
+                                const days = w.days.filter(
+                                    (d) =>
+                                        d.getMonth() === monthDate.getMonth() &&
+                                        d.getFullYear() === monthDate.getFullYear()
+                                );
+                                if (days.length === 0) return null;
+                                return { weekStart: w.weekStart, weekNum: w.weekNum, days };
+                            })
+                            .filter(Boolean);
 
-                    const monthWeeks = Array.from(monthWeeksMap.values())
-                        .sort((a, b) => a.weekStart - b.weekStart)
-                        .map((w) => ({ ...w, weekNum: getWeekNumberLocal(w.weekStart) }));
-
-                    return (
-                        <div key={mIdx} ref={(el) => setMonthColRef(mIdx, el)} className="w-1/3 self-stretch">
-                            <div className="text-left px-2 py-2 text-blue-500 text-base font-semibold">{monthLongNames[mIdx]}</div>
-                            <table className="w-full" style={{ tableLayout: 'fixed' }}>
-                                {monthWeeks.map((week, wIdx) => {
+                        return (
+                            <div key={mIdx} ref={(el) => setMonthColRef(mIdx, el)} className="min-w-0">
+                                <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                                    {monthWeeks.map((week, wIdx) => {
                                     const weekTbody = (
                                         <tbody
                                             key={`week-${wIdx}`}
@@ -487,15 +497,17 @@ export default function QuarterView({
                                                             data-date={date.toISOString().slice(0,10)}
                                                             style={{ minWidth: 80, position: 'relative' }}
                                                         >
-                                                            {showWeekNum && week.weekNum && (
-                                                                <span className="text-[11px] text-gray-500 bg-white px-1 rounded">
-                                                                    {week.weekNum}
-                                                                </span>
-                                                            )}
                                                             <div className={`text-sm font-semibold flex items-center justify-between ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="w-12 inline-block">{formatDate(date, { includeWeekday: true }).split(',')[0]}</span>
-                                                                    <span className="">{date.getDate()}</span>
+                                                                <div className="flex flex-col w-20 pr-2">
+                                                                    {showWeekNum && week.weekNum && (
+                                                                        <span className="text-[10px] text-gray-500 leading-none self-end mr-2 mb-0.5 px-1 rounded bg-white">
+                                                                            {week.weekNum}
+                                                                        </span>
+                                                                    )}
+                                                                    <div className="flex items-center gap-0.5">
+                                                                        <span className="w-8 inline-block">{formatDate(date, { includeWeekday: true }).split(',')[0]}</span>
+                                                                        <span className="">{date.getDate()}</span>
+                                                                    </div>
                                                                 </div>
                                                                 {(() => {
                                                                     const { start: dStart, end: dEnd } = getDayBounds(date);
@@ -593,12 +605,14 @@ export default function QuarterView({
                                             })}
                                         </tbody>
                                     );
-                                    return weekTbody;
-                                })}
-                            </table>
-                        </div>
-                    );
-                })}
+                                        return weekTbody;
+                                    })}
+                                </table>
+                            </div>
+                        );
+                    })}
+                </div>
+                </div>
             </div>
 
             

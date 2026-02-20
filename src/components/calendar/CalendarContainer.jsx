@@ -1643,9 +1643,9 @@ const CalendarContainer = () => {
     };
 
     return (
-        <div className="w-full h-screen flex flex-col">
+        <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
             {/* Unified calendar card */}
-            <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 flex flex-col flex-1 overflow-hidden">
+            <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Controls moved into each view header per request */}
                 {/* Each view renders its own navigation header */}
 

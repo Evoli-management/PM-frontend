@@ -852,7 +852,7 @@ export default function DayView({
               {/* CALENDAR CARD */}
               <div
             className="bg-white border border-blue-50 rounded-lg shadow-sm p-3 pr-2 overflow-hidden"
-            style={{ height: 'calc(100vh - 180px)', minHeight: 500 }}
+            style={{ height: '100%', minHeight: 0 }}
           >
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
