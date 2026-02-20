@@ -83,6 +83,7 @@ const CalendarContainer = () => {
         setSelectedTaskForElephant(null);
     };
     const [view, setView] = useState("day");
+    const [prefsLoaded, setPrefsLoaded] = useState(false);
     const [events, setEvents] = useState([]);
     const [todos, setTodos] = useState([]);
     const [keyAreas, setKeyAreas] = useState([]);
@@ -161,6 +162,7 @@ const CalendarContainer = () => {
                 if (!isNaN(d.getTime())) setCurrentDate(d);
             }
         } catch {}
+        setPrefsLoaded(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -226,13 +228,14 @@ const CalendarContainer = () => {
 
     // Persist view/date
     useEffect(() => {
+        if (!prefsLoaded) return;
         try {
             localStorage.setItem("calendar:view", view);
             localStorage.setItem("calendar:date", currentDate.toISOString());
             // persist workWeek preference as well
             try { localStorage.setItem('calendar:workWeek', workWeek ? 'true' : 'false'); } catch (_) {}
         } catch {}
-    }, [view, currentDate]);
+    }, [view, currentDate, prefsLoaded]);
     // Check if external sync is enabled to start auto-refresh
     useEffect(() => {
         let ignore = false;

@@ -134,12 +134,22 @@ export default function QuarterView({
     // popup: { iso: 'YYYY-MM-DD', events: [...], todos: [...], rect: DOMRect }
     // refs to allow equalizing row heights across the three month columns
     const rowRefs = useRef([]); // rowRefs.current[mIdx][wIdx][dayIdx] = tr element
+    const weekBlockRefs = useRef([]); // weekBlockRefs.current[mIdx][wIdx] = tbody element
+    const monthColRefs = useRef([]); // monthColRefs.current[mIdx] = month column div
     const setRowRef = (mIdx, wIdx, dayIdx, el) => {
         if (!rowRefs.current[mIdx]) rowRefs.current[mIdx] = [];
         if (!rowRefs.current[mIdx][wIdx]) rowRefs.current[mIdx][wIdx] = [];
         rowRefs.current[mIdx][wIdx][dayIdx] = el;
     };
+    const setWeekBlockRef = (mIdx, wIdx, el) => {
+        if (!weekBlockRefs.current[mIdx]) weekBlockRefs.current[mIdx] = [];
+        weekBlockRefs.current[mIdx][wIdx] = el;
+    };
+    const setMonthColRef = (mIdx, el) => {
+        monthColRefs.current[mIdx] = el;
+    };
     const gridRef = useRef(null);
+    const [weekSeparators, setWeekSeparators] = useState([]);
 
     const scrollToDate = (date) => {
         try {
@@ -147,7 +157,20 @@ export default function QuarterView({
             const iso = date.toISOString().slice(0, 10);
             const el = gridRef.current.querySelector(`[data-date="${iso}"]`);
             if (!el) return;
-            el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+            const container = gridRef.current;
+            const cRect = container.getBoundingClientRect();
+            const eRect = el.getBoundingClientRect();
+
+            const nextTop =
+                eRect.top - cRect.top + container.scrollTop - Math.max(0, (container.clientHeight - eRect.height) / 2);
+            const nextLeft =
+                eRect.left - cRect.left + container.scrollLeft - Math.max(0, (container.clientWidth - eRect.width) / 2);
+
+            container.scrollTo({
+                top: Math.max(0, nextTop),
+                left: Math.max(0, nextLeft),
+                behavior: "smooth",
+            });
             // brief highlight using the same animation/class as other views
             try {
                 el.classList.add("today-row-overlay");
@@ -224,6 +247,74 @@ export default function QuarterView({
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
     }, []);
+
+    useEffect(() => {
+        const container = gridRef.current;
+        if (!container) return;
+
+        let rafId = null;
+        const computeLines = () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                try {
+                    const rect = container.getBoundingClientRect();
+                    const maxWeeks = Math.max(0, ...weekBlockRefs.current.map((m) => (m ? m.length : 0)));
+                    const colRects = monthColRefs.current.map((el) => (el ? el.getBoundingClientRect() : null));
+                    const lines = [];
+                    const tolerance = 2; // px
+
+                    for (let wIdx = 0; wIdx < maxWeeks - 1; wIdx++) {
+                        const tops = monthColRefs.current.map((_, mIdx) => {
+                            const el = weekBlockRefs.current[mIdx]?.[wIdx];
+                            if (!el) return null;
+                            const r = el.getBoundingClientRect();
+                            return r.bottom - rect.top + container.scrollTop;
+                        });
+
+                        let mIdx = 0;
+                        while (mIdx < tops.length) {
+                            if (tops[mIdx] == null || !colRects[mIdx]) {
+                                mIdx += 1;
+                                continue;
+                            }
+
+                            let startIdx = mIdx;
+                            let endIdx = mIdx;
+                            let baseTop = tops[mIdx];
+
+                            while (endIdx + 1 < tops.length) {
+                                const nextTop = tops[endIdx + 1];
+                                if (nextTop == null) break;
+                                if (Math.abs(nextTop - baseTop) > tolerance) break;
+                                endIdx += 1;
+                            }
+
+                            const startRect = colRects[startIdx];
+                            const endRect = colRects[endIdx];
+                            if (startRect && endRect) {
+                                const left = startRect.left - rect.left + container.scrollLeft;
+                                const right = endRect.right - rect.left + container.scrollLeft;
+                                lines.push({ top: baseTop, left, right });
+                            }
+
+                            mIdx = endIdx + 1;
+                        }
+                    }
+
+                    setWeekSeparators(lines);
+                } catch (_) {}
+            });
+        };
+
+        computeLines();
+        window.addEventListener("resize", computeLines);
+        container.addEventListener("scroll", computeLines, { passive: true });
+        return () => {
+            window.removeEventListener("resize", computeLines);
+            container.removeEventListener("scroll", computeLines);
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [events, todos, months]);
 
     // Close popup on outside click or Esc
     useEffect(() => {
@@ -336,47 +427,63 @@ export default function QuarterView({
                 </div>
             </div>
             {/* Calendar grid: three independent month columns */}
-            <div ref={gridRef} className="flex gap-6 pb-6 overflow-auto" style={{ maxWidth: "100vw", maxHeight: "600px" }}>
+            <div
+                ref={gridRef}
+                className="relative flex items-stretch gap-6 pb-6 overflow-auto"
+                style={{ maxWidth: "100vw", maxHeight: "600px" }}
+            >
+                {weekSeparators.length > 0 && (
+                    <div className="pointer-events-none absolute left-0 right-0 top-0">
+                        {weekSeparators.map((line, idx) => (
+                            <div
+                                key={`wk-line-${idx}`}
+                                style={{ top: line.top, left: line.left, width: Math.max(0, line.right - line.left) }}
+                                className="absolute h-[2px] bg-blue-300"
+                            />
+                        ))}
+                    </div>
+                )}
                 {months.map((monthDate, mIdx) => {
-                    // Build weeks for this month (Mon..Sun) starting with week that contains the 1st
+                    // Build weeks for this month using only in-month dates (1..end of month),
+                    // while keeping week numbers based on the Monday of each week.
                     const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
                     const lastOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
                     const dayIndexMonday = (d) => (d.getDay() + 6) % 7; // 0 = Monday
-                    const monthFirstWeekStart = new Date(firstOfMonth);
-                    monthFirstWeekStart.setDate(firstOfMonth.getDate() - dayIndexMonday(firstOfMonth));
-                    const monthLastWeekEnd = new Date(lastOfMonth);
-                    monthLastWeekEnd.setDate(lastOfMonth.getDate() + (6 - dayIndexMonday(lastOfMonth)));
-                    // Assign weeks to this month only up to (but not including) the week that contains the next month's 1st.
-                    const nextMonthFirst = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
-                    const nextMonthFirstWeekStart = new Date(nextMonthFirst);
-                    nextMonthFirstWeekStart.setDate(nextMonthFirst.getDate() - dayIndexMonday(nextMonthFirst));
-
-                    const monthWeeks = [];
-                    for (let ws = new Date(monthFirstWeekStart); ws < nextMonthFirstWeekStart; ws.setDate(ws.getDate() + 7)) {
-                        const weekStart = new Date(ws);
-                        const days = Array.from({ length: 7 }, (_, i) => {
-                            const d = new Date(weekStart);
-                            d.setDate(weekStart.getDate() + i);
-                            return d;
-                        });
-                        monthWeeks.push({ weekStart: new Date(weekStart), weekNum: getWeekNumberLocal(weekStart), days });
+                    const monthWeeksMap = new Map();
+                    for (let day = 1; day <= lastOfMonth.getDate(); day++) {
+                        const d = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+                        const weekStart = new Date(d);
+                        weekStart.setDate(d.getDate() - dayIndexMonday(d));
+                        const weekKey = weekStart.toISOString().slice(0, 10);
+                        if (!monthWeeksMap.has(weekKey)) {
+                            monthWeeksMap.set(weekKey, { weekStart: new Date(weekStart), days: [] });
+                        }
+                        monthWeeksMap.get(weekKey).days.push(d);
                     }
 
+                    const monthWeeks = Array.from(monthWeeksMap.values())
+                        .sort((a, b) => a.weekStart - b.weekStart)
+                        .map((w) => ({ ...w, weekNum: getWeekNumberLocal(w.weekStart) }));
+
                     return (
-                        <div key={mIdx} className={`w-1/3 ${mIdx > 0 ? 'border-l border-blue-200 pl-4' : ''}`}>
+                        <div key={mIdx} ref={(el) => setMonthColRef(mIdx, el)} className="w-1/3 self-stretch">
                             <div className="text-left px-2 py-2 text-blue-500 text-base font-semibold">{monthLongNames[mIdx]}</div>
                             <table className="w-full" style={{ tableLayout: 'fixed' }}>
                                 {monthWeeks.map((week, wIdx) => {
                                     const weekTbody = (
-                                        <tbody key={`week-${wIdx}`} className="bg-white border border-blue-200 my-1">
+                                        <tbody
+                                            key={`week-${wIdx}`}
+                                            ref={(el) => setWeekBlockRef(mIdx, wIdx, el)}
+                                            className="bg-white border border-blue-200 my-1"
+                                        >
                                             {week.days.map((date, dayIdx) => {
-                                                const isCurrentMonth = date.getMonth() === monthDate.getMonth() && date.getFullYear() === monthDate.getFullYear();
                                                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                                const showWeekNum = dayIdx === 0; // Monday row
+                                                const showWeekNum = dayIndexMonday(date) === 0; // show only on Monday
+                                                const rowBorderClass = dayIdx < week.days.length - 1 ? "border-b border-blue-100" : "";
                                                 return (
                                                     <tr ref={(el) => setRowRef(mIdx, wIdx, dayIdx, el)} key={dayIdx} className="bg-white">
                                                         <td
-                                                            className={`px-3 py-3 text-left align-top ${!isCurrentMonth ? 'text-gray-300' : ''}`}
+                                                            className={`px-3 py-3 text-left align-top ${rowBorderClass}`}
                                                             data-date={date.toISOString().slice(0,10)}
                                                             style={{ minWidth: 80, position: 'relative' }}
                                                         >
@@ -486,21 +593,6 @@ export default function QuarterView({
                                             })}
                                         </tbody>
                                     );
-                                    // Render separator after every week except the last one so rows are visually separated
-                                    if (wIdx < monthWeeks.length - 1) {
-                                        return (
-                                            <React.Fragment key={`frag-${wIdx}`}>
-                                                {weekTbody}
-                                                <tbody key={`sep-${wIdx}`}>
-                                                    <tr>
-                                                        <td>
-                                                            <hr className="border-t border-blue-200 my-0" />
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </React.Fragment>
-                                        );
-                                    }
                                     return weekTbody;
                                 })}
                             </table>

@@ -222,7 +222,7 @@ export default function MonthView({
   const HOUR_SLOTS = useMemo(() => SLOTS.filter((s) => String(s).endsWith(":00")), [SLOTS]);
 
   const ALL_DAY_COL_WIDTH = 120;
-  const HOUR_COL_WIDTH = 80;
+  const HOUR_COL_WIDTH = 180;
 
   const LANE_WIDTH = 72;
   const LANE_GAP = 6;
@@ -555,7 +555,7 @@ export default function MonthView({
 
   const [overlayMetrics, setOverlayMetrics] = useState({ colLeft: 0, colWidth: 0, rows: [] });
   const [eventOverlays, setEventOverlays] = useState([]);
-  const [highlightToday, setHighlightToday] = useState(false);
+  const [highlightTodayPulse, setHighlightTodayPulse] = useState(0);
   const [rowOverlay, setRowOverlay] = useState(null);
 
   const heightSyncTimerRef = useRef(null);
@@ -564,6 +564,41 @@ export default function MonthView({
   const idleHandleRef = useRef(null);
   const chunkTimerRef = useRef(null);
   const initialNowFocusDoneRef = useRef(false);
+  const focusTodayAfterMonthJumpRef = useRef(false);
+
+  const focusNowInMonthGrid = () => {
+    try {
+      const now = new Date();
+      const vScroll = rightVScrollRef.current;
+      const hScroll = rightBodyScrollRef.current;
+      const headerThs = rightHeaderTableRef.current?.querySelectorAll("thead th");
+      const rows = dayRowRefs.current.filter(Boolean);
+      if (!vScroll || !hScroll || !headerThs?.length || !rows.length) return false;
+
+      const todayIdx = now.getDate() - 1;
+      const todayRow = rows[todayIdx];
+      if (todayRow) {
+        const nextTop = todayRow.offsetTop + todayRow.offsetHeight / 2 - vScroll.clientHeight / 2;
+        vScroll.scrollTop = Math.max(0, nextTop);
+      }
+
+      const hourIdx = Math.max(0, Math.min(headerThs.length - 1, now.getHours()));
+      const th = headerThs[hourIdx];
+      if (th) {
+        const fraction = (now.getMinutes() + now.getSeconds() / 60) / 60;
+        const nextLeft = th.offsetLeft + fraction * (th.offsetWidth || HOUR_COL_WIDTH) - hScroll.clientWidth / 2;
+        hScroll.scrollLeft = Math.max(0, nextLeft);
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const triggerTodayHighlight = () => {
+    setHighlightTodayPulse((v) => v + 1);
+  };
 
   // ✅ Sync horizontal scroll: body -> header
   useEffect(() => {
@@ -725,6 +760,67 @@ export default function MonthView({
     ensureRowCountMatches();
     syncRowHeights();
   }, [monthDays.length]);
+
+  // Focus current time on initial open (current month only)
+  useEffect(() => {
+    if (initialNowFocusDoneRef.current) return;
+
+    const now = new Date();
+    if (year !== now.getFullYear() || month !== now.getMonth()) return;
+
+    let rafId = null;
+    const timer = setTimeout(() => {
+      const vScroll = rightVScrollRef.current;
+      const hScroll = rightBodyScrollRef.current;
+      const headerThs = rightHeaderTableRef.current?.querySelectorAll("thead th");
+      const rows = dayRowRefs.current.filter(Boolean);
+
+      if (!vScroll || !hScroll || !headerThs?.length || !rows.length) return;
+
+      const todayIdx = now.getDate() - 1;
+      const todayRow = rows[todayIdx];
+      if (todayRow) {
+        const nextTop = todayRow.offsetTop + todayRow.offsetHeight / 2 - vScroll.clientHeight / 2;
+        vScroll.scrollTop = Math.max(0, nextTop);
+      }
+
+      const hourIdx = Math.max(0, Math.min(headerThs.length - 1, now.getHours()));
+      const th = headerThs[hourIdx];
+      if (th) {
+        const fraction = (now.getMinutes() + now.getSeconds() / 60) / 60;
+        const nextLeft = th.offsetLeft + fraction * (th.offsetWidth || HOUR_COL_WIDTH) - hScroll.clientWidth / 2;
+        hScroll.scrollLeft = Math.max(0, nextLeft);
+      }
+
+      initialNowFocusDoneRef.current = true;
+      triggerTodayHighlight();
+    }, 0);
+
+    rafId = requestAnimationFrame(() => {
+      ensureRowCountMatches();
+      syncRowHeights();
+    });
+
+    return () => {
+      clearTimeout(timer);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [month, year, HOUR_COL_WIDTH]);
+
+  useEffect(() => {
+    if (!focusTodayAfterMonthJumpRef.current) return;
+
+    const now = new Date();
+    if (year !== now.getFullYear() || month !== now.getMonth()) return;
+
+    const timer = setTimeout(() => {
+      focusNowInMonthGrid();
+      triggerTodayHighlight();
+      focusTodayAfterMonthJumpRef.current = false;
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [month, year, HOUR_COL_WIDTH]);
 
   // ✅ Build timed event overlays (kept from your version but anchored to BODY wrapper)
   useEffect(() => {
@@ -947,7 +1043,7 @@ export default function MonthView({
 
   // today blink overlay (kept minimal)
   useEffect(() => {
-    if (!highlightToday) return;
+    if (!highlightTodayPulse) return;
     if (year !== today.getFullYear() || month !== today.getMonth()) return;
 
     const idx = today.getDate() - 1;
@@ -956,7 +1052,6 @@ export default function MonthView({
     const table = tableRef.current;
 
     if (!el || !bodyWrap || !table) {
-      setHighlightToday(false);
       return;
     }
 
@@ -973,10 +1068,9 @@ export default function MonthView({
     });
 
     const t = setTimeout(() => setRowOverlay(null), 450 * 4 + 100);
-    setHighlightToday(false);
 
     return () => clearTimeout(t);
-  }, [highlightToday, year, month]);
+  }, [highlightTodayPulse, year, month]);
 
   const [showViewMenu, setShowViewMenu] = useState(false);
 
@@ -996,7 +1090,7 @@ export default function MonthView({
       `}</style>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="relative z-[400] flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <button
             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
@@ -1025,7 +1119,7 @@ export default function MonthView({
             {showViewMenu && (
               <div
                 role="menu"
-                className="absolute z-50 mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+                className="absolute z-[450] mt-2 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
               >
                 {["day", "week", "month", "quarter"].map((v) => (
                   <button
@@ -1065,7 +1159,20 @@ export default function MonthView({
             className="px-3 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50"
             style={{ minHeight: 36 }}
             aria-label="Today"
-            onClick={() => setHighlightToday(true)}
+            onClick={() => {
+              const now = new Date();
+              const monthDelta =
+                (now.getFullYear() - year) * 12 + (now.getMonth() - month);
+
+              if (monthDelta !== 0 && onShiftDate) {
+                focusTodayAfterMonthJumpRef.current = true;
+                onShiftDate({ months: monthDelta });
+                return;
+              }
+
+              focusNowInMonthGrid();
+              triggerTodayHighlight();
+            }}
           >
             Today
           </button>
@@ -1168,6 +1275,8 @@ export default function MonthView({
                         style={{
                           width: "96px",
                           height: "25px",
+                          borderTop: "1px solid rgba(226,232,240,0.35)",
+                          borderBottom: "1px solid rgba(226,232,240,0.35)",
                           borderRight: "2px solid rgba(226,232,240,1)",
                           display: "flex",
                           alignItems: "center",
@@ -1195,6 +1304,8 @@ export default function MonthView({
                         style={{
                           width: `${ALL_DAY_COL_WIDTH}px`,
                           height: "25px",
+                          borderTop: "1px solid rgba(226,232,240,0.35)",
+                          borderBottom: "1px solid rgba(226,232,240,0.35)",
                           borderLeft: "2px solid rgba(226,232,240,1)",
                           borderRight: "2px solid rgba(226,232,240,1)",
                         }}
@@ -1374,7 +1485,7 @@ export default function MonthView({
                                 }`}
                                 style={{
                                   height: "25px",
-                                  width: "120px",
+                                  width: `${HOUR_COL_WIDTH}px`,
                                   boxSizing: "border-box",
                                   borderLeft: "1px solid rgba(226,232,240,0.4)",
                                   borderRight: "1px solid rgba(226,232,240,0.4)",
