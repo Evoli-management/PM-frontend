@@ -185,7 +185,11 @@ export default function RemindersListModal({ isOpen, onClose, inline = false }) 
 
                         <div className="text-sm text-gray-500 space-y-1">
                           <p>
-                            <strong>When:</strong> {formatDate(new Date(reminder.reminderDateTime))} at {formatTime(new Date(reminder.reminderDateTime))}
+                            <strong>When:</strong> {formatDate(new Date(reminder.reminderDateTime))} at {formatTime(
+                              typeof reminder.reminderDateTime === 'string' && reminder.reminderDateTime.includes('T')
+                                ? reminder.reminderDateTime.split('T')[1]?.slice(0,5)
+                                : (typeof reminder.reminderDateTime === 'string' ? reminder.reminderDateTime.slice(11,16) : '')
+                            )}
                           </p>
                           {reminder.recurrencePattern !== 'none' && (
                             <p>

@@ -270,6 +270,25 @@ export default function NotificationBell() {
                   <div
                     key={notification.id}
                     className={`p-4 hover:bg-gray-50 transition ${!notification.isRead ? 'bg-blue-50' : ''}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={async () => {
+                      // Mark as read
+                      await handleMarkAsRead(notification.id);
+                      // Navigate based on notification type
+                      if (
+                        notification.type === 'task_delegated' ||
+                        notification.type === 'task_accepted' ||
+                        notification.type === 'task_rejected' ||
+                        notification.type === 'activity_delegated' ||
+                        notification.type === 'activity_accepted' ||
+                        notification.type === 'activity_rejected'
+                      ) {
+                        // Go to delegated tab
+                        window.location.hash = '#/key-areas?view=delegated';
+                        setShowDropdown(false);
+                      }
+                      // Add more navigation logic for other types as needed
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -300,21 +319,16 @@ export default function NotificationBell() {
                         </div>
                       </div>
                       <button
-                        onClick={() => handleDelete(notification.id)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleDelete(notification.id);
+                        }}
                         className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"
                         title="Delete"
                       >
                         <FaTimes size={14} />
                       </button>
                     </div>
-                    {!notification.isRead && (
-                      <button
-                        onClick={() => handleMarkAsRead(notification.id)}
-                        className="mt-2 text-xs text-blue-500 hover:text-blue-600 font-medium"
-                      >
-                        Mark as read
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
