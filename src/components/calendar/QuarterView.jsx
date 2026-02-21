@@ -60,17 +60,13 @@ export default function QuarterView({
     const months = getQuarterMonths(currentDate || today, 0);
     // month display values
     const monthLongNames = months.map((m) => m.toLocaleString("default", { month: "long" }));
-    const monthShortNames = months.map((m) => m.toLocaleString("default", { month: "short" }));
-    // Simplified quarter range like "Jan-Mar 26". If months span years, show both years (e.g. "Dec 26 - Feb 27").
+    // Quarter range with full month names and full year.
     const years = months.map((m) => m.getFullYear());
     let quarterLabel = "";
     if (years.every((y) => y === years[0])) {
-        const yy = String(years[0]).slice(-2);
-        quarterLabel = `${monthShortNames[0]}-${monthShortNames[2]} ${yy}`;
+        quarterLabel = `${monthLongNames[0]}-${monthLongNames[2]} ${years[0]}`;
     } else {
-        const y0 = String(years[0]).slice(-2);
-        const y2 = String(years[2]).slice(-2);
-        quarterLabel = `${monthShortNames[0]} ${y0} - ${monthShortNames[2]} ${y2}`;
+        quarterLabel = `${monthLongNames[0]} ${years[0]} - ${monthLongNames[2]} ${years[2]}`;
     }
     // (replaced below with calendar-aligned weeks)
 
