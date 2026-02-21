@@ -14,6 +14,8 @@ export default function ResizablePanels({
     initialTaskWidth = 50,
     minTaskWidth = 25,
     minActivityWidth = 25,
+    leftPanelScrollable = true,
+    rightPanelScrollable = true,
 }) {
     const [taskWidth, setTaskWidth] = useState(initialTaskWidth);
     const [isDragging, setIsDragging] = useState(false);
@@ -59,7 +61,7 @@ export default function ResizablePanels({
         >
             {/* Left Panel - Tasks */}
             <div
-                className="overflow-auto bg-white"
+                className={`${leftPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-white`}
                 style={{
                     width: `${taskWidth}%`,
                     borderRight: '1px solid #e2e8f0',
@@ -85,7 +87,7 @@ export default function ResizablePanels({
 
             {/* Right Panel - Activities */}
             <div
-                className="overflow-auto bg-slate-50"
+                className={`${rightPanelScrollable ? 'overflow-auto' : 'overflow-hidden'} bg-slate-50`}
                 style={{
                     width: `${activityWidth}%`,
                     transition: isDragging ? 'none' : 'width 0.2s ease',

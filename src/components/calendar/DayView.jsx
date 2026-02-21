@@ -136,6 +136,9 @@ export default function DayView({
   const justResizedRef = useRef(false);
   // State to track which time slot is being dragged over
   const [dragOverSlot, setDragOverSlot] = useState(null);
+  const [allDayOverflowOpen, setAllDayOverflowOpen] = useState(false);
+  const [allDayOverflowItems, setAllDayOverflowItems] = useState([]);
+  const allDayPopupRef = useRef(null);
 
   const isToday = (() => {
     const d = currentDate || new Date();
@@ -162,6 +165,21 @@ export default function DayView({
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  useEffect(() => {
+    const onDocMouseDown = (ev) => {
+      if (!allDayOverflowOpen) return;
+      if (allDayPopupRef.current && allDayPopupRef.current.contains(ev.target)) return;
+      if (ev.target?.closest?.("[data-day-all-day-overflow-trigger='true']")) return;
+      setAllDayOverflowOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [allDayOverflowOpen]);
+
+  useEffect(() => {
+    setAllDayOverflowOpen(false);
+  }, [currentDate]);
 
   useEffect(() => {
     if (typeof onChangeView === "function") onChangeView(view);
@@ -741,9 +759,9 @@ export default function DayView({
   );
 
   const leftPanel = (
-        <div className="flex-shrink-0 h-full">
+        <div className="flex-shrink-0 h-full min-h-0 flex flex-col">
           {/* compact header */}
-          <div className="w-full mb-3">
+          <div className="w-full mb-3 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <button
@@ -813,7 +831,7 @@ export default function DayView({
               </div>
 
               <h2 className="text-xl font-bold flex items-center gap-2">
-                {headerWeekday}, {headerDate}
+                { headerWeekday}, {headerDate}
               </h2>
 
               <div className="flex items-center gap-2">
@@ -851,14 +869,22 @@ export default function DayView({
 
               {/* CALENDAR CARD */}
               <div
-            className="bg-white border border-blue-50 rounded-lg shadow-sm p-3 pr-2 overflow-hidden"
-            style={{ height: '100%', minHeight: 0 }}
+            className="bg-white border border-blue-50 rounded-lg shadow-sm p-2 pr-1 overflow-visible flex-1 min-h-0"
           >
             <div className="w-full bg-white flex flex-col text-sm text-gray-700" style={{ height: "100%" }}>
               {/* all-day strip: show tasks that span multiple days with continuation indicators */}
-              <div className="flex">
-                <div className="w-16 bg-white text-xs text-gray-500">
-                  <div className="h-10 flex items-center">
+              <div
+                className="flex relative z-20"
+                style={{
+                  borderBottomWidth: "2px",
+                  borderBottomStyle: "solid",
+                  borderBottomColor: "rgba(100, 116, 139, 0.65)",
+                }}
+              >
+                <div className="w-16 bg-white text-xs text-gray-500 flex border-r border-gray-200">
+                  <div
+                    className="h-full flex items-start py-1"
+                  >
                     <span className="ml-2 px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-semibold">
                       All-Day
                     </span>
@@ -867,7 +893,7 @@ export default function DayView({
                 <div className="flex-1">
                   {/* make all-day area able to stack full-width bars for multi-day tasks */}
                   <div
-                    className="border-b border-gray-200 px-2 py-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="px-2 py-1 cursor-pointer hover:bg-gray-50 transition-colors"
                     role="button"
                     tabIndex={0}
                     aria-label="Click to create all-day event"
@@ -892,7 +918,7 @@ export default function DayView({
                       }
                     }}
                   >
-                    <div className="flex flex-col gap-1 max-h-28 overflow-y-auto">
+                    <div className="flex flex-col gap-1 overflow-visible">
                       {(() => {
                         try {
                           const dayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 0);
@@ -949,7 +975,12 @@ export default function DayView({
 
                           if (!multiDay || multiDay.length === 0) return null;
 
-                          return multiDay.map((t) => {
+                          const visibleItems = multiDay.slice(0, 2);
+                          const hiddenItems = multiDay.slice(2);
+
+                          return (
+                            <>
+                              {visibleItems.map((t) => {
                             try {
                               const s = t.startDate || t.start_date || t.date || t.dueDate || t.due_date || null;
                               // For end date, MUST check endDate/end_date explicitly, do NOT use t.date as fallback
@@ -1001,7 +1032,66 @@ export default function DayView({
                                 </div>
                               );
                             } catch (_) { return null; }
-                          });
+                              })}
+
+                              {hiddenItems.length > 0 && (
+                                <div className="w-full relative">
+                                  <button
+                                    type="button"
+                                    data-day-all-day-overflow-trigger="true"
+                                    className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
+                                    onClick={(e) => {
+                                      try { e.stopPropagation(); } catch (_) {}
+                                      setAllDayOverflowItems(hiddenItems);
+                                      setAllDayOverflowOpen((s) => !s);
+                                    }}
+                                  >
+                                    +show more
+                                  </button>
+
+                                  {allDayOverflowOpen && (
+                                    <div
+                                      ref={allDayPopupRef}
+                                      className="absolute top-7 left-0 w-64 max-h-56 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg z-30"
+                                      onClick={(e) => {
+                                        try { e.stopPropagation(); } catch (_) {}
+                                      }}
+                                    >
+                                      <div className="px-3 py-2 border-b border-slate-100 text-xs text-slate-700 flex items-center justify-between">
+                                        <span className="font-semibold">Events</span>
+                                        <button
+                                          type="button"
+                                          className="text-gray-500 hover:text-gray-700"
+                                          onClick={() => setAllDayOverflowOpen(false)}
+                                          aria-label="Close"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                      <div className="py-1">
+                                        {allDayOverflowItems.map((it, idx) => {
+                                          const title = it.title || it.name || it.summary || "Untitled";
+                                          return (
+                                            <button
+                                              key={`day-overflow-item-${it.id || idx}`}
+                                              type="button"
+                                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                              onClick={() => {
+                                                setAllDayOverflowOpen(false);
+                                                onTaskClick && onTaskClick(it);
+                                              }}
+                                            >
+                                              {title}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
                         } catch (e) { return null; }
                       })()}
                     </div>
@@ -1010,7 +1100,11 @@ export default function DayView({
               </div>
 
               {/* MAIN SCROLL AREA */}
-              <div ref={scrollContainerRef} className="flex-1 flex min-h-0" style={{ overflowX: "hidden", overflowY: "auto" }}>
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 flex min-h-0 relative z-0 pr-2"
+                style={{ overflowX: "hidden", overflowY: "auto", scrollbarGutter: "stable" }}
+              >
                 {/* LEFT TIME COLUMN – clearer hourly rows */}
                 <div className="w-16 bg-white text-xs text-gray-500 min-h-0">
                   <div
@@ -1357,6 +1451,7 @@ export default function DayView({
       initialTaskWidth={50}
       minTaskWidth={25}
       minActivityWidth={25}
+      leftPanelScrollable={false}
     />
   );
 }

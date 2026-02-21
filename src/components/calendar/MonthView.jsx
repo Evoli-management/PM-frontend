@@ -98,7 +98,9 @@ const RangeTaskBar = React.memo(function RangeTaskBar({
     );
     const endIdx = Math.min(
       overlayMetrics.rows.length - 1,
-      r.end.getMonth() === month ? r.end.getDate() - 1 : overlayMetrics.rows.length - 1
+      r.end.getMonth() === month
+        ? r.end.getDate() - 1
+        : overlayMetrics.rows.length - 1
     );
     if (startIdx > endIdx) return null;
 
@@ -114,18 +116,23 @@ const RangeTaskBar = React.memo(function RangeTaskBar({
       20,
       Math.min(overlayMetrics.colWidth - 12, CENTERED_BAR_WIDTH)
     );
-    const left = Math.round(Math.max(4, (overlayMetrics.colWidth - barWidth) / 2));
+    const left = Math.round(
+      Math.max(4, (overlayMetrics.colWidth - barWidth) / 2)
+    );
 
     const ka = keyAreaMap?.[String(r.task?.keyAreaId || r.task?.key_area_id)];
     let categoryColor = ka?.color || categories?.[r.task?.kind]?.color;
 
-    const isTailwind = typeof categoryColor === "string" && categoryColor.startsWith("bg-");
+    const isTailwind =
+      typeof categoryColor === "string" && categoryColor.startsWith("bg-");
     const isColorStr = typeof categoryColor === "string" && !isTailwind;
 
     const classForBg = isTailwind ? categoryColor : "";
     const classForBgFinal = classForBg || "bg-gray-200";
 
-    const resolvedTailwind = isTailwind ? tailwindColorCache[categoryColor] : null;
+    const resolvedTailwind = isTailwind
+      ? tailwindColorCache[categoryColor]
+      : null;
     const resolved = isColorStr ? categoryColor : resolvedTailwind;
 
     const styleBg = resolved
@@ -218,31 +225,26 @@ export default function MonthView({
   );
 
   const rawSlots = timeSlots && timeSlots.length > 0 ? timeSlots : ALL_HOURS;
-  const SLOTS = useMemo(() => rawSlots.filter((s) => String(s) !== "24:00"), [rawSlots]);
-  const HOUR_SLOTS = useMemo(() => SLOTS.filter((s) => String(s).endsWith(":00")), [SLOTS]);
+  const SLOTS = useMemo(
+    () => rawSlots.filter((s) => String(s) !== "24:00"),
+    [rawSlots]
+  );
+  const HOUR_SLOTS = useMemo(
+    () => SLOTS.filter((s) => String(s).endsWith(":00")),
+    [SLOTS]
+  );
 
   const ALL_DAY_COL_WIDTH = 120;
   const HOUR_COL_WIDTH = 180;
+
+  const BOTTOM_RADAR_HEIGHT = 26;
+  // ✅ increased to avoid overlap with the sticky bottom scrollbar + radar
+  const BOTTOM_SCROLL_SAFE_GAP = BOTTOM_RADAR_HEIGHT + 24 + 16;
 
   const LANE_WIDTH = 72;
   const LANE_GAP = 6;
   const LANE_HEIGHT = 18;
   const CENTERED_BAR_WIDTH = 60;
-
-  const MONTHS = [
-    { short: "Jan", long: "January", index: 0 },
-    { short: "Feb", long: "February", index: 1 },
-    { short: "Mar", long: "March", index: 2 },
-    { short: "Apr", long: "April", index: 3 },
-    { short: "May", long: "May", index: 4 },
-    { short: "Jun", long: "June", index: 5 },
-    { short: "Jul", long: "July", index: 6 },
-    { short: "Aug", long: "August", index: 7 },
-    { short: "Sep", long: "September", index: 8 },
-    { short: "Oct", long: "October", index: 9 },
-    { short: "Nov", long: "November", index: 10 },
-    { short: "Dec", long: "December", index: 11 },
-  ];
 
   let DEBUG = false;
   try {
@@ -288,7 +290,8 @@ export default function MonthView({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const monthDays = useMemo(
-    () => Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+    () =>
+      Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
     [year, month, daysInMonth]
   );
 
@@ -548,6 +551,9 @@ export default function MonthView({
   const rightHeaderScrollRef = useRef(null);
   const rightBodyScrollRef = useRef(null);
 
+  // ✅ NEW: sticky bottom scrollbar ref
+  const bottomHScrollRef = useRef(null);
+
   const dayRowRefs = useRef([]);
   const allDayRefs = useRef([]);
 
@@ -561,7 +567,6 @@ export default function MonthView({
   const heightSyncTimerRef = useRef(null);
   const cachedThRef = useRef(null);
   const lastTableWidthRef = useRef(0);
-  const idleHandleRef = useRef(null);
   const chunkTimerRef = useRef(null);
   const initialNowFocusDoneRef = useRef(false);
   const focusTodayAfterMonthJumpRef = useRef(false);
@@ -586,9 +591,15 @@ export default function MonthView({
       const th = headerThs[hourIdx];
       if (th) {
         const fraction = (now.getMinutes() + now.getSeconds() / 60) / 60;
-        const nextLeft = th.offsetLeft + fraction * (th.offsetWidth || HOUR_COL_WIDTH) - hScroll.clientWidth / 2;
+        const nextLeft =
+          th.offsetLeft +
+          fraction * (th.offsetWidth || HOUR_COL_WIDTH) -
+          hScroll.clientWidth / 2;
         hScroll.scrollLeft = Math.max(0, nextLeft);
       }
+
+      // ✅ keep bottom scrollbar in sync too
+      if (bottomHScrollRef.current) bottomHScrollRef.current.scrollLeft = hScroll.scrollLeft;
 
       return true;
     } catch (_) {
@@ -600,21 +611,58 @@ export default function MonthView({
     setHighlightTodayPulse((v) => v + 1);
   };
 
-  // ✅ Sync horizontal scroll: body -> header
+  // ✅ FULL SYNC: body <-> header + body <-> sticky bottom scrollbar
   useEffect(() => {
     const body = rightBodyScrollRef.current;
     const head = rightHeaderScrollRef.current;
-    if (!body || !head) return;
+    const bottom = bottomHScrollRef.current;
+    if (!body || !head || !bottom) return;
 
-    const onScroll = () => {
-      head.scrollLeft = body.scrollLeft;
+    let lock = false;
+
+    const syncAllTo = (left) => {
+      head.scrollLeft = left;
+      body.scrollLeft = left;
+      bottom.scrollLeft = left;
     };
-    body.addEventListener("scroll", onScroll, { passive: true });
+
+    const onBodyScroll = () => {
+      if (lock) return;
+      lock = true;
+      head.scrollLeft = body.scrollLeft;
+      bottom.scrollLeft = body.scrollLeft;
+      lock = false;
+    };
+
+    const onBottomScroll = () => {
+      if (lock) return;
+      lock = true;
+      body.scrollLeft = bottom.scrollLeft;
+      head.scrollLeft = bottom.scrollLeft;
+      lock = false;
+    };
+
+    // if user drags header (trackpad), keep others in sync too
+    const onHeadScroll = () => {
+      if (lock) return;
+      lock = true;
+      body.scrollLeft = head.scrollLeft;
+      bottom.scrollLeft = head.scrollLeft;
+      lock = false;
+    };
+
+    body.addEventListener("scroll", onBodyScroll, { passive: true });
+    bottom.addEventListener("scroll", onBottomScroll, { passive: true });
+    head.addEventListener("scroll", onHeadScroll, { passive: true });
 
     // initial sync
-    head.scrollLeft = body.scrollLeft;
+    syncAllTo(body.scrollLeft || 0);
 
-    return () => body.removeEventListener("scroll", onScroll);
+    return () => {
+      body.removeEventListener("scroll", onBodyScroll);
+      bottom.removeEventListener("scroll", onBottomScroll);
+      head.removeEventListener("scroll", onHeadScroll);
+    };
   }, []);
 
   // All-day overlay metrics (left side)
@@ -644,7 +692,7 @@ export default function MonthView({
     setOverlayMetrics({ colLeft, colWidth, rows });
   }, [year, month, daysInMonth, todos]);
 
-  // --- ENSURE LEFT + RIGHT ROW HEIGHTS MATCH (your original logic kept) ---
+  // --- ENSURE LEFT + RIGHT ROW HEIGHTS MATCH ---
   const syncRowHeights = () => {
     const leftRows = document.querySelectorAll(".mv-left-row");
     const rightRows = document.querySelectorAll(".mv-right-row");
@@ -788,9 +836,14 @@ export default function MonthView({
       const th = headerThs[hourIdx];
       if (th) {
         const fraction = (now.getMinutes() + now.getSeconds() / 60) / 60;
-        const nextLeft = th.offsetLeft + fraction * (th.offsetWidth || HOUR_COL_WIDTH) - hScroll.clientWidth / 2;
+        const nextLeft =
+          th.offsetLeft +
+          fraction * (th.offsetWidth || HOUR_COL_WIDTH) -
+          hScroll.clientWidth / 2;
         hScroll.scrollLeft = Math.max(0, nextLeft);
       }
+
+      if (bottomHScrollRef.current) bottomHScrollRef.current.scrollLeft = hScroll.scrollLeft;
 
       initialNowFocusDoneRef.current = true;
       triggerTodayHighlight();
@@ -822,7 +875,7 @@ export default function MonthView({
     return () => clearTimeout(timer);
   }, [month, year, HOUR_COL_WIDTH]);
 
-  // ✅ Build timed event overlays (kept from your version but anchored to BODY wrapper)
+  // ✅ Build timed event overlays (anchored to BODY wrapper)
   useEffect(() => {
     const bodyWrap = rightBodyScrollRef.current;
     const table = tableRef.current;
@@ -929,7 +982,6 @@ export default function MonthView({
       }
     };
 
-    // kick
     processBatch(0);
 
     const onResize = () => {
@@ -941,8 +993,6 @@ export default function MonthView({
 
     window.addEventListener("resize", onResize);
     const onBodyScroll = () => {
-      // overlays need vertical recalculation only when vertical scroll changes
-      // horizontal scroll is handled by being inside the horizontal scroller wrapper
       scheduleSyncHeights(80);
       setTimeout(() => processBatch(0), 0);
     };
@@ -1041,7 +1091,7 @@ export default function MonthView({
     };
   }, [month, year, HOUR_SLOTS]);
 
-  // today blink overlay (kept minimal)
+  // today blink overlay
   useEffect(() => {
     if (!highlightTodayPulse) return;
     if (year !== today.getFullYear() || month !== today.getMonth()) return;
@@ -1051,9 +1101,7 @@ export default function MonthView({
     const bodyWrap = rightBodyScrollRef.current;
     const table = tableRef.current;
 
-    if (!el || !bodyWrap || !table) {
-      return;
-    }
+    if (!el || !bodyWrap || !table) return;
 
     const wrapRect = bodyWrap.getBoundingClientRect();
     const rowRect = el.getBoundingClientRect();
@@ -1068,11 +1116,26 @@ export default function MonthView({
     });
 
     const t = setTimeout(() => setRowOverlay(null), 450 * 4 + 100);
-
     return () => clearTimeout(t);
   }, [highlightTodayPulse, year, month]);
 
   const [showViewMenu, setShowViewMenu] = useState(false);
+
+  const rightTableMinWidth = Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH);
+
+  const shiftMonthFromNav = (delta) => {
+    if (!onShiftDate) return;
+
+    const vScroll = rightVScrollRef.current;
+    if (vScroll) vScroll.scrollTop = 0;
+
+    onShiftDate(delta);
+
+    requestAnimationFrame(() => {
+      const nextVScroll = rightVScrollRef.current;
+      if (nextVScroll) nextVScroll.scrollTop = 0;
+    });
+  };
 
   return (
     <>
@@ -1087,6 +1150,21 @@ export default function MonthView({
         .today-row-overlay { animation: blinkRow 0.45s linear 4; background-clip: padding-box; border-radius: 4px; }
         .mv-hide-scrollbar::-webkit-scrollbar { height: 0px; }
         .mv-hide-scrollbar { scrollbar-width: none; }
+
+        /* ✅ hide internal horizontal scrollbar (body + header) */
+        .mv-hide-xscrollbar::-webkit-scrollbar { height: 0px; }
+        .mv-hide-xscrollbar { scrollbar-width: none; }
+
+        /* ✅ hover to show ONLY the sticky bottom scrollbar */
+        .mv-bottom-hscroll {
+          opacity: 0;
+          transition: opacity 120ms ease;
+          pointer-events: none;
+        }
+        .mv-vscroll:hover .mv-bottom-hscroll {
+          opacity: 1;
+          pointer-events: auto;
+        }
       `}</style>
 
       {/* Header */}
@@ -1096,7 +1174,7 @@ export default function MonthView({
             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
             style={{ minWidth: 36, minHeight: 36 }}
             aria-label="Previous month"
-            onClick={() => onShiftDate && onShiftDate(-1)}
+            onClick={() => shiftMonthFromNav(-1)}
           >
             <FaChevronLeft />
           </button>
@@ -1113,7 +1191,9 @@ export default function MonthView({
               <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                 {view && view.charAt(0).toUpperCase() + view.slice(1)}
               </span>
-              <FaChevronDown className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`} />
+              <FaChevronDown
+                className={`${showViewMenu ? "rotate-180" : "rotate-0"} transition-transform`}
+              />
             </button>
 
             {showViewMenu && (
@@ -1127,7 +1207,9 @@ export default function MonthView({
                     role="menuitemradio"
                     aria-checked={view === v}
                     className={`w-full text-left px-3 py-2 text-sm ${
-                      view === v ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-700 hover:bg-slate-50"
+                      view === v
+                        ? "bg-blue-50 text-blue-700 font-semibold"
+                        : "text-slate-700 hover:bg-slate-50"
                     }`}
                     onClick={() => {
                       onChangeView && onChangeView(v);
@@ -1144,9 +1226,11 @@ export default function MonthView({
 
         <h2 className="text-xl font-bold flex items-center gap-2">
           <img src={calendarSrc} alt="Calendar" style={{ width: 18, height: 18 }} />
-          {new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: userTimeZone }).format(
-            baseDate
-          )}
+          {new Intl.DateTimeFormat(undefined, {
+            month: "long",
+            year: "numeric",
+            timeZone: userTimeZone,
+          }).format(baseDate)}
           {prefsLoading && (
             <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
               Loading
@@ -1161,8 +1245,7 @@ export default function MonthView({
             aria-label="Today"
             onClick={() => {
               const now = new Date();
-              const monthDelta =
-                (now.getFullYear() - year) * 12 + (now.getMonth() - month);
+              const monthDelta = (now.getFullYear() - year) * 12 + (now.getMonth() - month);
 
               if (monthDelta !== 0 && onShiftDate) {
                 focusTodayAfterMonthJumpRef.current = true;
@@ -1180,7 +1263,7 @@ export default function MonthView({
             className="px-2 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-700 bg-white text-blue-900 border border-slate-300 shadow-sm hover:bg-slate-50 inline-flex items-center"
             style={{ minWidth: 36, minHeight: 36 }}
             aria-label="Next month"
-            onClick={() => onShiftDate && onShiftDate(1)}
+            onClick={() => shiftMonthFromNav(1)}
           >
             <FaChevronRight />
           </button>
@@ -1190,17 +1273,24 @@ export default function MonthView({
       {/* BODY: vertical scroll container */}
       <div
         ref={rightVScrollRef}
-        className="relative"
+        className="relative mv-vscroll"
         style={{
           height: 600,
           overflowY: "auto",
           overflowX: "hidden",
+          paddingBottom: BOTTOM_SCROLL_SAFE_GAP,
           maxWidth: "100vw",
           position: "relative",
           scrollBehavior: "smooth",
         }}
       >
-        <div className="flex" style={{ position: "relative" }}>
+        <div
+          className="flex"
+          style={{
+            position: "relative",
+            paddingBottom: BOTTOM_RADAR_HEIGHT,
+          }}
+        >
           {/* LEFT TABLE: Date + All-Day (sticky) */}
           <div
             ref={gridRef}
@@ -1353,19 +1443,19 @@ export default function MonthView({
             )}
           </div>
 
-          {/* ✅ RIGHT SIDE: separate sticky header scroller + body scroller */}
+          {/* RIGHT SIDE: sticky header + body scroller */}
           <div
             className="flex-1"
             style={{
               flex: 1,
               position: "relative",
-              minWidth: 0, // ✅ critical for overflowX in flex children
+              minWidth: 0,
             }}
           >
             {/* Sticky header (scrolls horizontally, stays sticky vertically) */}
             <div
               ref={rightHeaderScrollRef}
-              className="mv-hide-scrollbar"
+              className="mv-hide-scrollbar mv-hide-xscrollbar"
               style={{
                 position: "sticky",
                 top: 0,
@@ -1383,7 +1473,7 @@ export default function MonthView({
                 style={{
                   borderCollapse: "separate",
                   borderSpacing: 0,
-                  minWidth: Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH),
+                  minWidth: rightTableMinWidth,
                   tableLayout: "fixed",
                 }}
               >
@@ -1424,27 +1514,24 @@ export default function MonthView({
             {/* Body horizontal scroller */}
             <div
               ref={rightBodyScrollRef}
+              className="mv-hide-xscrollbar"
               style={{
                 overflowX: "auto",
                 overflowY: "hidden",
+                marginBottom: 8,
                 width: "100%",
                 minWidth: 0,
               }}
             >
-              {/* This wrapper makes overlays scroll with horizontal scroll */}
-              <div
-                style={{
-                  position: "relative",
-                  minWidth: Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH),
-                }}
-              >
+              {/* wrapper makes overlays scroll with horizontal scroll */}
+              <div style={{ position: "relative", minWidth: rightTableMinWidth }}>
                 <table
                   ref={tableRef}
                   className="border border-gray-200 rounded-r-lg"
                   style={{
                     borderCollapse: "separate",
                     borderSpacing: 0,
-                    minWidth: Math.max(800, HOUR_SLOTS.length * HOUR_COL_WIDTH),
+                    minWidth: rightTableMinWidth,
                     tableLayout: "fixed",
                   }}
                 >
@@ -1469,13 +1556,6 @@ export default function MonthView({
                             } catch {
                               isWorking = true;
                             }
-
-                            const hh = (h || "").split(":")[0];
-                            const hourKey = `${hh.padStart(2, "0")}:00`;
-                            const halfKey = `${hh.padStart(2, "0")}:30`;
-                            const evs00 = appointmentsByDaySlot[dayKey]?.[hourKey] || [];
-                            const evs30 = appointmentsByDaySlot[dayKey]?.[halfKey] || [];
-                            const evs = [...evs00, ...evs30];
 
                             return (
                               <td
@@ -1546,7 +1626,7 @@ export default function MonthView({
                   </tbody>
                 </table>
 
-                {/* Red line for current time (inside horizontal scroller wrapper) */}
+                {/* Red line */}
                 <div
                   ref={redLineRef}
                   aria-hidden="true"
@@ -1564,7 +1644,7 @@ export default function MonthView({
                   }}
                 />
 
-                {/* Timed event overlays (inside horizontal scroller wrapper) */}
+                {/* Timed event overlays */}
                 {eventOverlays.length > 0 && (
                   <div
                     aria-hidden
@@ -1614,6 +1694,33 @@ export default function MonthView({
           </div>
         </div>
 
+        {/* ✅ Sticky bottom REAL scrollbar (visible on hover) */}
+        <div
+          className="mv-bottom-hscroll"
+          style={{
+            position: "sticky",
+            bottom: BOTTOM_RADAR_HEIGHT, // sits just above radar
+            left: 0,
+            right: 0,
+            zIndex: 330,
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(2px)",
+            borderTop: "1px solid rgba(226,232,240,0.8)",
+          }}
+        >
+          <div
+            ref={bottomHScrollRef}
+            style={{
+              overflowX: "auto",
+              overflowY: "hidden",
+              width: "100%",
+              height: 14,
+            }}
+          >
+            <div style={{ width: rightTableMinWidth, height: 1 }} />
+          </div>
+        </div>
+
         {/* Bottom horizontal scroll radar */}
         <div
           className="pointer-events-none"
@@ -1627,7 +1734,7 @@ export default function MonthView({
         >
           <div
             style={{
-              height: 26,
+              height: BOTTOM_RADAR_HEIGHT,
               background:
                 "linear-gradient(to right, rgba(59,130,246,0.15), rgba(59,130,246,0.05) 20%, rgba(59,130,246,0.05) 80%, rgba(59,130,246,0.15))",
               borderTop: "1px solid rgba(226,232,240,0.8)",
