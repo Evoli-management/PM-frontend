@@ -37,6 +37,7 @@ const TaskRow = ({
   onRowClick,
   disableOpen = false,
   visibleColumns = null,
+  rowClassName = "",
 }) => {
   const { formatDate } = useFormattedDate();
   const vc = visibleColumns ?? {
@@ -77,11 +78,11 @@ const TaskRow = ({
   
   return (
     <tr
-      className="border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors"
+      className={`border-t border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors ${rowClassName}`.trim()}
       onMouseEnter={onMouseEnter}
       onClick={() => onRowClick && onRowClick(t)}
     >
-      <td className="px-3 py-2 align-top">
+      <td className="px-3 py-2 align-top w-12">
         <div className="relative inline-flex items-center gap-2">
           <input
             type="checkbox"
@@ -147,7 +148,7 @@ const TaskRow = ({
           </div>
         </div>
       </td>
-      <td className={`px-3 py-2 align-top`}>
+      <td className="px-3 py-2 align-top w-[240px] overflow-hidden">
         <div className="flex items-start gap-2">
           {(() => {
             const lvl = getPriorityLevel ? getPriorityLevel(t.priority) : 2;
@@ -214,7 +215,7 @@ const TaskRow = ({
         </div>
       </td>
       {vc.responsible && (
-        <td className="px-3 py-2 align-top text-slate-800">
+        <td className="px-3 py-2 align-top text-slate-800 w-[140px]">
           {enableInlineEditing ? (
           <select
             className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm w-20"
@@ -240,7 +241,7 @@ const TaskRow = ({
           )}
         </td>
       )}
-      <td className="px-3 py-2 align-top">
+      <td className="px-3 py-2 align-top w-[120px]">
         <div className="flex items-center gap-2">
           <StatusIndicator status={t.status || "open"} />
           <div>
@@ -258,7 +259,7 @@ const TaskRow = ({
         </div>
       </td>
       {vc.priority && (
-        <td className="px-3 py-2 align-top">
+        <td className="px-3 py-2 align-top w-[100px]">
           {enableInlineEditing ? (
             <select
               className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm"
@@ -297,7 +298,7 @@ const TaskRow = ({
         </td>
       )}
       {vc.quadrant && (
-        <td className="px-3 py-2 align-top">
+        <td className="px-3 py-2 align-top w-[90px]">
         {(() => {
           let qn = 4;
           if (typeof q === 'number') qn = Number(q) || 4;
@@ -312,7 +313,7 @@ const TaskRow = ({
       )}
       {/* Goal and Tags columns removed per UX request */}
       {vc.start_date && (
-        <td className="px-3 py-2 align-top text-slate-800">
+        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
         {enableInlineEditing ? (
           <div className="relative inline-block">
             <button
@@ -355,7 +356,7 @@ const TaskRow = ({
         </td>
       )}
       {vc.end_date && (
-        <td className="px-3 py-2 align-top text-slate-800">
+        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
         {enableInlineEditing ? (
           <div className="relative inline-block">
             <button
@@ -398,7 +399,7 @@ const TaskRow = ({
         </td>
       )}
       {vc.deadline && (
-        <td className="px-3 py-2 align-top text-slate-800">
+        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
         {enableInlineEditing ? (
           <div className="relative inline-block">
             <button
@@ -441,10 +442,10 @@ const TaskRow = ({
         </td>
       )}
       {vc.duration && (
-        <td className="px-3 py-2 align-top text-slate-800">{formatDuration(t.start_date || t.deadline, t.end_date)}</td>
+        <td className="px-3 py-2 align-top text-slate-800 w-[90px]">{formatDuration(t.start_date || t.deadline, t.end_date)}</td>
       )}
       {vc.completed && (
-        <td className="px-3 py-2 align-top text-slate-800">
+        <td className="px-3 py-2 align-top text-slate-800 w-[120px]">
           {(t.completionDate || t.completion_date) ? <span>{formatDate(t.completionDate || t.completion_date)}</span> : <span className="text-slate-500">—</span>}
         </td>
       )}

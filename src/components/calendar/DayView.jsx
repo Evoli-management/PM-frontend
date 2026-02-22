@@ -1271,7 +1271,7 @@ export default function DayView({
                         // Use events prop (merged events+appointments from container) when present,
                         // otherwise fall back to locally loaded `sideAppointments`.
                         const source = (Array.isArray(events) && events.length) ? events : sideAppointments;
-                        return (Array.isArray(source) ? source : []).map((appt, idx) => {
+                        const parsed = (Array.isArray(source) ? source : []).map((appt, idx) => {
                         // robust date parsing
                         const parseDate = (s) => {
                           if (!s) return null;
@@ -1292,6 +1292,39 @@ export default function DayView({
                         const apptEndMins = end.getHours() * 60 + end.getMinutes() + end.getSeconds() / 60;
                         if (apptEndMins <= startMinutes || apptStartMins >= startMinutes + totalMinutes) return null;
 
+                        return {
+                          appt,
+                          originalIndex: idx,
+                          createdAt: parseDate(appt.createdAt || appt.created_at),
+                          start,
+                          end,
+                          apptStartMins,
+                          apptEndMins,
+                        };
+                        }).filter(Boolean);
+
+                        // Stable ordering for concurrent layout:
+                        // 1) earlier start on the left
+                        // 2) for same start, earlier created appointment on the left
+                        // 3) fallback to original source order
+                        const compareForLane = (a, b) => {
+                          const byStart = a.start.getTime() - b.start.getTime();
+                          if (byStart !== 0) return byStart;
+                          const aCreated = a.createdAt ? a.createdAt.getTime() : Number.POSITIVE_INFINITY;
+                          const bCreated = b.createdAt ? b.createdAt.getTime() : Number.POSITIVE_INFINITY;
+                          const byCreated = aCreated - bCreated;
+                          if (byCreated !== 0) return byCreated;
+                          return a.originalIndex - b.originalIndex;
+                        };
+                        const sorted = parsed.sort(compareForLane);
+
+                        const isOverlapping = (a, b) => {
+                          return a.start.getTime() < b.end.getTime() && a.end.getTime() > b.start.getTime();
+                        };
+
+                        return sorted.map((item) => {
+                        const { appt, start, end, apptStartMins, apptEndMins, originalIndex } = item;
+
                         const topPx = Math.max(0, ((apptStartMins - startMinutes) / 60) * HOUR_HEIGHT);
                         const durationMins = Math.max(15, (apptEndMins - apptStartMins));
                         const heightPx = Math.max(18, (durationMins / 60) * HOUR_HEIGHT);
@@ -1308,15 +1341,41 @@ export default function DayView({
                         const DEFAULT_BAR_COLOR = '#4DC3D8';
                         const finalBg = bgClass ? null : (kaColor || DEFAULT_BAR_COLOR);
                         const textColor = finalBg ? getContrastTextColor(finalBg) : '#ffffff';
-                        const style = bgClass ? undefined : { top: topPx + 'px', height: heightPx + 'px', left: '6px', right: '8px', backgroundColor: finalBg, borderColor: finalBg, color: textColor };
+
+                        const laneAwareStyle = (() => {
+                          const concurrent = sorted.filter((other) => isOverlapping(item, other));
+                          const visualColumns = Math.min(3, Math.max(1, concurrent.length));
+                          const laneIndex = Math.max(0, concurrent.findIndex((other) => other === item));
+                          const visualLane = visualColumns <= 1 ? 0 : laneIndex % visualColumns;
+                          if (visualColumns <= 1) {
+                            return { left: '6px', right: '8px' };
+                          }
+                          const widthPct = 100 / visualColumns;
+                          const leftPct = visualLane * widthPct;
+                          return {
+                            left: `calc(${leftPct}% + 4px)`,
+                            width: `calc(${widthPct}% - 8px)`,
+                          };
+                        })();
+
+                        const style = bgClass
+                          ? undefined
+                          : {
+                              top: topPx + 'px',
+                              height: heightPx + 'px',
+                              ...laneAwareStyle,
+                              backgroundColor: finalBg,
+                              borderColor: finalBg,
+                              color: textColor,
+                            };
 
                         const title = appt.title || appt.name || appt.summary || appt.text || 'Appointment';
 
                         return (
                           <div
-                            key={`appt-${idx}-${title}`}
+                            key={`appt-${appt.id || originalIndex}-${title}`}
                             className={`absolute rounded px-2 py-1 text-xs overflow-hidden flex items-center gap-2 group ${bgClass || ''}`}
-                            style={bgClass ? { top: topPx + 'px', height: heightPx + 'px', left: '6px', right: '8px', zIndex: 5 } : { ...style, zIndex: 5 }}
+                            style={bgClass ? { top: topPx + 'px', height: heightPx + 'px', ...laneAwareStyle, zIndex: 5 } : { ...style, zIndex: 5 }}
                             draggable
                             onDragStart={(e) => {
                               try {
@@ -1333,6 +1392,50 @@ export default function DayView({
                                 if (justResizedRef && justResizedRef.current) return;
                               } catch (__) {}
                               onEventClick && onEventClick(appt);
+                            }}
+                            onDragOver={(e) => {
+                              try {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+                              } catch (_) {}
+                            }}
+                            onDrop={(e) => {
+                              try {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const data = e.dataTransfer;
+                                const eventId = data.getData("eventId");
+                                const taskId = data.getData("taskId");
+                                const activityId = data.getData("activityId");
+                                const durationMs = parseInt(data.getData("durationMs") || "0", 10);
+                                const base = currentDate || new Date();
+                                const dt = new Date(
+                                  base.getFullYear(),
+                                  base.getMonth(),
+                                  base.getDate(),
+                                  start.getHours(),
+                                  start.getMinutes(),
+                                  0,
+                                  0
+                                );
+                                if (eventId && typeof onEventMove === "function") {
+                                  const newEnd = durationMs > 0 ? new Date(dt.getTime() + durationMs) : null;
+                                  onEventMove(eventId, dt, newEnd);
+                                  return;
+                                }
+                                if (taskId && typeof onTaskDrop === "function") {
+                                  const taskText = data.getData("taskText");
+                                  const dropEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
+                                  onTaskDrop(taskId, dt, dropEffect, taskText);
+                                  return;
+                                }
+                                if (activityId && typeof onActivityDrop === "function") {
+                                  const activityText = data.getData("activityText");
+                                  const dropEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
+                                  onActivityDrop(activityId, dt, dropEffect, activityText);
+                                }
+                              } catch (_) {}
                             }}
                             title={title}
                           >

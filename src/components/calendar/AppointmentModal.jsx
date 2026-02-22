@@ -628,28 +628,6 @@ const buildRecurringPattern = ({
                 }
             }
 
-            // Client-side pre-check for overlapping appointments to avoid
-            // an immediate 400 and provide a friendlier inline message.
-            try {
-                const fromISO = new Date(s.getTime() - 1 * 60 * 1000).toISOString();
-                const toISO = new Date(e.getTime() + 1 * 60 * 1000).toISOString();
-                const existing = await calendarService.listAppointments({ from: fromISO, to: toISO });
-                const conflict = (Array.isArray(existing) ? existing : []).find((row) => {
-                    try {
-                        const rs = new Date(row.start).getTime();
-                        const re = new Date(row.end).getTime();
-                        return rs < e.getTime() && re > s.getTime();
-                    } catch { return false; }
-                });
-                if (conflict) {
-                    setClientConflict(conflict);
-                    addToast({ title: 'Time conflict', description: `Conflicts with "${conflict.title || 'appointment'}" ${conflict.start ? 'at ' + new Date(conflict.start).toLocaleString() : ''}`, variant: 'error' });
-                    return;
-                }
-            } catch (__) {
-                // If pre-check fails for any reason, proceed to attempt save and let server validate.
-            }
-
             setSaving(true);
 
             const timezone =

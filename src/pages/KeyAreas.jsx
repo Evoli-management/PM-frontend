@@ -3273,8 +3273,8 @@ export default function KeyAreas() {
     };
 
     return (
-        <div className="min-h-screen bg-[#EDEDED]">
-            <div className="flex w-full min-h-screen">
+        <div className="h-[calc(100vh-72px)] bg-[#EDEDED] overflow-hidden">
+            <div className="flex w-full h-full min-h-0">
                 <Sidebar
                     user={{ name: "User" }}
                     mobileOpen={mobileSidebarOpen}
@@ -3346,7 +3346,7 @@ export default function KeyAreas() {
                         isSaving={isSavingActivity}
                     />
                 )}
-                <main className="flex-1 min-w-0 w-full min-h-screen transition-all overflow-y-auto">
+                <main className="flex-1 min-w-0 w-full h-full min-h-0 transition-all overflow-hidden">
                     {/* Main View Tabs (legacy pattern - at top like legacy UI) */}
                     <div className="md:hidden">
                         <ViewTabsNavigation 
@@ -3609,8 +3609,8 @@ export default function KeyAreas() {
                                     taskPanel={
                                     <div className="flex flex-col h-full bg-white">
                                         {/* Task Panel Content */}
-                                        <div className="flex-1 overflow-y-auto px-3 py-3">
-                                            <div className="space-y-6">
+                                        <div className="flex-1 min-h-0 overflow-hidden px-3 py-3">
+                                            <div className="space-y-6 flex flex-col h-full min-h-0">
                                 <div className="bg-white border border-blue-200 rounded-lg shadow-sm p-3 space-y-6">
                                         {/* Header Row: Task Lists Label + Mass Edit Control */}
                                         <div className="flex items-center justify-between border-b pb-2">
@@ -3842,7 +3842,7 @@ export default function KeyAreas() {
                                         </div>
 
                                         {/* Bottom Row: Tasks Display (full width) */}
-                                        <div ref={tasksDisplayRef}>
+                                        <div ref={tasksDisplayRef} className="flex flex-col min-h-0">
                                             {view === "list" ? (
                                                 sortedTasks.length === 0 ? (
                                                     <EmptyState
@@ -3850,11 +3850,11 @@ export default function KeyAreas() {
                                                         hint="Use the 'Add Task' button below to create your first task."
                                                     />
                                                 ) : (
-                                                    <div className="overflow-x-auto">
-                                                        <table className="min-w-full text-sm">
-                                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700">
-                                                                <tr>
-                                                                    <th className="px-3 py-2 text-left w-8">
+                                                    <div className="flex-1 min-h-0 overflow-x-auto">
+                                                        <table className="min-w-[1400px] w-full text-sm table-fixed">
+                                                            <thead className="bg-slate-50 border border-slate-200 text-slate-700 block">
+                                                                <tr className="table w-full table-fixed">
+                                                                    <th className="px-3 py-2 text-left w-12">
                                                                         <input
                                                                             type="checkbox"
                                                                             aria-label="Select all visible"
@@ -3868,28 +3868,28 @@ export default function KeyAreas() {
                                                                         />
                                                                     </th>
                                                                     <th 
-                                                                        className="px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                                        className="px-3 py-2 text-left font-semibold w-[240px] cursor-pointer hover:bg-slate-100"
                                                                         onClick={() => handleTaskSort('title')}
                                                                     >
                                                                         Task {taskSortField === 'title' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.responsible && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[140px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('responsible')}
                                                                         >
                                                                             Responsible {taskSortField === 'responsible' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                         </th>
                                                                     )}
                                                                     <th 
-                                                                        className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                        className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                         onClick={() => handleTaskSort('status')}
                                                                     >
                                                                         Status {taskSortField === 'status' && (taskSortDirection === 'asc' ? '↑' : '↓')}
                                                                     </th>
                                                                     {visibleColumns.priority && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[100px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('priority')}
                                                                         >
                                                                             Priority {taskSortField === 'priority' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3897,7 +3897,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.quadrant && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('quadrant')}
                                                                         >
                                                                             Quadrant {taskSortField === 'quadrant' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3906,7 +3906,7 @@ export default function KeyAreas() {
                                                                     {/* Goal and Tags columns removed per UX request */}
                                                                     {visibleColumns.start_date && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('start_date')}
                                                                         >
                                                                             Start Date {taskSortField === 'start_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3914,7 +3914,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.end_date && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('end_date')}
                                                                         >
                                                                             End date {taskSortField === 'end_date' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3922,7 +3922,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.deadline && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('deadline')}
                                                                         >
                                                                             Deadline {taskSortField === 'deadline' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3930,7 +3930,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.duration && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[90px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('duration')}
                                                                         >
                                                                             Duration {taskSortField === 'duration' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3938,7 +3938,7 @@ export default function KeyAreas() {
                                                                     )}
                                                                     {visibleColumns.completed && (
                                                                         <th 
-                                                                            className="px-3 py-2 text-left font-semibold cursor-pointer hover:bg-slate-100"
+                                                                            className="px-3 py-2 text-left font-semibold w-[120px] cursor-pointer hover:bg-slate-100"
                                                                             onClick={() => handleTaskSort('completed')}
                                                                         >
                                                                             Completed {taskSortField === 'completed' && (taskSortDirection === 'asc' ? '↑' : '↓')}
@@ -3947,7 +3947,7 @@ export default function KeyAreas() {
                                                                     {/* Actions column removed — actions available via row menu */}
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="bg-white">
+                                                            <tbody className="bg-white block max-h-[calc(100vh-520px)] overflow-y-auto overflow-x-hidden">
                                                                 {sortedTasks.map((t) => {
                                                                     const q = computeEisenhowerQuadrant({
                                                                         deadline: t.deadline,
@@ -4045,9 +4045,10 @@ export default function KeyAreas() {
                                                                                     console.log('Task clicked:', task);
                                                                                     setSelectedTaskInPanel(task);
                                                                                 }}
+                                                                                rowClassName="table w-full table-fixed"
                                                                             />
                                                                             {expandedActivityRows.has(t.id) && (
-                                                                                <tr className="bg-slate-50">
+                                                                                <tr className="bg-slate-50 table w-full table-fixed">
                                                                                     <td className="px-3 py-2" />
                                                                                     <td colSpan={14} className="px-0 py-2">
                                                                                         <div className="ml-6 pl-6 border-l-2 border-slate-200">
@@ -4102,7 +4103,7 @@ export default function KeyAreas() {
                                     </div>
                                         
                                     {/* Add Task Footer */}
-                                    <div className="flex justify-end pr-10 pt-3">
+                                    <div className="flex justify-end pr-10 pt-2 pb-2 bg-white border-t border-slate-100">
                                             <button
                                                 type="button"
                                                 onClick={() => {

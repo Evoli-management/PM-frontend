@@ -326,8 +326,16 @@ const CalendarContainer = () => {
                     calendarService.listAppointments({ from: fromISO, to: toISO }),
                 ]);
                 
-                // Merge events and appointments
-                const allEvents = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
+                // Merge events and appointments (listEvents already includes appointments in backend).
+                // Keep merge for compatibility, but dedupe to avoid duplicate bars at the same time.
+                const allEventsRaw = [...(Array.isArray(evs) ? evs : []), ...(Array.isArray(appointments) ? appointments : [])];
+                const seenEvents = new Set();
+                const allEvents = allEventsRaw.filter((ev) => {
+                    const key = `${ev?.kind || ''}|${ev?.id || ''}|${ev?.start || ''}|${ev?.end || ''}`;
+                    if (seenEvents.has(key)) return false;
+                    seenEvents.add(key);
+                    return true;
+                });
                 // Attach human-friendly labels converted from UTC -> user's timezone
                 try {
                     // Use the synchronous wrapper; preloadTzLib is called at app startup so this will work.

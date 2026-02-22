@@ -1249,26 +1249,44 @@ const WeekView = ({
 
                           {/* overlays (appointments) */}
                           {days.map((date, dIdx) => {
-                            return (events || [])
-                              .filter((ev) => {
-                                try {
-                                  const s = ev.start ? new Date(ev.start) : null;
-                                  if (!s) return false;
-                                  return (
-                                    s.getFullYear() === date.getFullYear() &&
-                                    s.getMonth() === date.getMonth() &&
-                                    s.getDate() === date.getDate() &&
-                                    !ev.taskId
-                                  );
-                                } catch {
-                                  return false;
-                                }
-                              })
+                            const parseDate = (value) => {
+                              try {
+                                if (!value) return null;
+                                const dt = new Date(value);
+                                return isNaN(dt.getTime()) ? null : dt;
+                              } catch {
+                                return null;
+                              }
+                            };
+
+                            const compareForLane = (a, b) => {
+                              const byStart = a.start.getTime() - b.start.getTime();
+                              if (byStart !== 0) return byStart;
+                              const aCreated = a.createdAt ? a.createdAt.getTime() : Number.POSITIVE_INFINITY;
+                              const bCreated = b.createdAt ? b.createdAt.getTime() : Number.POSITIVE_INFINITY;
+                              const byCreated = aCreated - bCreated;
+                              if (byCreated !== 0) return byCreated;
+                              return a.originalIndex - b.originalIndex;
+                            };
+
+                            const isOverlapping = (a, b) => {
+                              return a.start.getTime() < b.end.getTime() && a.end.getTime() > b.start.getTime();
+                            };
+
+                            const dayEvents = (events || [])
                               .map((ev, i) => {
                                 try {
-                                  const evStart = ev.start ? new Date(ev.start) : null;
-                                  const evEnd = ev.end ? new Date(ev.end) : null;
+                                  const evStart = parseDate(ev.start);
+                                  const evEnd = parseDate(ev.end);
                                   if (!evStart) return null;
+                                  if (
+                                    evStart.getFullYear() !== date.getFullYear() ||
+                                    evStart.getMonth() !== date.getMonth() ||
+                                    evStart.getDate() !== date.getDate() ||
+                                    ev.taskId
+                                  ) {
+                                    return null;
+                                  }
 
                                   const evStartMins =
                                     evStart.getHours() * 60 + evStart.getMinutes() + evStart.getSeconds() / 60;
@@ -1276,12 +1294,44 @@ const WeekView = ({
                                     ? evEnd.getHours() * 60 + evEnd.getMinutes() + evEnd.getSeconds() / 60
                                     : evStartMins + slotSize / 60;
 
+                                  return {
+                                    ev,
+                                    start: evStart,
+                                    end: evEnd || new Date(evStart.getTime() + Math.max(slotSize, 15) * 60000),
+                                    startMins: evStartMins,
+                                    endMins: evEndMins,
+                                    createdAt: parseDate(ev.createdAt || ev.created_at),
+                                    originalIndex: i,
+                                  };
+                                } catch {
+                                  return null;
+                                }
+                              })
+                              .filter(Boolean)
+                              .sort(compareForLane);
+
+                            return dayEvents.map((entry, i) => {
+                                try {
+                                  const { ev, start: evStart, end: evEnd, startMins: evStartMins, endMins: evEndMins } = entry;
+
                                   const topPx = (evStartMins - startMinutes) * pxPerMinute;
                                   const durationMins = Math.max(15, evEndMins - evStartMins);
                                   const heightPx = Math.max(18, durationMins * pxPerMinute);
 
-                                  const leftPx = TIME_COL_PX + dIdx * colW + 6;
-                                  const widthPx = Math.max(40, colW - 12);
+                                  const concurrent = dayEvents.filter((other) => isOverlapping(entry, other));
+                                  const visualColumns = Math.min(3, Math.max(1, concurrent.length));
+                                  const laneIndex = Math.max(0, concurrent.findIndex((other) => other === entry));
+                                  const visualLane = visualColumns <= 1 ? 0 : laneIndex % visualColumns;
+
+                                  const dayInnerLeft = TIME_COL_PX + dIdx * colW + 6;
+                                  const dayInnerWidth = Math.max(40, colW - 12);
+                                  const colWidth = dayInnerWidth / visualColumns;
+                                  const leftPx = visualColumns <= 1
+                                    ? dayInnerLeft
+                                    : dayInnerLeft + visualLane * colWidth + 2;
+                                  const widthPx = visualColumns <= 1
+                                    ? dayInnerWidth
+                                    : Math.max(24, colWidth - 4);
 
                                   const kindClass = categories[ev.kind]?.color || null;
                                   const isResizingThis = resizing && String(resizing.id) === String(ev.id);
@@ -1300,10 +1350,11 @@ const WeekView = ({
                                       }}
                                     >
                                       <div
-                                        className={`rounded px-2 py-1 text-xs overflow-hidden flex items-center gap-2 group ${
+                                        className={`rounded px-1.5 py-1 text-xs overflow-hidden group ${
                                           kindClass || "bg-gray-200"
                                         }`}
                                         style={{ height: "100%", cursor: "pointer" }}
+                                        title={ev.title || "Appointment"}
                                         draggable
                                         onDragStart={(e) => {
                                           try {
@@ -1321,40 +1372,158 @@ const WeekView = ({
                                           } catch {}
                                           onEventClick && onEventClick(ev);
                                         }}
+                                        onDragOver={(e) => {
+                                          try {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.dataTransfer.dropEffect = "copy";
+                                            console.log("[WeekView] Appointment bar drag-over detected");
+                                          } catch (err) {
+                                            console.error("[WeekView] Drag-over error", err);
+                                          }
+                                        }}
+                                        onDrop={(e) => {
+                                          try {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const data = e.dataTransfer;
+                                            const eventId = data.getData("eventId");
+                                            const taskId = data.getData("taskId");
+                                            const activityId = data.getData("activityId");
+                                            const durationMs = parseInt(data.getData("durationMs") || "0", 10);
+                                            
+                                            console.log("[WeekView] Drop on appointment bar detected", {
+                                              eventId,
+                                              taskId,
+                                              activityId,
+                                              dropEffect: e.dataTransfer.dropEffect,
+                                              dragEffect: data.getData("dragEffect"),
+                                              effectAllowed: data.effectAllowed,
+                                            });
+                                            
+                                            const dt = new Date(
+                                              date.getFullYear(),
+                                              date.getMonth(),
+                                              date.getDate(),
+                                              evStart.getHours(),
+                                              evStart.getMinutes(),
+                                              0,
+                                              0
+                                            );
+
+                                            if (eventId && typeof onEventMove === "function") {
+                                              console.log("[WeekView] Moving appointment to", dt);
+                                              const newEnd = durationMs > 0 ? new Date(dt.getTime() + durationMs) : null;
+                                              onEventMove(eventId, dt, newEnd);
+                                              return;
+                                            }
+                                            if (taskId && typeof onTaskDrop === "function") {
+                                              const taskText = data.getData("taskText");
+                                              const rawEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
+                                              const dropEffect = rawEffect && rawEffect !== "none" ? rawEffect : "copy";
+                                              console.log("[WeekView] Creating appointment from task drop", {
+                                                taskId,
+                                                taskText,
+                                                dropEffect,
+                                                dt,
+                                              });
+                                              onTaskDrop(taskId, dt, dropEffect, taskText);
+                                              return;
+                                            }
+                                            if (activityId && typeof onActivityDrop === "function") {
+                                              const activityText = data.getData("activityText");
+                                              const rawEffect = data.getData("dragEffect") || data.dropEffect || data.effectAllowed || "copy";
+                                              const dropEffect = rawEffect && rawEffect !== "none" ? rawEffect : "copy";
+                                              console.log("[WeekView] Creating appointment from activity drop", {
+                                                activityId,
+                                                activityText,
+                                                dropEffect,
+                                                dt,
+                                              });
+                                              onActivityDrop(activityId, dt, dropEffect, activityText);
+                                            }
+                                          } catch (err) {
+                                            console.error("[WeekView] Drop handler error", err);
+                                          }
+                                        }}
                                       >
-                                        <span className="shrink-0">{categories[ev.kind]?.icon || ""}</span>
-                                        <span className="truncate whitespace-nowrap text-xs min-w-0 flex-1" tabIndex={0} aria-label={ev.title}>
-                                          {ev.title}
-                                        </span>
-                                        <div className="hidden group-hover:flex items-center gap-1 ml-2">
-                                          <button
-                                            className="p-1 rounded hover:bg-black/10 transition-colors"
-                                            onClick={(e) => {
-                                              try {
-                                                e.stopPropagation();
-                                              } catch {}
-                                              onEventClick && onEventClick(ev, "edit");
-                                            }}
-                                            aria-label={`Edit ${ev.title}`}
-                                            title="Edit appointment"
-                                          >
-                                            <FaEdit className="w-3 h-3 text-blue-600" />
-                                          </button>
-                                          <button
-                                            className="p-1 rounded hover:bg-black/10 transition-colors"
-                                            onClick={(e) => {
-                                              try {
-                                                e.stopPropagation();
-                                              } catch {}
-                                              if (typeof onDeleteRequest === "function") return onDeleteRequest(ev, e);
-                                              onEventClick && onEventClick(ev, "delete");
-                                            }}
-                                            aria-label={`Delete ${ev.title}`}
-                                            title="Delete appointment"
-                                          >
-                                            <FaTrash className="w-3 h-3 text-red-600" />
-                                          </button>
-                                        </div>
+                                        {concurrent.length > 1 && heightPx < 40 ? (
+                                          // Concurrent small bar: truncated text with icons below
+                                          <div className="h-full flex flex-col items-start justify-between gap-0.5 w-full">
+                                            <div className="flex items-start gap-1 min-w-0 w-full">
+                                              <span className="shrink-0 text-[9px]">{categories[ev.kind]?.icon || "📌"}</span>
+                                              <span className="text-[9px] font-medium leading-tight truncate" tabIndex={0} aria-label={ev.title}>
+                                                {ev.title}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button
+                                                className="p-0 rounded hover:bg-black/10 transition-colors flex-shrink-0"
+                                                onClick={(e) => {
+                                                  try {
+                                                    e.stopPropagation();
+                                                  } catch {}
+                                                  onEventClick && onEventClick(ev, "edit");
+                                                }}
+                                                aria-label={`Edit ${ev.title}`}
+                                                title="Edit appointment"
+                                              >
+                                                <FaEdit className="w-2 h-2 text-blue-600" />
+                                              </button>
+                                              <button
+                                                className="p-0 rounded hover:bg-black/10 transition-colors flex-shrink-0"
+                                                onClick={(e) => {
+                                                  try {
+                                                    e.stopPropagation();
+                                                  } catch {}
+                                                  if (typeof onDeleteRequest === "function") return onDeleteRequest(ev, e);
+                                                  onEventClick && onEventClick(ev, "delete");
+                                                }}
+                                                aria-label={`Delete ${ev.title}`}
+                                                title="Delete appointment"
+                                              >
+                                                <FaTrash className="w-2 h-2 text-red-600" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          // Non-concurrent or larger bar: inline icons
+                                          <div className="h-full flex items-center gap-1 w-full min-w-0">
+                                            <span className="shrink-0">{categories[ev.kind]?.icon || "📌"}</span>
+                                            <span className="truncate whitespace-nowrap text-[11px] min-w-0 flex-1 leading-4 font-medium" tabIndex={0} aria-label={ev.title}>
+                                              {ev.title}
+                                            </span>
+                                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button
+                                                className="p-0.5 rounded hover:bg-black/10 transition-colors"
+                                                onClick={(e) => {
+                                                  try {
+                                                    e.stopPropagation();
+                                                  } catch {}
+                                                  onEventClick && onEventClick(ev, "edit");
+                                                }}
+                                                aria-label={`Edit ${ev.title}`}
+                                                title="Edit appointment"
+                                              >
+                                                <FaEdit className="w-2.5 h-2.5 text-blue-600" />
+                                              </button>
+                                              <button
+                                                className="p-0.5 rounded hover:bg-black/10 transition-colors"
+                                                onClick={(e) => {
+                                                  try {
+                                                    e.stopPropagation();
+                                                  } catch {}
+                                                  if (typeof onDeleteRequest === "function") return onDeleteRequest(ev, e);
+                                                  onEventClick && onEventClick(ev, "delete");
+                                                }}
+                                                aria-label={`Delete ${ev.title}`}
+                                                title="Delete appointment"
+                                              >
+                                                <FaTrash className="w-2.5 h-2.5 text-red-600" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
 
                                       <div
@@ -1752,8 +1921,16 @@ const WeekView = ({
                                   try {
                                     e.dataTransfer.setData("taskId", String(t.id));
                                     e.dataTransfer.setData("text/plain", String(t.title || t.name || "Task"));
+                                    e.dataTransfer.setData("taskText", String(t.title || t.name || "Task"));
+                                    e.dataTransfer.setData("dragEffect", "copy");
                                     e.dataTransfer.effectAllowed = "copy";
-                                  } catch {}
+                                    console.log("[WeekView] Task drag started", {
+                                      taskId: t.id,
+                                      taskTitle: t.title || t.name,
+                                    });
+                                  } catch (err) {
+                                    console.error("[WeekView] Task drag start error", err);
+                                  }
                                 }}
                                 className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 shrink-0 min-h-[28px] ${
                                   bgClass || ""
@@ -1833,8 +2010,15 @@ const WeekView = ({
                                   e.dataTransfer.setData("activityId", String(a.id || ""));
                                   e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
                                   e.dataTransfer.setData("text/plain", String(a.text || a.title || "Activity"));
+                                  e.dataTransfer.setData("dragEffect", "copy");
                                   e.dataTransfer.effectAllowed = "copy";
-                                } catch {}
+                                  console.log("[WeekView] Activity drag started", {
+                                    activityId: a.id,
+                                    activityText: a.text || a.title,
+                                  });
+                                } catch (err) {
+                                  console.error("[WeekView] Activity drag start error", err);
+                                }
                               }}
                               className={`group px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 shrink-0 min-h-[28px] ${
                                 bgClass || ""
