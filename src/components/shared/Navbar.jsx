@@ -733,14 +733,17 @@ export default function Navbar() {
                     </div>
                 )}
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
-                    {/* Show Imported toggle: only on DontForget page */}
-                    {location.pathname === '/dontforget' && (
+                    {/* Show Imported toggle: only on Don't Forget page */}
+                    {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
                         <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
                             <input
                                 id="show-imported-toggle"
                                 type="checkbox"
-                                checked={typeof showImported !== 'undefined' ? showImported : true}
-                                onChange={() => typeof setShowImported === 'function' && setShowImported((s) => !s)}
+                                checked={window.pmDontForgetShowImported !== false}
+                                onChange={() => {
+                                    window.pmDontForgetShowImported = !window.pmDontForgetShowImported;
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: window.pmDontForgetShowImported } }));
+                                }}
                                 className="accent-blue-600 mr-1"
                             />
                             <label htmlFor="show-imported-toggle" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
