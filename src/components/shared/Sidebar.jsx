@@ -337,7 +337,7 @@ export default function Sidebar({
             className={`bg-white ${collapsed ? "w-20" : "w-64"} shadow-sm border border-gray-200 border-t-0 flex flex-col justify-between px-2 transition-transform duration-300 rounded-none overflow-hidden ${mobileTranslate} fixed top-16 left-0 z-40 md:fixed md:top-16 md:left-0 md:translate-x-0 layout-panel-gap-right h-[calc(100vh-64px)]`}
             aria-label="Sidebar"
         >
-            <div className="flex-1 overflow-y-visible pb-2">
+            <div className="flex-1 overflow-hidden pb-2">
                 <div className="mb-6 flex items-center gap-2 px-2">
                     <div className="ml-auto flex items-center gap-2">
                         {mobileOpen && (
@@ -446,7 +446,7 @@ export default function Sidebar({
                                                 </button>
 
                                                 {!collapsed && keyAreasOpen && (
-                                                    <div className="ml-6 mt-2 space-y-1">
+                                                    <div className="ml-6 mt-2 space-y-1 max-h-48 overflow-y-auto pr-1">
                                                         {displayKeyAreas &&
                                                             displayKeyAreas.length > 0 &&
                                                             displayKeyAreas.map((ka, index) => {
