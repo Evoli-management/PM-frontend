@@ -733,22 +733,29 @@ export default function Navbar() {
                     </div>
                 )}
                 <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
-                    {/* Show Imported toggle: only on Don't Forget page */}
+                    {/* Imported Tasks tab group: only on Don't Forget page */}
                     {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
-                        <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
-                            <input
-                                id="show-imported-toggle"
-                                type="checkbox"
-                                checked={window.pmDontForgetShowImported !== false}
-                                onChange={() => {
-                                    window.pmDontForgetShowImported = !window.pmDontForgetShowImported;
-                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: window.pmDontForgetShowImported } }));
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.pmDontForgetShowImported = false;
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: false } }));
                                 }}
-                                className="accent-blue-600 mr-1"
-                            />
-                            <label htmlFor="show-imported-toggle" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
-                                Show Imported
-                            </label>
+                                className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === false ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                ALL TASKS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.pmDontForgetShowImported = true;
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: true } }));
+                                }}
+                                className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === true ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                IMPORTED TASKS
+                            </button>
                         </div>
                     )}
                     <div className="relative">
