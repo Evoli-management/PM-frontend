@@ -732,34 +732,34 @@ export default function Navbar() {
                         </div>
                     </div>
                 )}
-                <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
-                    {/* Imported Tasks tab group: only on Don't Forget page */}
-                    {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        window.pmDontForgetShowImported = false;
-                                        window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: false } }));
-                                    }}
-                                    className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === false ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
-                                >
-                                    ALL TASKS
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        window.pmDontForgetShowImported = true;
-                                        window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: true } }));
-                                    }}
-                                    className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === true ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
-                                >
-                                    IMPORTED TASKS
-                                </button>
-                            </div>
+                {/* Imported Tasks tab group: only on Don't Forget page */}
+                {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.pmDontForgetShowImported = false;
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: false } }));
+                                }}
+                                className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === false ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                ALL TASKS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.pmDontForgetShowImported = true;
+                                    window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: true } }));
+                                }}
+                                className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === true ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                IMPORTED TASKS
+                            </button>
                         </div>
-                    )}
+                    </div>
+                )}
+                <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     <div className="relative">
                         <button
                             className="text-black hover:text-gray-700 px-1 py-0.5 rounded-full"
