@@ -2028,7 +2028,9 @@ export default function DontForget() {
                                                 {dontForgetTasks.length === 0 && (
                                                     <tr>
                                                         <td className="px-6 py-8 text-gray-500" colSpan={12}>
-                                                            {`This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
+                                                            {showImportedOnly
+                                                                ? "No Imported tasks currently..."
+                                                                : `This list has no tasks yet. Click "Add Task" to create one for ${getDfListName(selectedDfList)}.`}
                                                         </td>
                                                     </tr>
                                                 )}
