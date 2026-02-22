@@ -668,8 +668,7 @@ export default function DontForget() {
 
     // Which DF tasks are visible in the list (filtered by selected DF list)
     // showImported is now controlled by Navbar; listen for its state via window event or context
-    // showImported is controlled by Navbar; default to undefined and only set via event
-    const [showImported, setShowImported] = useState();
+    const [showImported, setShowImported] = useState(true);
     useEffect(() => {
         // Listen for imported filter state from Navbar
         const handler = (e) => {
