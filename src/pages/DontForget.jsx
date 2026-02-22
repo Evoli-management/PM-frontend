@@ -393,7 +393,15 @@ export default function DontForget() {
 
     // UI state
     const [selectedIds, setSelectedIds] = useState(new Set());
+    // Legacy-style imported filter: show only imported tasks if true, else all
+    const [showImportedOnly, setShowImportedOnly] = useState(false);
+    // For backward compatibility, keep showImported as always true (for now)
     const [showImported, setShowImported] = useState(true);
+    // Expose setter for Navbar tab group
+    useEffect(() => {
+        window.setDontForgetShowImported = setShowImportedOnly;
+        return () => { delete window.setDontForgetShowImported; };
+    }, []);
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
@@ -671,19 +679,19 @@ export default function DontForget() {
         () => {
             let arr = (tasks || []).filter((t) => {
                 if (t.keyArea) return false;
-                if (!(showImported || !t.imported)) return false;
+                // Legacy-style imported filter: show only imported if tab active, else all
+                if (showImportedOnly && !t.imported) return false;
+                if (!showImportedOnly && !(showImported || !t.imported)) return false;
                 if (!(showCompleted || !t.completed)) return false;
                 // Only include tasks that belong to the selected DF list
                 const idx = Number(t.listIndex ?? t.list_index ?? 1);
                 if (selectedDfList && Number(selectedDfList) !== Number(idx)) return false;
                 return true;
             });
-            
             // Apply sorting if a sort field is selected
             if (dfSortField && dfSortDirection) {
                 arr.sort((a, b) => {
                     let aVal, bVal;
-                    
                     switch (dfSortField) {
                         case 'title':
                             aVal = (a.title || a.name || '').toLowerCase();
