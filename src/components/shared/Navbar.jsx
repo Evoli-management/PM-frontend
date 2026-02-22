@@ -741,6 +741,7 @@ export default function Navbar() {
                                 onClick={() => {
                                     window.pmDontForgetShowImported = false;
                                     window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: false } }));
+                                    if (typeof window.setDontForgetShowImported === 'function') window.setDontForgetShowImported(false);
                                 }}
                                 className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === false ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
@@ -751,6 +752,7 @@ export default function Navbar() {
                                 onClick={() => {
                                     window.pmDontForgetShowImported = true;
                                     window.dispatchEvent(new CustomEvent('pm-dontforget-toggle-imported', { detail: { value: true } }));
+                                    if (typeof window.setDontForgetShowImported === 'function') window.setDontForgetShowImported(true);
                                 }}
                                 className={`px-2 py-2 rounded transition ${window.pmDontForgetShowImported === true ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
                             >
