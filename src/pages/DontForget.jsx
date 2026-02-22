@@ -1629,6 +1629,7 @@ export default function DontForget() {
                                                 onChange={(e) => setSiteSearch(e.target.value)}
                                             />
                                         </div>
+                                        {/* ...existing code... */}
                                         <button
                                             type="button"
                                             onClick={() => navigate('/my-focus')}
@@ -1884,7 +1885,7 @@ export default function DontForget() {
                                                             />
                                                         </th>
                                                         <th 
-                                                            className="px-2 sm:px-3 py-2 text-left font-semibold w-[160px] sm:w-[220px] cursor-pointer hover:bg-slate-100"
+                                                            className="px-2 sm:px-3 py-2 text-left font-semibold w-40 sm:w-[220px] cursor-pointer hover:bg-slate-100"
                                                             onClick={() => handleDfSort('title')}
                                                         >
                                                             Task {dfSortField === 'title' && (dfSortDirection === 'asc' ? '↑' : '↓')}
