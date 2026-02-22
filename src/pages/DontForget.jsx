@@ -393,7 +393,7 @@ export default function DontForget() {
 
     // UI state
     const [selectedIds, setSelectedIds] = useState(new Set());
-    // showImported is now controlled by Navbar; remove local toggle
+    const [showImported, setShowImported] = useState(true);
     const [savingIds, setSavingIds] = useState(new Set());
     const [dfName, setDfName] = useState("");
     const [showComposer, setShowComposer] = useState(false);
@@ -667,16 +667,6 @@ export default function DontForget() {
     });
 
     // Which DF tasks are visible in the list (filtered by selected DF list)
-    // showImported is now controlled by Navbar; listen for its state via window event or context
-    const [showImported, setShowImported] = useState(true);
-    useEffect(() => {
-        // Listen for imported filter state from Navbar
-        const handler = (e) => {
-            if (e && typeof e.detail === 'boolean') setShowImported(e.detail);
-        };
-        window.addEventListener('imported-filter-changed', handler);
-        return () => window.removeEventListener('imported-filter-changed', handler);
-    }, []);
     const dontForgetTasks = useMemo(
         () => {
             let arr = (tasks || []).filter((t) => {
@@ -688,10 +678,12 @@ export default function DontForget() {
                 if (selectedDfList && Number(selectedDfList) !== Number(idx)) return false;
                 return true;
             });
-            // ...existing code...
+            
+            // Apply sorting if a sort field is selected
             if (dfSortField && dfSortDirection) {
                 arr.sort((a, b) => {
                     let aVal, bVal;
+                    
                     switch (dfSortField) {
                         case 'title':
                             aVal = (a.title || a.name || '').toLowerCase();
@@ -742,10 +734,12 @@ export default function DontForget() {
                         default:
                             return 0;
                     }
+                    
                     // Handle empty values
                     if (!aVal && !bVal) return 0;
                     if (!aVal) return 1;
                     if (!bVal) return -1;
+                    
                     // Compare values
                     let comparison = 0;
                     if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -753,9 +747,11 @@ export default function DontForget() {
                     } else {
                         comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
                     }
+                    
                     return dfSortDirection === 'asc' ? comparison : -comparison;
                 });
             }
+            
             return arr;
         },
         [tasks, showImported, showCompleted, selectedDfList, dfSortField, dfSortDirection],

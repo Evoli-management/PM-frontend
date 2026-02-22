@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -534,34 +535,15 @@ export default function Navbar() {
         return params.get('tab') || 'give';
     })();
 
-    // Add state for imported filter tab group
-    const showDontForgetTabs = location.pathname.startsWith('/tasks') && location.search.includes('dontforget=1');
-    const [showImported, setShowImported] = useState(() => {
-        try {
-            const raw = window.localStorage.getItem('dontforget.showImported');
-            if (raw !== null) return raw === 'true';
-        } catch (e) {}
-        return true;
-    });
-    useEffect(() => {
-        try {
-            window.localStorage.setItem('dontforget.showImported', String(!!showImported));
-        } catch (e) {}
-        // Sync with DontForget page
-        if (showDontForgetTabs) {
-            window.dispatchEvent(new CustomEvent('dontforget-imported-toggle', { detail: { showImported } }));
-        }
-    }, [showImported, showDontForgetTabs]);
-
     return (
         <header
-            className="bg-gray-50 text-slate-800 z-100 border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
+            className="bg-gray-50 text-slate-800 z-[100] border-b border-gray-200 fixed top-0 left-0 right-0 h-16"
             // style={{
             //     background: 'linear-gradient(90deg, #dff7f9 0%, #a7eaf0 50%, #59d2df 100%)',
             // }}
         >
             <div className="w-full px-2 md:px-4 h-16 flex items-center gap-4">
-                    <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 shrink-0">
+                    <Link to="/dashboard" className="font-bold tracking-wide flex items-center gap-2 flex-shrink-0">
                         <img
                             src={`${import.meta.env.BASE_URL}logo.png`}
                             alt="Practical Manager"
@@ -750,29 +732,7 @@ export default function Navbar() {
                         </div>
                     </div>
                 )}
-                {showDontForgetTabs && !showKeyAreaTabs && !showTeamsTabs && !showGiveStrokesTabs && (
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto whitespace-nowrap navbar-keyarea-tabs">
-                            <button
-                                type="button"
-                                onClick={() => setShowImported(false)}
-                                className={`px-2 py-2 rounded transition ${!showImported ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-600 hover:text-slate-900'}`}
-                                aria-selected={!showImported}
-                            >
-                                ALL TASKS
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setShowImported(true)}
-                                className={`px-2 py-2 rounded transition ${showImported ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-600 hover:text-slate-900'}`}
-                                aria-selected={showImported}
-                            >
-                                IMPORTED
-                            </button>
-                        </div>
-                    </div>
-                )}
-                <div className="relative flex items-center gap-3 ml-auto shrink-0">
+                <div className="relative flex items-center gap-3 ml-auto flex-shrink-0">
                     {/* Show Imported toggle: only on Don't Forget page */}
                     {location.search.includes('dontforget=1') && location.pathname.startsWith('/tasks') && (
                         <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
@@ -816,7 +776,7 @@ export default function Navbar() {
 
                         {/* Inline compact search input and results */}
                         {openSearch && (
-                            <div ref={searchRef} className="absolute right-0 mt-2 w-80 z-220">
+                            <div ref={searchRef} className="absolute right-0 mt-2 w-80 z-[220]">
                                 <div className="bg-white rounded-md shadow-lg border border-gray-200 p-2">
                                     <div className="flex items-center gap-2">
                                         <input
@@ -872,7 +832,7 @@ export default function Navbar() {
                             </button>
 
                             {openWidgets && (
-                                <div className="absolute right-2 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-150 p-2">
+                                <div className="absolute right-2 mt-2 w-64 rounded-md bg-white text-slate-800 shadow-lg z-[150] p-2">
                                     <div className="px-2 py-1 text-xs text-slate-500 border-b flex items-center justify-between">
                                         <span>Widgets</span>
                                         <button
@@ -922,7 +882,7 @@ export default function Navbar() {
                         </button>
 
                         {openQuick && (
-                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-150">
+                            <div id="quick-actions-menu" role="menu" className="absolute right-20 mt-2 w-56 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
                                 <div className="px-3 py-2 text-xs text-slate-500 border-b">Quick Actions</div>
                                 <button
                                     role="menuitem"
@@ -1048,7 +1008,7 @@ export default function Navbar() {
                             </svg>
                         </button>
                         {open && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-150">
+                            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white text-slate-800 shadow-lg z-[150]">
                                 <Link
                                     to="/profile"
                                     className="block px-3 py-2 text-sm hover:bg-slate-50"
