@@ -78,6 +78,7 @@ const taskService = {
                     // support both camelCase and snake_case from server
                     list_index: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
                     listIndex: typeof t.listIndex !== 'undefined' ? t.listIndex : (typeof t.list_index !== 'undefined' ? t.list_index : null),
+                    imported: typeof t.imported === 'boolean' ? t.imported : !!t.imported,
                 };
             });
         } catch (e) {
