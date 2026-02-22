@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { FaChevronDown } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import QuarterView from "./QuarterView";
@@ -1520,6 +1520,13 @@ const CalendarContainer = () => {
         setCurrentDate(d);
     };
 
+    const handleChangeView = useCallback((nextView) => {
+        if (!VIEWS.includes(nextView)) return;
+        if (nextView === view) return;
+        setView(nextView);
+        setCurrentDate(new Date());
+    }, [view]);
+
     // Human-readable label for current range (day/week/month/quarter)
     const rangeLabel = (() => {
         const d = new Date(currentDate);
@@ -1673,7 +1680,7 @@ const CalendarContainer = () => {
                         onShiftDate={shiftDate}
                         onSetDate={setCurrentDate}
                         view={view}
-                        onChangeView={setView}
+                        onChangeView={handleChangeView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
@@ -1691,7 +1698,7 @@ const CalendarContainer = () => {
                         currentDate={currentDate}
                         onShiftDate={shiftDate}
                         view={view}
-                        onChangeView={setView}
+                        onChangeView={handleChangeView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}
@@ -1714,7 +1721,7 @@ const CalendarContainer = () => {
                         onQuickCreate={handleQuickCreate}
                         onAddTaskOrActivity={openAddModal}
                         view={view}
-                        onChangeView={setView}
+                        onChangeView={handleChangeView}
                             workWeek={workWeek}
                             setWorkWeek={setWorkWeek}
                         filterType={filterType}
@@ -1728,6 +1735,12 @@ const CalendarContainer = () => {
                         onEventClick={(ev, action) => (ev?.taskId ? openEditTask(ev.taskId) : openModal(ev, action))}
                         onDeleteRequest={(ev, mouseEvent) => handleDeleteRequest(ev, mouseEvent)}
                         onTaskClick={openEditTask}
+                        onTaskComplete={handleTaskComplete}
+                        onTaskEdit={openEditTask}
+                        onTaskDelete={handleTaskDelete}
+                        onActivityComplete={handleActivityComplete}
+                        onActivityEdit={openEditActivity}
+                        onActivityDelete={handleActivityDelete}
                         activities={weekActivities}
                     />
                     </div>
@@ -1741,7 +1754,7 @@ const CalendarContainer = () => {
                         onQuickCreate={handleQuickCreate}
                         onAddTaskOrActivity={openAddModal}
                         view={view}
-                        onChangeView={setView}
+                        onChangeView={handleChangeView}
                         filterType={filterType}
                         onChangeFilter={setFilterType}
                         events={events.filter((e) => filterType === "all" || e.kind === filterType)}

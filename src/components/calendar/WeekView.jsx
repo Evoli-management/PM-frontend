@@ -3,7 +3,7 @@ import { FixedSizeList } from "react-window";
 import AvailabilityBlock from "./AvailabilityBlock";
 import { useCalendarPreferences } from "../../hooks/useCalendarPreferences";
 import { generateTimeSlots } from "../../utils/timeUtils";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaCheck } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaBars } from "react-icons/fa";
 
 function getWeekNumber(date) {
@@ -37,6 +37,12 @@ const WeekView = ({
   activities = [],
   workWeek = false,
   setWorkWeek = () => {},
+  onTaskComplete = null,
+  onTaskEdit = null,
+  onTaskDelete = null,
+  onActivityComplete = null,
+  onActivityEdit = null,
+  onActivityDelete = null,
   // ✅ was referenced but not provided in your snippet; keep safe
   onDeleteRequest = null,
 }) => {
@@ -343,6 +349,8 @@ const WeekView = ({
   // Drag-and-drop handler
   const handleDrop = (e, day, slot) => {
     try {
+      e.preventDefault();
+      e.stopPropagation();
       const [h, m] = slot.split(":");
       const date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
       const eventId = e.dataTransfer.getData("eventId");
@@ -354,13 +362,17 @@ const WeekView = ({
       }
       const taskId = e.dataTransfer.getData("taskId");
       if (taskId) {
-        const dropEffect = e.dataTransfer.dropEffect || e.dataTransfer.effectAllowed || "";
+        const dropEffect = (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
+          ? e.dataTransfer.dropEffect
+          : (e.dataTransfer.effectAllowed || "copy");
         onTaskDrop && onTaskDrop(taskId, date, dropEffect);
         return;
       }
       const activityId = e.dataTransfer.getData("activityId");
       if (activityId) {
-        const dropEffect = e.dataTransfer.dropEffect || e.dataTransfer.effectAllowed || "";
+        const dropEffect = (e.dataTransfer.dropEffect && e.dataTransfer.dropEffect !== "none")
+          ? e.dataTransfer.dropEffect
+          : (e.dataTransfer.effectAllowed || "copy");
         onActivityDrop && onActivityDrop(activityId, date, dropEffect);
       }
     } catch (err) {
@@ -1479,7 +1491,11 @@ const WeekView = ({
                                 borderRightColor: "rgba(148, 163, 184, 0.3)",
                                 ...cellTopBorderStyle,
                               }}
-                              onDragOver={(e) => e.preventDefault()}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                try { e.dataTransfer.dropEffect = "copy"; } catch {}
+                              }}
                               onDrop={(e) => handleDrop(e, date, slot)}
                               onClick={(e) => {
                                 try { e.stopPropagation(); } catch {}
@@ -1523,7 +1539,7 @@ const WeekView = ({
                     top: colOverlay.top,
                     width: colOverlay.width,
                     height: colOverlay.height,
-                    zIndex: 80,
+                    zIndex: 8,
                     pointerEvents: "none",
                     backgroundColor: "rgba(59,130,246,0.32)",
                   }}
@@ -1541,7 +1557,7 @@ const WeekView = ({
                 height: 10,
                 cursor: "row-resize",
                 touchAction: "none",
-                zIndex: 9999,
+                zIndex: 2,
                 pointerEvents: "auto",
                 flex: "0 0 auto",
               }}
@@ -1735,17 +1751,55 @@ const WeekView = ({
                                 onDragStart={(e) => {
                                   try {
                                     e.dataTransfer.setData("taskId", String(t.id));
+                                    e.dataTransfer.setData("text/plain", String(t.title || t.name || "Task"));
                                     e.dataTransfer.effectAllowed = "copy";
                                   } catch {}
                                 }}
-                                onClick={() => onTaskClick && onTaskClick(String(t.id))}
-                                className={`px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 shrink-0 min-h-[28px] ${
+                                className={`group px-2 py-1 rounded border text-xs cursor-grab active:cursor-grabbing min-w-0 flex items-center gap-2 hover:opacity-90 shrink-0 min-h-[28px] ${
                                   bgClass || ""
                                 }`}
                                 style={style}
                                 title={t.title || t.name}
                               >
-                                <div className="truncate font-medium">{t.title || t.name}</div>
+                                <div className="truncate font-medium flex-1">{t.title || t.name}</div>
+                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {onTaskComplete && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onTaskComplete(t);
+                                      }}
+                                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                                      title="Mark complete"
+                                    >
+                                      <FaCheck className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  {onTaskEdit && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onTaskEdit(t);
+                                      }}
+                                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                                      title="Edit"
+                                    >
+                                      <FaEdit className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  {onTaskDelete && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onTaskDelete(t);
+                                      }}
+                                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                                      title="Delete"
+                                    >
+                                      <FaTrash className="w-3 h-3 text-red-600" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             );
                           }
@@ -1778,10 +1832,11 @@ const WeekView = ({
                                 try {
                                   e.dataTransfer.setData("activityId", String(a.id || ""));
                                   e.dataTransfer.setData("activityText", String(a.text || a.title || "Activity"));
-                                  e.dataTransfer.effectAllowed = "copyMove";
+                                  e.dataTransfer.setData("text/plain", String(a.text || a.title || "Activity"));
+                                  e.dataTransfer.effectAllowed = "copy";
                                 } catch {}
                               }}
-                              className={`px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 shrink-0 min-h-[28px] ${
+                              className={`group px-2 py-1 rounded border text-xs truncate w-full flex items-center gap-2 shrink-0 min-h-[28px] ${
                                 bgClass || ""
                               }`}
                               style={style}
@@ -1798,7 +1853,45 @@ const WeekView = ({
                               >
                                 <path d="M432 416H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-128H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"></path>
                               </svg>
-                              <div className="truncate font-medium">{a.text || a.title}</div>
+                              <div className="truncate font-medium flex-1">{a.text || a.title}</div>
+                              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {onActivityComplete && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onActivityComplete(a);
+                                    }}
+                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                    title="Mark complete"
+                                  >
+                                    <FaCheck className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {onActivityEdit && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onActivityEdit(a);
+                                    }}
+                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                    title="Edit"
+                                  >
+                                    <FaEdit className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {onActivityDelete && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onActivityDelete(a);
+                                    }}
+                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <FaTrash className="w-3 h-3 text-red-600" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
