@@ -839,10 +839,10 @@ const buildRecurringPattern = ({
 
     return (
         <div
-            className="fixed inset-0 z-50 grid place-items-center bg-black/40"
+            className="fixed inset-0 z-[9999] grid place-items-center bg-black/40"
         >
             <div
-                className="appointment-modal relative z-10 rounded-2xl bg-white ring-1 ring-black/5 flex flex-col overflow-hidden"
+                className="appointment-modal relative z-[10000] rounded-2xl bg-white ring-1 ring-black/5 flex flex-col overflow-hidden"
                 style={{ 
                     ["--assignee-accent"]: "#7c3aed",
                     transform: `translate(${position.x}px, ${position.y}px)`,
